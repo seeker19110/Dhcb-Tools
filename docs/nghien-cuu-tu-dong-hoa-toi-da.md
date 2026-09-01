@@ -1,5 +1,7 @@
 # Nghiên cứu khả năng tự động hoá cao nhất cho Revit
 
+> **Phạm vi đã chốt**: DHCB Tools chỉ triển khai trên Revit desktop — tức tối đa đến **Cấp 3 (batch máy trạm)**, có thể thêm Cấp 4 (HTTP/MCP bridge) nếu cần sau này. Cấp 5 (cloud DA4R) giữ lại trong tài liệu để tham khảo, không nằm trong kế hoạch.
+
 Tài liệu này xếp hạng các cấp độ tự động hoá Revit từ thấp đến cao nhất — đích đến là **chạy hoàn toàn không cần người, không cần mở Revit desktop** — kèm đánh giá công nghệ, chi phí và kiến trúc đề xuất cho DHCB Tools.
 
 ## 1. Thang cấp độ tự động hoá
@@ -62,10 +64,11 @@ DhcbTools.DA          # vỏ cloud: DesignAutomationBridge → gọi Core (AppBu
 
 Cùng một lệnh (ví dụ "audit + purge + export PDF") chạy được ở cả 4 vỏ. Đầu vào luôn là JSON config thay vì hộp thoại; đầu ra luôn là file report (JSON/Excel) — điều kiện bắt buộc để lên cloud sau này.
 
-## 4. Lộ trình tự động hoá
+## 4. Lộ trình tự động hoá (phạm vi desktop)
 
-1. **Ngay từ giai đoạn 1**: áp kiến trúc Core/vỏ ở trên; mọi lệnh nhận config JSON.
+1. **Ngay từ giai đoạn 1**: áp kiến trúc Core/vỏ ở trên; mọi lệnh nhận config JSON — vẫn giữ nguyên tắc này vì nó cũng là điều kiện để chạy batch không người ngồi máy.
 2. **Cấp 2**: thêm `IFailuresPreprocessor` dùng chung + IUpdater tự điền mã cấu kiện + checker chạy khi sync.
-3. **Cấp 3**: batch runner nội bộ (hoặc tích hợp RevitBatchProcessor) + Task Scheduler chạy đêm.
-4. **Cấp 5**: đăng ký APS, đóng gói `DhcbTools.Core` thành AppBundle DA4R, nối webhook ACC — đạt tự động hoá tối đa.
-5. **Cấp 4 (song song, tuỳ nhu cầu)**: HTTP/MCP bridge cho tích hợp AI và hệ thống nội bộ.
+3. **Cấp 3 (đích của dự án)**: batch runner nội bộ (hoặc tích hợp RevitBatchProcessor) + Task Scheduler chạy đêm — audit, purge, export PDF/DWG, health report cho toàn bộ danh sách file.
+4. **Cấp 4 (tuỳ chọn về sau)**: HTTP/MCP bridge cho tích hợp AI và hệ thống nội bộ.
+
+Cấp 5 (cloud) không triển khai; `DhcbTools.DA` trong sơ đồ kiến trúc chỉ là chỗ dành sẵn, không cần tạo.
