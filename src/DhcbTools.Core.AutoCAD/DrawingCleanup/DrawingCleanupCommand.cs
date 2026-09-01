@@ -1,10 +1,13 @@
 using Autodesk.AutoCAD.DatabaseServices;
+using DhcbTools.Shared.Logic;
 
 namespace DhcbTools.Core.AutoCAD.DrawingCleanup;
 
 /// <summary>
-/// Dọn dẹp drawing: xoá layer rỗng, purge block/linetype không dùng —
-/// tương đương RemoveUnusedViewsCommand của Revit.
+/// Dọn dẹp drawing: xoá layer rỗng, purge block/linetype không dùng — tương đương RemoveUnusedViewsCommand của Revit.
+/// Sửa lỗi #6 (mục 0.4): (1) linetype dùng bởi layer definition được coi là "đang dùng"; (2) không xoá layer hiện hành,
+/// layer "0"/"Defpoints", layer của xref, linetype hệ thống; (3) try/catch quanh từng item — một Erase() hỏng
+/// không làm hỏng cả transaction. Quyết định xoá đi qua <see cref="CleanupDecider"/> (đã test).
 /// </summary>
 public sealed class DrawingCleanupCommand : ICoreCommand<CleanupConfig>
 {
@@ -13,150 +16,142 @@ public sealed class DrawingCleanupCommand : ICoreCommand<CleanupConfig>
     public CommandResult Execute(Database database, CleanupConfig config)
     {
         var report = new List<string>();
-        var toDeleteLayers = new List<ObjectId>();
-        var toDeleteBlocks = new List<ObjectId>();
-        var toDeleteLinetypes = new List<ObjectId>();
+        var toDeleteLayers = new List<(ObjectId Id, string Name)>();
+        var toDeleteBlocks = new List<(ObjectId Id, string Name)>();
+        var toDeleteLinetypes = new List<(ObjectId Id, string Name)>();
 
         using var transaction = database.TransactionManager.StartTransaction();
 
-        // --- Tìm layer rỗng ---
+        var usedLayers = CollectUsedLayerNames(database, transaction);
+        var usedLinetypes = CollectUsedLinetypeIds(database, transaction);
+        var currentLayerName = database.Clayer.IsValid ? ((LayerTableRecord)transaction.GetObject(database.Clayer, OpenMode.ForRead)).Name : "0";
+
         if (config.RemoveEmptyLayers)
         {
-            var usedLayers = CollectUsedLayerNames(database, transaction);
-
             var layerTable = (LayerTable)transaction.GetObject(database.LayerTableId, OpenMode.ForRead);
             foreach (ObjectId layerId in layerTable)
             {
                 var layer = (LayerTableRecord)transaction.GetObject(layerId, OpenMode.ForRead);
+                var isCurrent = string.Equals(layer.Name, currentLayerName, StringComparison.OrdinalIgnoreCase) || layerId == database.Clayer;
+                var isUsed = usedLayers.Contains(layer.Name) || layer.IsDependent;
 
-                // Không xoá layer "0" và các layer được đặc biệt giữ lại
-                if (layer.Name == "0")
+                if (CleanupDecider.ShouldErase(layer.Name, isUsed, isCurrent, CleanupDecider.IsSystemLayer(layer.Name), config.KeepLayerNameContains))
                 {
-                    continue;
-                }
-
-                if (config.KeepLayerNameContains.Any(keep =>
-                        layer.Name.IndexOf(keep, StringComparison.OrdinalIgnoreCase) >= 0))
-                {
-                    continue;
-                }
-
-                if (!usedLayers.Contains(layer.Name))
-                {
-                    toDeleteLayers.Add(layerId);
+                    toDeleteLayers.Add((layerId, layer.Name));
                     report.Add($"Layer rỗng: \"{layer.Name}\"");
+                }
+                else if (isCurrent && !isUsed && !CleanupDecider.IsSystemLayer(layer.Name))
+                {
+                    report.Add($"Giữ layer hiện hành \"{layer.Name}\" dù rỗng.");
                 }
             }
         }
 
-        // --- Tìm block definition không dùng ---
         if (config.PurgeUnusedBlocks)
         {
             var blockTable = (BlockTable)transaction.GetObject(database.BlockTableId, OpenMode.ForRead);
             foreach (ObjectId blockId in blockTable)
             {
                 var block = (BlockTableRecord)transaction.GetObject(blockId, OpenMode.ForRead);
-
-                // Bỏ qua *Model_Space, *Paper_Space và anonymous block
-                if (block.IsLayout || block.IsAnonymous || block.Name.StartsWith("*"))
+                if (block.IsLayout || block.IsAnonymous || block.Name.StartsWith("*", StringComparison.Ordinal) || block.IsFromExternalReference || block.IsDependent)
                 {
                     continue;
                 }
 
-                if (!block.IsDynamicBlock && block.GetBlockReferenceIds(true, false).Count == 0)
+                var refs = block.GetBlockReferenceIds(true, false).Count;
+                var anonRefs = block.IsDynamicBlock ? block.GetAnonymousBlockIds().Count : 0;
+                if (refs == 0 && anonRefs == 0)
                 {
-                    toDeleteBlocks.Add(blockId);
+                    toDeleteBlocks.Add((blockId, block.Name));
                     report.Add($"Block không dùng: \"{block.Name}\"");
                 }
             }
         }
 
-        // --- Tìm linetype không dùng ---
         if (config.PurgeUnusedLinetypes)
         {
-            var reservedLinetypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "Continuous", "ByLayer", "ByBlock"
-            };
-
-            var usedLinetypes = CollectUsedLinetypeIds(database, transaction);
-
             var linetypeTable = (LinetypeTable)transaction.GetObject(database.LinetypeTableId, OpenMode.ForRead);
             foreach (ObjectId ltId in linetypeTable)
             {
                 var lt = (LinetypeTableRecord)transaction.GetObject(ltId, OpenMode.ForRead);
-                if (reservedLinetypes.Contains(lt.Name))
+                var isCurrent = ltId == database.Celtype;
+                var isUsed = usedLinetypes.Contains(ltId) || lt.IsDependent;
+                if (CleanupDecider.ShouldErase(lt.Name, isUsed, isCurrent, CleanupDecider.IsSystemLinetype(lt.Name)))
                 {
-                    continue;
-                }
-
-                if (!usedLinetypes.Contains(ltId))
-                {
-                    toDeleteLinetypes.Add(ltId);
+                    toDeleteLinetypes.Add((ltId, lt.Name));
                     report.Add($"Linetype không dùng: \"{lt.Name}\"");
                 }
             }
         }
 
         var totalToDelete = toDeleteLayers.Count + toDeleteBlocks.Count + toDeleteLinetypes.Count;
-
         if (totalToDelete == 0)
         {
-            transaction.Commit();
-            return CommandResult.Ok("Không có layer/block/linetype thừa cần dọn.");
+            transaction.Abort();
+            var none = CommandResult.Ok("Không có layer/block/linetype thừa cần dọn.");
+            none.Messages.AddRange(report);
+            return none;
         }
 
         if (config.DryRun)
         {
             transaction.Abort();
-            var preview = CommandResult.Ok(
-                $"[Xem trước] Sẽ xoá {totalToDelete} object (layer/block/linetype thừa).",
-                totalToDelete);
+            var preview = CommandResult.Ok($"[Xem trước] Sẽ xoá {totalToDelete} object (layer/block/linetype thừa).", totalToDelete);
             preview.Messages.AddRange(report);
             return preview;
         }
 
-        // Xoá thật
-        foreach (var id in toDeleteLayers)
-        {
-            var layer = (LayerTableRecord)transaction.GetObject(id, OpenMode.ForWrite);
-            layer.Erase();
-        }
-        foreach (var id in toDeleteBlocks)
-        {
-            var block = (BlockTableRecord)transaction.GetObject(id, OpenMode.ForWrite);
-            block.Erase();
-        }
-        foreach (var id in toDeleteLinetypes)
-        {
-            var lt = (LinetypeTableRecord)transaction.GetObject(id, OpenMode.ForWrite);
-            lt.Erase();
-        }
+        var result = CommandResult.Ok(string.Empty);
+        result.Messages.AddRange(report);
+        var deleted = 0;
+
+        // Block trước (giải phóng layer/linetype mà block đang giữ), rồi layer, rồi linetype.
+        deleted += EraseEach(transaction, toDeleteBlocks, "Block", result);
+        deleted += EraseEach(transaction, toDeleteLayers, "Layer", result);
+        deleted += EraseEach(transaction, toDeleteLinetypes, "Linetype", result);
 
         transaction.Commit();
-
-        var result = CommandResult.Ok(
-            $"Đã xoá {totalToDelete} object (layer/block/linetype thừa).",
-            totalToDelete);
-        result.Messages.AddRange(report);
+        result.Summary = $"Đã xoá {deleted}/{totalToDelete} object (layer/block/linetype thừa).";
+        result.AffectedCount = deleted;
         return result;
+    }
+
+    private static int EraseEach(Transaction tr, List<(ObjectId Id, string Name)> items, string kind, CommandResult result)
+    {
+        var count = 0;
+        foreach (var (id, name) in items)
+        {
+            try
+            {
+                var obj = tr.GetObject(id, OpenMode.ForWrite);
+                obj.Erase();
+                count++;
+            }
+            catch (Exception ex)
+            {
+                result.Messages.Add($"Không xoá được {kind} \"{name}\": {ex.Message}");
+            }
+        }
+        return count;
     }
 
     private static HashSet<string> CollectUsedLayerNames(Database database, Transaction transaction)
     {
         var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var blockTable = (BlockTable)transaction.GetObject(database.BlockTableId, OpenMode.ForRead);
-
         foreach (ObjectId blockId in blockTable)
         {
             var block = (BlockTableRecord)transaction.GetObject(blockId, OpenMode.ForRead);
             foreach (ObjectId entityId in block)
             {
-                var entity = (Entity)transaction.GetObject(entityId, OpenMode.ForRead);
-                used.Add(entity.Layer);
+                if (transaction.GetObject(entityId, OpenMode.ForRead) is Entity entity)
+                {
+                    used.Add(entity.Layer);
+                }
             }
         }
 
+        // Layer đang dùng bởi viewport freeze list hay layer state không tính là "rỗng" — giữ nguyên qua IsDependent ở trên.
         return used;
     }
 
@@ -164,20 +159,33 @@ public sealed class DrawingCleanupCommand : ICoreCommand<CleanupConfig>
     {
         var used = new HashSet<ObjectId>();
         var blockTable = (BlockTable)transaction.GetObject(database.BlockTableId, OpenMode.ForRead);
-
         foreach (ObjectId blockId in blockTable)
         {
             var block = (BlockTableRecord)transaction.GetObject(blockId, OpenMode.ForRead);
             foreach (ObjectId entityId in block)
             {
-                var entity = (Entity)transaction.GetObject(entityId, OpenMode.ForRead);
-                if (entity.LinetypeId.IsValid)
+                if (transaction.GetObject(entityId, OpenMode.ForRead) is Entity entity && entity.LinetypeId.IsValid)
                 {
                     used.Add(entity.LinetypeId);
                 }
             }
         }
 
+        // Lỗi #6: linetype chỉ được layer definition dùng cũng là "đang dùng".
+        var layerTable = (LayerTable)transaction.GetObject(database.LayerTableId, OpenMode.ForRead);
+        foreach (ObjectId layerId in layerTable)
+        {
+            var layer = (LayerTableRecord)transaction.GetObject(layerId, OpenMode.ForRead);
+            if (layer.LinetypeObjectId.IsValid)
+            {
+                used.Add(layer.LinetypeObjectId);
+            }
+        }
+
+        used.Add(database.Celtype);
+        used.Add(database.ContinuousLinetype);
+        used.Add(database.ByLayerLinetype);
+        used.Add(database.ByBlockLinetype);
         return used;
     }
 }
