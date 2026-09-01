@@ -1,4 +1,5 @@
 using Autodesk.AutoCAD.Runtime;
+using DhcbTools.AutoCAD.Bridge;
 
 [assembly: ExtensionApplication(typeof(DhcbTools.AutoCAD.App))]
 
@@ -6,11 +7,12 @@ namespace DhcbTools.AutoCAD;
 
 /// <summary>
 /// Entry point của DHCB AutoCAD Plugin.
-/// AutoCAD gọi Initialize() khi load DLL; Terminate() khi tắt.
-/// Lệnh được đăng ký qua [CommandMethod] trên các class Commands (không cần đăng ký thủ công).
+/// Initialize() khởi động HTTP Bridge (port 8766) để agent AI gửi lệnh trực tiếp.
 /// </summary>
 public sealed class App : IExtensionApplication
 {
+    private DhcbHttpBridge? _bridge;
+
     public void Initialize()
     {
         try
@@ -19,12 +21,26 @@ public sealed class App : IExtensionApplication
                 .MdiActiveDocument?.Editor;
 
             editor?.WriteMessage("\n[DHCB Tools] Đã tải DHCB AutoCAD Tools. Gõ DHCB để xem lệnh.\n");
+            editor?.WriteMessage($"[DHCB Tools] HTTP Bridge đang lắng nghe tại http://localhost:{DhcbHttpBridge.Port}/execute\n");
+
+            _bridge = new DhcbHttpBridge();
+            _bridge.Start();
         }
-        catch
+        catch (System.Exception ex)
         {
-            // Không block AutoCAD nếu lỗi khởi tạo.
+            try
+            {
+                Autodesk.AutoCAD.ApplicationServices.Core.Application.DocumentManager
+                    .MdiActiveDocument?.Editor
+                    .WriteMessage($"\n[DHCB Tools] Lỗi khởi động Bridge: {ex.Message}\n");
+            }
+            catch { }
         }
     }
 
-    public void Terminate() { }
+    public void Terminate()
+    {
+        _bridge?.Stop();
+        _bridge?.Dispose();
+    }
 }
