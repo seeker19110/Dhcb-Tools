@@ -62,13 +62,22 @@ namespace DhcbTools.Shared.Logic
             var expectedBytes = Encoding.UTF8.GetBytes(expected);
             var actualBytes = Encoding.UTF8.GetBytes(actual);
 
+            // Token rỗng không bao giờ hợp lệ — và cũng không có byte nào để so, nên chặn trước
+            // vòng lặp thay vì lấy dư chỉ số trên mảng rỗng.
+            if (expectedBytes.Length == 0 || actualBytes.Length == 0)
+            {
+                return false;
+            }
+
             var diff = expectedBytes.Length ^ actualBytes.Length;
             for (var i = 0; i < expectedBytes.Length; i++)
             {
-                diff |= expectedBytes[i] ^ actualBytes[i % Math.Max(actualBytes.Length, 1)];
+                // Lấy dư chỉ số để số vòng lặp chỉ phụ thuộc độ dài token đúng, không phụ thuộc
+                // token client gửi lên — giữ thời gian so sánh không rò rỉ độ dài.
+                diff |= expectedBytes[i] ^ actualBytes[i % actualBytes.Length];
             }
 
-            return diff == 0 && expectedBytes.Length > 0;
+            return diff == 0;
         }
 
         /// <summary>
