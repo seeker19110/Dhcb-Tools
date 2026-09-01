@@ -15,6 +15,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DhcbTools.Shared.Logic", "s
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DhcbTools.Shared.Logic.Tests", "tests\DhcbTools.Shared.Logic.Tests\DhcbTools.Shared.Logic.Tests.csproj", "{A1B2C3D4-0006-4A2B-8C3D-1E2F3A4B5C6D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DhcbTools.Shared.Hosting", "src\DhcbTools.Shared.Hosting\DhcbTools.Shared.Hosting.csproj", "{A1B2C3D4-0007-4A2B-8C3D-1E2F3A4B5C6D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DhcbTools.BatchRunner", "src\DhcbTools.BatchRunner\DhcbTools.BatchRunner.csproj", "{A1B2C3D4-0008-4A2B-8C3D-1E2F3A4B5C6D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -45,6 +49,14 @@ Global
 		{A1B2C3D4-0006-4A2B-8C3D-1E2F3A4B5C6D}.Debug|x64.Build.0 = Debug|Any CPU
 		{A1B2C3D4-0006-4A2B-8C3D-1E2F3A4B5C6D}.Release|x64.ActiveCfg = Release|Any CPU
 		{A1B2C3D4-0006-4A2B-8C3D-1E2F3A4B5C6D}.Release|x64.Build.0 = Release|Any CPU
+		{A1B2C3D4-0007-4A2B-8C3D-1E2F3A4B5C6D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A1B2C3D4-0007-4A2B-8C3D-1E2F3A4B5C6D}.Debug|x64.Build.0 = Debug|Any CPU
+		{A1B2C3D4-0007-4A2B-8C3D-1E2F3A4B5C6D}.Release|x64.ActiveCfg = Release|Any CPU
+		{A1B2C3D4-0007-4A2B-8C3D-1E2F3A4B5C6D}.Release|x64.Build.0 = Release|Any CPU
+		{A1B2C3D4-0008-4A2B-8C3D-1E2F3A4B5C6D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A1B2C3D4-0008-4A2B-8C3D-1E2F3A4B5C6D}.Debug|x64.Build.0 = Debug|Any CPU
+		{A1B2C3D4-0008-4A2B-8C3D-1E2F3A4B5C6D}.Release|x64.ActiveCfg = Release|Any CPU
+		{A1B2C3D4-0008-4A2B-8C3D-1E2F3A4B5C6D}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
