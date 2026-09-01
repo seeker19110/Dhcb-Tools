@@ -1,0 +1,19 @@
+{
+  "name": "Chạy đêm AutoCAD - dọn và trích dữ liệu",
+  "app": "autocad",
+  "stopOnError": false,
+  "saveMode": "SaveAs",
+  "outputFolder": "D:/DHCB/nightly-cad/{yyyy-MM-dd}",
+  "files": [
+    { "path": "P:/Landmark/CAD/KT-01.dwg" },
+    { "path": "P:/Landmark/CAD/KC-01.dwg", "onlySteps": ["LayerExport", "GridExtract"] }
+  ],
+  "steps": [
+    { "command": "LayerExport",        "config": { "outputPath": "{outputFolder}/{fileName}-layers.csv" } },
+    { "command": "AttributeExport",    "config": { "outputPath": "{outputFolder}/{fileName}-attributes.csv" } },
+    { "command": "XrefAudit",          "config": { "outputPath": "{outputFolder}/{fileName}-xrefs.csv" } },
+    { "command": "GridExtract",        "config": { "gridLayer": "AXIS", "outputPath": "{outputFolder}/{fileName}-grids.csv" } },
+    { "command": "LayerStandardCheck", "config": { "rulesPath": "D:/DHCB/configs/layer-rules.json", "outputPath": "{outputFolder}/{fileName}-layercheck.html" } },
+    { "command": "DrawingCleanup",     "config": { "dryRun": false, "keepLayerNameContains": ["DHCB"] } }
+  ]
+}
