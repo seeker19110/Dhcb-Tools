@@ -29,7 +29,7 @@ src/
 ├── DhcbTools.Revit/               # Vỏ Revit: Ribbon, TaskDialog, WPF
 │   ├── App.cs                     # IExternalApplication — khởi động cả Ribbon + HTTP Bridge
 │   ├── DhcbTools.Revit.addin
-│   ├── Bridge/DhcbHttpBridge.cs   # HttpListener port 8765 — agent AI gọi lệnh Core qua HTTP
+│   ├── Bridge/DhcbHttpBridge.cs   # HttpListener port 8765 — dùng BridgeAuth để xác thực /execute + /query
 │   ├── Commands/                  # IExternalCommand — vỏ mỏng gọi Core (kể cả Export/Health/MEPF/ProjectInit)
 │   └── UI/                        # WPF config windows
 │
@@ -43,7 +43,7 @@ src/
 │
 └── DhcbTools.AutoCAD/             # Vỏ AutoCAD: IExtensionApplication, CommandMethod
     ├── App.cs                     # IExtensionApplication — khởi tạo plugin + HTTP Bridge
-    ├── Bridge/DhcbHttpBridge.cs   # HttpListener port 8766 — agent AI gọi lệnh Core qua HTTP
+    ├── Bridge/DhcbHttpBridge.cs   # HttpListener port 8766 — dùng BridgeAuth để xác thực /execute + /query
     └── Commands/DhcbCommands.cs   # 4 lệnh: DHCB_LAYER_EXPORT/IMPORT, DHCB_CLEANUP, DHCB_AUTONUMBER
 ```
 
@@ -59,6 +59,12 @@ Hermes, hoặc bất kỳ agent AI nào:
 python scripts/dhcb_agent.py revit Cleanup --dry-run
 python scripts/dhcb_agent.py autocad LayerExport --output C:/tmp/layers.csv
 ```
+
+**Xác thực:** Bridge sinh token (`BridgeAuth.GenerateToken()` ở `DhcbTools.Shared.Logic`) lần đầu
+khởi động và lưu ở `%APPDATA%\DHCB\bridge-token.txt`. Client tự đọc file này; muốn ghi đè thì đặt
+biến môi trường `DHCB_BRIDGE_TOKEN`. Mọi request `/execute` và `/query` phải kèm header
+`Authorization: Bearer <token>` đúng **và** `Content-Type: application/json`; sai quá 5 lần/60s bị
+khoá tạm 5 phút. `GET /health` không cần token, chỉ trả `{status, version}`.
 
 ### Tương đồng giữa hai nền tảng
 
@@ -124,10 +130,17 @@ Các lệnh AutoCAD sau khi load:
 - 3 nhóm lệnh nền tảng trên cả hai nền tảng: đồng bộ dữ liệu qua CSV, dọn dẹp, đánh số hàng loạt.
 - HTTP Bridge cho agent AI: Revit port 8765, AutoCAD port 8766, kèm client `scripts/dhcb_agent.py`.
 - Batch export (PDF/DWG/IFC/NWC), health report, khởi tạo dự án (grid/level/family/project info).
-- MEPF phần nền tảng: sleeve tại giao cắt, tag cao độ, hanger, chia ống, connector checker.
+- MEPF phần nền tảng: sleeve tại giao cắt, tag cao độ, hanger, chia ống, connector checker —
+  cả 5 lệnh đều có nút Ribbon và gọi được qua HTTP Bridge.
+- Giai đoạn 0 (trả nợ kỹ thuật): tách `DhcbTools.Shared.Logic` (logic thuần, có test xUnit chạy
+  CI) sửa 5 lỗi sai âm thầm #1–#5 (CSV locale/BOM, mất cảnh báo, dung sai đánh số); sửa thêm #6
+  (cleanup AutoCAD), #7 (huỷ việc khi client Bridge hết thời gian chờ), #8 (token xác thực cho
+  Bridge), #11 (gắn Hanger/PipeSplitter vào Ribbon + Bridge); lọc category qua
+  `ElementMulticategoryFilter` (#10).
 
-**Đang tới** — routing MEPF (mức A/B/C), `IUpdater` chạy theo sự kiện, lớp AI, batch runner chạy
-đêm theo lịch.
+**Đang tới** — tách nốt `DhcbTools.Shared.Hosting` (`CommandResult`/`ICoreCommand`/phần HTTP chung
+— xem `docs/dac-ta-tinh-nang.md` §0.2), batch runner chạy đêm theo lịch, routing MEPF (mức A/B/C),
+`IUpdater` chạy theo sự kiện, lớp AI.
 
 Chi tiết:
 - [`docs/progress.md`](docs/progress.md) — hiện trạng đầy đủ và danh sách lỗi đã biết.

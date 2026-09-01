@@ -19,6 +19,7 @@ Hoặc gửi JSON thô:
 
 import argparse
 import json
+import os
 import sys
 import urllib.request
 import urllib.error
@@ -26,13 +27,41 @@ import urllib.error
 REVIT_URL = "http://localhost:8765/execute"
 ACAD_URL  = "http://localhost:8766/execute"
 
+# Bridge sinh token ngẫu nhiên lúc khởi động và lưu ở đây; client đọc lại để gửi kèm request.
+TOKEN_PATH = os.path.join(
+    os.environ.get("APPDATA", os.path.expanduser("~")), "DHCB", "bridge-token.txt"
+)
+
+
+def read_token() -> str:
+    """Token lấy từ biến môi trường DHCB_BRIDGE_TOKEN, nếu không có thì đọc file do Bridge ghi ra."""
+    env_token = os.environ.get("DHCB_BRIDGE_TOKEN")
+    if env_token:
+        return env_token.strip()
+    try:
+        with open(TOKEN_PATH, encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
+
 
 def send(url: str, command: str, config: dict) -> dict:
+    token = read_token()
+    if not token:
+        return {
+            "success": False,
+            "summary": f"Không đọc được token Bridge. Mở Revit/AutoCAD một lần để sinh "
+                       f"\"{TOKEN_PATH}\", hoặc đặt biến môi trường DHCB_BRIDGE_TOKEN.",
+        }
+
     payload = json.dumps({"command": command, "config": config}).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=payload,
-        headers={"Content-Type": "application/json; charset=utf-8"},
+        headers={
+            "Content-Type": "application/json; charset=utf-8",
+            "Authorization": f"Bearer {token}",
+        },
         method="POST",
     )
     try:

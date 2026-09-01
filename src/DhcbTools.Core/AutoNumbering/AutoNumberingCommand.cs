@@ -21,9 +21,11 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
             return CommandResult.Fail($"Không tìm thấy category \"{config.Category}\" trong mô hình.");
         }
 
+        // Lọc category ở tầng native của Revit qua ElementMulticategoryFilter thay vì LINQ trong bộ
+        // nhớ — cùng cải thiện hiệu năng như ParameterExportCommand (lỗi #10).
         var elements = new FilteredElementCollector(document)
             .WhereElementIsNotElementType()
-            .Where(e => e.Category is not null && categoryIds.Contains(e.Category.Id))
+            .WherePasses(new ElementMulticategoryFilter(categoryIds))
             .Where(e => config.LevelName is null || BelongsToLevel(document, e, config.LevelName))
             .Select(e => (Element: e, Location: GetLocationPoint(e)))
             .Where(t => t.Location is not null)

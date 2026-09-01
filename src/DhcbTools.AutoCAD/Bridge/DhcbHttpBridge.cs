@@ -9,6 +9,7 @@ using DhcbTools.Core.AutoCAD.AutoNumbering;
 using DhcbTools.Core.AutoCAD.DrawingCleanup;
 using DhcbTools.Core.AutoCAD.LayerSync;
 using DhcbTools.Core.AutoCAD.Query;
+using DhcbTools.Shared.Logic;
 
 namespace DhcbTools.AutoCAD.Bridge;
 
@@ -20,15 +21,18 @@ namespace DhcbTools.AutoCAD.Bridge;
 /// — cách chính thức của Autodesk từ AutoCAD 2014+ (AcMgd managed).
 ///
 /// Endpoints:
-///   GET  http://localhost:8766/health  → { "status": "ok", "port": 8766, "app": "AutoCAD" }
+///   GET  http://localhost:8766/health  → { "status": "ok", "version": "..." } (không cần token)
 ///   POST http://localhost:8766/execute { "command": "LayerExport", "config": {...} }
 ///   POST http://localhost:8766/query   { "query": "drawing_info" }
 /// </summary>
 public sealed class DhcbHttpBridge : IDisposable
 {
     public const int Port = 8766;
+    private const string Version = "0.1";
 
     private readonly HttpListener _listener = new();
+    private readonly string _token = BridgeTokenStore.LoadOrCreate();
+    private readonly BridgeRateLimiter _rateLimiter = new();
     private CancellationTokenSource? _cts;
     private Task? _listenTask;
     private bool _disposed;
@@ -72,10 +76,25 @@ public sealed class DhcbHttpBridge : IDisposable
         var req = ctx.Request;
         var res = ctx.Response;
 
-        // ── Health check ──────────────────────────────────────────
+        // ── Health check (không cần token) ────────────────────────
         if (req.HttpMethod == "GET" && req.Url?.AbsolutePath == "/health")
         {
-            WriteJson(res, 200, new { status = "ok", port = Port, app = "AutoCAD" });
+            WriteJson(res, 200, new { status = "ok", version = Version });
+            return;
+        }
+
+        // ── Chặn brute-force trước khi so token (lỗi #8) ──────────
+        if (_rateLimiter.IsLockedOut())
+        {
+            WriteJson(res, 429, new { error = "too_many_attempts" });
+            return;
+        }
+
+        // ── Xác thực token + Content-Type (lỗi #8) ────────────────
+        if (!BridgeAuth.IsAuthorized(_token, req.Headers["Authorization"], req.ContentType))
+        {
+            _rateLimiter.RecordFailure();
+            WriteJson(res, 401, new { error = "unauthorized" });
             return;
         }
 
@@ -131,9 +150,16 @@ public sealed class DhcbHttpBridge : IDisposable
         }
 
         var tcs = new TaskCompletionSource<CommandResult>();
+        // Cờ huỷ: client hết thời gian chờ thì không chạy lệnh nữa, tránh sửa drawing sau lưng (lỗi #7).
+        var cancelled = new System.Threading.CancellationTokenSource();
 
         Application.DocumentManager.ExecuteInCommandContextAsync(async _ =>
         {
+            if (cancelled.IsCancellationRequested)
+            {
+                return;
+            }
+
             var doc = Application.DocumentManager.MdiActiveDocument;
             if (doc is null)
             {
@@ -156,8 +182,15 @@ public sealed class DhcbHttpBridge : IDisposable
         CommandResult cmdResult;
         try
         {
-            cmdResult = tcs.Task.Wait(30_000) ? tcs.Task.Result
-                : CommandResult.Fail("Timeout: AutoCAD không xử lý trong 30 giây.");
+            if (tcs.Task.Wait(30_000))
+            {
+                cmdResult = tcs.Task.Result;
+            }
+            else
+            {
+                cancelled.Cancel();
+                cmdResult = CommandResult.Fail("Timeout: AutoCAD không xử lý trong 30 giây; lệnh đã bị huỷ, drawing không bị thay đổi.");
+            }
         }
         catch (System.Exception ex)
         {
@@ -197,9 +230,15 @@ public sealed class DhcbHttpBridge : IDisposable
         }
 
         var tcs = new TaskCompletionSource<object>();
+        var cancelled = new System.Threading.CancellationTokenSource();
 
         Application.DocumentManager.ExecuteInCommandContextAsync(async _ =>
         {
+            if (cancelled.IsCancellationRequested)
+            {
+                return;
+            }
+
             var doc = Application.DocumentManager.MdiActiveDocument;
             if (doc is null)
             {
@@ -222,8 +261,15 @@ public sealed class DhcbHttpBridge : IDisposable
         object queryResult;
         try
         {
-            queryResult = tcs.Task.Wait(30_000) ? tcs.Task.Result
-                : new { error = "Timeout: AutoCAD không xử lý trong 30 giây." };
+            if (tcs.Task.Wait(30_000))
+            {
+                queryResult = tcs.Task.Result;
+            }
+            else
+            {
+                cancelled.Cancel();
+                queryResult = new { error = "Timeout: AutoCAD không xử lý trong 30 giây; truy vấn đã bị huỷ." };
+            }
         }
         catch (System.Exception ex)
         {
@@ -285,6 +331,84 @@ public sealed class DhcbHttpBridge : IDisposable
         _disposed = true;
         Stop();
         _listener.Close();
+    }
+}
+
+// ──────────────────────────────────────────────────────────────
+// Token persistence + rate limit — phần "vỏ" (I/O, trạng thái) của lỗi #8.
+// Logic thuần (sinh/so khớp token) nằm ở DhcbTools.Shared.Logic.BridgeAuth, đã có test.
+// Trùng với DhcbTools.Revit/Bridge/DhcbHttpBridge.cs — sẽ gộp khi có DhcbTools.Shared.Hosting
+// (xem docs/dac-ta-tinh-nang.md §0.2).
+// ──────────────────────────────────────────────────────────────
+
+internal static class BridgeTokenStore
+{
+    public static string TokenFilePath => System.IO.Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DHCB", "bridge-token.txt");
+
+    public static string LoadOrCreate()
+    {
+        var path = TokenFilePath;
+        try
+        {
+            if (System.IO.File.Exists(path))
+            {
+                var existing = System.IO.File.ReadAllText(path).Trim();
+                if (existing.Length >= 32)
+                {
+                    return existing;
+                }
+            }
+        }
+        catch (System.IO.IOException)
+        {
+            // Không đọc được thì sinh mới bên dưới.
+        }
+
+        var token = BridgeAuth.GenerateToken();
+        var directory = System.IO.Path.GetDirectoryName(path)!;
+        System.IO.Directory.CreateDirectory(directory);
+        System.IO.File.WriteAllText(path, token);
+        return token;
+    }
+}
+
+/// <summary>Khoá tạm 5 phút sau 5 lần sai token trong 60 giây, chặn dò token bằng brute-force.</summary>
+internal sealed class BridgeRateLimiter
+{
+    private static readonly TimeSpan FailureWindow = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(5);
+    private const int MaxFailuresBeforeLockout = 5;
+
+    private readonly object _gate = new();
+    private readonly Queue<DateTime> _recentFailures = new();
+    private DateTime? _lockedUntilUtc;
+
+    public bool IsLockedOut()
+    {
+        lock (_gate)
+        {
+            return _lockedUntilUtc is { } until && DateTime.UtcNow < until;
+        }
+    }
+
+    public void RecordFailure()
+    {
+        lock (_gate)
+        {
+            var now = DateTime.UtcNow;
+            _recentFailures.Enqueue(now);
+            while (_recentFailures.Count > 0 && now - _recentFailures.Peek() > FailureWindow)
+            {
+                _recentFailures.Dequeue();
+            }
+
+            if (_recentFailures.Count >= MaxFailuresBeforeLockout)
+            {
+                _lockedUntilUtc = now + LockoutDuration;
+                _recentFailures.Clear();
+            }
+        }
     }
 }
 

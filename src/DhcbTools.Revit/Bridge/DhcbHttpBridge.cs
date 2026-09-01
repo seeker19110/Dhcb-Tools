@@ -13,6 +13,7 @@ using DhcbTools.Core.ModelCleanup;
 using DhcbTools.Core.ParameterSync;
 using DhcbTools.Core.ProjectInit;
 using DhcbTools.Core.Query;
+using DhcbTools.Shared.Logic;
 
 namespace DhcbTools.Revit.Bridge;
 
@@ -30,7 +31,7 @@ namespace DhcbTools.Revit.Bridge;
 ///   POST http://localhost:8765/query  { "query": "document_info" }
 ///   → tương tự nhưng trả về dữ liệu đọc (không transaction ghi)
 ///
-///   GET  http://localhost:8765/health  → { "status": "ok", "port": 8765 }
+///   GET  http://localhost:8765/health  → { "status": "ok", "version": "..." } (không cần token)
 ///
 /// Khởi động: App.cs gọi DhcbHttpBridge.Start() khi add-in load.
 /// Dừng:      App.cs gọi DhcbHttpBridge.Stop() khi add-in unload.
@@ -38,10 +39,13 @@ namespace DhcbTools.Revit.Bridge;
 public sealed class DhcbHttpBridge : IDisposable
 {
     public const int Port = 8765;
+    private const string Version = "0.1";
 
     private readonly HttpListener _listener = new();
     private readonly ExternalEvent _externalEvent;
     private readonly BridgeEventHandler _handler;
+    private readonly string _token = BridgeTokenStore.LoadOrCreate();
+    private readonly BridgeRateLimiter _rateLimiter = new();
     private CancellationTokenSource? _cts;
     private Task? _listenTask;
     private bool _disposed;
@@ -91,10 +95,26 @@ public sealed class DhcbHttpBridge : IDisposable
         var req = ctx.Request;
         var res = ctx.Response;
 
-        // ── Health check ──────────────────────────────────────────
+        // ── Health check (không cần token, không lộ tên file/lệnh — chỉ báo add-in còn sống) ──
         if (req.HttpMethod == "GET" && req.Url?.AbsolutePath == "/health")
         {
-            WriteJson(res, 200, new { status = "ok", port = Port, app = "Revit" });
+            WriteJson(res, 200, new { status = "ok", version = Version });
+            return;
+        }
+
+        // ── Chặn brute-force trước khi so token (lỗi #8) ──────────
+        if (_rateLimiter.IsLockedOut())
+        {
+            WriteJson(res, 429, new { error = "too_many_attempts" });
+            return;
+        }
+
+        // ── Xác thực token + Content-Type (lỗi #8) ────────────────
+        // Không có token thì bất kỳ tiến trình nào trên máy cũng gửi được lệnh xoá với dryRun=false.
+        if (!BridgeAuth.IsAuthorized(_token, req.Headers["Authorization"], req.ContentType))
+        {
+            _rateLimiter.RecordFailure();
+            WriteJson(res, 401, new { error = "unauthorized" });
             return;
         }
 
@@ -152,16 +172,25 @@ public sealed class DhcbHttpBridge : IDisposable
             return;
         }
 
-        // Marshal sang Revit main thread qua ExternalEvent
+        // Marshal sang Revit main thread qua ExternalEvent. Item mang theo cờ huỷ: nếu client đã
+        // hết thời gian chờ thì handler bỏ qua, không chạy lệnh sau lưng người dùng (lỗi #7).
         var tcs = new TaskCompletionSource<CommandResult>();
-        _handler.EnqueueCommand(bridgeReq, tcs);
+        var item = new BridgeWorkItem<CommandResult>(bridgeReq, tcs);
+        _handler.EnqueueCommand(item);
         _externalEvent.Raise();
 
         CommandResult result;
         try
         {
-            result = tcs.Task.Wait(30_000) ? tcs.Task.Result
-                : CommandResult.Fail("Timeout: Revit không xử lý trong 30 giây.");
+            if (tcs.Task.Wait(30_000))
+            {
+                result = tcs.Task.Result;
+            }
+            else
+            {
+                item.Cancel();
+                result = CommandResult.Fail("Timeout: Revit không xử lý trong 30 giây; lệnh đã bị huỷ, mô hình không bị thay đổi.");
+            }
         }
         catch (System.Exception ex)
         {
@@ -201,14 +230,22 @@ public sealed class DhcbHttpBridge : IDisposable
         }
 
         var tcs = new TaskCompletionSource<object>();
-        _handler.EnqueueQuery(queryReq, tcs);
+        var item = new BridgeWorkItem<object>(queryReq, tcs);
+        _handler.EnqueueQuery(item);
         _externalEvent.Raise();
 
         object queryResult;
         try
         {
-            queryResult = tcs.Task.Wait(30_000) ? tcs.Task.Result
-                : new { error = "Timeout: Revit không xử lý trong 30 giây." };
+            if (tcs.Task.Wait(30_000))
+            {
+                queryResult = tcs.Task.Result;
+            }
+            else
+            {
+                item.Cancel();
+                queryResult = new { error = "Timeout: Revit không xử lý trong 30 giây; truy vấn đã bị huỷ." };
+            }
         }
         catch (System.Exception ex)
         {
@@ -244,22 +281,119 @@ public sealed class DhcbHttpBridge : IDisposable
 }
 
 // ──────────────────────────────────────────────────────────────
+// Token persistence + rate limit — phần "vỏ" (I/O, trạng thái) của lỗi #8.
+// Logic thuần (sinh/so khớp token) nằm ở DhcbTools.Shared.Logic.BridgeAuth, đã có test.
+// Trùng với DhcbTools.AutoCAD/Bridge/DhcbHttpBridge.cs — sẽ gộp khi có DhcbTools.Shared.Hosting
+// (xem docs/dac-ta-tinh-nang.md §0.2).
+// ──────────────────────────────────────────────────────────────
+
+internal static class BridgeTokenStore
+{
+    public static string TokenFilePath => System.IO.Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DHCB", "bridge-token.txt");
+
+    public static string LoadOrCreate()
+    {
+        var path = TokenFilePath;
+        try
+        {
+            if (System.IO.File.Exists(path))
+            {
+                var existing = System.IO.File.ReadAllText(path).Trim();
+                if (existing.Length >= 32)
+                {
+                    return existing;
+                }
+            }
+        }
+        catch (System.IO.IOException)
+        {
+            // Không đọc được thì sinh mới bên dưới.
+        }
+
+        var token = BridgeAuth.GenerateToken();
+        var directory = System.IO.Path.GetDirectoryName(path)!;
+        System.IO.Directory.CreateDirectory(directory);
+        System.IO.File.WriteAllText(path, token);
+        return token;
+    }
+}
+
+/// <summary>Khoá tạm 5 phút sau 5 lần sai token trong 60 giây, chặn dò token bằng brute-force.</summary>
+internal sealed class BridgeRateLimiter
+{
+    private static readonly TimeSpan FailureWindow = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(5);
+    private const int MaxFailuresBeforeLockout = 5;
+
+    private readonly object _gate = new();
+    private readonly Queue<DateTime> _recentFailures = new();
+    private DateTime? _lockedUntilUtc;
+
+    public bool IsLockedOut()
+    {
+        lock (_gate)
+        {
+            return _lockedUntilUtc is { } until && DateTime.UtcNow < until;
+        }
+    }
+
+    public void RecordFailure()
+    {
+        lock (_gate)
+        {
+            var now = DateTime.UtcNow;
+            _recentFailures.Enqueue(now);
+            while (_recentFailures.Count > 0 && now - _recentFailures.Peek() > FailureWindow)
+            {
+                _recentFailures.Dequeue();
+            }
+
+            if (_recentFailures.Count >= MaxFailuresBeforeLockout)
+            {
+                _lockedUntilUtc = now + LockoutDuration;
+                _recentFailures.Clear();
+            }
+        }
+    }
+}
+
+// ──────────────────────────────────────────────────────────────
 // IExternalEventHandler: chạy trên Revit main thread
 // ──────────────────────────────────────────────────────────────
 
+/// <summary>
+/// Một việc đang chờ Revit main thread xử lý. <see cref="Cancel"/> được gọi khi client đã hết thời
+/// gian chờ — handler thấy cờ này thì bỏ qua thay vì chạy lệnh khi không còn ai nhận kết quả (lỗi #7).
+/// </summary>
+internal sealed class BridgeWorkItem<TResult>
+{
+    private int _cancelled;
+
+    public BridgeWorkItem(object request, TaskCompletionSource<TResult> tcs)
+    {
+        Request = request;
+        Tcs = tcs;
+    }
+
+    public object Request { get; }
+    public TaskCompletionSource<TResult> Tcs { get; }
+    public bool IsCancelled => System.Threading.Volatile.Read(ref _cancelled) != 0;
+
+    public void Cancel() => System.Threading.Interlocked.Exchange(ref _cancelled, 1);
+}
+
 internal sealed class BridgeEventHandler : IExternalEventHandler
 {
-    private readonly System.Collections.Concurrent.ConcurrentQueue<(BridgeRequest Req, TaskCompletionSource<CommandResult> Tcs)>
+    private readonly System.Collections.Concurrent.ConcurrentQueue<BridgeWorkItem<CommandResult>>
         _commandQueue = new();
 
-    private readonly System.Collections.Concurrent.ConcurrentQueue<(QueryRequest Req, TaskCompletionSource<object> Tcs)>
+    private readonly System.Collections.Concurrent.ConcurrentQueue<BridgeWorkItem<object>>
         _queryQueue = new();
 
-    public void EnqueueCommand(BridgeRequest req, TaskCompletionSource<CommandResult> tcs)
-        => _commandQueue.Enqueue((req, tcs));
+    public void EnqueueCommand(BridgeWorkItem<CommandResult> item) => _commandQueue.Enqueue(item);
 
-    public void EnqueueQuery(QueryRequest req, TaskCompletionSource<object> tcs)
-        => _queryQueue.Enqueue((req, tcs));
+    public void EnqueueQuery(BridgeWorkItem<object> item) => _queryQueue.Enqueue(item);
 
     public string GetName() => "DHCB HTTP Bridge";
 
@@ -268,7 +402,13 @@ internal sealed class BridgeEventHandler : IExternalEventHandler
         // Xử lý lệnh ghi
         while (_commandQueue.TryDequeue(out var item))
         {
-            var (req, tcs) = item;
+            if (item.IsCancelled)
+            {
+                continue;
+            }
+
+            var req = (BridgeRequest)item.Request;
+            var tcs = item.Tcs;
             try
             {
                 var doc = app.ActiveUIDocument?.Document;
@@ -288,7 +428,13 @@ internal sealed class BridgeEventHandler : IExternalEventHandler
         // Xử lý truy vấn đọc
         while (_queryQueue.TryDequeue(out var item))
         {
-            var (req, tcs) = item;
+            if (item.IsCancelled)
+            {
+                continue;
+            }
+
+            var req = (QueryRequest)item.Request;
+            var tcs = item.Tcs;
             try
             {
                 var doc = app.ActiveUIDocument?.Document;

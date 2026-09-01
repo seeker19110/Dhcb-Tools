@@ -59,3 +59,55 @@ public sealed class ConnectorCheckerAutoCommand : IExternalCommand
         return result.Success ? Result.Succeeded : Result.Failed;
     }
 }
+
+[Transaction(TransactionMode.Manual)]
+[Regeneration(RegenerationOption.Manual)]
+public sealed class HangerAutoCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+    {
+        var doc = commandData.Application.ActiveUIDocument.Document;
+        var td = new TaskDialog("DHCB - Đặt hanger")
+        {
+            MainInstruction = "Đặt hanger dọc ống/duct/cable tray",
+            MainContent = "Lệnh đặt hanger theo khoảng cách đều (mặc định 3000mm) dọc trục phần tử.\n" +
+                          "Dùng HTTP Bridge để truyền tên family hanger, khoảng cách và category cụ thể.\n\n" +
+                          "Nhấn OK để xem trước (DryRun=true).",
+            CommonButtons = TaskDialogCommonButtons.Ok | TaskDialogCommonButtons.Cancel,
+        };
+        if (td.Show() != TaskDialogResult.Ok) return Result.Cancelled;
+
+        var config = new HangerConfig
+        {
+            HangerFamilyName = "M_Generic Model",  // placeholder — cấu hình đầy đủ qua HTTP Bridge
+            DryRun = true,
+        };
+        var result = new HangerCommand().Execute(doc, config);
+        Feedback.Show("Đặt hanger", result);
+        return result.Success ? Result.Succeeded : Result.Failed;
+    }
+}
+
+[Transaction(TransactionMode.Manual)]
+[Regeneration(RegenerationOption.Manual)]
+public sealed class PipeSplitterAutoCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+    {
+        var doc = commandData.Application.ActiveUIDocument.Document;
+        var td = new TaskDialog("DHCB - Chia ống theo cây")
+        {
+            MainInstruction = "Chia ống/duct dài thành từng cây",
+            MainContent = "Lệnh cắt các đoạn dài hơn 6000mm thành nhiều cây.\n" +
+                          "Dùng HTTP Bridge để đổi chiều dài cây, category và family coupling.\n\n" +
+                          "Nhấn OK để xem trước (DryRun=true).",
+            CommonButtons = TaskDialogCommonButtons.Ok | TaskDialogCommonButtons.Cancel,
+        };
+        if (td.Show() != TaskDialogResult.Ok) return Result.Cancelled;
+
+        var config = new PipeSplitterConfig { DryRun = true };
+        var result = new PipeSplitterCommand().Execute(doc, config);
+        Feedback.Show("Chia ống theo cây", result);
+        return result.Success ? Result.Succeeded : Result.Failed;
+    }
+}

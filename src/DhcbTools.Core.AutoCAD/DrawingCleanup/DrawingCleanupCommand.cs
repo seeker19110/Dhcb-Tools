@@ -29,8 +29,9 @@ public sealed class DrawingCleanupCommand : ICoreCommand<CleanupConfig>
             {
                 var layer = (LayerTableRecord)transaction.GetObject(layerId, OpenMode.ForRead);
 
-                // Không xoá layer "0" và các layer được đặc biệt giữ lại
-                if (layer.Name == "0")
+                // Không xoá layer "0" và layer hiện hành (CLAYER): Erase() layer hiện hành ném lỗi
+                // và làm hỏng cả transaction (lỗi #6).
+                if (layer.Name == "0" || layerId == database.Clayer)
                 {
                     continue;
                 }
@@ -116,30 +117,41 @@ public sealed class DrawingCleanupCommand : ICoreCommand<CleanupConfig>
             return preview;
         }
 
-        // Xoá thật
-        foreach (var id in toDeleteLayers)
-        {
-            var layer = (LayerTableRecord)transaction.GetObject(id, OpenMode.ForWrite);
-            layer.Erase();
-        }
-        foreach (var id in toDeleteBlocks)
-        {
-            var block = (BlockTableRecord)transaction.GetObject(id, OpenMode.ForWrite);
-            block.Erase();
-        }
-        foreach (var id in toDeleteLinetypes)
-        {
-            var lt = (LinetypeTableRecord)transaction.GetObject(id, OpenMode.ForWrite);
-            lt.Erase();
-        }
+        // Xoá thật — bọc try/catch từng item: một object không xoá được (đang dùng ngầm, bị khoá)
+        // không được phép làm hỏng cả transaction (lỗi #6).
+        var skipped = new List<string>();
+        var erased = EraseAll(transaction, toDeleteLayers, "Layer", skipped)
+                   + EraseAll(transaction, toDeleteBlocks, "Block", skipped)
+                   + EraseAll(transaction, toDeleteLinetypes, "Linetype", skipped);
 
         transaction.Commit();
 
         var result = CommandResult.Ok(
-            $"Đã xoá {totalToDelete} object (layer/block/linetype thừa).",
-            totalToDelete);
+            $"Đã xoá {erased}/{totalToDelete} object (layer/block/linetype thừa).",
+            erased);
         result.Messages.AddRange(report);
+        result.Messages.AddRange(skipped);
         return result;
+    }
+
+    /// <summary>Xoá từng object, ghi lại object nào không xoá được thay vì để lỗi lan ra transaction.</summary>
+    private static int EraseAll(Transaction transaction, List<ObjectId> ids, string kind, List<string> skipped)
+    {
+        var erased = 0;
+        foreach (var id in ids)
+        {
+            try
+            {
+                var record = (SymbolTableRecord)transaction.GetObject(id, OpenMode.ForWrite);
+                record.Erase();
+                erased++;
+            }
+            catch (Autodesk.AutoCAD.Runtime.Exception ex)
+            {
+                skipped.Add($"Không xoá được {kind} (id {id}): {ex.Message}");
+            }
+        }
+        return erased;
     }
 
     private static HashSet<string> CollectUsedLayerNames(Database database, Transaction transaction)
@@ -163,6 +175,25 @@ public sealed class DrawingCleanupCommand : ICoreCommand<CleanupConfig>
     private static HashSet<ObjectId> CollectUsedLinetypeIds(Database database, Transaction transaction)
     {
         var used = new HashSet<ObjectId>();
+
+        // Linetype mà layer definition đang dùng cũng là "đang dùng", dù không entity nào tham chiếu
+        // trực tiếp — bỏ sót chỗ này là xoá nhầm linetype còn sống (lỗi #6).
+        var layerTable = (LayerTable)transaction.GetObject(database.LayerTableId, OpenMode.ForRead);
+        foreach (ObjectId layerId in layerTable)
+        {
+            var layer = (LayerTableRecord)transaction.GetObject(layerId, OpenMode.ForRead);
+            if (layer.LinetypeObjectId.IsValid)
+            {
+                used.Add(layer.LinetypeObjectId);
+            }
+        }
+
+        // Linetype mặc định của bản vẽ (CELTYPE).
+        if (database.Celtype.IsValid)
+        {
+            used.Add(database.Celtype);
+        }
+
         var blockTable = (BlockTable)transaction.GetObject(database.BlockTableId, OpenMode.ForRead);
 
         foreach (ObjectId blockId in blockTable)

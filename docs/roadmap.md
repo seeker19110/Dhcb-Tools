@@ -26,10 +26,11 @@ hơn nhiều so với sau khi thêm routing MEPF (khối lượng lớn nhất c
 | Việc | Lý do |
 |---|---|
 | ✅ Project test xUnit (`tests/DhcbTools.Shared.Logic.Tests`) | Parser CSV, thuật toán đánh số, logic hình học MEPF đều là logic thuần, test được không cần Revit |
-| ✅ Sửa nhóm lỗi âm thầm #1–#5 | Xem mục "Lỗi đã biết" trong `progress.md` |
-| Token xác thực cho HTTP Bridge | Bridge đang mở cổng không xác thực trên máy kỹ sư |
-| 🟡 Tách phần dùng chung — xong `DhcbTools.Shared.Logic`, còn `Shared.Hosting` | `CommandResult`, `ICoreCommand`, phần HTTP chung đang bị nhân đôi giữa Revit và AutoCAD |
-| Gắn Hanger/PipeSplitter vào Ribbon + Bridge | Core command đã có, chưa gọi được từ đâu cả |
+| ✅ Sửa nhóm lỗi âm thầm #1–#5 (test được) | `DhcbTools.Shared.Logic` — xem "Lỗi đã biết" trong `progress.md` |
+| ✅ Sửa #6, #7 (chưa có test, cần compiler xác nhận) | DrawingCleanup AutoCAD, timeout Bridge — xem `progress.md` |
+| ✅ Token xác thực cho HTTP Bridge (#8) | `BridgeAuth` (đã test) + wiring vào cả hai Bridge, token lưu ở `%APPDATA%\DHCB\bridge-token.txt` |
+| 🟡 Tách phần dùng chung — xong `DhcbTools.Shared.Logic`, còn `Shared.Hosting` | `CommandResult`, `ICoreCommand`, phần HTTP chung đang bị nhân đôi giữa Revit và AutoCAD — xem `dac-ta-tinh-nang.md` §0.2 |
+| ✅ Gắn Hanger/PipeSplitter vào Ribbon + Bridge (#11) | Đã có nút trong panel MEPF |
 
 **Xong khi:** test chạy xanh trong CI, Bridge yêu cầu token, không còn class trùng lặp giữa hai Core.
 
@@ -78,8 +79,8 @@ lại và nặng nhất.
 |---|---|---|
 | 1. Sleeve/opening tại giao cắt tường-sàn-dầm | ✅ | `MEPF/SleeveCommand`, lọc 2 lớp BoundingBox → IntersectsSolid |
 | 2. Tag hàng loạt + điền cao độ đáy/đỉnh/tim | ✅ | `MEPF/ElevationTagCommand` |
-| Hanger/support theo khoảng cách chuẩn | ✅ (chưa gắn UI) | `MEPF/HangerCommand` — xem Giai đoạn 0 |
-| Chia ống/máng theo cây 3m/6m | ✅ (chưa gắn UI) | `MEPF/PipeSplitterCommand` (`BreakCurve`) — xem Giai đoạn 0 |
+| Hanger/support theo khoảng cách chuẩn | ✅ | `MEPF/HangerCommand`  |
+| Chia ống/máng theo cây 3m/6m | ✅ | `MEPF/PipeSplitterCommand` (`BreakCurve`)  |
 | Kiểm tra connector hở toàn mô hình | ✅ | `MEPF/ConnectorCheckerCommand`, tuỳ chọn tạo 3D view khoanh vùng |
 | 3. Routing mức A — bán tự động theo tuyến | ⬜ | Kỹ sư vẽ model line, tool dựng duct/pipe/tray hoàn chỉnh với fitting đúng routing preference |
 | 5. Routing mức B — tự động cục bộ theo quy tắc | ⬜ | Rải sprinkler/miệng gió theo pattern chuẩn rồi nối về trục chính |
