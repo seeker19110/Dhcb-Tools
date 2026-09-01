@@ -45,6 +45,7 @@ Tài liệu nghiên cứu toàn bộ các nhóm tính năng có thể triển kh
 - Copy phần tử giữa các tầng/giữa các file link (`ElementTransformUtils.CopyElements`).
 
 ### 2.5 MEP chuyên biệt (khó hơn – giá trị cao cho hạ tầng cơ điện)
+> Đã mở rộng thành danh mục MEPF đầy đủ (bao gồm auto routing 3 mức) trong `nghien-cuu-mepf-tu-dong.md`.
 - Đặt sleeve tự động tại giao ống/máng cáp với kết cấu.
 - Đánh tag hàng loạt cho duct/pipe (kích thước, cao độ, hệ thống).
 - Tính toán và điền cao độ đáy/đỉnh ống vào tham số.
