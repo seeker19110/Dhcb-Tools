@@ -8,6 +8,7 @@ using DhcbTools.Core.AutoCAD;
 using DhcbTools.Core.AutoCAD.AutoNumbering;
 using DhcbTools.Core.AutoCAD.DrawingCleanup;
 using DhcbTools.Core.AutoCAD.LayerSync;
+using DhcbTools.Core.AutoCAD.Query;
 
 namespace DhcbTools.AutoCAD.Bridge;
 
@@ -16,9 +17,12 @@ namespace DhcbTools.AutoCAD.Bridge;
 ///
 /// AutoCAD marshal sang main thread qua
 /// Application.DocumentManager.ExecuteInCommandContextAsync()
-/// — đây là cách chính thức của Autodesk từ AutoCAD 2014+ (AcMgd managed).
+/// — cách chính thức của Autodesk từ AutoCAD 2014+ (AcMgd managed).
 ///
-/// POST http://localhost:8766/execute  { "command": "LayerExport", "config": {...} }
+/// Endpoints:
+///   GET  http://localhost:8766/health  → { "status": "ok", "port": 8766, "app": "AutoCAD" }
+///   POST http://localhost:8766/execute { "command": "LayerExport", "config": {...} }
+///   POST http://localhost:8766/query   { "query": "drawing_info" }
 /// </summary>
 public sealed class DhcbHttpBridge : IDisposable
 {
@@ -68,9 +72,16 @@ public sealed class DhcbHttpBridge : IDisposable
         var req = ctx.Request;
         var res = ctx.Response;
 
-        if (req.HttpMethod != "POST" || req.Url?.AbsolutePath != "/execute")
+        // ── Health check ──────────────────────────────────────────
+        if (req.HttpMethod == "GET" && req.Url?.AbsolutePath == "/health")
         {
-            WriteJson(res, 404, new { error = "Chỉ hỗ trợ POST /execute" });
+            WriteJson(res, 200, new { status = "ok", port = Port, app = "AutoCAD" });
+            return;
+        }
+
+        if (req.HttpMethod != "POST")
+        {
+            WriteJson(res, 405, new { error = "Chỉ hỗ trợ GET /health, POST /execute, POST /query" });
             return;
         }
 
@@ -80,12 +91,34 @@ public sealed class DhcbHttpBridge : IDisposable
             body = reader.ReadToEnd();
         }
 
+        var path = req.Url?.AbsolutePath ?? string.Empty;
+
+        if (path == "/execute")
+        {
+            HandleExecute(res, body);
+            return;
+        }
+
+        if (path == "/query")
+        {
+            HandleQuery(res, body);
+            return;
+        }
+
+        WriteJson(res, 404, new { error = $"Endpoint không tồn tại: {path}. Dùng /execute hoặc /query." });
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // /execute
+    // ──────────────────────────────────────────────────────────────
+    private void HandleExecute(HttpListenerResponse res, string body)
+    {
         BridgeRequest? bridgeReq;
         try
         {
             bridgeReq = JsonConvert.DeserializeObject<BridgeRequest>(body);
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             WriteJson(res, 400, new { error = $"JSON không hợp lệ: {ex.Message}" });
             return;
@@ -97,7 +130,6 @@ public sealed class DhcbHttpBridge : IDisposable
             return;
         }
 
-        // Marshal sang AutoCAD main thread
         var tcs = new TaskCompletionSource<CommandResult>();
 
         Application.DocumentManager.ExecuteInCommandContextAsync(async _ =>
@@ -111,10 +143,9 @@ public sealed class DhcbHttpBridge : IDisposable
 
             try
             {
-                var result = DispatchCommand(doc.Database, bridgeReq);
-                tcs.SetResult(result);
+                tcs.SetResult(DispatchCommand(doc.Database, bridgeReq));
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 tcs.SetException(ex);
             }
@@ -128,19 +159,78 @@ public sealed class DhcbHttpBridge : IDisposable
             cmdResult = tcs.Task.Wait(30_000) ? tcs.Task.Result
                 : CommandResult.Fail("Timeout: AutoCAD không xử lý trong 30 giây.");
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             cmdResult = CommandResult.Fail($"Lỗi thực thi: {ex.Message}");
         }
 
         WriteJson(res, cmdResult.Success ? 200 : 500, new
         {
-            success = cmdResult.Success,
-            summary = cmdResult.Summary,
+            success      = cmdResult.Success,
+            summary      = cmdResult.Summary,
             affectedCount = cmdResult.AffectedCount,
-            messages = cmdResult.Messages,
-            errors = cmdResult.Errors,
+            messages     = cmdResult.Messages,
+            errors       = cmdResult.Errors,
         });
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // /query
+    // ──────────────────────────────────────────────────────────────
+    private void HandleQuery(HttpListenerResponse res, string body)
+    {
+        QueryRequest? queryReq;
+        try
+        {
+            queryReq = JsonConvert.DeserializeObject<QueryRequest>(body);
+        }
+        catch (System.Exception ex)
+        {
+            WriteJson(res, 400, new { error = $"JSON không hợp lệ: {ex.Message}" });
+            return;
+        }
+
+        if (queryReq is null || string.IsNullOrWhiteSpace(queryReq.Query))
+        {
+            WriteJson(res, 400, new { error = "Thiếu trường 'query'." });
+            return;
+        }
+
+        var tcs = new TaskCompletionSource<object>();
+
+        Application.DocumentManager.ExecuteInCommandContextAsync(async _ =>
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc is null)
+            {
+                tcs.SetResult(new { error = "Không có drawing nào đang mở trong AutoCAD." });
+                return;
+            }
+
+            try
+            {
+                tcs.SetResult(AcadQueryHandler.Handle(doc.Database, queryReq));
+            }
+            catch (System.Exception ex)
+            {
+                tcs.SetResult(new { error = ex.Message });
+            }
+
+            await Task.CompletedTask;
+        }, null);
+
+        object queryResult;
+        try
+        {
+            queryResult = tcs.Task.Wait(30_000) ? tcs.Task.Result
+                : new { error = "Timeout: AutoCAD không xử lý trong 30 giây." };
+        }
+        catch (System.Exception ex)
+        {
+            queryResult = new { error = $"Lỗi truy vấn: {ex.Message}" };
+        }
+
+        WriteJson(res, 200, queryResult);
     }
 
     private static CommandResult DispatchCommand(Database db, BridgeRequest req)
@@ -170,9 +260,7 @@ public sealed class DhcbHttpBridge : IDisposable
     {
         var result = JsonConvert.DeserializeObject<T>(json);
         if (result is null)
-        {
             throw new InvalidOperationException($"Không thể deserialize config thành {typeof(T).Name}.");
-        }
         return result;
     }
 

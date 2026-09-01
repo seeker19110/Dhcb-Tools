@@ -17,7 +17,7 @@ public partial class AutoNumberingWindow : Window
     {
         if (string.IsNullOrWhiteSpace(CategoryBox.Text))
         {
-            MessageBox.Show(this, "Vui lòng nhập category.", "DHCB Tools", MessageBoxButton.OK, MessageBoxImage.Warning);
+            System.Windows.MessageBox.Show(this, "Vui lòng nhập category.", "DHCB Tools", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
