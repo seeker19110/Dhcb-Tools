@@ -84,7 +84,77 @@ public sealed class DrawingCleanupCommand : ICoreCommand<CleanupConfig>
             }
         }
 
-        var totalToDelete = toDeleteLayers.Count + toDeleteBlocks.Count + toDeleteLinetypes.Count;
+        var toDeleteStyles = new List<(ObjectId Id, string Name)>();
+        if (config.PurgeUnusedTextStyles)
+        {
+            var used = new HashSet<ObjectId> { database.Textstyle };
+            ForEachEntity(database, transaction, e =>
+            {
+                switch (e)
+                {
+                    case AttributeDefinition ad: used.Add(ad.TextStyleId); break; // kế thừa DBText — xét trước
+                    case DBText t: used.Add(t.TextStyleId); break;
+                    case MText m: used.Add(m.TextStyleId); break;
+                }
+            });
+            foreach (var d in EnumerateDimStyles(database, transaction)) { used.Add(d.Dimtxsty); }
+            var tst = (TextStyleTable)transaction.GetObject(database.TextStyleTableId, OpenMode.ForRead);
+            foreach (ObjectId id in tst)
+            {
+                var ts = (TextStyleTableRecord)transaction.GetObject(id, OpenMode.ForRead);
+                if (ts.IsShapeFile) continue;
+                var isSystem = ts.Name.Equals("Standard", StringComparison.OrdinalIgnoreCase) || ts.Name.Equals("Annotative", StringComparison.OrdinalIgnoreCase);
+                if (CleanupDecider.ShouldErase(ts.Name, used.Contains(id) || ts.IsDependent, id == database.Textstyle, isSystem))
+                {
+                    toDeleteStyles.Add((id, "TextStyle " + ts.Name));
+                    report.Add($"Text style không dùng: \"{ts.Name}\"");
+                }
+            }
+        }
+
+        if (config.PurgeUnusedDimStyles)
+        {
+            var used = new HashSet<ObjectId> { database.Dimstyle };
+            ForEachEntity(database, transaction, e =>
+            {
+                if (e is Dimension dim) used.Add(dim.DimensionStyle);
+                if (e is Leader ld) used.Add(ld.DimensionStyle);
+            });
+            var dst = (DimStyleTable)transaction.GetObject(database.DimStyleTableId, OpenMode.ForRead);
+            foreach (ObjectId id in dst)
+            {
+                var ds = (DimStyleTableRecord)transaction.GetObject(id, OpenMode.ForRead);
+                var isSystem = ds.Name.Equals("Standard", StringComparison.OrdinalIgnoreCase) || ds.Name.Equals("ISO-25", StringComparison.OrdinalIgnoreCase) || ds.Name.StartsWith("*", StringComparison.Ordinal);
+                if (CleanupDecider.ShouldErase(ds.Name, used.Contains(id) || ds.IsDependent, id == database.Dimstyle, isSystem))
+                {
+                    toDeleteStyles.Add((id, "DimStyle " + ds.Name));
+                    report.Add($"Dim style không dùng: \"{ds.Name}\"");
+                }
+            }
+        }
+
+        if (config.PurgeRegApps)
+        {
+            var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "ACAD", "ACAD_PSEXT", "ACAD_DSTYLE_DIMJAG", "ACAD_MLEADERVER" };
+            ForEachEntity(database, transaction, e =>
+            {
+                var xd = e.XData;
+                if (xd == null) return;
+                foreach (var tv in xd) { if (tv.TypeCode == 1001 && tv.Value is string app) used.Add(app); }
+            });
+            var rat = (RegAppTable)transaction.GetObject(database.RegAppTableId, OpenMode.ForRead);
+            foreach (ObjectId id in rat)
+            {
+                var ra = (RegAppTableRecord)transaction.GetObject(id, OpenMode.ForRead);
+                if (CleanupDecider.ShouldErase(ra.Name, used.Contains(ra.Name) || ra.IsDependent, false, ra.Name.StartsWith("ACAD", StringComparison.OrdinalIgnoreCase)))
+                {
+                    toDeleteStyles.Add((id, "RegApp " + ra.Name));
+                    report.Add($"RegApp không dùng: \"{ra.Name}\"");
+                }
+            }
+        }
+
+        var totalToDelete = toDeleteLayers.Count + toDeleteBlocks.Count + toDeleteLinetypes.Count + toDeleteStyles.Count;
         if (totalToDelete == 0)
         {
             transaction.Abort();
@@ -109,6 +179,7 @@ public sealed class DrawingCleanupCommand : ICoreCommand<CleanupConfig>
         deleted += EraseEach(transaction, toDeleteBlocks, "Block", result);
         deleted += EraseEach(transaction, toDeleteLayers, "Layer", result);
         deleted += EraseEach(transaction, toDeleteLinetypes, "Linetype", result);
+        deleted += EraseEach(transaction, toDeleteStyles, "Style", result);
 
         transaction.Commit();
         result.Summary = $"Đã xoá {deleted}/{totalToDelete} object (layer/block/linetype thừa).";
@@ -133,6 +204,31 @@ public sealed class DrawingCleanupCommand : ICoreCommand<CleanupConfig>
             }
         }
         return count;
+    }
+
+    private static void ForEachEntity(Database database, Transaction transaction, Action<Entity> action)
+    {
+        var blockTable = (BlockTable)transaction.GetObject(database.BlockTableId, OpenMode.ForRead);
+        foreach (ObjectId blockId in blockTable)
+        {
+            var block = (BlockTableRecord)transaction.GetObject(blockId, OpenMode.ForRead);
+            foreach (ObjectId entityId in block)
+            {
+                if (transaction.GetObject(entityId, OpenMode.ForRead) is Entity entity)
+                {
+                    action(entity);
+                }
+            }
+        }
+    }
+
+    private static IEnumerable<DimStyleTableRecord> EnumerateDimStyles(Database database, Transaction transaction)
+    {
+        var dst = (DimStyleTable)transaction.GetObject(database.DimStyleTableId, OpenMode.ForRead);
+        foreach (ObjectId id in dst)
+        {
+            yield return (DimStyleTableRecord)transaction.GetObject(id, OpenMode.ForRead);
+        }
     }
 
     private static HashSet<string> CollectUsedLayerNames(Database database, Transaction transaction)

@@ -8,6 +8,8 @@ using DhcbTools.Core.MEPF;
 using DhcbTools.Core.ModelCleanup;
 using DhcbTools.Core.ParameterSync;
 using DhcbTools.Core.ProjectInit;
+using DhcbTools.Core.Sheets;
+using DhcbTools.Core.Styles;
 using DhcbTools.Shared.Logic.Ai;
 using Newtonsoft.Json;
 
@@ -55,6 +57,13 @@ public static class RevitCommandTable
             "TRANSFERSTANDARDS" => new TransferStandardsCommand().Execute(doc, Deserialize<TransferStandardsConfig>(configJson)),
             "GRIDFROMCSV" => new GridFromCsvCommand().Execute(doc, Deserialize<GridFromCsvConfig>(configJson)),
             "SHEETBATCHCREATE" => new SheetBatchCreateCommand().Execute(doc, Deserialize<SheetBatchCreateConfig>(configJson)),
+
+            "SHEETRENAME" => new SheetRenameCommand().Execute(doc, Deserialize<SheetRenameConfig>(configJson)),
+            "REVISIONONSHEETS" => new RevisionOnSheetsCommand().Execute(doc, Deserialize<RevisionOnSheetsConfig>(configJson)),
+            "WARNINGSEXPORT" => new WarningsExportCommand().Execute(doc, Deserialize<WarningsExportConfig>(configJson)),
+            "STYLEPURGE" => new StylePurgeCommand().Execute(doc, Deserialize<StylePurgeConfig>(configJson)),
+            "COLORBYPARAMETER" => new ColorByParameterCommand().Execute(doc, Deserialize<ColorByParameterConfig>(configJson)),
+            "FAMILYAUDIT" => new FamilyAuditCommand().Execute(doc, Deserialize<FamilyAuditConfig>(configJson)),
 
             "PARAMETERRULECHECK" => new ParameterRuleCheckCommand().Execute(doc, Deserialize<ParameterRuleCheckConfig>(configJson)),
             "CLASHDETECTION" => new ClashDetectionCommand().Execute(doc, Deserialize<ClashDetectionConfig>(configJson)),

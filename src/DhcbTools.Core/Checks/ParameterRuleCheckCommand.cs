@@ -28,6 +28,10 @@ public sealed class ParameterRuleCheckCommand : ICoreCommand<ParameterRuleCheckC
             return CommandResult.Fail($"Không tìm thấy file quy tắc \"{config.RulesPath}\".");
         }
 
+        var violations = new List<RuleViolation>();
+        var violatingIds = new HashSet<ElementId>();
+        var checkedCount = 0;
+
         List<ParameterRule> rules;
         try
         {
@@ -38,16 +42,23 @@ public sealed class ParameterRuleCheckCommand : ICoreCommand<ParameterRuleCheckC
             return CommandResult.Fail("File quy tắc không hợp lệ: " + ex.Message);
         }
 
-        if (rules.Count == 0)
+        // Chỉ giữ quy tắc tham số có category; quy tắc ngưỡng (metric) đọc riêng — cùng một file checkset (mục 7.7).
+        rules = rules.Where(r => !string.IsNullOrWhiteSpace(r.Category)).ToList();
+        var thresholds = ThresholdRule.Parse(File.ReadAllText(config.RulesPath));
+        if (rules.Count == 0 && thresholds.Count == 0)
         {
             return CommandResult.Fail("File quy tắc rỗng.");
         }
 
         var result = CommandResult.Ok(string.Empty);
-        var violations = new List<RuleViolation>();
-        var violatingIds = new HashSet<ElementId>();
-        var checkedCount = 0;
-
+        if (thresholds.Count > 0)
+        {
+            var notes = new List<string>();
+            var metrics = CollectMetrics(document);
+            violations.AddRange(ThresholdRule.Evaluate(thresholds, metrics, notes));
+            result.Messages.AddRange(notes);
+            result.Messages.Add("Số đo mô hình: " + string.Join(", ", metrics.Select(m => m.Key + "=" + Shared.Logic.NumericText.Format(m.Value, 1))));
+        }
         foreach (var group in rules.GroupBy(r => r.Category, StringComparer.OrdinalIgnoreCase))
         {
             var ids = ParameterSync.ParameterExportCommand.ResolveCategoryIds(document, new[] { group.Key }, out var unknown);
@@ -105,8 +116,51 @@ public sealed class ParameterRuleCheckCommand : ICoreCommand<ParameterRuleCheckC
             result.Messages.Add($"{kv.Key}: {kv.Value} vi phạm");
         }
 
-        result.Summary = $"Đã kiểm {checkedCount} giá trị, {violations.Count} vi phạm trên {violatingIds.Count} phần tử → \"{config.OutputPath}\".";
+        result.Summary = $"Đã kiểm {checkedCount} giá trị + {thresholds.Count} ngưỡng, {violations.Count} vi phạm trên {violatingIds.Count} phần tử → \"{config.OutputPath}\".";
         result.AffectedCount = violations.Count;
         return result;
+    }
+
+    /// <summary>Số đo mô hình cho checkset (Autodesk Model Checker style).</summary>
+    internal static Dictionary<string, double> CollectMetrics(Document doc)
+    {
+        var m = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        try { m["warnings"] = doc.GetWarnings().Count; } catch { }
+        try
+        {
+            var placed = new HashSet<ElementId>(new FilteredElementCollector(doc).OfClass(typeof(Viewport)).Cast<Viewport>().Select(v => v.ViewId));
+            var views = new FilteredElementCollector(doc).OfClass(typeof(View)).Cast<View>().Where(v => !v.IsTemplate && v is not ViewSheet && v.CanBePrinted).ToList();
+            m["views"] = views.Count;
+            m["unplacedViews"] = views.Count(v => !placed.Contains(v.Id));
+            m["sheets"] = new FilteredElementCollector(doc).OfClass(typeof(ViewSheet)).GetElementCount();
+        }
+        catch { }
+        try { m["elements"] = new FilteredElementCollector(doc).WhereElementIsNotElementType().GetElementCount(); } catch { }
+        try
+        {
+            var families = new FilteredElementCollector(doc).OfClass(typeof(Family)).Cast<Family>().ToList();
+            m["families"] = families.Count;
+            m["inPlaceFamilies"] = families.Count(f => f.IsInPlace);
+            var usedFamilies = new HashSet<ElementId>(new FilteredElementCollector(doc).OfClass(typeof(FamilyInstance)).Cast<FamilyInstance>().Select(i => i.Symbol.Family.Id));
+            m["unusedFamilies"] = families.Count(f => !usedFamilies.Contains(f.Id));
+        }
+        catch { }
+        try
+        {
+            var links = new FilteredElementCollector(doc).OfClass(typeof(RevitLinkType)).Cast<RevitLinkType>().ToList();
+            m["links"] = links.Count;
+            m["missingLinks"] = links.Count(l => l.GetLinkedFileStatus() != LinkedFileStatus.Loaded);
+        }
+        catch { }
+        try { m["cadImports"] = new FilteredElementCollector(doc).OfClass(typeof(ImportInstance)).GetElementCount(); } catch { }
+        try
+        {
+            if (!string.IsNullOrEmpty(doc.PathName) && File.Exists(doc.PathName))
+            {
+                m["fileSizeMb"] = new FileInfo(doc.PathName).Length / (1024.0 * 1024.0);
+            }
+        }
+        catch { }
+        return m;
     }
 }
