@@ -1,8 +1,8 @@
-namespace DhcbTools.Core;
+namespace DhcbTools.Core.AutoCAD;
 
 /// <summary>
-/// Kết quả trả về của một lệnh Core. Dùng chung cho vỏ desktop (hiển thị) và vỏ batch (ghi log/report),
-/// để không lệnh nào phải biết mình đang chạy trong ngữ cảnh nào.
+/// Kết quả trả về của một lệnh Core AutoCAD. Giữ cùng hình dạng với Revit để dễ tích hợp chung
+/// vào một batch runner hoặc UI layer về sau.
 /// </summary>
 public sealed class CommandResult
 {
@@ -10,13 +10,13 @@ public sealed class CommandResult
     public string Summary { get; init; } = string.Empty;
     public List<string> Messages { get; } = new();
     public List<string> Errors { get; } = new();
-    public int AffectedElementCount { get; init; }
+    public int AffectedCount { get; init; }
 
     public static CommandResult Ok(string summary, int affected = 0) => new()
     {
         Success = true,
         Summary = summary,
-        AffectedElementCount = affected,
+        AffectedCount = affected,
     };
 
     public static CommandResult Fail(string summary, IEnumerable<string>? errors = null)

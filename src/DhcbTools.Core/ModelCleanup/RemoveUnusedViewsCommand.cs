@@ -71,7 +71,7 @@ public sealed class RemoveUnusedViewsCommand : ICoreCommand<CleanupConfig>
             .Where(v => !v.IsTemplate)
             .Where(v => v.ViewType is not (ViewType.DrawingSheet or ViewType.Legend or ViewType.Schedule or ViewType.SystemBrowser or ViewType.ProjectBrowser or ViewType.Internal or ViewType.Undefined))
             .Where(v => !placedViewIds.Contains(v.Id))
-            .Where(v => !keepNameContains.Any(keep => v.Name.Contains(keep, StringComparison.OrdinalIgnoreCase)))
+            .Where(v => !keepNameContains.Any(keep => v.Name.IndexOf(keep, StringComparison.OrdinalIgnoreCase) >= 0))
             .ToList();
     }
 

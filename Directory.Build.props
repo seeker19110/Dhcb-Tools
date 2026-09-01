@@ -26,4 +26,15 @@
     <TargetFramework>net8.0-windows</TargetFramework>
   </PropertyGroup>
 
+  <!--
+    AutoCAD: đường dẫn tới thư mục cài AutoCAD, dùng cho HintPath của AcMgd/AcDbMgd/AcCoreMgd.
+    Truyền vào khi build:  dotnet build -p:AcadVersion=2024
+    Hoặc đặt biến môi trường AcadRoot trỏ thẳng đến thư mục cài đặt.
+    AutoCAD 2024 trở về trước: net48 | AutoCAD 2025+: net8.0-windows (tương tự Revit).
+  -->
+  <PropertyGroup>
+    <AcadVersion Condition="'$(AcadVersion)'==''">2024</AcadVersion>
+    <AcadRoot Condition="'$(AcadRoot)'==''">$(ProgramFiles)\Autodesk\AutoCAD $(AcadVersion)</AcadRoot>
+  </PropertyGroup>
+
 </Project>

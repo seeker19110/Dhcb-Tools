@@ -7,6 +7,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DhcbTools.Core", "src\DhcbT
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DhcbTools.Revit", "src\DhcbTools.Revit\DhcbTools.Revit.csproj", "{A1B2C3D4-0002-4A2B-8C3D-1E2F3A4B5C6D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DhcbTools.Core.AutoCAD", "src\DhcbTools.Core.AutoCAD\DhcbTools.Core.AutoCAD.csproj", "{A1B2C3D4-0003-4A2B-8C3D-1E2F3A4B5C6D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DhcbTools.AutoCAD", "src\DhcbTools.AutoCAD\DhcbTools.AutoCAD.csproj", "{A1B2C3D4-0004-4A2B-8C3D-1E2F3A4B5C6D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -21,6 +25,14 @@ Global
 		{A1B2C3D4-0002-4A2B-8C3D-1E2F3A4B5C6D}.Debug|x64.Build.0 = Debug|x64
 		{A1B2C3D4-0002-4A2B-8C3D-1E2F3A4B5C6D}.Release|x64.ActiveCfg = Release|x64
 		{A1B2C3D4-0002-4A2B-8C3D-1E2F3A4B5C6D}.Release|x64.Build.0 = Release|x64
+		{A1B2C3D4-0003-4A2B-8C3D-1E2F3A4B5C6D}.Debug|x64.ActiveCfg = Debug|x64
+		{A1B2C3D4-0003-4A2B-8C3D-1E2F3A4B5C6D}.Debug|x64.Build.0 = Debug|x64
+		{A1B2C3D4-0003-4A2B-8C3D-1E2F3A4B5C6D}.Release|x64.ActiveCfg = Release|x64
+		{A1B2C3D4-0003-4A2B-8C3D-1E2F3A4B5C6D}.Release|x64.Build.0 = Release|x64
+		{A1B2C3D4-0004-4A2B-8C3D-1E2F3A4B5C6D}.Debug|x64.ActiveCfg = Debug|x64
+		{A1B2C3D4-0004-4A2B-8C3D-1E2F3A4B5C6D}.Debug|x64.Build.0 = Debug|x64
+		{A1B2C3D4-0004-4A2B-8C3D-1E2F3A4B5C6D}.Release|x64.ActiveCfg = Release|x64
+		{A1B2C3D4-0004-4A2B-8C3D-1E2F3A4B5C6D}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

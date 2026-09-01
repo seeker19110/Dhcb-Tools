@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>DhcbTools.Core.AutoCAD</RootNamespace>
+    <AssemblyName>DhcbTools.Core.AutoCAD</AssemblyName>
+    <!--
+      AutoCAD 2024 trở về trước dùng .NET Framework 4.8.
+      AutoCAD 2025+ dùng .NET 8.0-windows (tương tự Revit).
+      Cùng quy ước với Revit trong Directory.Build.props.
+    -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Package chính thức của Autodesk trên NuGet — đóng gói AcMgd/AcCoreMgd/AcDbMgd
+      theo từng năm phát hành, không cần cài AutoCAD trên máy build.
+      AutoCAD.NET  = meta-package kéo cả Core + Model + UI vào.
+      Version "24.*" tương ứng AutoCAD 2024 (internal version 24.x).
+      Revit dùng cách tương tự với Nice3point.Revit.Api.RevitAPI.
+    -->
+    <PackageReference Include="AutoCAD.NET" Version="24.*" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+</Project>

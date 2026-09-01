@@ -1,53 +1,90 @@
-# DHCB Revit Tools
+# DHCB Tools — Revit & AutoCAD
 
-Add-in Revit (C#, chạy trên Revit desktop) giúp kỹ sư tự động hoá các tác vụ lặp lại. Xem nghiên cứu đầy đủ và lộ trình tại [`docs/nghien-cuu-dhcb-revit-tools.md`](docs/nghien-cuu-dhcb-revit-tools.md).
+Add-in **2-trong-1** (C#) tự động hoá các tác vụ lặp lại cho kỹ sư xây dựng, chạy trực tiếp trên
+**Revit desktop** và **AutoCAD desktop**. Xem nghiên cứu đầy đủ và lộ trình tại
+[`docs/nghien-cuu-dhcb-revit-tools.md`](docs/nghien-cuu-dhcb-revit-tools.md).
 
 ## Cấu trúc solution
 
 ```
 Dhcb-Tools.sln
-Directory.Build.props        # multi-target: net48 (Revit 2021-2024) / net8.0-windows (Revit 2025+)
+Directory.Build.props              # multi-target: net48 / net8.0-windows; AcadRoot/RevitVersion
 src/
-├── DhcbTools.Core/           # logic thuần: Document + config → xử lý → CommandResult
-│   │                         # KHÔNG TaskDialog, KHÔNG Selection, KHÔNG WPF — chạy được cả
-│   │                         # từ Ribbon lẫn từ batch runner sau này mà không viết lại.
-│   ├── ICoreCommand.cs
+├── DhcbTools.Core/                # Core Revit — logic thuần, KHÔNG TaskDialog/WPF
+│   ├── ICoreCommand.cs            # Document + config → CommandResult
 │   ├── CommandResult.cs
 │   ├── SilentFailuresPreprocessor.cs
-│   ├── ParameterSync/        # Lệnh #1: xuất/nhập tham số qua CSV (Excel mở trực tiếp)
-│   ├── ModelCleanup/         # Lệnh #2: dọn view không đặt trên sheet + sheet rỗng
-│   └── AutoNumbering/        # Lệnh #3: đánh số hàng loạt theo vị trí hình học
-└── DhcbTools.Revit/          # vỏ desktop: Ribbon tab "DHCB Tools", TaskDialog, cửa sổ WPF
-    ├── App.cs                # IExternalApplication — tạo Ribbon
-    ├── DhcbTools.Revit.addin # manifest nạp add-in vào Revit
-    ├── Commands/              # IExternalCommand — vỏ mỏng gọi vào Core
-    └── UI/                    # cửa sổ WPF nhập cấu hình (ví dụ đánh số tự động)
+│   ├── ParameterSync/             # #1: xuất/nhập tham số qua CSV
+│   ├── ModelCleanup/              # #2: dọn view/sheet thừa
+│   └── AutoNumbering/             # #3: đánh số hàng loạt theo vị trí hình học
+│
+├── DhcbTools.Revit/               # Vỏ Revit: Ribbon, TaskDialog, WPF
+│   ├── App.cs                     # IExternalApplication
+│   ├── DhcbTools.Revit.addin
+│   ├── Commands/                  # IExternalCommand — vỏ mỏng gọi Core
+│   └── UI/                        # WPF config windows
+│
+├── DhcbTools.Core.AutoCAD/        # Core AutoCAD — logic thuần, KHÔNG Editor/WPF
+│   ├── ICoreCommand.cs            # Database + config → CommandResult
+│   ├── CommandResult.cs
+│   ├── LayerSync/                 # #1: xuất/nhập layer qua CSV (≈ ParameterSync)
+│   ├── DrawingCleanup/            # #2: dọn layer/block/linetype thừa (≈ ModelCleanup)
+│   └── AutoNumbering/             # #3: đánh số Block Reference theo attribute tag
+│
+└── DhcbTools.AutoCAD/             # Vỏ AutoCAD: IExtensionApplication, CommandMethod
+    ├── App.cs                     # IExtensionApplication — khởi tạo plugin
+    └── Commands/DhcbCommands.cs   # 4 lệnh: DHCB_LAYER_EXPORT/IMPORT, DHCB_CLEANUP, DHCB_AUTONUMBER
 ```
 
-Ba lệnh đầu tiên đúng theo lộ trình trong tài liệu nghiên cứu (mục "Lộ trình triển khai", bước 1):
-**xuất/nhập tham số qua CSV**, **dọn view/sheet thừa**, **đánh số tự động**.
+### Tương đồng giữa hai nền tảng
+
+| Revit                  | AutoCAD                  | Chức năng                          |
+|------------------------|--------------------------|------------------------------------|
+| `ParameterExport`      | `LayerExport`            | Xuất dữ liệu → CSV                 |
+| `ParameterImport`      | `LayerImport`            | Nhập CSV → ghi vào model/drawing   |
+| `RemoveUnusedViews`    | `DrawingCleanup`         | Dọn object thừa                    |
+| `AutoNumbering`        | `AutoNumbering`          | Đánh số hàng loạt theo toạ độ      |
 
 ## Build
 
-Yêu cầu Visual Studio 2022 (hoặc `dotnet build`) trên **Windows** — Revit API chỉ chạy trên Windows nên
-solution này không build/test được trong môi trường Linux hiện tại của phiên làm việc.
+Yêu cầu Visual Studio 2022 (hoặc `dotnet build`) trên **Windows**.
 
 ```powershell
+# Build Revit (2021-2024)
 dotnet build Dhcb-Tools.sln -p:RevitVersion=2024
+
+# Build AutoCAD 2024
+dotnet build Dhcb-Tools.sln -p:AcadVersion=2024
+
+# Build tất cả cùng lúc (mỗi app một lần)
+dotnet build src/DhcbTools.Revit/DhcbTools.Revit.csproj      -p:RevitVersion=2024
+dotnet build src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj  -p:AcadVersion=2024
 ```
 
-`RevitVersion` quyết định TargetFramework (xem `Directory.Build.props`) và version của package
-`Nice3point.Revit.Api.*` được resolve (các package này đóng gói lại `RevitAPI.dll`/`RevitAPIUI.dll`
-theo từng năm Revit, không cần cài Revit trên máy build).
+**Packages NuGet dùng thay cho DLL local:**
+- Revit: `Nice3point.Revit.Api.RevitAPI` — không cần cài Revit trên máy build
+- AutoCAD: `AutoCAD.NET` (Autodesk chính thức) — không cần cài AutoCAD trên máy build
 
 ## Triển khai (dev)
 
-Sau khi build, copy hoặc symlink các file sau vào `%ProgramData%\Autodesk\Revit\Addins\<version>\`:
-
+### Revit
+Copy vào `%ProgramData%\Autodesk\Revit\Addins\<version>\`:
 - `DhcbTools.Revit.addin`
-- `DhcbTools.Revit.dll` + `DhcbTools.Core.dll` (và dependency đi kèm)
+- `DhcbTools.Revit.dll` + `DhcbTools.Core.dll`
+
+### AutoCAD
+Trong AutoCAD, gõ lệnh `NETLOAD` và chọn `DhcbTools.AutoCAD.dll`.  
+Hoặc thêm vào `%AppData%\Autodesk\ApplicationPlugins\` để tự động load.
+
+Các lệnh AutoCAD sau khi load:
+| Lệnh | Chức năng |
+|------|-----------|
+| `DHCB_LAYER_EXPORT` | Xuất toàn bộ layer ra CSV |
+| `DHCB_LAYER_IMPORT` | Nhập layer từ CSV vào drawing |
+| `DHCB_CLEANUP`      | Dọn layer rỗng, block/linetype không dùng |
+| `DHCB_AUTONUMBER`   | Đánh số hàng loạt Block Reference |
 
 ## Trạng thái
 
-Khung solution + 3 lệnh nền tảng đã dựng xong theo lộ trình. Các bước tiếp theo (batch runner,
-IUpdater, MEPF, tích hợp AI) nằm trong tài liệu nghiên cứu, mục "Lộ trình triển khai".
+Khung solution 2-trong-1 (Revit + AutoCAD) đã dựng xong. Các bước tiếp theo (HTTP Bridge để
+kết nối trực tiếp từ agent AI, batch runner, MEPF, IUpdater) nằm trong tài liệu nghiên cứu.
