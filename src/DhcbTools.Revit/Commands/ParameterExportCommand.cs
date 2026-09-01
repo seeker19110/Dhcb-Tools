@@ -18,7 +18,7 @@ public sealed class ParameterExportCommand : IExternalCommand
     {
         var document = commandData.Application.ActiveUIDocument.Document;
 
-        var dialog = new SaveFileDialog
+        var dialog = new Microsoft.Win32.SaveFileDialog
         {
             Title = "DHCB Tools - Chọn nơi lưu file CSV",
             Filter = "CSV (*.csv)|*.csv",
