@@ -21,10 +21,18 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
             return CommandResult.Fail($"Không tìm thấy category \"{config.Category}\" trong mô hình.");
         }
 
-        var elements = new FilteredElementCollector(document)
+        // Lỗi #10: lọc category (và level nếu có) ở tầng Revit bằng ElementMulticategoryFilter/ElementLevelFilter.
+        var collector = new FilteredElementCollector(document)
             .WhereElementIsNotElementType()
-            .Where(e => e.Category is not null && categoryIds.Contains(e.Category.Id))
-            .Where(e => config.LevelName is null || BelongsToLevel(document, e, config.LevelName))
+            .WherePasses(new ElementMulticategoryFilter(categoryIds.ToList()));
+        var level = RevitCompat.FindLevel(document, config.LevelName);
+        if (level is not null)
+        {
+            collector = collector.WherePasses(new ElementLevelFilter(level.Id));
+        }
+
+        var elements = collector
+            .Where(e => config.LevelName is null || level is not null || BelongsToLevel(document, e, config.LevelName))
             .Select(e => (Element: e, Location: GetLocationPoint(e)))
             .Where(t => t.Location is not null)
             .ToList();

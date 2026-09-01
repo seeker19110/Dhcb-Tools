@@ -11,6 +11,9 @@ public sealed class ParameterExportConfig
 
     /// <summary>Đường dẫn file CSV đầu ra.</summary>
     public required string OutputPath { get; init; }
+
+    /// <summary>Ghi thời gian chạy vào Messages (đo hiệu năng, mục 0.6).</summary>
+    public bool Verbose { get; init; }
 }
 
 /// <summary>Cấu hình cho lệnh nhập tham số từ CSV/Excel (ghi ngược giá trị đã chỉnh vào mô hình).</summary>
