@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
+using DhcbTools.Shared.Logic;
 using Autodesk.Revit.DB.Electrical;
 using Autodesk.Revit.DB.Mechanical;
 using Autodesk.Revit.DB.Plumbing;
@@ -417,6 +418,6 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         if (param.StorageType == StorageType.Double)
             param.Set(valueMm / FtToMm);
         else if (param.StorageType == StorageType.String)
-            param.Set(valueMm.ToString("F1"));
+            param.Set(NumericText.Format(valueMm, 1)); // Invariant, không phụ thuộc culture máy
     }
 }

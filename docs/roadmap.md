@@ -1,7 +1,9 @@
 # Lộ trình phát triển DHCB Tools
 
 Tài liệu này mô tả **kế hoạch phía trước**. Hiện trạng thực tế (đã làm được gì, còn lỗi gì)
-nằm ở [`progress.md`](progress.md). Cơ sở kỹ thuật và khảo sát tính năng nằm ở
+nằm ở [`progress.md`](progress.md). Đặc tả chi tiết phần chưa làm ở
+[`dac-ta-tinh-nang.md`](dac-ta-tinh-nang.md), kế hoạch kiểm thử ở [`dac-ta-kiem-thu.md`](dac-ta-kiem-thu.md).
+Cơ sở kỹ thuật và khảo sát tính năng nằm ở
 [`nghien-cuu-dhcb-revit-tools.md`](nghien-cuu-dhcb-revit-tools.md).
 
 Ký hiệu: ✅ xong · 🟡 làm dở · ⬜ chưa bắt đầu.
@@ -16,17 +18,17 @@ Ký hiệu: ✅ xong · 🟡 làm dở · ⬜ chưa bắt đầu.
 
 ---
 
-## Giai đoạn 0 — Trả nợ kỹ thuật ⬜
+## Giai đoạn 0 — Trả nợ kỹ thuật 🟡
 
 **Vì sao đứng trước:** mọi giai đoạn sau đều xây trên `DhcbTools.Core`. Sửa nền móng bây giờ rẻ
 hơn nhiều so với sau khi thêm routing MEPF (khối lượng lớn nhất còn lại).
 
 | Việc | Lý do |
 |---|---|
-| Project `DhcbTools.Core.Tests` (xUnit) | Parser CSV, thuật toán đánh số, logic hình học MEPF đều là logic thuần, test được không cần Revit |
-| Sửa nhóm lỗi âm thầm | Xem mục "Lỗi đã biết" trong `progress.md` |
+| ✅ Project test xUnit (`tests/DhcbTools.Shared.Logic.Tests`) | Parser CSV, thuật toán đánh số, logic hình học MEPF đều là logic thuần, test được không cần Revit |
+| ✅ Sửa nhóm lỗi âm thầm #1–#5 | Xem mục "Lỗi đã biết" trong `progress.md` |
 | Token xác thực cho HTTP Bridge | Bridge đang mở cổng không xác thực trên máy kỹ sư |
-| Tách `DhcbTools.Shared` | `CommandResult`, `ICoreCommand`, phần HTTP chung đang bị nhân đôi giữa Revit và AutoCAD |
+| 🟡 Tách phần dùng chung — xong `DhcbTools.Shared.Logic`, còn `Shared.Hosting` | `CommandResult`, `ICoreCommand`, phần HTTP chung đang bị nhân đôi giữa Revit và AutoCAD |
 | Gắn Hanger/PipeSplitter vào Ribbon + Bridge | Core command đã có, chưa gọi được từ đâu cả |
 
 **Xong khi:** test chạy xanh trong CI, Bridge yêu cầu token, không còn class trùng lặp giữa hai Core.

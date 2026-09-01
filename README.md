@@ -10,6 +10,14 @@ Add-in **2-trong-1** (C#) tự động hoá các tác vụ lặp lại cho kỹ 
 Dhcb-Tools.sln
 Directory.Build.props              # multi-target: net48 / net8.0-windows; AcadRoot/RevitVersion
 src/
+├── DhcbTools.Shared.Logic/        # Logic thuần dùng chung — KHÔNG Revit, KHÔNG AutoCAD
+│   ├── CsvText.cs                 # đọc/ghi CSV, UTF-8 có BOM
+│   ├── NumericText.cs             # số Invariant, đọc được cả dấu phẩy thập phân
+│   ├── NumberingPlanner.cs        # đánh số theo vị trí, gom hàng theo dung sai
+│   ├── MepLayout.cs               # vị trí hanger, điểm cắt ống, cao độ, giao bounding box
+│   ├── FileNaming.cs              # tên file xuất (sanitize, mẫu token, chống trùng)
+│   └── BridgeAuth.cs              # token cho HTTP Bridge
+│
 ├── DhcbTools.Core/                # Core Revit — logic thuần, KHÔNG TaskDialog/WPF
 │   ├── ICoreCommand.cs            # Document + config → CommandResult
 │   ├── CommandResult.cs
@@ -76,6 +84,15 @@ dotnet build Dhcb-Tools.sln -p:AcadVersion=2024
 dotnet build src/DhcbTools.Revit/DhcbTools.Revit.csproj      -p:RevitVersion=2024
 dotnet build src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj  -p:AcadVersion=2024
 ```
+
+**Test** (chạy được trên mọi hệ điều hành, không cần Revit/AutoCAD):
+
+```bash
+dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj
+```
+
+CI chạy đúng lệnh này trên mỗi push/PR. Kế hoạch kiểm thử đầy đủ — gồm kịch bản thủ công cho phần
+cần Revit thật — ở [`docs/dac-ta-kiem-thu.md`](docs/dac-ta-kiem-thu.md).
 
 **Packages NuGet dùng thay cho DLL local:**
 - Revit: `Nice3point.Revit.Api.RevitAPI` — không cần cài Revit trên máy build
