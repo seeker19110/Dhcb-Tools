@@ -102,7 +102,9 @@ Các lệnh AutoCAD sau khi load:
 - HTTP Bridge cho agent AI: Revit port 8765 (HttpListener + ExternalEvent), AutoCAD port 8766
   (HttpListener + `ExecuteInCommandContextAsync`), kèm client `scripts/dhcb_agent.py`.
 
-**Chưa làm** — chi tiết trong [tài liệu nghiên cứu](docs/nghien-cuu-dhcb-revit-tools.md):
-- Batch runner chạy nhiều model/drawing một lượt.
-- Nhóm tính năng MEPF (auto routing).
-- `IUpdater` để tự kiểm tra dữ liệu theo thời gian thực.
+**Đang tới** — batch runner chạy đêm, khởi tạo dự án, MEPF, `IUpdater`, lớp AI.
+
+Chi tiết:
+- [`docs/progress.md`](docs/progress.md) — hiện trạng đầy đủ và danh sách lỗi đã biết.
+- [`docs/roadmap.md`](docs/roadmap.md) — lộ trình theo giai đoạn.
+- [`docs/nghien-cuu-dhcb-revit-tools.md`](docs/nghien-cuu-dhcb-revit-tools.md) — khảo sát kỹ thuật.
