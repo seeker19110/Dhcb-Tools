@@ -43,7 +43,8 @@ public sealed class ParameterExportCommand : ICoreCommand<ParameterExportConfig>
             sb.Append('\n');
         }
 
-        File.WriteAllText(config.OutputPath, sb.ToString(), Encoding.UTF8);
+        // UTF-8 kèm BOM: Excel trên Windows cần BOM mới nhận đúng tên tiếng Việt (lỗi #4).
+        File.WriteAllText(config.OutputPath, sb.ToString(), new UTF8Encoding(true));
 
         var result = CommandResult.Ok(
             $"Đã xuất {collector.Count} phần tử, {config.ParameterNames.Count} tham số ra \"{config.OutputPath}\".",

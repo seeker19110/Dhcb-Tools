@@ -29,6 +29,7 @@ public sealed class DhcbHttpBridge : IDisposable
     public const int Port = 8766;
 
     private readonly HttpListener _listener = new();
+    private readonly string _token = BridgeToken.LoadOrCreate();
     private CancellationTokenSource? _cts;
     private Task? _listenTask;
     private bool _disposed;
@@ -76,6 +77,22 @@ public sealed class DhcbHttpBridge : IDisposable
         if (req.HttpMethod == "GET" && req.Url?.AbsolutePath == "/health")
         {
             WriteJson(res, 200, new { status = "ok", port = Port, app = "AutoCAD" });
+            return;
+        }
+
+        // ── Xác thực token (lỗi #8) ───────────────────────────────
+        var authorization = req.Headers["Authorization"];
+        var provided = authorization is not null && authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+            ? authorization.Substring("Bearer ".Length).Trim()
+            : null;
+
+        if (!BridgeToken.Matches(_token, provided))
+        {
+            WriteJson(res, 401, new
+            {
+                error = "Thiếu hoặc sai token. Gửi header \"Authorization: Bearer <token>\".",
+                tokenFile = BridgeToken.TokenFilePath,
+            });
             return;
         }
 
@@ -131,9 +148,16 @@ public sealed class DhcbHttpBridge : IDisposable
         }
 
         var tcs = new TaskCompletionSource<CommandResult>();
+        // Cờ huỷ: client hết thời gian chờ thì không chạy lệnh nữa, tránh sửa drawing sau lưng (lỗi #7).
+        var cancelled = new System.Threading.CancellationTokenSource();
 
         Application.DocumentManager.ExecuteInCommandContextAsync(async _ =>
         {
+            if (cancelled.IsCancellationRequested)
+            {
+                return;
+            }
+
             var doc = Application.DocumentManager.MdiActiveDocument;
             if (doc is null)
             {
@@ -156,8 +180,15 @@ public sealed class DhcbHttpBridge : IDisposable
         CommandResult cmdResult;
         try
         {
-            cmdResult = tcs.Task.Wait(30_000) ? tcs.Task.Result
-                : CommandResult.Fail("Timeout: AutoCAD không xử lý trong 30 giây.");
+            if (tcs.Task.Wait(30_000))
+            {
+                cmdResult = tcs.Task.Result;
+            }
+            else
+            {
+                cancelled.Cancel();
+                cmdResult = CommandResult.Fail("Timeout: AutoCAD không xử lý trong 30 giây; lệnh đã bị huỷ, drawing không bị thay đổi.");
+            }
         }
         catch (System.Exception ex)
         {
@@ -197,9 +228,15 @@ public sealed class DhcbHttpBridge : IDisposable
         }
 
         var tcs = new TaskCompletionSource<object>();
+        var cancelled = new System.Threading.CancellationTokenSource();
 
         Application.DocumentManager.ExecuteInCommandContextAsync(async _ =>
         {
+            if (cancelled.IsCancellationRequested)
+            {
+                return;
+            }
+
             var doc = Application.DocumentManager.MdiActiveDocument;
             if (doc is null)
             {
@@ -222,8 +259,15 @@ public sealed class DhcbHttpBridge : IDisposable
         object queryResult;
         try
         {
-            queryResult = tcs.Task.Wait(30_000) ? tcs.Task.Result
-                : new { error = "Timeout: AutoCAD không xử lý trong 30 giây." };
+            if (tcs.Task.Wait(30_000))
+            {
+                queryResult = tcs.Task.Result;
+            }
+            else
+            {
+                cancelled.Cancel();
+                queryResult = new { error = "Timeout: AutoCAD không xử lý trong 30 giây; truy vấn đã bị huỷ." };
+            }
         }
         catch (System.Exception ex)
         {

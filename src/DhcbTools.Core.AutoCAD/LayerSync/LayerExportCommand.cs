@@ -52,7 +52,8 @@ public sealed class LayerExportCommand : ICoreCommand<LayerExportConfig>
 
         transaction.Commit();
 
-        File.WriteAllText(config.OutputPath, sb.ToString(), Encoding.UTF8);
+        // UTF-8 kèm BOM để Excel trên Windows hiển thị đúng tên tiếng Việt (lỗi #4).
+        File.WriteAllText(config.OutputPath, sb.ToString(), new UTF8Encoding(true));
 
         return CommandResult.Ok(
             $"Đã xuất {count} layer ra \"{config.OutputPath}\".",

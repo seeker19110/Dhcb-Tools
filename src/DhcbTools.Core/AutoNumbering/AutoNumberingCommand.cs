@@ -33,9 +33,16 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
             return CommandResult.Fail($"Không có phần tử nào của category \"{config.Category}\" có vị trí để đánh số.");
         }
 
+        // Gom theo dung sai trước khi sắp: nếu sắp thuần theo toạ độ thì hai cửa cùng hàng lệch 1mm
+        // rơi vào hai "hàng" khác nhau, làm tiêu chí phụ gần như vô tác dụng (lỗi #5).
+        var tolerance = MmToFeet(config.RowToleranceMm);
         var ordered = config.Direction == NumberingDirection.LeftToRightThenTopToBottom
-            ? elements.OrderByDescending(t => t.Location!.Y).ThenBy(t => t.Location!.X)
-            : elements.OrderBy(t => t.Location!.X).ThenByDescending(t => t.Location!.Y);
+            ? elements
+                .OrderByDescending(t => Bucket(t.Location!.Y, tolerance))
+                .ThenBy(t => t.Location!.X)
+            : elements
+                .OrderBy(t => Bucket(t.Location!.X, tolerance))
+                .ThenByDescending(t => t.Location!.Y);
 
         var plan = new List<(Element Element, string Value)>();
         var number = config.StartNumber;
@@ -56,6 +63,10 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
                 $"[Xem trước] Sẽ đánh số {plan.Count} phần tử \"{config.Category}\" vào tham số \"{config.ParameterName}\".",
                 plan.Count);
             preview.Messages.AddRange(plan.Select(p => $"{p.Element.Id}: \"{p.Value}\""));
+            if (unknown.Count > 0)
+            {
+                preview.Messages.Add($"Bỏ qua category không xác định: {string.Join(", ", unknown)}.");
+            }
             return preview;
         }
 
@@ -86,8 +97,16 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
 
         transaction.Commit();
 
-        return CommandResult.Ok($"Đã đánh số {updated}/{plan.Count} phần tử \"{config.Category}\".", updated);
+        // Dùng result.With để giữ lại toàn bộ cảnh báo "Bỏ qua phần tử ..." đã gom ở trên (lỗi #2).
+        return result.With($"Đã đánh số {updated}/{plan.Count} phần tử \"{config.Category}\".", updated);
     }
+
+    /// <summary>Quy tròn toạ độ về "rổ" theo dung sai để các phần tử cùng hàng có cùng khoá sắp xếp.</summary>
+    internal static double Bucket(double coordinate, double tolerance)
+        => tolerance <= 0 ? coordinate : Math.Round(coordinate / tolerance, MidpointRounding.AwayFromZero) * tolerance;
+
+    /// <summary>Đổi mm sang feet — đơn vị nội bộ của Revit API.</summary>
+    internal static double MmToFeet(double millimeters) => millimeters / 304.8;
 
     private static bool BelongsToLevel(Document document, Element element, string levelName)
     {

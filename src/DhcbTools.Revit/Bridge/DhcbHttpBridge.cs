@@ -42,6 +42,7 @@ public sealed class DhcbHttpBridge : IDisposable
     private readonly HttpListener _listener = new();
     private readonly ExternalEvent _externalEvent;
     private readonly BridgeEventHandler _handler;
+    private readonly string _token = BridgeToken.LoadOrCreate();
     private CancellationTokenSource? _cts;
     private Task? _listenTask;
     private bool _disposed;
@@ -95,6 +96,23 @@ public sealed class DhcbHttpBridge : IDisposable
         if (req.HttpMethod == "GET" && req.Url?.AbsolutePath == "/health")
         {
             WriteJson(res, 200, new { status = "ok", port = Port, app = "Revit" });
+            return;
+        }
+
+        // ── Xác thực token (lỗi #8) ───────────────────────────────
+        // Không có token thì bất kỳ tiến trình nào trên máy cũng gửi được lệnh xoá với dryRun=false.
+        var authorization = req.Headers["Authorization"];
+        var provided = authorization is not null && authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+            ? authorization.Substring("Bearer ".Length).Trim()
+            : null;
+
+        if (!BridgeToken.Matches(_token, provided))
+        {
+            WriteJson(res, 401, new
+            {
+                error = "Thiếu hoặc sai token. Gửi header \"Authorization: Bearer <token>\".",
+                tokenFile = BridgeToken.TokenFilePath,
+            });
             return;
         }
 
@@ -152,16 +170,25 @@ public sealed class DhcbHttpBridge : IDisposable
             return;
         }
 
-        // Marshal sang Revit main thread qua ExternalEvent
+        // Marshal sang Revit main thread qua ExternalEvent. Item mang theo cờ huỷ: nếu client đã
+        // hết thời gian chờ thì handler bỏ qua, không chạy lệnh sau lưng người dùng (lỗi #7).
         var tcs = new TaskCompletionSource<CommandResult>();
-        _handler.EnqueueCommand(bridgeReq, tcs);
+        var item = new BridgeWorkItem<CommandResult>(bridgeReq, tcs);
+        _handler.EnqueueCommand(item);
         _externalEvent.Raise();
 
         CommandResult result;
         try
         {
-            result = tcs.Task.Wait(30_000) ? tcs.Task.Result
-                : CommandResult.Fail("Timeout: Revit không xử lý trong 30 giây.");
+            if (tcs.Task.Wait(30_000))
+            {
+                result = tcs.Task.Result;
+            }
+            else
+            {
+                item.Cancel();
+                result = CommandResult.Fail("Timeout: Revit không xử lý trong 30 giây; lệnh đã bị huỷ, mô hình không bị thay đổi.");
+            }
         }
         catch (System.Exception ex)
         {
@@ -201,14 +228,22 @@ public sealed class DhcbHttpBridge : IDisposable
         }
 
         var tcs = new TaskCompletionSource<object>();
-        _handler.EnqueueQuery(queryReq, tcs);
+        var item = new BridgeWorkItem<object>(queryReq, tcs);
+        _handler.EnqueueQuery(item);
         _externalEvent.Raise();
 
         object queryResult;
         try
         {
-            queryResult = tcs.Task.Wait(30_000) ? tcs.Task.Result
-                : new { error = "Timeout: Revit không xử lý trong 30 giây." };
+            if (tcs.Task.Wait(30_000))
+            {
+                queryResult = tcs.Task.Result;
+            }
+            else
+            {
+                item.Cancel();
+                queryResult = new { error = "Timeout: Revit không xử lý trong 30 giây; truy vấn đã bị huỷ." };
+            }
         }
         catch (System.Exception ex)
         {
@@ -247,19 +282,38 @@ public sealed class DhcbHttpBridge : IDisposable
 // IExternalEventHandler: chạy trên Revit main thread
 // ──────────────────────────────────────────────────────────────
 
+/// <summary>
+/// Một việc đang chờ Revit main thread xử lý. <see cref="Cancel"/> được gọi khi client đã hết thời
+/// gian chờ — handler thấy cờ này thì bỏ qua thay vì chạy lệnh khi không còn ai nhận kết quả (lỗi #7).
+/// </summary>
+internal sealed class BridgeWorkItem<TResult>
+{
+    private int _cancelled;
+
+    public BridgeWorkItem(object request, TaskCompletionSource<TResult> tcs)
+    {
+        Request = request;
+        Tcs = tcs;
+    }
+
+    public object Request { get; }
+    public TaskCompletionSource<TResult> Tcs { get; }
+    public bool IsCancelled => System.Threading.Volatile.Read(ref _cancelled) != 0;
+
+    public void Cancel() => System.Threading.Interlocked.Exchange(ref _cancelled, 1);
+}
+
 internal sealed class BridgeEventHandler : IExternalEventHandler
 {
-    private readonly System.Collections.Concurrent.ConcurrentQueue<(BridgeRequest Req, TaskCompletionSource<CommandResult> Tcs)>
+    private readonly System.Collections.Concurrent.ConcurrentQueue<BridgeWorkItem<CommandResult>>
         _commandQueue = new();
 
-    private readonly System.Collections.Concurrent.ConcurrentQueue<(QueryRequest Req, TaskCompletionSource<object> Tcs)>
+    private readonly System.Collections.Concurrent.ConcurrentQueue<BridgeWorkItem<object>>
         _queryQueue = new();
 
-    public void EnqueueCommand(BridgeRequest req, TaskCompletionSource<CommandResult> tcs)
-        => _commandQueue.Enqueue((req, tcs));
+    public void EnqueueCommand(BridgeWorkItem<CommandResult> item) => _commandQueue.Enqueue(item);
 
-    public void EnqueueQuery(QueryRequest req, TaskCompletionSource<object> tcs)
-        => _queryQueue.Enqueue((req, tcs));
+    public void EnqueueQuery(BridgeWorkItem<object> item) => _queryQueue.Enqueue(item);
 
     public string GetName() => "DHCB HTTP Bridge";
 
@@ -268,7 +322,13 @@ internal sealed class BridgeEventHandler : IExternalEventHandler
         // Xử lý lệnh ghi
         while (_commandQueue.TryDequeue(out var item))
         {
-            var (req, tcs) = item;
+            if (item.IsCancelled)
+            {
+                continue;
+            }
+
+            var req = (BridgeRequest)item.Request;
+            var tcs = item.Tcs;
             try
             {
                 var doc = app.ActiveUIDocument?.Document;
@@ -288,7 +348,13 @@ internal sealed class BridgeEventHandler : IExternalEventHandler
         // Xử lý truy vấn đọc
         while (_queryQueue.TryDequeue(out var item))
         {
-            var (req, tcs) = item;
+            if (item.IsCancelled)
+            {
+                continue;
+            }
+
+            var req = (QueryRequest)item.Request;
+            var tcs = item.Tcs;
             try
             {
                 var doc = app.ActiveUIDocument?.Document;

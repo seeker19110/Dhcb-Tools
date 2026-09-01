@@ -2,7 +2,7 @@
 
 Ảnh chụp tại thời điểm cập nhật gần nhất. Kế hoạch phía trước xem [`roadmap.md`](roadmap.md).
 
-> Cập nhật lần cuối: 2026-09-02 · Tương ứng nhánh `main` (sau khi merge Phase 1+2+3: Batch Export, Health Report, Project Init, MEPF)
+> Cập nhật lần cuối: 2026-09-02 · Tương ứng nhánh `claude/hoan-thien-not-w4dq9r` (Giai đoạn 0 — trả nợ kỹ thuật)
 
 ## Tóm tắt
 
@@ -10,10 +10,10 @@
 |---|---|
 | Kiến trúc Core / vỏ UI | ✅ Tốt — nền móng vững cho các giai đoạn sau |
 | Lệnh nền tảng (Revit + AutoCAD) | ✅ 3 nhóm lệnh, chạy được từ Ribbon và HTTP |
-| HTTP Bridge cho agent AI | ⚠️ Chạy được, có endpoint `/query`, chưa có xác thực |
+| HTTP Bridge cho agent AI | ✅ Có `/query`, xác thực bằng token Bearer, huỷ việc khi client timeout |
 | Batch export (PDF/DWG/IFC/NWC) + Health report | ✅ Xong |
 | Khởi tạo dự án (grid/level/family/project info) | ✅ Xong |
-| MEPF — sleeve, tag cao độ, hanger, chia ống, connector checker | ✅ Xong phần nền tảng |
+| MEPF — sleeve, tag cao độ, hanger, chia ống, connector checker | ✅ Xong phần nền tảng, cả 5 lệnh đều có nút Ribbon + Bridge |
 | MEPF — routing mức A/B/C | ⬜ Chưa bắt đầu |
 | Batch runner chạy đêm theo lịch | ⬜ Chưa bắt đầu |
 | `IUpdater` theo sự kiện | ⬜ Chưa bắt đầu |
@@ -61,10 +61,8 @@ Level, Grid, load family theo danh mục, gán project info — tất cả từ 
 `MEPF/SleeveCommand` (giao cắt MEP × Tường/Sàn, lọc 2 lớp BoundingBox → IntersectsSolid),
 `ElevationTagCommand` (cao độ đáy/đỉnh/tim), `HangerCommand` (đặt hanger theo khoảng cách đều
 dọc `LocationCurve`), `PipeSplitterCommand` (`BreakCurve` cho Pipe/Duct), `ConnectorCheckerCommand`
-(quét connector hở toàn mô hình, tuỳ chọn tạo 3D view khoanh vùng). Ribbon hiện có nút cho
-Sleeve, ElevationTag, ConnectorChecker; **Hanger và PipeSplitter đã có Core command nhưng chưa
-gắn nút Ribbon lẫn dispatch trong Bridge** — chỉ gọi được bằng cách sửa code, chưa dùng được
-từ UI hay HTTP.
+(quét connector hở toàn mô hình, tuỳ chọn tạo 3D view khoanh vùng). Cả 5 lệnh đều có nút trong
+panel MEPF của Ribbon và case dispatch trong Bridge — dùng được cả từ UI lẫn HTTP.
 
 ### Điều kiện cho tự động hoá cấp 2–3
 `SilentFailuresPreprocessor` đã có và được dùng đúng trong các lệnh Revit. Đây là điều kiện bắt
@@ -75,56 +73,29 @@ nó (mở → xử lý → lưu → đóng theo danh sách file, hẹn giờ Tas
 
 ## Lỗi đã biết
 
-Xếp theo mức độ. Nhóm "âm thầm" nguy hiểm nhất vì tool báo thành công trong khi kết quả sai.
+### Đã sửa ở Giai đoạn 0
 
-### Nghiêm trọng — sai âm thầm
+| # | Lỗi | Cách sửa |
+|---|---|---|
+| 1 | Round-trip số thực hỏng trên máy locale Việt Nam | Import đọc số bằng `InvariantCulture` đúng như lúc xuất, có fallback sang culture hệ thống cho file người dùng tự gõ (`ParameterImportCommand.TryParseDouble/TryParseInt`) |
+| 2 | Cảnh báo bị nuốt ở dòng `return` cuối | Thêm `CommandResult.With(summary, affected)` giữ nguyên `Messages`/`Errors`; áp dụng cho AutoNumbering (Revit + AutoCAD) và ParameterImport |
+| 3 | Bất đối xứng Export/Import tham số | Import tra tham số ở instance rồi fallback sang Type (`ResolveParameter`), đối xứng với export; tham số chỉ đọc/ghi hỏng đều được báo ra |
+| 4 | CSV không có BOM | `ParameterExportCommand` và `LayerExportCommand` ghi bằng `new UTF8Encoding(true)` |
+| 5 | Đánh số theo hàng không có dung sai | Thêm `AutoNumberingConfig.RowToleranceMm` (mặc định 300mm), gom toạ độ về "rổ" trước khi sắp nên tiêu chí phụ mới có tác dụng |
+| 6 | DrawingCleanup xoá nhầm và làm hỏng transaction | Linetype của layer definition và `CELTYPE` được tính là đang dùng; loại trừ layer hiện hành `CLAYER`; mỗi `Erase()` bọc try/catch riêng và báo object nào không xoá được |
+| 7 | Request timeout vẫn thực thi | Việc trong queue mang cờ huỷ; client hết 30s thì handler bỏ qua thay vì chạy khi không còn ai nhận kết quả |
+| 8 | HTTP Bridge không xác thực | Token 32 byte ngẫu nhiên sinh lúc khởi động, lưu ở `%APPDATA%\DhcbTools\bridge-token.txt`; `/execute` và `/query` bắt buộc header `Authorization: Bearer <token>` (so sánh theo thời gian cố định), `GET /health` vẫn mở |
+| 11 | Hanger và PipeSplitter chưa gắn UI | Thêm `HangerAutoCommand`, `PipeSplitterAutoCommand` và hai nút trong panel MEPF (Bridge đã dispatch sẵn từ trước) |
 
-1. **Round-trip số thực hỏng trên máy locale Việt Nam.** Export ghi bằng `InvariantCulture`
-   (dấu chấm), import đọc theo culture hệ thống (dấu phẩy). Trên Windows tiếng Việt, mọi giá trị
-   Double xuất ra không import ngược được và bị bỏ qua không báo lỗi.
-   `ParameterExportCommand.cs` ↔ `ParameterImportCommand.cs`
-
-2. **Cảnh báo bị nuốt trong AutoNumbering.** Các message "Bỏ qua phần tử X" được gom vào một
-   `CommandResult` nhưng dòng `return` cuối tạo object mới, làm mất toàn bộ. Kỹ sư thấy
-   "Đã đánh số 40/120" mà không biết 80 phần tử kia hỏng vì lý do gì.
-   `Core/AutoNumbering/AutoNumberingCommand.cs`
-
-3. **Bất đối xứng Export/Import tham số.** Export có fallback đọc tham số ở Type, import chỉ tra
-   ở instance. Tham số Type xuất ra được, sửa xong không nhập lại được, không báo gì.
-
-4. **CSV không có BOM.** Excel trên Windows hiển thị sai tên tiếng Việt. Cần `new UTF8Encoding(true)`.
-
-### Nghiêm trọng — hành vi sai
-
-5. **Đánh số theo hàng không có dung sai.** Sắp `OrderByDescending(Y).ThenBy(X)`; hai cửa cùng hàng
-   lệch 1mm rơi vào hai "hàng" khác nhau nên `ThenBy(X)` gần như vô tác dụng — kết quả thực tế là
-   sắp thuần theo Y. Cần gom Y theo dung sai (ví dụ 300mm) rồi mới sắp X trong nhóm.
-
-6. **DrawingCleanup có thể xoá nhầm và làm hỏng transaction.** `CollectUsedLinetypeIds` chỉ duyệt
-   entity, bỏ sót linetype mà layer definition đang dùng. Layer hiện hành (`CLAYER`) không được
-   loại trừ; `Erase()` nó sẽ ném lỗi, và vì không có try/catch từng item nên hỏng cả transaction.
-   `Core.AutoCAD/DrawingCleanup/DrawingCleanupCommand.cs`
-
-7. **Request timeout vẫn thực thi.** Bridge báo timeout sau 30s nhưng item vẫn nằm trong queue;
-   khi Revit rảnh nó vẫn chạy dù client đã bỏ đi. Với `dryRun:false` là thay đổi mô hình ngoài ý muốn.
-
-### Bảo mật
-
-8. **HTTP Bridge không xác thực.** Không kiểm tra token, `Origin` hay `Content-Type`. Bất kỳ tiến
-   trình nào trên máy đều gửi được lệnh xoá view/sheet với `dryRun:false`. Cần token sinh ngẫu
-   nhiên lúc khởi động, lưu ở `%APPDATA%`, bắt buộc qua header `Authorization`.
-
-### Chất lượng
+### Còn lại
 
 9. **Trùng lặp ~40%** giữa `Core` và `Core.AutoCAD`: `ICoreCommand`, `CommandResult`, `Polyfills`,
-   và gần như toàn bộ phần HTTP của hai Bridge. Chi phí sẽ nhân lên theo mỗi tính năng mới.
+   và gần như toàn bộ phần HTTP của hai Bridge (nay thêm cả `BridgeToken`). Chi phí sẽ nhân lên
+   theo mỗi tính năng mới — cần tách `DhcbTools.Shared` **trước** khi thêm routing MEPF.
 10. **Hiệu năng collector.** `ParameterExport` và `AutoNumbering` dùng `FilteredElementCollector`
     rồi lọc bằng LINQ trong bộ nhớ. Nên dùng `ElementMulticategoryFilter` để Revit lọc ở tầng dưới.
-11. **Hanger và PipeSplitter chưa gắn UI/Bridge.** Core command đã viết xong nhưng không có nút
-    Ribbon, không có case trong `DispatchCommand` của Bridge — hiện chỉ chạy được nếu tự viết
-    code gọi. Cần bổ sung cả hai chỗ trước khi coi nhóm MEPF nền tảng là "dùng được".
-12. **Không còn test nào cho MEPF/Export/ProjectInit.** Cùng nợ kỹ thuật với các lệnh cũ, nhưng
-    khối lượng logic hình học (giao cắt, khoảng cách hanger) rủi ro sai cao hơn CSV/đánh số.
+12. **Không có test nào.** Nợ lớn nhất còn lại: logic hình học (giao cắt, khoảng cách hanger),
+    parser CSV và thuật toán gom hàng đều là logic thuần, test được mà chưa có test.
 
 ---
 
@@ -132,9 +103,7 @@ Xếp theo mức độ. Nhóm "âm thầm" nguy hiểm nhất vì tool báo thà
 
 Theo [`roadmap.md`](roadmap.md) — Giai đoạn 0 (trả nợ kỹ thuật) rồi Giai đoạn 1 (batch runner):
 
-1. Thêm `DhcbTools.Core.Tests` — bắt luôn lỗi #1 và #5.
-2. Sửa nhóm lỗi âm thầm #1–#4.
-3. Gắn Hanger/PipeSplitter vào Ribbon + Bridge (#11).
-4. Thêm token cho Bridge (#8).
-5. Sửa #6, #7.
-6. Tách `DhcbTools.Shared` (#9) — làm **trước** khi thêm routing MEPF (khối lượng lớn nhất còn lại).
+1. Thêm `DhcbTools.Core.Tests` (xUnit) — phủ trước `TryParseDouble`, `Bucket`, parser CSV.
+2. Tách `DhcbTools.Shared` (#9) — làm **trước** khi thêm routing MEPF (khối lượng lớn nhất còn lại).
+3. Chuyển collector sang `ElementMulticategoryFilter` (#10).
+4. Batch runner chạy đêm (Giai đoạn 1) — đích của dự án theo tài liệu nghiên cứu.

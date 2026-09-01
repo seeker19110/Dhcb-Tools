@@ -82,6 +82,16 @@ public sealed class App : IExternalApplication
             typeof(Commands.ConnectorCheckerAutoCommand).FullName)
         { ToolTip = "Tìm và liệt kê connector MEP chưa kết nối. Tạo 3D view khoanh vùng." });
 
+        panelMepf.AddItem(new PushButtonData(
+            "DhcbHanger", "Đặt\nhanger", assemblyPath,
+            typeof(Commands.HangerAutoCommand).FullName)
+        { ToolTip = "Đặt hanger theo khoảng cách đều dọc ống/duct/cable tray." });
+
+        panelMepf.AddItem(new PushButtonData(
+            "DhcbPipeSplit", "Chia ống\ntheo cây", assemblyPath,
+            typeof(Commands.PipeSplitterAutoCommand).FullName)
+        { ToolTip = "Cắt các đoạn ống/duct dài hơn chiều dài cây tiêu chuẩn (mặc định 6m)." });
+
         // ── HTTP Bridge ───────────────────────────────────────────
         _bridge = new DhcbHttpBridge();
         application.ControlledApplication.ApplicationInitialized += (_, _) =>

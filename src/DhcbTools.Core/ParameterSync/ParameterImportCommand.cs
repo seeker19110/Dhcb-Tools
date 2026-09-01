@@ -1,3 +1,4 @@
+using System.Globalization;
 using Autodesk.Revit.DB;
 
 namespace DhcbTools.Core.ParameterSync;
@@ -71,15 +72,28 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
                     continue;
                 }
 
-                var parameter = element.LookupParameter(parameterColumns[col]);
-                if (parameter is null || parameter.IsReadOnly)
+                var parameter = ResolveParameter(element, parameterColumns[col]);
+                if (parameter is null)
                 {
                     continue;
                 }
 
-                if (TrySetParameter(parameter, cells[cellIndex]))
+                if (parameter.IsReadOnly)
+                {
+                    result.Messages.Add(
+                        $"Dòng {i + 1}: tham số \"{parameterColumns[col]}\" chỉ đọc, không ghi được.");
+                    continue;
+                }
+
+                var rawValue = cells[cellIndex];
+                if (TrySetParameter(parameter, rawValue))
                 {
                     updated++;
+                }
+                else if (!string.IsNullOrWhiteSpace(rawValue))
+                {
+                    result.Messages.Add(
+                        $"Dòng {i + 1}: không ghi được giá trị \"{rawValue}\" vào tham số \"{parameterColumns[col]}\".");
                 }
             }
         }
@@ -87,11 +101,52 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
         if (config.DryRun)
         {
             transaction.RollBack();
-            return CommandResult.Ok($"[Xem trước] Sẽ cập nhật {updated} giá trị tham số (chưa ghi vào mô hình).", updated);
+            return result.With(
+                $"[Xem trước] Sẽ cập nhật {updated} giá trị tham số (chưa ghi vào mô hình).", updated);
         }
 
         transaction.Commit();
-        return CommandResult.Ok($"Đã cập nhật {updated} giá trị tham số từ \"{config.InputPath}\".", updated);
+        return result.With($"Đã cập nhật {updated} giá trị tham số từ \"{config.InputPath}\".", updated);
+    }
+
+    /// <summary>
+    /// Tra tham số ở instance, nếu không có thì tra tiếp ở Type — đối xứng với
+    /// <see cref="ParameterExportCommand.ReadParameterAsString"/> (lỗi #3).
+    /// </summary>
+    internal static Parameter? ResolveParameter(Element element, string parameterName)
+    {
+        var parameter = element.LookupParameter(parameterName);
+        if (parameter is not null)
+        {
+            return parameter;
+        }
+
+        var typeElement = element.Document.GetElement(element.GetTypeId());
+        return typeElement?.LookupParameter(parameterName);
+    }
+
+    /// <summary>
+    /// Đọc số theo <see cref="CultureInfo.InvariantCulture"/> đúng như lúc xuất, có fallback sang
+    /// culture hệ thống cho file người dùng tự gõ tay trong Excel tiếng Việt (lỗi #1).
+    /// </summary>
+    internal static bool TryParseDouble(string rawValue, out double value)
+    {
+        if (double.TryParse(rawValue, NumberStyles.Float, CultureInfo.InvariantCulture, out value))
+        {
+            return true;
+        }
+
+        return double.TryParse(rawValue, NumberStyles.Float, CultureInfo.CurrentCulture, out value);
+    }
+
+    internal static bool TryParseInt(string rawValue, out int value)
+    {
+        if (int.TryParse(rawValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out value))
+        {
+            return true;
+        }
+
+        return int.TryParse(rawValue, NumberStyles.Integer, CultureInfo.CurrentCulture, out value);
     }
 
     private static bool TrySetParameter(Parameter parameter, string rawValue)
@@ -103,9 +158,9 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
                 case StorageType.String:
                     return parameter.Set(rawValue);
                 case StorageType.Integer:
-                    return int.TryParse(rawValue, out var intValue) && parameter.Set(intValue);
+                    return TryParseInt(rawValue, out var intValue) && parameter.Set(intValue);
                 case StorageType.Double:
-                    return double.TryParse(rawValue, out var doubleValue) && parameter.Set(doubleValue);
+                    return TryParseDouble(rawValue, out var doubleValue) && parameter.Set(doubleValue);
                 default:
                     return false;
             }

@@ -22,6 +22,7 @@ src/
 │   ├── App.cs                     # IExternalApplication — khởi động cả Ribbon + HTTP Bridge
 │   ├── DhcbTools.Revit.addin
 │   ├── Bridge/DhcbHttpBridge.cs   # HttpListener port 8765 — agent AI gọi lệnh Core qua HTTP
+│   ├── Bridge/BridgeToken.cs      # token Bearer bắt buộc cho /execute và /query
 │   ├── Commands/                  # IExternalCommand — vỏ mỏng gọi Core (kể cả Export/Health/MEPF/ProjectInit)
 │   └── UI/                        # WPF config windows
 │
@@ -51,6 +52,11 @@ Hermes, hoặc bất kỳ agent AI nào:
 python scripts/dhcb_agent.py revit Cleanup --dry-run
 python scripts/dhcb_agent.py autocad LayerExport --output C:/tmp/layers.csv
 ```
+
+**Xác thực:** Bridge sinh token ngẫu nhiên lần đầu khởi động và lưu ở
+`%APPDATA%\DhcbTools\bridge-token.txt`. Client tự đọc file này; muốn ghi đè thì đặt biến môi
+trường `DHCB_BRIDGE_TOKEN`. Mọi request `/execute` và `/query` phải kèm header
+`Authorization: Bearer <token>`; riêng `GET /health` vẫn mở để kiểm tra add-in có sống không.
 
 ### Tương đồng giữa hai nền tảng
 
@@ -107,10 +113,14 @@ Các lệnh AutoCAD sau khi load:
 - 3 nhóm lệnh nền tảng trên cả hai nền tảng: đồng bộ dữ liệu qua CSV, dọn dẹp, đánh số hàng loạt.
 - HTTP Bridge cho agent AI: Revit port 8765, AutoCAD port 8766, kèm client `scripts/dhcb_agent.py`.
 - Batch export (PDF/DWG/IFC/NWC), health report, khởi tạo dự án (grid/level/family/project info).
-- MEPF phần nền tảng: sleeve tại giao cắt, tag cao độ, hanger, chia ống, connector checker.
+- MEPF phần nền tảng: sleeve tại giao cắt, tag cao độ, hanger, chia ống, connector checker —
+  cả 5 lệnh đều có nút Ribbon và gọi được qua HTTP Bridge.
+- Giai đoạn 0 (trả nợ kỹ thuật): sửa nhóm lỗi sai âm thầm (CSV locale/BOM, mất cảnh báo, dung sai
+  đánh số, cleanup AutoCAD), token xác thực cho Bridge, huỷ việc khi client hết thời gian chờ.
 
-**Đang tới** — routing MEPF (mức A/B/C), `IUpdater` chạy theo sự kiện, lớp AI, batch runner chạy
-đêm theo lịch.
+**Đang tới** — test tự động (`DhcbTools.Core.Tests`), tách `DhcbTools.Shared` để bỏ phần trùng lặp
+giữa hai Core, batch runner chạy đêm theo lịch, routing MEPF (mức A/B/C), `IUpdater` chạy theo
+sự kiện, lớp AI.
 
 Chi tiết:
 - [`docs/progress.md`](docs/progress.md) — hiện trạng đầy đủ và danh sách lỗi đã biết.
