@@ -1,6 +1,6 @@
-using System.Globalization;
 using System.Text;
 using Autodesk.Revit.DB;
+using DhcbTools.Shared.Logic;
 
 namespace DhcbTools.Core.ParameterSync;
 
@@ -43,7 +43,8 @@ public sealed class ParameterExportCommand : ICoreCommand<ParameterExportConfig>
             sb.Append('\n');
         }
 
-        File.WriteAllText(config.OutputPath, sb.ToString(), Encoding.UTF8);
+        // UTF-8 CÓ BOM: thiếu BOM thì Excel trên Windows đọc theo code page hệ thống và hiện sai tiếng Việt.
+        File.WriteAllText(config.OutputPath, sb.ToString(), CsvText.Utf8WithBom);
 
         var result = CommandResult.Ok(
             $"Đã xuất {collector.Count} phần tử, {config.ParameterNames.Count} tham số ra \"{config.OutputPath}\".",
@@ -99,20 +100,12 @@ public sealed class ParameterExportCommand : ICoreCommand<ParameterExportConfig>
         return parameter.StorageType switch
         {
             StorageType.String => parameter.AsString() ?? string.Empty,
-            StorageType.Integer => parameter.AsInteger().ToString(CultureInfo.InvariantCulture),
-            StorageType.Double => parameter.AsDouble().ToString(CultureInfo.InvariantCulture),
+            StorageType.Integer => NumericText.Format(parameter.AsInteger()),
+            StorageType.Double => NumericText.Format(parameter.AsDouble()),
             StorageType.ElementId => parameter.AsValueString() ?? string.Empty,
             _ => parameter.AsValueString() ?? string.Empty,
         };
     }
 
-    private static string CsvEscape(string? value)
-    {
-        value ??= string.Empty;
-        if (value.Contains(',') || value.Contains('"') || value.Contains('\n'))
-        {
-            return "\"" + value.Replace("\"", "\"\"") + "\"";
-        }
-        return value;
-    }
+    private static string CsvEscape(string? value) => CsvText.Escape(value ?? string.Empty);
 }

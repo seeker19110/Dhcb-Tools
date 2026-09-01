@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Structure;
+using DhcbTools.Shared.Logic;
 
 namespace DhcbTools.Core.MEPF;
 
@@ -39,8 +40,13 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
             return CommandResult.Fail("Không có phần tử MEP nào phù hợp với cấu hình.");
         }
 
-        double spacingFt = config.SpacingMm / FtToMm;
-        double offsetFt = config.OffsetMm / FtToMm;
+        if (config.SpacingMm <= 0)
+        {
+            return CommandResult.Fail("SpacingMm phải lớn hơn 0.");
+        }
+
+        double spacingFt = MepLayout.MmToFeet(config.SpacingMm);
+        double offsetFt = MepLayout.MmToFeet(config.OffsetMm);
 
         // 3. Build placement plan
         var plan = new List<(XYZ Point, XYZ Direction)>();
@@ -53,9 +59,11 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
 
             if (lengthFt <= 0) continue;
 
-            // Place at spacingFt/2, 3*spacingFt/2, ...
-            double pos = spacingFt / 2.0;
-            while (pos < lengthFt)
+            // Vị trí đặt tính bằng MepLayout.HangerPositions: spacing/2, 3·spacing/2, … và luôn có
+            // đúng một hanger cho đoạn ngắn. Bản cũ kiểm tra `plan.Count == 0 || lengthFt < spacingFt`
+            // trên danh sách plan DÙNG CHUNG cho mọi phần tử nên đoạn dài hơn nửa khoảng cách mà ngắn
+            // hơn một khoảng cách bị đặt hai hanger chồng nhau.
+            foreach (var pos in MepLayout.HangerPositions(lengthFt, spacingFt))
             {
                 double normalizedParam = pos / lengthFt;
                 var point = curve.Evaluate(normalizedParam, true);
@@ -64,17 +72,6 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
                 // Offset upward
                 var insertPoint = new XYZ(point.X, point.Y, point.Z + offsetFt);
                 plan.Add((insertPoint, tangent));
-
-                pos += spacingFt;
-            }
-
-            // Ensure at least one hanger per element
-            if (plan.Count == 0 || lengthFt < spacingFt)
-            {
-                var midPt = curve.Evaluate(0.5, true);
-                var midTangent = GetCurveTangent(curve, 0.5);
-                var insertMid = new XYZ(midPt.X, midPt.Y, midPt.Z + offsetFt);
-                plan.Add((insertMid, midTangent));
             }
         }
 

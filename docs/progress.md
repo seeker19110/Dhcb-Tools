@@ -73,11 +73,28 @@ nó (mở → xử lý → lưu → đóng theo danh sách file, hẹn giờ Tas
 
 ---
 
+## Kiểm thử và thư viện logic thuần (Giai đoạn 0, đã làm)
+
+`src/DhcbTools.Shared.Logic` — thư viện netstandard2.0 KHÔNG tham chiếu Revit lẫn AutoCAD, chứa phần
+thuật toán trước đây bị trộn trong lệnh và bị chép ở nhiều nơi: `CsvText` (đọc/ghi CSV, UTF-8 có
+BOM), `NumericText` (số Invariant, đọc được cả dấu phẩy), `NumberingPlanner` (đánh số theo vị trí có
+gom dải theo dung sai), `MepLayout` (vị trí hanger, điểm cắt ống, cao độ, giao bounding box),
+`FileNaming`, `ExportVersionMap`, `HtmlText`, `BridgeAuth`.
+
+`tests/DhcbTools.Shared.Logic.Tests` — xUnit, chạy trên CI Linux không cần cài Revit
+(`.github/workflows/tests.yml`). Nhờ tách tầng này, các lỗi **#1 (round-trip số), #2 (nuốt cảnh
+báo), #3 (bất đối xứng export/import), #4 (CSV không BOM), #5 (đánh số không dung sai)** đã được sửa
+và mỗi lỗi có test tái hiện. Kế hoạch kiểm thử đầy đủ — gồm cả kịch bản thủ công cho phần cần Revit
+thật — ở [`dac-ta-kiem-thu.md`](dac-ta-kiem-thu.md); đặc tả các tính năng còn lại ở
+[`dac-ta-tinh-nang.md`](dac-ta-tinh-nang.md).
+
+---
+
 ## Lỗi đã biết
 
 Xếp theo mức độ. Nhóm "âm thầm" nguy hiểm nhất vì tool báo thành công trong khi kết quả sai.
 
-### Nghiêm trọng — sai âm thầm
+### Nghiêm trọng — sai âm thầm (#1–#5 đã sửa, xem mục trên)
 
 1. **Round-trip số thực hỏng trên máy locale Việt Nam.** Export ghi bằng `InvariantCulture`
    (dấu chấm), import đọc theo culture hệ thống (dấu phẩy). Trên Windows tiếng Việt, mọi giá trị
