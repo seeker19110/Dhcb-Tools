@@ -19,8 +19,9 @@ src/
 │   └── AutoNumbering/             # #3: đánh số hàng loạt theo vị trí hình học
 │
 ├── DhcbTools.Revit/               # Vỏ Revit: Ribbon, TaskDialog, WPF
-│   ├── App.cs                     # IExternalApplication
+│   ├── App.cs                     # IExternalApplication — khởi động cả Ribbon + HTTP Bridge
 │   ├── DhcbTools.Revit.addin
+│   ├── Bridge/DhcbHttpBridge.cs   # HttpListener port 8765 — agent AI gọi lệnh Core qua HTTP
 │   ├── Commands/                  # IExternalCommand — vỏ mỏng gọi Core
 │   └── UI/                        # WPF config windows
 │
@@ -32,8 +33,17 @@ src/
 │   └── AutoNumbering/             # #3: đánh số Block Reference theo attribute tag
 │
 └── DhcbTools.AutoCAD/             # Vỏ AutoCAD: IExtensionApplication, CommandMethod
-    ├── App.cs                     # IExtensionApplication — khởi tạo plugin
+    ├── App.cs                     # IExtensionApplication — khởi tạo plugin + HTTP Bridge
+    ├── Bridge/DhcbHttpBridge.cs   # HttpListener port 8766 — agent AI gọi lệnh Core qua HTTP
     └── Commands/DhcbCommands.cs   # 4 lệnh: DHCB_LAYER_EXPORT/IMPORT, DHCB_CLEANUP, DHCB_AUTONUMBER
+```
+
+`scripts/dhcb_agent.py` — client Python (không cần dependency ngoài) gọi HTTP Bridge từ terminal,
+Hermes, hoặc bất kỳ agent AI nào:
+
+```bash
+python scripts/dhcb_agent.py revit Cleanup --dry-run
+python scripts/dhcb_agent.py autocad LayerExport --output C:/tmp/layers.csv
 ```
 
 ### Tương đồng giữa hai nền tảng
@@ -86,5 +96,13 @@ Các lệnh AutoCAD sau khi load:
 
 ## Trạng thái
 
-Khung solution 2-trong-1 (Revit + AutoCAD) đã dựng xong. Các bước tiếp theo (HTTP Bridge để
-kết nối trực tiếp từ agent AI, batch runner, MEPF, IUpdater) nằm trong tài liệu nghiên cứu.
+**Đã xong**
+- Khung solution 2-trong-1 (Revit + AutoCAD), tách Core (logic thuần) khỏi vỏ UI.
+- 3 nhóm lệnh nền tảng trên cả hai nền tảng: đồng bộ dữ liệu qua CSV, dọn dẹp, đánh số hàng loạt.
+- HTTP Bridge cho agent AI: Revit port 8765 (HttpListener + ExternalEvent), AutoCAD port 8766
+  (HttpListener + `ExecuteInCommandContextAsync`), kèm client `scripts/dhcb_agent.py`.
+
+**Chưa làm** — chi tiết trong [tài liệu nghiên cứu](docs/nghien-cuu-dhcb-revit-tools.md):
+- Batch runner chạy nhiều model/drawing một lượt.
+- Nhóm tính năng MEPF (auto routing).
+- `IUpdater` để tự kiểm tra dữ liệu theo thời gian thực.
