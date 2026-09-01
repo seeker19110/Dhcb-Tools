@@ -2,7 +2,7 @@
 
 Ảnh chụp tại thời điểm cập nhật gần nhất. Kế hoạch phía trước xem [`roadmap.md`](roadmap.md).
 
-> Cập nhật lần cuối: 2026-09-01 · Tương ứng nhánh `main`
+> Cập nhật lần cuối: 2026-09-02 · Tương ứng nhánh `main` (sau khi merge Phase 1+2+3: Batch Export, Health Report, Project Init, MEPF)
 
 ## Tóm tắt
 
@@ -10,15 +10,21 @@
 |---|---|
 | Kiến trúc Core / vỏ UI | ✅ Tốt — nền móng vững cho các giai đoạn sau |
 | Lệnh nền tảng (Revit + AutoCAD) | ✅ 3 nhóm lệnh, chạy được từ Ribbon và HTTP |
-| HTTP Bridge cho agent AI | ⚠️ Chạy được, chưa có xác thực |
-| Batch runner | ⬜ Chưa bắt đầu |
-| MEPF | ⬜ Chưa bắt đầu |
+| HTTP Bridge cho agent AI | ⚠️ Chạy được, có endpoint `/query`, chưa có xác thực |
+| Batch export (PDF/DWG/IFC/NWC) + Health report | ✅ Xong |
+| Khởi tạo dự án (grid/level/family/project info) | ✅ Xong |
+| MEPF — sleeve, tag cao độ, hanger, chia ống, connector checker | ✅ Xong phần nền tảng |
+| MEPF — routing mức A/B/C | ⬜ Chưa bắt đầu |
+| Batch runner chạy đêm theo lịch | ⬜ Chưa bắt đầu |
+| `IUpdater` theo sự kiện | ⬜ Chưa bắt đầu |
 | Lớp AI | ⬜ Chưa bắt đầu |
 | Kiểm thử tự động | ❌ Không có test nào |
 | CI | ❌ Không có workflow nào |
 
-Ước tính: hoàn thành khoảng **10%** phạm vi trong tài liệu nghiên cứu. Phần đã làm là phần nền
-móng — tỷ lệ này sẽ tăng nhanh hơn ở các giai đoạn sau vì mỗi lệnh mới tái dùng được hạ tầng có sẵn.
+Ước tính: hoàn thành khoảng **35%** phạm vi trong tài liệu nghiên cứu — nhảy nhanh hơn dự kiến
+vì phần lớn Giai đoạn 5+0 và nền tảng MEPF được làm cùng lúc với hạ tầng ban đầu. Phần còn thiếu
+lớn nhất là routing MEPF (khối lượng nhiều nhất) và batch runner (đích của dự án theo tài liệu
+nghiên cứu — vẫn chưa có, dù các lệnh nó cần đã có đủ).
 
 ---
 
@@ -42,11 +48,28 @@ Cả bốn lệnh đều hỗ trợ `DryRun` (mặc định bật) và gói tron
 
 ### HTTP Bridge
 Revit cổng 8765 (`HttpListener` + `ExternalEvent` để marshal về main thread), AutoCAD cổng 8766
-(`ExecuteInCommandContextAsync`). Kèm client `scripts/dhcb_agent.py` không cần dependency ngoài.
+(`ExecuteInCommandContextAsync`). Có thêm endpoint `GET /health` và `POST /query` (đọc ngữ cảnh
+model, không ghi transaction) bên cạnh `POST /execute`. Kèm client `scripts/dhcb_agent.py` không
+cần dependency ngoài.
+
+### Giai đoạn 5+0 — Xuất bản & khởi tạo dự án
+`Export/BatchExportCommand` xuất PDF/DWG/IFC/NWC hàng loạt; `Health/HealthReportCommand` xuất
+báo cáo HTML (warning, view thừa, open connector, in-place family). `ProjectInit/*` dựng
+Level, Grid, load family theo danh mục, gán project info — tất cả từ config JSON.
+
+### MEPF — phần nền tảng
+`MEPF/SleeveCommand` (giao cắt MEP × Tường/Sàn, lọc 2 lớp BoundingBox → IntersectsSolid),
+`ElevationTagCommand` (cao độ đáy/đỉnh/tim), `HangerCommand` (đặt hanger theo khoảng cách đều
+dọc `LocationCurve`), `PipeSplitterCommand` (`BreakCurve` cho Pipe/Duct), `ConnectorCheckerCommand`
+(quét connector hở toàn mô hình, tuỳ chọn tạo 3D view khoanh vùng). Ribbon hiện có nút cho
+Sleeve, ElevationTag, ConnectorChecker; **Hanger và PipeSplitter đã có Core command nhưng chưa
+gắn nút Ribbon lẫn dispatch trong Bridge** — chỉ gọi được bằng cách sửa code, chưa dùng được
+từ UI hay HTTP.
 
 ### Điều kiện cho tự động hoá cấp 2–3
-`SilentFailuresPreprocessor` đã có và được dùng đúng trong cả ba lệnh Revit. Đây là điều kiện
-bắt buộc để chạy batch không người trực — nền cho batch runner đã sẵn sàng.
+`SilentFailuresPreprocessor` đã có và được dùng đúng trong các lệnh Revit. Đây là điều kiện bắt
+buộc để chạy batch không người trực — nền cho batch runner đã sẵn sàng, nhưng **batch runner tự
+nó (mở → xử lý → lưu → đóng theo danh sách file, hẹn giờ Task Scheduler) chưa tồn tại.**
 
 ---
 
@@ -97,8 +120,11 @@ Xếp theo mức độ. Nhóm "âm thầm" nguy hiểm nhất vì tool báo thà
    và gần như toàn bộ phần HTTP của hai Bridge. Chi phí sẽ nhân lên theo mỗi tính năng mới.
 10. **Hiệu năng collector.** `ParameterExport` và `AutoNumbering` dùng `FilteredElementCollector`
     rồi lọc bằng LINQ trong bộ nhớ. Nên dùng `ElementMulticategoryFilter` để Revit lọc ở tầng dưới.
-11. **Comment lệch code.** `Revit/App.cs` nói Bridge "lazy-get từ DocumentManager", thực tế
-    `ExternalEvent` được tạo ngay trong constructor.
+11. **Hanger và PipeSplitter chưa gắn UI/Bridge.** Core command đã viết xong nhưng không có nút
+    Ribbon, không có case trong `DispatchCommand` của Bridge — hiện chỉ chạy được nếu tự viết
+    code gọi. Cần bổ sung cả hai chỗ trước khi coi nhóm MEPF nền tảng là "dùng được".
+12. **Không còn test nào cho MEPF/Export/ProjectInit.** Cùng nợ kỹ thuật với các lệnh cũ, nhưng
+    khối lượng logic hình học (giao cắt, khoảng cách hanger) rủi ro sai cao hơn CSV/đánh số.
 
 ---
 
@@ -108,6 +134,7 @@ Theo [`roadmap.md`](roadmap.md) — Giai đoạn 0 (trả nợ kỹ thuật) r�
 
 1. Thêm `DhcbTools.Core.Tests` — bắt luôn lỗi #1 và #5.
 2. Sửa nhóm lỗi âm thầm #1–#4.
-3. Thêm token cho Bridge (#8).
-4. Sửa #6, #7.
-5. Tách `DhcbTools.Shared` (#9) — làm **trước** khi thêm tính năng mới.
+3. Gắn Hanger/PipeSplitter vào Ribbon + Bridge (#11).
+4. Thêm token cho Bridge (#8).
+5. Sửa #6, #7.
+6. Tách `DhcbTools.Shared` (#9) — làm **trước** khi thêm routing MEPF (khối lượng lớn nhất còn lại).
