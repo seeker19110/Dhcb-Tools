@@ -87,13 +87,20 @@ nó (mở → xử lý → lưu → đóng theo danh sách file, hẹn giờ Tas
 | 8 | HTTP Bridge không xác thực | Token 32 byte ngẫu nhiên sinh lúc khởi động, lưu ở `%APPDATA%\DhcbTools\bridge-token.txt`; `/execute` và `/query` bắt buộc header `Authorization: Bearer <token>` (so sánh theo thời gian cố định), `GET /health` vẫn mở |
 | 11 | Hanger và PipeSplitter chưa gắn UI | Thêm `HangerAutoCommand`, `PipeSplitterAutoCommand` và hai nút trong panel MEPF (Bridge đã dispatch sẵn từ trước) |
 
+### Đã sửa thêm (đợt 2)
+
+| # | Việc | Cách sửa |
+|---|---|---|
+| 9 (một phần) | `DhcbTools.Shared` | Project mới, không phụ thuộc Revit/AutoCAD API — `BridgeToken` chuyển vào đây, dùng chung cho cả hai Bridge thay vì hai file giống hệt nhau |
+| 10 | Hiệu năng collector | `ParameterExportCommand` và `AutoNumberingCommand` lọc category bằng `ElementMulticategoryFilter` (native) thay vì `.Where(...)` LINQ trong bộ nhớ |
+
 ### Còn lại
 
-9. **Trùng lặp ~40%** giữa `Core` và `Core.AutoCAD`: `ICoreCommand`, `CommandResult`, `Polyfills`,
-   và gần như toàn bộ phần HTTP của hai Bridge (nay thêm cả `BridgeToken`). Chi phí sẽ nhân lên
-   theo mỗi tính năng mới — cần tách `DhcbTools.Shared` **trước** khi thêm routing MEPF.
-10. **Hiệu năng collector.** `ParameterExport` và `AutoNumbering` dùng `FilteredElementCollector`
-    rồi lọc bằng LINQ trong bộ nhớ. Nên dùng `ElementMulticategoryFilter` để Revit lọc ở tầng dưới.
+9. **Trùng lặp còn lại giữa `Core` và `Core.AutoCAD`**: `ICoreCommand<TConfig>` (chữ ký khác nhau —
+   `Document` vs `Database` — nên không gộp trực tiếp được), `CommandResult` (hai property khác tên:
+   `AffectedElementCount` vs `AffectedCount`, cần đổi tên xuyên suốt để gộp), `Polyfills` (giống hệt
+   nhau, an toàn để gộp bất cứ lúc nào). Đã dọn phần dễ nhất (`BridgeToken` → `DhcbTools.Shared`);
+   phần còn lại rủi ro hơn (đổi tên property dùng ở nhiều nơi) nên để dành khi có compiler xác nhận.
 12. **Không có test nào.** Nợ lớn nhất còn lại: logic hình học (giao cắt, khoảng cách hanger),
     parser CSV và thuật toán gom hàng đều là logic thuần, test được mà chưa có test.
 
@@ -104,6 +111,8 @@ nó (mở → xử lý → lưu → đóng theo danh sách file, hẹn giờ Tas
 Theo [`roadmap.md`](roadmap.md) — Giai đoạn 0 (trả nợ kỹ thuật) rồi Giai đoạn 1 (batch runner):
 
 1. Thêm `DhcbTools.Core.Tests` (xUnit) — phủ trước `TryParseDouble`, `Bucket`, parser CSV.
-2. Tách `DhcbTools.Shared` (#9) — làm **trước** khi thêm routing MEPF (khối lượng lớn nhất còn lại).
-3. Chuyển collector sang `ElementMulticategoryFilter` (#10).
+2. Build thử trên Windows (`dotnet build`/Visual Studio) — mọi thay đổi ở Giai đoạn 0 mới chỉ
+   viết bằng tay, chưa qua compiler.
+3. Gộp nốt `Polyfills` vào `DhcbTools.Shared`; cân nhắc đổi tên `AffectedCount` →
+   `AffectedElementCount` để gộp nốt `CommandResult` (#9).
 4. Batch runner chạy đêm (Giai đoạn 1) — đích của dự án theo tài liệu nghiên cứu.

@@ -9,6 +9,7 @@ using DhcbTools.Core.AutoCAD.AutoNumbering;
 using DhcbTools.Core.AutoCAD.DrawingCleanup;
 using DhcbTools.Core.AutoCAD.LayerSync;
 using DhcbTools.Core.AutoCAD.Query;
+using DhcbTools.Shared.Bridge;
 
 namespace DhcbTools.AutoCAD.Bridge;
 

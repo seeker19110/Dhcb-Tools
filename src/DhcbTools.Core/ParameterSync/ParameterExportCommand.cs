@@ -16,9 +16,11 @@ public sealed class ParameterExportCommand : ICoreCommand<ParameterExportConfig>
     {
         var categoryIds = ResolveCategoryIds(document, config.Categories, out var unknownCategories);
 
+        // ElementMulticategoryFilter lọc ở tầng native của Revit thay vì kéo hết phần tử vào bộ nhớ
+        // rồi lọc bằng LINQ — nhanh hơn đáng kể trên model lớn nhiều category (lỗi #10).
         var collector = new FilteredElementCollector(document)
             .WhereElementIsNotElementType()
-            .Where(e => e.Category is not null && categoryIds.Contains(e.Category.Id))
+            .WherePasses(new ElementMulticategoryFilter(categoryIds))
             .ToList();
 
         var sb = new StringBuilder();

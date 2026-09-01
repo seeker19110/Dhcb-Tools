@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>DhcbTools.Shared</RootNamespace>
+    <AssemblyName>DhcbTools.Shared</AssemblyName>
+  </PropertyGroup>
+
+  <!--
+    Chỉ chứa code không phụ thuộc Revit API hay AutoCAD API — mọi type ở đây build được với
+    TargetFramework "trần" (net48 / net8.0-windows) không cần Nice3point.Revit.Api.RevitAPI
+    hay AutoCAD.NET. Bắt đầu bằng BridgeToken (giống hệt nhau ở hai Bridge, không tham chiếu gì
+    ngoài BCL) — xem lỗi #9 trong docs/progress.md.
+  -->
+
+</Project>

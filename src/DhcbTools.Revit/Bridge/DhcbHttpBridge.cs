@@ -13,6 +13,7 @@ using DhcbTools.Core.ModelCleanup;
 using DhcbTools.Core.ParameterSync;
 using DhcbTools.Core.ProjectInit;
 using DhcbTools.Core.Query;
+using DhcbTools.Shared.Bridge;
 
 namespace DhcbTools.Revit.Bridge;
 

@@ -26,6 +26,9 @@ src/
 │   ├── Commands/                  # IExternalCommand — vỏ mỏng gọi Core (kể cả Export/Health/MEPF/ProjectInit)
 │   └── UI/                        # WPF config windows
 │
+├── DhcbTools.Shared/               # Code dùng chung, không phụ thuộc Revit/AutoCAD API
+│   └── Bridge/BridgeToken.cs       # sinh + xác thực token Bearer, dùng chung cho cả hai Bridge
+│
 ├── DhcbTools.Core.AutoCAD/        # Core AutoCAD — logic thuần, KHÔNG Editor/WPF
 │   ├── ICoreCommand.cs            # Database + config → CommandResult
 │   ├── CommandResult.cs
@@ -116,7 +119,8 @@ Các lệnh AutoCAD sau khi load:
 - MEPF phần nền tảng: sleeve tại giao cắt, tag cao độ, hanger, chia ống, connector checker —
   cả 5 lệnh đều có nút Ribbon và gọi được qua HTTP Bridge.
 - Giai đoạn 0 (trả nợ kỹ thuật): sửa nhóm lỗi sai âm thầm (CSV locale/BOM, mất cảnh báo, dung sai
-  đánh số, cleanup AutoCAD), token xác thực cho Bridge, huỷ việc khi client hết thời gian chờ.
+  đánh số, cleanup AutoCAD), token xác thực cho Bridge, huỷ việc khi client hết thời gian chờ,
+  tách `DhcbTools.Shared` (bắt đầu với `BridgeToken`), lọc category qua `ElementMulticategoryFilter`.
 
 **Đang tới** — test tự động (`DhcbTools.Core.Tests`), tách `DhcbTools.Shared` để bỏ phần trùng lặp
 giữa hai Core, batch runner chạy đêm theo lịch, routing MEPF (mức A/B/C), `IUpdater` chạy theo

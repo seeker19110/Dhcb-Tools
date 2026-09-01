@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 
-namespace DhcbTools.Revit.Bridge;
+namespace DhcbTools.Shared.Bridge;
 
 /// <summary>
 /// Token dùng chung cho HTTP Bridge (lỗi #8). Sinh ngẫu nhiên lần đầu, lưu ở

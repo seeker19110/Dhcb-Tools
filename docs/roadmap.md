@@ -26,7 +26,7 @@ hơn nhiều so với sau khi thêm routing MEPF (khối lượng lớn nhất c
 | ⬜ Project `DhcbTools.Core.Tests` (xUnit) | Parser CSV, thuật toán đánh số, logic hình học MEPF đều là logic thuần, test được không cần Revit |
 | ✅ Sửa nhóm lỗi âm thầm | Lỗi #1–#7 đã sửa — xem "Lỗi đã biết" trong `progress.md` |
 | ✅ Token xác thực cho HTTP Bridge | Bearer token lưu ở `%APPDATA%\DhcbTools\bridge-token.txt` |
-| ⬜ Tách `DhcbTools.Shared` | `CommandResult`, `ICoreCommand`, phần HTTP chung đang bị nhân đôi giữa Revit và AutoCAD |
+| 🟡 Tách `DhcbTools.Shared` | `BridgeToken` đã chuyển sang; `CommandResult`/`ICoreCommand` còn lại vì khác chữ ký/tên property, cần compiler xác nhận trước khi đổi |
 | ✅ Gắn Hanger/PipeSplitter vào Ribbon + Bridge | Đã có nút trong panel MEPF |
 
 **Xong khi:** test chạy xanh trong CI, Bridge yêu cầu token, không còn class trùng lặp giữa hai Core.
