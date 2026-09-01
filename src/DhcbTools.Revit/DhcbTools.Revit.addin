@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>DHCB Revit Tools</Name>
+    <Assembly>DhcbTools.Revit.dll</Assembly>
+    <AddInId>2E9F5B1A-8F2D-4C7E-9B3A-1D6C4E8F2A70</AddInId>
+    <FullClassName>DhcbTools.Revit.App</FullClassName>
+    <VendorId>DHCB</VendorId>
+    <VendorDescription>DHCB, https://github.com/seeker19110/Dhcb-Tools</VendorDescription>
+  </AddIn>
+</RevitAddIns>
