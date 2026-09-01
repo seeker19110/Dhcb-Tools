@@ -1,4 +1,5 @@
 using Autodesk.Revit.DB;
+using DhcbTools.Shared.Logic;
 
 namespace DhcbTools.Core.AutoNumbering;
 
@@ -35,29 +36,22 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
             return CommandResult.Fail($"Không có phần tử nào của category \"{config.Category}\" có vị trí để đánh số.");
         }
 
-        // Gom theo dung sai trước khi sắp: nếu sắp thuần theo toạ độ thì hai cửa cùng hàng lệch 1mm
-        // rơi vào hai "hàng" khác nhau, làm tiêu chí phụ gần như vô tác dụng (lỗi #5).
-        var tolerance = MmToFeet(config.RowToleranceMm);
-        var ordered = config.Direction == NumberingDirection.LeftToRightThenTopToBottom
-            ? elements
-                .OrderByDescending(t => Bucket(t.Location!.Y, tolerance))
-                .ThenBy(t => t.Location!.X)
-            : elements
-                .OrderBy(t => Bucket(t.Location!.X, tolerance))
-                .ThenByDescending(t => t.Location!.Y);
+        // Sắp xếp có gom dải theo dung sai (mặc định 300 mm): hai cửa cùng hàng lệch vài mm phải nằm
+        // cùng một "hàng" thì thứ tự trái→phải mới có nghĩa (lỗi #5 trong docs/progress.md).
+        var items = elements
+            .Select(t => new NumberingItem<Element>(t.Element, t.Location!.X, t.Location!.Y))
+            .ToList();
 
-        var plan = new List<(Element Element, string Value)>();
-        var number = config.StartNumber;
-        foreach (var (element, _) in ordered)
-        {
-            var digits = number.ToString();
-            if (config.PadWidth > 0)
-            {
-                digits = digits.PadLeft(config.PadWidth, '0');
-            }
-            plan.Add((element, config.Prefix + digits));
-            number += config.Step;
-        }
+        var direction = config.Direction == NumberingDirection.LeftToRightThenTopToBottom
+            ? ScanDirection.LeftToRightThenTopToBottom
+            : ScanDirection.TopToBottomThenLeftToRight;
+
+        var ordered = NumberingPlanner.Order(items, direction, config.RowToleranceMm / MepLayout.FeetToMm);
+
+        var plan = NumberingPlanner
+            .Assign(ordered, config.Prefix, config.StartNumber, config.Step, config.PadWidth)
+            .Select(a => (Element: a.Key, Value: a.Value))
+            .ToList();
 
         if (config.DryRun)
         {
@@ -65,10 +59,6 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
                 $"[Xem trước] Sẽ đánh số {plan.Count} phần tử \"{config.Category}\" vào tham số \"{config.ParameterName}\".",
                 plan.Count);
             preview.Messages.AddRange(plan.Select(p => $"{p.Element.Id}: \"{p.Value}\""));
-            if (unknown.Count > 0)
-            {
-                preview.Messages.Add($"Bỏ qua category không xác định: {string.Join(", ", unknown)}.");
-            }
             return preview;
         }
 
@@ -99,16 +89,12 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
 
         transaction.Commit();
 
-        // Dùng result.With để giữ lại toàn bộ cảnh báo "Bỏ qua phần tử ..." đã gom ở trên (lỗi #2).
-        return result.With($"Đã đánh số {updated}/{plan.Count} phần tử \"{config.Category}\".", updated);
+        // Lỗi #2: bản cũ `return CommandResult.Ok(...)` tạo object mới nên toàn bộ dòng "Bỏ qua phần tử X"
+        // gom trong `result` bị mất — kỹ sư thấy "40/120" mà không biết 80 phần tử kia hỏng vì lý do gì.
+        var final = CommandResult.Ok($"Đã đánh số {updated}/{plan.Count} phần tử \"{config.Category}\".", updated);
+        final.Messages.AddRange(result.Messages);
+        return final;
     }
-
-    /// <summary>Quy tròn toạ độ về "rổ" theo dung sai để các phần tử cùng hàng có cùng khoá sắp xếp.</summary>
-    internal static double Bucket(double coordinate, double tolerance)
-        => tolerance <= 0 ? coordinate : Math.Round(coordinate / tolerance, MidpointRounding.AwayFromZero) * tolerance;
-
-    /// <summary>Đổi mm sang feet — đơn vị nội bộ của Revit API.</summary>
-    internal static double MmToFeet(double millimeters) => millimeters / 304.8;
 
     private static bool BelongsToLevel(Document document, Element element, string levelName)
     {

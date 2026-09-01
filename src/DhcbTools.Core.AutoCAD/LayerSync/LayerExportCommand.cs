@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Autodesk.AutoCAD.DatabaseServices;
+using DhcbTools.Shared.Logic;
 
 namespace DhcbTools.Core.AutoCAD.LayerSync;
 
@@ -52,8 +53,8 @@ public sealed class LayerExportCommand : ICoreCommand<LayerExportConfig>
 
         transaction.Commit();
 
-        // UTF-8 kèm BOM để Excel trên Windows hiển thị đúng tên tiếng Việt (lỗi #4).
-        File.WriteAllText(config.OutputPath, sb.ToString(), new UTF8Encoding(true));
+        // UTF-8 CÓ BOM để Excel trên Windows đọc đúng tên layer tiếng Việt.
+        File.WriteAllText(config.OutputPath, sb.ToString(), CsvText.Utf8WithBom);
 
         return CommandResult.Ok(
             $"Đã xuất {count} layer ra \"{config.OutputPath}\".",
@@ -78,13 +79,5 @@ public sealed class LayerExportCommand : ICoreCommand<LayerExportConfig>
         }
     }
 
-    private static string CsvEscape(string? value)
-    {
-        value ??= string.Empty;
-        if (value.Contains(',') || value.Contains('"') || value.Contains('\n'))
-        {
-            return "\"" + value.Replace("\"", "\"\"") + "\"";
-        }
-        return value;
-    }
+    private static string CsvEscape(string? value) => CsvText.Escape(value ?? string.Empty);
 }

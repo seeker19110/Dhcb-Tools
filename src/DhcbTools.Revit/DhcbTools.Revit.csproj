@@ -11,7 +11,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DhcbTools.Core\DhcbTools.Core.csproj" />
-    <ProjectReference Include="..\DhcbTools.Shared\DhcbTools.Shared.csproj" />
+    <ProjectReference Include="..\DhcbTools.Shared.Logic\DhcbTools.Shared.Logic.csproj" />
   </ItemGroup>
 
   <ItemGroup>

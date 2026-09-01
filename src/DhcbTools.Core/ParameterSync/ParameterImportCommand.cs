@@ -1,5 +1,5 @@
-using System.Globalization;
 using Autodesk.Revit.DB;
+using DhcbTools.Shared.Logic;
 
 namespace DhcbTools.Core.ParameterSync;
 
@@ -24,7 +24,7 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
             return CommandResult.Fail("File CSV không có dữ liệu (chỉ có dòng tiêu đề hoặc rỗng).");
         }
 
-        var header = SplitCsvLine(lines[0]);
+        var header = CsvText.SplitLine(lines[0]);
         // 3 cột đầu cố định: ElementId, Category, Name — phần còn lại là tên tham số.
         var parameterColumns = header.Skip(3).ToList();
 
@@ -43,7 +43,7 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
                 continue;
             }
 
-            var cells = SplitCsvLine(lines[i]);
+            var cells = CsvText.SplitLine(lines[i]);
             if (cells.Count < 3 || !long.TryParse(cells[0], out var idValue))
             {
                 result.Messages.Add($"Bỏ qua dòng {i + 1}: ElementId không hợp lệ.");
@@ -72,81 +72,56 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
                     continue;
                 }
 
-                var parameter = ResolveParameter(element, parameterColumns[col]);
+                var name = parameterColumns[col];
+                var parameter = element.LookupParameter(name);
+
                 if (parameter is null)
                 {
+                    // Export có fallback đọc tham số ở Type; import phải đối xứng, nếu không thì tham số
+                    // Type xuất ra được mà sửa xong không nhập lại được và không có cảnh báo nào (lỗi #3).
+                    parameter = document.GetElement(element.GetTypeId())?.LookupParameter(name);
+                }
+
+                if (parameter is null)
+                {
+                    result.Messages.Add($"Bỏ qua dòng {i + 1}, cột \"{name}\": phần tử {idValue} không có tham số này.");
                     continue;
                 }
 
                 if (parameter.IsReadOnly)
                 {
-                    result.Messages.Add(
-                        $"Dòng {i + 1}: tham số \"{parameterColumns[col]}\" chỉ đọc, không ghi được.");
+                    result.Messages.Add($"Bỏ qua dòng {i + 1}, cột \"{name}\": tham số chỉ đọc.");
                     continue;
                 }
 
-                var rawValue = cells[cellIndex];
-                if (TrySetParameter(parameter, rawValue))
+                if (TrySetParameter(parameter, cells[cellIndex]))
                 {
                     updated++;
                 }
-                else if (!string.IsNullOrWhiteSpace(rawValue))
+                else
                 {
                     result.Messages.Add(
-                        $"Dòng {i + 1}: không ghi được giá trị \"{rawValue}\" vào tham số \"{parameterColumns[col]}\".");
+                        $"Bỏ qua dòng {i + 1}, cột \"{name}\": không ghi được giá trị \"{cells[cellIndex]}\" ({parameter.StorageType}).");
                 }
             }
         }
 
+        string summary;
         if (config.DryRun)
         {
             transaction.RollBack();
-            return result.With(
-                $"[Xem trước] Sẽ cập nhật {updated} giá trị tham số (chưa ghi vào mô hình).", updated);
+            summary = $"[Xem trước] Sẽ cập nhật {updated} giá trị tham số (chưa ghi vào mô hình).";
         }
-
-        transaction.Commit();
-        return result.With($"Đã cập nhật {updated} giá trị tham số từ \"{config.InputPath}\".", updated);
-    }
-
-    /// <summary>
-    /// Tra tham số ở instance, nếu không có thì tra tiếp ở Type — đối xứng với
-    /// <see cref="ParameterExportCommand.ReadParameterAsString"/> (lỗi #3).
-    /// </summary>
-    internal static Parameter? ResolveParameter(Element element, string parameterName)
-    {
-        var parameter = element.LookupParameter(parameterName);
-        if (parameter is not null)
+        else
         {
-            return parameter;
+            transaction.Commit();
+            summary = $"Đã cập nhật {updated} giá trị tham số từ \"{config.InputPath}\".";
         }
 
-        var typeElement = element.Document.GetElement(element.GetTypeId());
-        return typeElement?.LookupParameter(parameterName);
-    }
-
-    /// <summary>
-    /// Đọc số theo <see cref="CultureInfo.InvariantCulture"/> đúng như lúc xuất, có fallback sang
-    /// culture hệ thống cho file người dùng tự gõ tay trong Excel tiếng Việt (lỗi #1).
-    /// </summary>
-    internal static bool TryParseDouble(string rawValue, out double value)
-    {
-        if (double.TryParse(rawValue, NumberStyles.Float, CultureInfo.InvariantCulture, out value))
-        {
-            return true;
-        }
-
-        return double.TryParse(rawValue, NumberStyles.Float, CultureInfo.CurrentCulture, out value);
-    }
-
-    internal static bool TryParseInt(string rawValue, out int value)
-    {
-        if (int.TryParse(rawValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out value))
-        {
-            return true;
-        }
-
-        return int.TryParse(rawValue, NumberStyles.Integer, CultureInfo.CurrentCulture, out value);
+        // Giữ nguyên object `result` để không đánh rơi toàn bộ cảnh báo đã gom ở trên (cùng dạng lỗi #2).
+        var final = CommandResult.Ok(summary, updated);
+        final.Messages.AddRange(result.Messages);
+        return final;
     }
 
     private static bool TrySetParameter(Parameter parameter, string rawValue)
@@ -158,9 +133,11 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
                 case StorageType.String:
                     return parameter.Set(rawValue);
                 case StorageType.Integer:
-                    return TryParseInt(rawValue, out var intValue) && parameter.Set(intValue);
+                    return NumericText.TryParseInt(rawValue, out var intValue) && parameter.Set(intValue);
                 case StorageType.Double:
-                    return TryParseDouble(rawValue, out var doubleValue) && parameter.Set(doubleValue);
+                    // Export ghi bằng InvariantCulture; đọc lại cũng phải Invariant, đồng thời chấp nhận
+                    // dấu phẩy thập phân do kỹ sư gõ tay trong Excel tiếng Việt (lỗi #1).
+                    return NumericText.TryParseDouble(rawValue, out var doubleValue) && parameter.Set(doubleValue);
                 default:
                     return false;
             }
@@ -171,46 +148,4 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
         }
     }
 
-    private static List<string> SplitCsvLine(string line)
-    {
-        var cells = new List<string>();
-        var current = new System.Text.StringBuilder();
-        var inQuotes = false;
-
-        for (var i = 0; i < line.Length; i++)
-        {
-            var c = line[i];
-            if (inQuotes)
-            {
-                if (c == '"' && i + 1 < line.Length && line[i + 1] == '"')
-                {
-                    current.Append('"');
-                    i++;
-                }
-                else if (c == '"')
-                {
-                    inQuotes = false;
-                }
-                else
-                {
-                    current.Append(c);
-                }
-            }
-            else if (c == '"')
-            {
-                inQuotes = true;
-            }
-            else if (c == ',')
-            {
-                cells.Add(current.ToString());
-                current.Clear();
-            }
-            else
-            {
-                current.Append(c);
-            }
-        }
-        cells.Add(current.ToString());
-        return cells;
-    }
 }

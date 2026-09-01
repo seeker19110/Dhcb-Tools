@@ -29,7 +29,7 @@ ACAD_URL  = "http://localhost:8766/execute"
 
 # Bridge sinh token ngẫu nhiên lúc khởi động và lưu ở đây; client đọc lại để gửi kèm request.
 TOKEN_PATH = os.path.join(
-    os.environ.get("APPDATA", os.path.expanduser("~")), "DhcbTools", "bridge-token.txt"
+    os.environ.get("APPDATA", os.path.expanduser("~")), "DHCB", "bridge-token.txt"
 )
 
 

@@ -31,6 +31,12 @@ public sealed class AutoNumberingConfig
     /// <summary>Chỉ đánh số phần tử thuộc Level này (null = tất cả các tầng, đánh số liên tục).</summary>
     public string? LevelName { get; init; }
 
+    /// <summary>
+    /// Dung sai gom hàng/cột khi sắp xếp (mm). Hai phần tử lệch nhau trong dung sai này được coi là
+    /// cùng một hàng (hoặc cùng một cột), nhờ đó thứ tự trong hàng mới có tác dụng.
+    /// </summary>
+    public double RowToleranceMm { get; init; } = 300.0;
+
     /// <summary>Hướng quét để xác định thứ tự đánh số theo vị trí hình học.</summary>
     public NumberingDirection Direction { get; init; } = NumberingDirection.LeftToRightThenTopToBottom;
 

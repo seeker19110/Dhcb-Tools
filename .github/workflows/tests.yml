@@ -1,0 +1,35 @@
+# CI chỉ build + test phần logic thuần (DhcbTools.Shared.Logic).
+# Các project vỏ Revit/AutoCAD cần RevitAPI.dll / AcMgd.dll nên không build được trên runner Linux;
+# quy trình build vỏ nằm ở CONTRIBUTING.md và chạy trên máy có cài Revit/AutoCAD.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  logic-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj
+
+      - name: Build
+        run: dotnet build tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj --no-restore -c Release
+
+      - name: Test
+        run: dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj --no-build -c Release --logger "trx;LogFileName=test-results.trx"
+
+      - name: Tải kết quả test
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/test-results.trx'

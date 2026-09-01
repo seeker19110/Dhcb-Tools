@@ -1,7 +1,9 @@
 # Lộ trình phát triển DHCB Tools
 
 Tài liệu này mô tả **kế hoạch phía trước**. Hiện trạng thực tế (đã làm được gì, còn lỗi gì)
-nằm ở [`progress.md`](progress.md). Cơ sở kỹ thuật và khảo sát tính năng nằm ở
+nằm ở [`progress.md`](progress.md). Đặc tả chi tiết phần chưa làm ở
+[`dac-ta-tinh-nang.md`](dac-ta-tinh-nang.md), kế hoạch kiểm thử ở [`dac-ta-kiem-thu.md`](dac-ta-kiem-thu.md).
+Cơ sở kỹ thuật và khảo sát tính năng nằm ở
 [`nghien-cuu-dhcb-revit-tools.md`](nghien-cuu-dhcb-revit-tools.md).
 
 Ký hiệu: ✅ xong · 🟡 làm dở · ⬜ chưa bắt đầu.
@@ -23,11 +25,12 @@ hơn nhiều so với sau khi thêm routing MEPF (khối lượng lớn nhất c
 
 | Việc | Lý do |
 |---|---|
-| ⬜ Project `DhcbTools.Core.Tests` (xUnit) | Parser CSV, thuật toán đánh số, logic hình học MEPF đều là logic thuần, test được không cần Revit |
-| ✅ Sửa nhóm lỗi âm thầm | Lỗi #1–#7 đã sửa — xem "Lỗi đã biết" trong `progress.md` |
-| ✅ Token xác thực cho HTTP Bridge | Bearer token lưu ở `%APPDATA%\DhcbTools\bridge-token.txt` |
-| 🟡 Tách `DhcbTools.Shared` | `BridgeToken` đã chuyển sang; `CommandResult`/`ICoreCommand` còn lại vì khác chữ ký/tên property, cần compiler xác nhận trước khi đổi |
-| ✅ Gắn Hanger/PipeSplitter vào Ribbon + Bridge | Đã có nút trong panel MEPF |
+| ✅ Project test xUnit (`tests/DhcbTools.Shared.Logic.Tests`) | Parser CSV, thuật toán đánh số, logic hình học MEPF đều là logic thuần, test được không cần Revit |
+| ✅ Sửa nhóm lỗi âm thầm #1–#5 (test được) | `DhcbTools.Shared.Logic` — xem "Lỗi đã biết" trong `progress.md` |
+| ✅ Sửa #6, #7 (chưa có test, cần compiler xác nhận) | DrawingCleanup AutoCAD, timeout Bridge — xem `progress.md` |
+| ✅ Token xác thực cho HTTP Bridge (#8) | `BridgeAuth` (đã test) + wiring vào cả hai Bridge, token lưu ở `%APPDATA%\DHCB\bridge-token.txt` |
+| 🟡 Tách phần dùng chung — xong `DhcbTools.Shared.Logic`, còn `Shared.Hosting` | `CommandResult`, `ICoreCommand`, phần HTTP chung đang bị nhân đôi giữa Revit và AutoCAD — xem `dac-ta-tinh-nang.md` §0.2 |
+| ✅ Gắn Hanger/PipeSplitter vào Ribbon + Bridge (#11) | Đã có nút trong panel MEPF |
 
 **Xong khi:** test chạy xanh trong CI, Bridge yêu cầu token, không còn class trùng lặp giữa hai Core.
 

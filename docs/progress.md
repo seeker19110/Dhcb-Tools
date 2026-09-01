@@ -71,38 +71,60 @@ nó (mở → xử lý → lưu → đóng theo danh sách file, hẹn giờ Tas
 
 ---
 
+## Kiểm thử và thư viện logic thuần (Giai đoạn 0, đã làm)
+
+`src/DhcbTools.Shared.Logic` — thư viện netstandard2.0 KHÔNG tham chiếu Revit lẫn AutoCAD, chứa phần
+thuật toán trước đây bị trộn trong lệnh và bị chép ở nhiều nơi: `CsvText` (đọc/ghi CSV, UTF-8 có
+BOM), `NumericText` (số Invariant, đọc được cả dấu phẩy), `NumberingPlanner` (đánh số theo vị trí có
+gom dải theo dung sai), `MepLayout` (vị trí hanger, điểm cắt ống, cao độ, giao bounding box),
+`FileNaming`, `ExportVersionMap`, `HtmlText`, `BridgeAuth`.
+
+`tests/DhcbTools.Shared.Logic.Tests` — xUnit, chạy trên CI Linux không cần cài Revit
+(`.github/workflows/tests.yml`). Nhờ tách tầng này, các lỗi **#1 (round-trip số), #2 (nuốt cảnh
+báo), #3 (bất đối xứng export/import), #4 (CSV không BOM), #5 (đánh số không dung sai)** đã được sửa
+và mỗi lỗi có test tái hiện. Kế hoạch kiểm thử đầy đủ — gồm cả kịch bản thủ công cho phần cần Revit
+thật — ở [`dac-ta-kiem-thu.md`](dac-ta-kiem-thu.md); đặc tả các tính năng còn lại ở
+[`dac-ta-tinh-nang.md`](dac-ta-tinh-nang.md).
+
+---
+
 ## Lỗi đã biết
 
 ### Đã sửa ở Giai đoạn 0
 
+### #1–#5 (đã sửa ở `DhcbTools.Shared.Logic`, xem mục trên)
+
+### #6–#11 (đã sửa trực tiếp trong Core/vỏ, chưa có test tự động)
+
 | # | Lỗi | Cách sửa |
 |---|---|---|
-| 1 | Round-trip số thực hỏng trên máy locale Việt Nam | Import đọc số bằng `InvariantCulture` đúng như lúc xuất, có fallback sang culture hệ thống cho file người dùng tự gõ (`ParameterImportCommand.TryParseDouble/TryParseInt`) |
-| 2 | Cảnh báo bị nuốt ở dòng `return` cuối | Thêm `CommandResult.With(summary, affected)` giữ nguyên `Messages`/`Errors`; áp dụng cho AutoNumbering (Revit + AutoCAD) và ParameterImport |
-| 3 | Bất đối xứng Export/Import tham số | Import tra tham số ở instance rồi fallback sang Type (`ResolveParameter`), đối xứng với export; tham số chỉ đọc/ghi hỏng đều được báo ra |
-| 4 | CSV không có BOM | `ParameterExportCommand` và `LayerExportCommand` ghi bằng `new UTF8Encoding(true)` |
-| 5 | Đánh số theo hàng không có dung sai | Thêm `AutoNumberingConfig.RowToleranceMm` (mặc định 300mm), gom toạ độ về "rổ" trước khi sắp nên tiêu chí phụ mới có tác dụng |
 | 6 | DrawingCleanup xoá nhầm và làm hỏng transaction | Linetype của layer definition và `CELTYPE` được tính là đang dùng; loại trừ layer hiện hành `CLAYER`; mỗi `Erase()` bọc try/catch riêng và báo object nào không xoá được |
-| 7 | Request timeout vẫn thực thi | Việc trong queue mang cờ huỷ; client hết 30s thì handler bỏ qua thay vì chạy khi không còn ai nhận kết quả |
-| 8 | HTTP Bridge không xác thực | Token 32 byte ngẫu nhiên sinh lúc khởi động, lưu ở `%APPDATA%\DhcbTools\bridge-token.txt`; `/execute` và `/query` bắt buộc header `Authorization: Bearer <token>` (so sánh theo thời gian cố định), `GET /health` vẫn mở |
+| 7 | Request timeout vẫn thực thi | Việc trong hàng đợi mang cờ huỷ; client hết 30s thì handler bỏ qua thay vì chạy khi không còn ai nhận kết quả |
+| 8 | HTTP Bridge không xác thực | Dùng `BridgeAuth` (đã test ở `Shared.Logic`) để sinh/so khớp token; `/execute` và `/query` bắt buộc header `Authorization: Bearer <token>` đúng **và** `Content-Type: application/json`; sai token quá 5 lần/60s bị khoá tạm 5 phút; `GET /health` chỉ trả `{status, version}` |
 | 11 | Hanger và PipeSplitter chưa gắn UI | Thêm `HangerAutoCommand`, `PipeSplitterAutoCommand` và hai nút trong panel MEPF (Bridge đã dispatch sẵn từ trước) |
 
-### Đã sửa thêm (đợt 2)
+Chi tiết thiết kế của #8 và #11 — xem [`dac-ta-tinh-nang.md`](dac-ta-tinh-nang.md) §0.1 và §0.3.
+
+### Đã sửa thêm
 
 | # | Việc | Cách sửa |
 |---|---|---|
-| 9 (một phần) | `DhcbTools.Shared` | Project mới, không phụ thuộc Revit/AutoCAD API — `BridgeToken` chuyển vào đây, dùng chung cho cả hai Bridge thay vì hai file giống hệt nhau |
 | 10 | Hiệu năng collector | `ParameterExportCommand` và `AutoNumberingCommand` lọc category bằng `ElementMulticategoryFilter` (native) thay vì `.Where(...)` LINQ trong bộ nhớ |
 
 ### Còn lại
 
-9. **Trùng lặp còn lại giữa `Core` và `Core.AutoCAD`**: `ICoreCommand<TConfig>` (chữ ký khác nhau —
-   `Document` vs `Database` — nên không gộp trực tiếp được), `CommandResult` (hai property khác tên:
-   `AffectedElementCount` vs `AffectedCount`, cần đổi tên xuyên suốt để gộp), `Polyfills` (giống hệt
-   nhau, an toàn để gộp bất cứ lúc nào). Đã dọn phần dễ nhất (`BridgeToken` → `DhcbTools.Shared`);
-   phần còn lại rủi ro hơn (đổi tên property dùng ở nhiều nơi) nên để dành khi có compiler xác nhận.
-12. **Không có test nào.** Nợ lớn nhất còn lại: logic hình học (giao cắt, khoảng cách hanger),
-    parser CSV và thuật toán gom hàng đều là logic thuần, test được mà chưa có test.
+9. **`DhcbTools.Shared.Hosting` chưa tồn tại** (xem `dac-ta-tinh-nang.md` §0.2): `CommandResult`
+   (hai property khác tên — `AffectedElementCount` vs `AffectedCount`), `ICoreCommand<TConfig>`,
+   `Polyfills`, và phần dùng chung ~90% của hai `DhcbHttpBridge.cs` (`HttpBridgeServer`) vẫn bị
+   nhân đôi giữa Core Revit và Core AutoCAD. `DhcbTools.Shared.Logic` (phần logic thuần, không
+   phụ thuộc HttpListener) đã tách xong và dùng chung — đây chỉ còn phần "vỏ" HTTP + kiểu dữ liệu.
+12. **Test tự động mới phủ lớp logic thuần.** #6 (DrawingCleanup AutoCAD), #7/#8 (Bridge — cần
+    `HttpListener` thật nên khó unit test, xem kịch bản thủ công ở `dac-ta-kiem-thu.md` §4.1), và
+    #11 (Ribbon/Bridge wiring) vẫn chưa có test.
+13. **Mọi thay đổi C# trong Giai đoạn 0 (cả đợt #1-#5 lẫn #6-#11) chưa được build trên máy có
+    Revit/AutoCAD SDK** — môi trường CI hiện chỉ build/test được `DhcbTools.Shared.Logic` (không
+    tham chiếu Revit/AutoCAD API). `dotnet build` toàn solution trên Windows là bước bắt buộc
+    trước khi coi Giai đoạn 0 là xong.
 
 ---
 
@@ -110,9 +132,7 @@ nó (mở → xử lý → lưu → đóng theo danh sách file, hẹn giờ Tas
 
 Theo [`roadmap.md`](roadmap.md) — Giai đoạn 0 (trả nợ kỹ thuật) rồi Giai đoạn 1 (batch runner):
 
-1. Thêm `DhcbTools.Core.Tests` (xUnit) — phủ trước `TryParseDouble`, `Bucket`, parser CSV.
-2. Build thử trên Windows (`dotnet build`/Visual Studio) — mọi thay đổi ở Giai đoạn 0 mới chỉ
-   viết bằng tay, chưa qua compiler.
-3. Gộp nốt `Polyfills` vào `DhcbTools.Shared`; cân nhắc đổi tên `AffectedCount` →
-   `AffectedElementCount` để gộp nốt `CommandResult` (#9).
-4. Batch runner chạy đêm (Giai đoạn 1) — đích của dự án theo tài liệu nghiên cứu.
+1. Build thử toàn solution trên Windows (`dotnet build`/Visual Studio) — #6-#11 chưa qua compiler.
+2. Tách `DhcbTools.Shared.Hosting` theo `dac-ta-tinh-nang.md` §0.2 — gộp nốt `CommandResult`,
+   `ICoreCommand`, `Polyfills`, và phần chung của hai `DhcbHttpBridge.cs`.
+3. Batch runner chạy đêm (Giai đoạn 1) — đích của dự án theo tài liệu nghiên cứu.

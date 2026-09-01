@@ -13,7 +13,7 @@ using DhcbTools.Core.ModelCleanup;
 using DhcbTools.Core.ParameterSync;
 using DhcbTools.Core.ProjectInit;
 using DhcbTools.Core.Query;
-using DhcbTools.Shared.Bridge;
+using DhcbTools.Shared.Logic;
 
 namespace DhcbTools.Revit.Bridge;
 
@@ -31,7 +31,7 @@ namespace DhcbTools.Revit.Bridge;
 ///   POST http://localhost:8765/query  { "query": "document_info" }
 ///   → tương tự nhưng trả về dữ liệu đọc (không transaction ghi)
 ///
-///   GET  http://localhost:8765/health  → { "status": "ok", "port": 8765 }
+///   GET  http://localhost:8765/health  → { "status": "ok", "version": "..." } (không cần token)
 ///
 /// Khởi động: App.cs gọi DhcbHttpBridge.Start() khi add-in load.
 /// Dừng:      App.cs gọi DhcbHttpBridge.Stop() khi add-in unload.
@@ -39,11 +39,13 @@ namespace DhcbTools.Revit.Bridge;
 public sealed class DhcbHttpBridge : IDisposable
 {
     public const int Port = 8765;
+    private const string Version = "0.1";
 
     private readonly HttpListener _listener = new();
     private readonly ExternalEvent _externalEvent;
     private readonly BridgeEventHandler _handler;
-    private readonly string _token = BridgeToken.LoadOrCreate();
+    private readonly string _token = BridgeTokenStore.LoadOrCreate();
+    private readonly BridgeRateLimiter _rateLimiter = new();
     private CancellationTokenSource? _cts;
     private Task? _listenTask;
     private bool _disposed;
@@ -93,27 +95,26 @@ public sealed class DhcbHttpBridge : IDisposable
         var req = ctx.Request;
         var res = ctx.Response;
 
-        // ── Health check ──────────────────────────────────────────
+        // ── Health check (không cần token, không lộ tên file/lệnh — chỉ báo add-in còn sống) ──
         if (req.HttpMethod == "GET" && req.Url?.AbsolutePath == "/health")
         {
-            WriteJson(res, 200, new { status = "ok", port = Port, app = "Revit" });
+            WriteJson(res, 200, new { status = "ok", version = Version });
             return;
         }
 
-        // ── Xác thực token (lỗi #8) ───────────────────────────────
-        // Không có token thì bất kỳ tiến trình nào trên máy cũng gửi được lệnh xoá với dryRun=false.
-        var authorization = req.Headers["Authorization"];
-        var provided = authorization is not null && authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
-            ? authorization.Substring("Bearer ".Length).Trim()
-            : null;
-
-        if (!BridgeToken.Matches(_token, provided))
+        // ── Chặn brute-force trước khi so token (lỗi #8) ──────────
+        if (_rateLimiter.IsLockedOut())
         {
-            WriteJson(res, 401, new
-            {
-                error = "Thiếu hoặc sai token. Gửi header \"Authorization: Bearer <token>\".",
-                tokenFile = BridgeToken.TokenFilePath,
-            });
+            WriteJson(res, 429, new { error = "too_many_attempts" });
+            return;
+        }
+
+        // ── Xác thực token + Content-Type (lỗi #8) ────────────────
+        // Không có token thì bất kỳ tiến trình nào trên máy cũng gửi được lệnh xoá với dryRun=false.
+        if (!BridgeAuth.IsAuthorized(_token, req.Headers["Authorization"], req.ContentType))
+        {
+            _rateLimiter.RecordFailure();
+            WriteJson(res, 401, new { error = "unauthorized" });
             return;
         }
 
@@ -276,6 +277,84 @@ public sealed class DhcbHttpBridge : IDisposable
         Stop();
         _externalEvent.Dispose();
         _listener.Close();
+    }
+}
+
+// ──────────────────────────────────────────────────────────────
+// Token persistence + rate limit — phần "vỏ" (I/O, trạng thái) của lỗi #8.
+// Logic thuần (sinh/so khớp token) nằm ở DhcbTools.Shared.Logic.BridgeAuth, đã có test.
+// Trùng với DhcbTools.AutoCAD/Bridge/DhcbHttpBridge.cs — sẽ gộp khi có DhcbTools.Shared.Hosting
+// (xem docs/dac-ta-tinh-nang.md §0.2).
+// ──────────────────────────────────────────────────────────────
+
+internal static class BridgeTokenStore
+{
+    public static string TokenFilePath => System.IO.Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DHCB", "bridge-token.txt");
+
+    public static string LoadOrCreate()
+    {
+        var path = TokenFilePath;
+        try
+        {
+            if (System.IO.File.Exists(path))
+            {
+                var existing = System.IO.File.ReadAllText(path).Trim();
+                if (existing.Length >= 32)
+                {
+                    return existing;
+                }
+            }
+        }
+        catch (System.IO.IOException)
+        {
+            // Không đọc được thì sinh mới bên dưới.
+        }
+
+        var token = BridgeAuth.GenerateToken();
+        var directory = System.IO.Path.GetDirectoryName(path)!;
+        System.IO.Directory.CreateDirectory(directory);
+        System.IO.File.WriteAllText(path, token);
+        return token;
+    }
+}
+
+/// <summary>Khoá tạm 5 phút sau 5 lần sai token trong 60 giây, chặn dò token bằng brute-force.</summary>
+internal sealed class BridgeRateLimiter
+{
+    private static readonly TimeSpan FailureWindow = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(5);
+    private const int MaxFailuresBeforeLockout = 5;
+
+    private readonly object _gate = new();
+    private readonly Queue<DateTime> _recentFailures = new();
+    private DateTime? _lockedUntilUtc;
+
+    public bool IsLockedOut()
+    {
+        lock (_gate)
+        {
+            return _lockedUntilUtc is { } until && DateTime.UtcNow < until;
+        }
+    }
+
+    public void RecordFailure()
+    {
+        lock (_gate)
+        {
+            var now = DateTime.UtcNow;
+            _recentFailures.Enqueue(now);
+            while (_recentFailures.Count > 0 && now - _recentFailures.Peek() > FailureWindow)
+            {
+                _recentFailures.Dequeue();
+            }
+
+            if (_recentFailures.Count >= MaxFailuresBeforeLockout)
+            {
+                _lockedUntilUtc = now + LockoutDuration;
+                _recentFailures.Clear();
+            }
+        }
     }
 }
 
