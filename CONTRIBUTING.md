@@ -14,6 +14,27 @@ thì ghi rõ là việc của [Giai đoạn 0 trong roadmap](docs/roadmap.md#gia
 3. Commit nhỏ, mỗi commit một thay đổi logic.
 4. Mở PR, để CI (khi đã có — xem Giai đoạn 0) chạy qua trước khi merge.
 
+## Merge PR — thử auto-merge, không được thì tự theo dõi
+
+Quy ước lấy từ `donghanh` (mục 11 `CLAUDE.md`), áp dụng ngay cả khi repo này chưa có CI:
+
+1. **Tạo PR ở trạng thái sẵn sàng** (không để nháp) rồi **thử bật auto-merge (squash) ngay**,
+   một lần, không hỏi lại.
+2. Auto-merge thường thất bại nếu repo chưa bật "Allow auto-merge" ở Settings → General → Pull
+   Requests (đây là tình trạng hiện tại của Dhcb-Tools) — đó không phải lỗi cần chẩn đoán, cứ đi
+   thẳng sang bước tiếp theo.
+3. **Kiểm trạng thái PR** (`mergeable_state` + danh sách check, nếu có):
+   - **Repo chưa có CI** (như hiện tại — không có `.github/workflows`, `get_status` trả
+     `total_count: 0`): không có gì để chờ chuyển xanh. `mergeable_state: clean` (không xung
+     đột) là đủ điều kiện — merge (squash) ngay, không polling vô ích.
+   - **Repo đã có CI** (từ khi Giai đoạn 0 dựng xong): poll trạng thái PR mỗi ~2,5 phút. Mọi
+     check bắt buộc xanh + không xung đột → merge (squash) ngay, không chờ người bấm tay. Còn
+     check đang chạy → tiếp tục poll. Có check đỏ → dừng, đọc log, sửa và push lại, không merge.
+4. **Không merge tay để đi tắt khi có check đang đỏ.** Chỉ merge khi xanh thật hoặc khi xác nhận
+   không có CI nào để chờ.
+5. Nếu `main` tiến lên gây xung đột (`mergeable_state: dirty`) trong lúc chờ, merge `main` vào
+   nhánh, giải xung đột, rồi mới tiếp tục từ bước 3.
+
 ## Commit message — Conventional Commits
 
 Dùng tiền tố chuẩn: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `style`, `perf`.
