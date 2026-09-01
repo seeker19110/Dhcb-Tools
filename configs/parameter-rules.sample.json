@@ -7,5 +7,13 @@
     { "category": "Walls",   "parameter": "Fire Rating", "required": false, "allowedValues": ["EI60", "EI90", "EI120"], "severity": "warning" },
     { "category": "Ducts",   "parameter": "System Name", "required": true,  "pattern": "^MEC-[A-Z]{2,4}-.+" },
     { "category": "Pipes",   "parameter": "System Name", "required": true }
+  ],
+  "thresholds": [
+    { "metric": "warnings",        "max": 200,  "description": "Checkset kiểu Autodesk Model Checker — số warning cho phép" },
+    { "metric": "unplacedViews",   "max": 50 },
+    { "metric": "fileSizeMb",      "max": 300,  "severity": "warning" },
+    { "metric": "inPlaceFamilies", "max": 0 },
+    { "metric": "missingLinks",    "max": 0 },
+    { "metric": "cadImports",      "max": 0,    "severity": "warning" }
   ]
 }

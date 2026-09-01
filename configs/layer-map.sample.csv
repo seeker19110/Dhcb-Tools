@@ -1,0 +1,12 @@
+Source,Target,Color,Linetype,Lineweight,Plottable
+WALL,A-WALL,7,Continuous,035,true
+TUONG*,A-WALL,7,Continuous,035,true
+DOOR,A-DOOR,3,Continuous,,true
+CUA*,A-DOOR,3,Continuous,,true
+WINDOW,A-GLAZ,4,Continuous,,true
+COL*,S-COLS,1,Continuous,050,true
+BEAM*,S-BEAM,2,HIDDEN,,true
+TEXT,A-ANNO-TEXT,7,Continuous,,true
+DIM*,A-ANNO-DIMS,7,Continuous,,true
+AXIS,S-GRID,8,CENTER,,true
+DEFPOINTS,Defpoints,,,,

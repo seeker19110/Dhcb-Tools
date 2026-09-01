@@ -74,9 +74,33 @@ public static class Program
 
     // ── Revit: pending-job + journal → Revit.exe → add-in chạy → batch-done.json ───────────────────────
 
+    /// <summary>Mục 7.13 (RevitBatchProcessor): phiên bản Revit theo header file — nhiều phiên bản khác nhau → dùng cao nhất và cảnh báo.</summary>
+    internal static int ResolveRevitVersion(BatchJob job, Action<string> log)
+    {
+        var detected = job.Files.Select(f => (f.Path, Version: RvtFileInfo.DetectVersion(f.Path))).Where(t => t.Version.HasValue).Select(t => (t.Path, t.Version!.Value)).ToList();
+        if (detected.Count == 0)
+        {
+            return job.RevitVersion;
+        }
+
+        var max = detected.Max(d => d.Item2);
+        foreach (var (path, v) in detected.Where(d => d.Item2 != max))
+        {
+            log($"Cảnh báo: {path} lưu bằng Revit {v}, sẽ mở bằng Revit {max} (nâng cấp trong phiên, không ghi ngược nếu saveMode=None/SaveAs).");
+        }
+
+        if (max != job.RevitVersion)
+        {
+            log($"Phiên bản Revit theo file: {max} (job ghi {job.RevitVersion}).");
+        }
+
+        return max;
+    }
+
     private static int RunRevit(BatchJob job, Options opts, string runLog)
     {
-        var revitExe = opts.RevitExe ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Autodesk", "Revit " + job.RevitVersion, "Revit.exe");
+        var version = opts.AutoDetectVersion ? ResolveRevitVersion(job, Console.WriteLine) : job.RevitVersion;
+        var revitExe = opts.RevitExe ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Autodesk", "Revit " + version, "Revit.exe");
         if (!File.Exists(revitExe))
         {
             Console.Error.WriteLine("Không tìm thấy Revit.exe: " + revitExe + " (dùng --revit-exe).");
@@ -124,7 +148,7 @@ public static class Program
 
         if (!File.Exists(done))
         {
-            Console.Error.WriteLine("Add-in không báo hoàn thành (batch-done.json). Kiểm tra add-in đã cài cho Revit " + job.RevitVersion + " và batch-error.txt.");
+            Console.Error.WriteLine("Add-in không báo hoàn thành (batch-done.json). Kiểm tra add-in đã cài cho Revit " + version + " và batch-error.txt.");
             File.Delete(pending);
             return 1;
         }
@@ -193,7 +217,7 @@ public static class Program
 
             var stepPaths = new List<string>();
             var s = 0;
-            foreach (var step in job.StepsFor(file))
+            foreach (var step in job.StepsFor(file).Where(st => !st.Command.Equals("PlotPdf", StringComparison.OrdinalIgnoreCase)))
             {
                 var cfg = job.ExpandStepConfig(step, outputFolder, file.Path, runTime);
                 if (opts.DryRun)
@@ -209,8 +233,21 @@ public static class Program
             }
 
             string? saveAs = job.SaveMode == SaveMode.SaveAs && !opts.DryRun ? Path.Combine(outputFolder, Path.GetFileName(file.Path)) : null;
+
+            // Step đặc biệt "PlotPdf" (mục 7.13): không phải lệnh Core — sinh -PLOT trong script accoreconsole.
+            string? plotScript = null;
+            foreach (var step in job.StepsFor(file).Where(st => st.Command.Equals("PlotPdf", StringComparison.OrdinalIgnoreCase)))
+            {
+                var cfg = JObject.Parse(job.ExpandStepConfig(step, outputFolder, file.Path, runTime));
+                var pdf = (string?)cfg["outputPath"] ?? Path.Combine(outputFolder, Path.GetFileNameWithoutExtension(file.Path) + ".pdf");
+                plotScript = (plotScript ?? string.Empty) + AcadScriptGen.PlotPdf(pdf,
+                    (string?)cfg["layout"] ?? "Model", (string?)cfg["paperSize"] ?? "ISO A3 (420.00 x 297.00 MM)",
+                    (string?)cfg["orientation"] ?? "Landscape", (string?)cfg["plotArea"] ?? "Extents", (string?)cfg["plotStyle"] ?? "monochrome.ctb");
+                RunLog.Append(runLog, new RunLogEntry { File = file.Path, Command = "PlotPdf", Success = true, Summary = "Đã xếp lệnh -PLOT → " + pdf + " (kết quả thật xem file PDF)." });
+            }
+
             var script = Path.Combine(work, $"{index:D3}.scr");
-            File.WriteAllText(script, AcadScriptGen.Build(plugin, stepPaths, saveAs, Path.GetFullPath(runLog), file.Path), new UTF8Encoding(false));
+            File.WriteAllText(script, AcadScriptGen.Build(plugin, stepPaths, saveAs, Path.GetFullPath(runLog), file.Path, plotScript), new UTF8Encoding(false));
 
             Console.WriteLine($"[{index}/{job.Files.Count}] {file.Path}");
             var psi = new ProcessStartInfo(console, $"/i \"{file.Path}\" /s \"{script}\" /l en-US") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
@@ -254,11 +291,13 @@ internal sealed class Options
     public string? PluginDll { get; private set; }
     public bool ReportOnly { get; private set; }
     public bool Analyze { get; private set; }
+    public bool AutoDetectVersion { get; private set; } = true;
 
     public const string Usage = """
         DhcbTools.BatchRunner --job <job.json> [--dry-run] [--log-dir logs] [--max-minutes 480]
                               [--revit-exe <Revit.exe>] [--accoreconsole <accoreconsole.exe>] [--plugin-dll <DhcbTools.AutoCAD.dll>]
-                              [--report-only] [--analyze]
+                              [--report-only] [--analyze] [--no-autodetect]
+        (Revit: phiên bản tự nhận từ header .rvt; step "PlotPdf" trong job AutoCAD sinh -PLOT ra PDF)
         """;
 
     public static Options? Parse(string[] args)
@@ -280,6 +319,7 @@ internal sealed class Options
                     case "--plugin-dll": o.PluginDll = Next(); break;
                     case "--report-only": o.ReportOnly = true; break;
                     case "--analyze": o.Analyze = true; break;
+                    case "--no-autodetect": o.AutoDetectVersion = false; break;
                     case "-h": case "--help": return null;
                     default:
                         Console.Error.WriteLine("Tham số không biết: " + args[i]);

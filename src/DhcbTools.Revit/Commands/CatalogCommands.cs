@@ -152,6 +152,50 @@ public sealed class SpecToConfigCommand : IExternalCommand
         new JObject { ["inputPath"] = "<thuyet-minh.txt>", ["outputPath"] = Path.Combine(ConfigStore.Directory, "project-init-from-spec.json") });
 }
 
+// ── Giai đoạn 7: hồ sơ & style (học từ pyRevit/DiRoots/Ideate/Colour Splasher) ──────────────────
+
+[Transaction(TransactionMode.Manual)] [Regeneration(RegenerationOption.Manual)]
+public sealed class SheetRenameCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData c, ref string m, ElementSet e) => CommandRunner.Run(c, "SheetRename",
+        new JObject { ["target"] = "Sheets", ["numberPattern"] = "", ["namePattern"] = "", ["find"] = "", ["replace"] = "", ["filterContains"] = "", ["orderBy"] = "Number", ["counterStart"] = 1, ["dryRun"] = true });
+}
+
+[Transaction(TransactionMode.Manual)] [Regeneration(RegenerationOption.Manual)]
+public sealed class RevisionOnSheetsCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData c, ref string m, ElementSet e) => CommandRunner.Run(c, "RevisionOnSheets",
+        new JObject { ["revisionSequence"] = 1, ["sheetNumberContains"] = "", ["sheetNumbers"] = new JArray(), ["remove"] = false, ["dryRun"] = true });
+}
+
+[Transaction(TransactionMode.Manual)] [Regeneration(RegenerationOption.Manual)]
+public sealed class StylePurgeCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData c, ref string m, ElementSet e) => CommandRunner.Run(c, "StylePurge",
+        new JObject { ["kinds"] = new JArray("ViewTemplates", "Filters", "LinePatterns", "FillPatterns", "TextTypes", "DimensionTypes"), ["keepNameContains"] = new JArray("DHCB"), ["dryRun"] = true });
+}
+
+[Transaction(TransactionMode.Manual)] [Regeneration(RegenerationOption.Manual)]
+public sealed class ColorByParameterCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData c, ref string m, ElementSet e) => CommandRunner.Run(c, "ColorByParameter",
+        new JObject { ["viewName"] = "", ["categories"] = new JArray(), ["parameterName"] = "<tên tham số, ví dụ Fire Rating>", ["fixedColors"] = new JObject(), ["legendCsvPath"] = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "DHCB_ColorLegend.csv"), ["reset"] = false, ["dryRun"] = true });
+}
+
+[Transaction(TransactionMode.Manual)] [Regeneration(RegenerationOption.Manual)]
+public sealed class FamilyAuditCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData c, ref string m, ElementSet e) => CommandRunner.Run(c, "FamilyAudit",
+        new JObject { ["outputPath"] = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "DHCB_Families.csv"), ["renamePattern"] = "", ["find"] = "", ["replace"] = "", ["categories"] = new JArray(), ["dryRun"] = true });
+}
+
+[Transaction(TransactionMode.Manual)] [Regeneration(RegenerationOption.Manual)]
+public sealed class WarningsExportCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData c, ref string m, ElementSet e) => CommandRunner.Run(c, "WarningsExport",
+        new JObject { ["outputPath"] = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "DHCB_Warnings.csv") });
+}
+
 /// <summary>Chạy một job batch ngay trong phiên Revit đang mở (không cần console) — job JSON chọn trong config.</summary>
 [Transaction(TransactionMode.Manual)] [Regeneration(RegenerationOption.Manual)]
 public sealed class RunBatchJobCommand : IExternalCommand

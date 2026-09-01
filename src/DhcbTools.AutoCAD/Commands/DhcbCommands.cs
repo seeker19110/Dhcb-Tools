@@ -28,6 +28,7 @@ public sealed class DhcbCommands
         ed.WriteMessage("  DHCB_LAYER_EXPORT / DHCB_LAYER_IMPORT / DHCB_CLEANUP / DHCB_AUTONUMBER\n");
         ed.WriteMessage("  DHCB_ATTR_EXPORT / DHCB_ATTR_IMPORT / DHCB_TEXT_REPLACE / DHCB_XREF_AUDIT\n");
         ed.WriteMessage("  DHCB_GRID_EXTRACT (trục AXIS → CSV cho Revit) / DHCB_LAYER_CHECK / DHCB_LAYERMAP (AI offline)\n");
+        ed.WriteMessage("  DHCB_LAYTRANS (map layer chuẩn) / DHCB_COMPARE (so hai DWG) / DHCB_BLOCKCOUNT (BOM) / DHCB_ATTR_INC (attribute tăng dần)\n");
         ed.WriteMessage("  DHCB_EXEC <Lệnh> — chạy lệnh Core bất kỳ với config JSON trong %APPDATA%\\DHCB\\configs\\autocad\\\n");
         ed.WriteMessage("  DHCB_CFG <Lệnh> — tạo file config mẫu · DHCB_AI — ra lệnh bằng tiếng Việt · DHCB_RUN — batch\n");
         foreach (var c in CommandCatalog.For(CommandCatalog.AutoCad))
@@ -172,6 +173,55 @@ public sealed class DhcbCommands
         if (output is null) return;
         var ollama = AskKeyword(ed, "Dùng model local (Ollama)", new[] { "Không", "Có" }, "Không") == "Có";
         Run(doc, "CadLayerMap", new JObject { ["revitTypesPath"] = types, ["outputPath"] = output, ["useOllama"] = ollama });
+    }
+
+    [CommandMethod("DHCB_LAYTRANS", CommandFlags.Modal)]
+    public void LayerTranslate()
+    {
+        var doc = Application.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+        var ed = doc.Editor;
+        var map = AskString(ed, "File CSV map layer (Source,Target,Color,Linetype,Lineweight,Plottable)", Path.Combine(ConfigStore.Directory, "layer-map.csv"));
+        if (string.IsNullOrWhiteSpace(map)) return;
+        Run(doc, "LayerTranslate", new JObject { ["mapCsvPath"] = map, ["deleteEmptySource"] = true, ["dryRun"] = AskDryRun(ed) });
+    }
+
+    [CommandMethod("DHCB_COMPARE", CommandFlags.Modal)]
+    public void DrawingCompare()
+    {
+        var doc = Application.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+        var ed = doc.Editor;
+        var other = AskString(ed, "DWG để so sánh (bản cũ)", null);
+        if (string.IsNullOrWhiteSpace(other)) return;
+        var output = AskString(ed, "File báo cáo (.html hoặc .csv)", Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "DHCB_Compare.html"));
+        if (output is null) return;
+        Run(doc, "DrawingCompare", new JObject { ["otherPath"] = other, ["outputPath"] = output });
+    }
+
+    [CommandMethod("DHCB_BLOCKCOUNT", CommandFlags.Modal)]
+    public void BlockQuantity()
+    {
+        var doc = Application.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+        var ed = doc.Editor;
+        var group = AskString(ed, "Nhóm theo attribute (Enter = không)", string.Empty);
+        var output = AskString(ed, "File CSV BOM", Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "dhcb_bom.csv"));
+        if (output is null) return;
+        Run(doc, "BlockQuantity", new JObject { ["outputPath"] = output, ["groupByAttribute"] = string.IsNullOrWhiteSpace(group) ? null : group });
+    }
+
+    [CommandMethod("DHCB_ATTR_INC", CommandFlags.Modal)]
+    public void AttributeIncrement()
+    {
+        var doc = Application.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+        var ed = doc.Editor;
+        var block = AskString(ed, "Tên Block", null);
+        if (string.IsNullOrWhiteSpace(block)) return;
+        var tag = AskString(ed, "Attribute Tag", "MARK") ?? "MARK";
+        var pattern = AskString(ed, "Mẫu giá trị (ví dụ P-{n:000})", "{n}") ?? "{n}";
+        Run(doc, "AttributeIncrement", new JObject { ["blockName"] = block, ["attributeTag"] = tag, ["pattern"] = pattern, ["dryRun"] = AskDryRun(ed) });
     }
 
     /// <summary>Chạy lệnh Core bất kỳ với config JSON lưu sẵn.</summary>

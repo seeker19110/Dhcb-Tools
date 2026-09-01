@@ -46,6 +46,14 @@ public sealed class App : IExternalApplication
         Add(init, asm, "DhcbGridCsv", "Trục/Level\ntừ CSV", typeof(Commands.GridFromCsvCommand), "Trục từ CSV (Excel hoặc trích từ CAD bằng DHCB_GRID_EXTRACT), level từ CSV.");
         Add(init, asm, "DhcbSheets", "Tạo sheet\nhàng loạt", typeof(Commands.SheetBatchCreateCommand), "Sheet + đặt view từ bảng CSV.");
 
+        var docs = application.CreateRibbonPanel(TabName, "Hồ sơ & Style");
+        Add(docs, asm, "DhcbSheetRename", "Đổi tên\nsheet/view", typeof(Commands.SheetRenameCommand), "Đổi số/tên sheet hoặc view theo mẫu token + regex, chống trùng (pyRevit Sheets).");
+        Add(docs, asm, "DhcbRevision", "Revision\nlên sheet", typeof(Commands.RevisionOnSheetsCommand), "Gán/bỏ một revision trên nhiều sheet.");
+        Add(docs, asm, "DhcbStylePurge", "Purge\nstyle", typeof(Commands.StylePurgeCommand), "Xoá view template, filter, pattern, text/dim type không được tham chiếu (Ideate StyleManager).");
+        Add(docs, asm, "DhcbColorBy", "Tô màu\ntheo tham số", typeof(Commands.ColorByParameterCommand), "Tô màu phần tử trong view theo giá trị tham số + chú giải CSV (Colour Splasher).");
+        Add(docs, asm, "DhcbFamilyAudit", "Kiểm kê\nfamily", typeof(Commands.FamilyAuditCommand), "Family/type: instance, in-place, không dùng → CSV; đổi tên theo mẫu (FamilyReviser).");
+        Add(docs, asm, "DhcbWarnings", "Warning\n→ CSV", typeof(Commands.WarningsExportCommand), "Xuất warning kèm ElementId/category để lọc trong Excel (Ideate Explorer).");
+
         var mepf = application.CreateRibbonPanel(TabName, "MEPF");
         Add(mepf, asm, "DhcbSleeve", "Sleeve\ntự động", typeof(Commands.SleeveAutoCommand), "Sleeve/opening tại giao cắt MEP × tường/sàn.");
         Add(mepf, asm, "DhcbElevTag", "Gán cao\nđộ MEP", typeof(Commands.ElevationTagAutoCommand), "Cao độ đáy/đỉnh/tim vào tham số.");

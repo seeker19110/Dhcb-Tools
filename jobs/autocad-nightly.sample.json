@@ -14,6 +14,9 @@
     { "command": "XrefAudit",          "config": { "outputPath": "{outputFolder}/{fileName}-xrefs.csv" } },
     { "command": "GridExtract",        "config": { "gridLayer": "AXIS", "outputPath": "{outputFolder}/{fileName}-grids.csv" } },
     { "command": "LayerStandardCheck", "config": { "rulesPath": "D:/DHCB/configs/layer-rules.json", "outputPath": "{outputFolder}/{fileName}-layercheck.html" } },
-    { "command": "DrawingCleanup",     "config": { "dryRun": false, "keepLayerNameContains": ["DHCB"] } }
+    { "command": "LayerTranslate",     "config": { "mapCsvPath": "D:/DHCB/configs/layer-map.csv", "dryRun": true } },
+    { "command": "BlockQuantity",      "config": { "outputPath": "{outputFolder}/{fileName}-bom.csv" } },
+    { "command": "DrawingCleanup",     "config": { "dryRun": false, "keepLayerNameContains": ["DHCB"], "purgeUnusedTextStyles": true, "purgeUnusedDimStyles": true } },
+    { "command": "PlotPdf",            "config": { "outputPath": "{outputFolder}/pdf/{fileName}.pdf", "layout": "Model", "paperSize": "ISO A3 (420.00 x 297.00 MM)", "plotStyle": "monochrome.ctb" } }
   ]
 }
