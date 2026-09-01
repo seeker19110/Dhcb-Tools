@@ -63,6 +63,12 @@ thuyết minh thực tế.
   kiếm → polyline → model line → `RouteFromLines`.
 - **MCP server:** ✅ `scripts/dhcb_mcp_server.py`.
 
+## Giai đoạn 7 — Khoảng trống so với tool thị trường ✅ P1 🧪 · ⬜ P2
+
+Khảo sát và kế hoạch: [`nghien-cuu-tool-thi-truong-va-ke-hoach.md`](nghien-cuu-tool-thi-truong-va-ke-hoach.md).
+P1 (7.1–7.14) đã có mã nguồn và test phần thuần. P2: ống dốc/kick-90, BOM spool, lệnh nối PathFinder3D → RouteFromLines,
+vỏ AutoCAD core-only cho accoreconsole, xuất theo schedule, copy viewport.
+
 ## Sau đó
 
 - Test tích hợp chạy **bên trong** Revit (add-in test runner kích bằng batch runner) — hạ tầng đã có.

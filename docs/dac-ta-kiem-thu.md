@@ -90,6 +90,15 @@ trong lỗ, chèn thêm khi thiếu phủ, phòng hẹp một thiết bị, phò
 ASHRAE ductulator và bảng SCH40), `SystemNaming`, `FlowNumbering` (nhánh phân cấp 1.1, 1.2.1, chu trình không lặp),
 `PathFinder3D` (đi thẳng, vòng tường ít rẽ nhất, khoảng hở, bị chặn, giới hạn ô).
 
+### 2.10 Giai đoạn 7 (đã có — `Phase7Tests`)
+
+`NamePattern` (token, bộ đếm `{n:00}`, định dạng upper/left, regex tìm/thay, chống trùng trong lô và với tên đã có),
+`PaletteGenerator` (màu kề nhau khác xa, cùng giá trị cùng màu, màu cố định), `ThresholdRule` (đọc cùng file với
+ParameterRule, max/min, số đo thiếu), `LayerMapTable` (khớp chính xác/wildcard/phủ định, plan bỏ layer đã chuẩn),
+`DiffSummary` (thêm/xoá/đổi layer/dời/đổi text, dung sai, CSV/HTML escape), `RvtFileInfo` (UTF-16 "Format: 2024",
+chuỗi build cũ, không nhận ra → null), `AcadScriptGen.PlotPdf` (thứ tự prompt -PLOT, chèn trước SAVEAS),
+`CommandIntentParser.Candidates` (≤ 8, lệnh khớp đứng đầu).
+
 ### 2.9 Kiểm tra và AI (đã có)
 
 `RuleChecker`, `ClashAcceptance` (khoá ổn định theo cặp id + vị trí làm tròn), `LayerMappingSuggester` (tường 200 đúng
@@ -161,6 +170,19 @@ file `test-drawing.dwg` có layer trùng tên, layer rỗng, linetype chỉ dùn
 | `GridExtract` | Layer AXIS, bản vẽ mm | CSV đúng số trục |
 | `LayerStandardCheck` | layer-rules.sample.json | HTML liệt kê layer sai tên |
 | `DHCB_RUN` qua accoreconsole | Script từ BatchRunner | run.jsonl có đủ dòng, không hộp thoại |
+| `SheetRename` | 20 sheet, mẫu `A-{Level}-{n:00}` | Số mới đúng thứ tự, không trùng, đổi chéo A↔B không lỗi |
+| `RevisionOnSheets` | Revision 2 lên sheet A-1xx | Đúng sheet, chạy lại không nhân đôi |
+| `StylePurge` | View template dùng ở 1 view + 3 không dùng | Chỉ xoá 3; `<Solid fill>` không bị đụng |
+| `ColorByParameter` | Tường theo Fire Rating | Mỗi giá trị một màu, chú giải CSV đúng số lượng; `reset` trả về bình thường |
+| `FamilyAudit` | Mẫu `DHCB_{Category:upper}_{Name}` | CSV đủ cột; đổi tên bỏ qua in-place |
+| `WarningsExport` | Model có warning | CSV có ElementId mở được trong Excel tiếng Việt |
+| `ParameterRuleCheck` + thresholds | warnings max 200 | Dòng "Model / warnings" xuất hiện khi vượt |
+| `LayerTranslate` | layer-map.sample.csv, bản vẽ WALL/TUONG-200 | Entity sang A-WALL (kể cả trong block), layer nguồn rỗng bị xoá, CLAYER giữ |
+| `DrawingCompare` | Hai bản của cùng DWG | Handle thêm/xoá/dời đúng; HTML mở được |
+| `BlockQuantity` | Block DOOR có SIZE | BOM nhóm theo SIZE đúng số |
+| `AttributeIncrement` | Mẫu `P-{n:000}` | Thứ tự trái→phải trên→dưới, `P-001…` |
+| BatchRunner autodetect | Job lẫn file 2023 và 2024 | Mở Revit 2024, cảnh báo file 2023 |
+| `PlotPdf` accoreconsole | Layout A3 | PDF sinh ra đúng thư mục |
 
 ### 4.3 Kiểm thử hồi quy trước mỗi lần phát hành
 

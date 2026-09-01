@@ -25,10 +25,20 @@ transaction của tool và có kỹ sư duyệt**, cộng thêm ràng buộc **k
 Test `CommandCatalogTests` đối chiếu catalog với mã nguồn Core và với bảng dispatch — thêm lệnh Core mà quên khai báo là
 CI đỏ (đúng yêu cầu §2.6 của đặc tả kiểm thử).
 
+## Giai đoạn 7 — theo giới hạn thực tế của model local
+
+- **Structured outputs:** `OllamaClient` gửi `format` = JSON Schema (không phải `"json"`), ép cú pháp hợp lệ ở tầng token;
+  schema phẳng, ít trường bắt buộc (`MappingSchema`, `ChoiceSchema`).
+- **≤ 8 ứng viên một lượt:** `CommandIntentParser.Candidates()` lọc bằng heuristic rồi `OllamaClient.ChooseCommand()` chỉ
+  cho model chọn trong danh sách đó; kết quả ngoài whitelist → null.
+- **Model mặc định `qwen3:8b`** (ổn nhất về tool-calling/JSON trong benchmark 2026; gemma3 không hỗ trợ tool).
+- **MCP server:** `--read-only` chỉ lộ tool đọc (tương đồng Revit 2027 MCP Server tech preview), `--group <query|data|sheets|cleanup|check|mep|project|ai>`
+  lộ một nhóm để agent local chọn đúng hơn.
+
 ## Model local (tuỳ chọn)
 
 ```powershell
-ollama pull qwen2.5:7b
+ollama pull qwen3:8b
 copy configs\ai.sample.json %APPDATA%\DHCB\ai.json   # đặt "enabled": true
 python scripts\dhcb_ai.py ollama-check
 ```

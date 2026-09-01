@@ -57,6 +57,13 @@ Mã thoát: `0` mọi step thành công · `1` có step lỗi/bỏ qua · `2` l�
 Cũng có nút **AI offline & Batch → Chạy job batch** trên Ribbon để chạy cùng job ngay trong phiên Revit đang mở
 (job ở `%APPDATA%\DHCB\configs\revit\batch-job.json`).
 
+## Giai đoạn 7 (học từ RevitBatchProcessor và batch plot)
+
+- **Tự nhận phiên bản Revit theo file:** runner đọc header `.rvt` (`RvtFileInfo`) và mở đúng `Revit <năm>\Revit.exe`;
+  nhiều phiên bản khác nhau trong một job → dùng bản cao nhất và cảnh báo. Tắt bằng `--no-autodetect`.
+- **Step `PlotPdf` cho AutoCAD:** không phải lệnh Core; runner sinh chuỗi `-PLOT` không hộp thoại vào script accoreconsole
+  (`outputPath`, `layout`, `paperSize`, `orientation`, `plotArea`, `plotStyle`). Xem `jobs/autocad-nightly.sample.json`.
+
 ## Hẹn giờ
 
 ```powershell

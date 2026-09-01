@@ -24,7 +24,8 @@
 | Lớp AI (offline) | ✅ [`ai-offline.md`](ai-offline.md) — heuristic mặc định, Ollama local tuỳ chọn |
 | Routing C (A* 3D) | ✅ Phần thuần `PathFinder3D`, chưa có lệnh Core dựng trực tiếp (kết quả là polyline cho routing A) |
 | MCP server | ✅ `scripts/dhcb_mcp_server.py` |
-| Kiểm thử tự động | ✅ 295 test xUnit, chạy trên CI Linux |
+| Giai đoạn 7 — khoảng trống so với tool thị trường ([`nghien-cuu-tool-thi-truong-va-ke-hoach.md`](nghien-cuu-tool-thi-truong-va-ke-hoach.md)) | ✅ P1 xong mã nguồn: SheetRename, RevisionOnSheets, StylePurge, ColorByParameter, FamilyAudit, WarningsExport, checkset ngưỡng; AutoCAD LayerTranslate, DrawingCompare, BlockQuantity, AttributeIncrement, purge text/dim/regapp; batch autodetect phiên bản + PlotPdf; AI structured outputs + ≤8 ứng viên; MCP read-only/nhóm |
+| Kiểm thử tự động | ✅ 322 test xUnit, chạy trên CI Linux |
 | CI | ✅ test + check-build toàn bộ Core/vỏ bằng API package (RevitVersion=2025) |
 
 Ước tính: hoàn thành khoảng **90 %** phạm vi tài liệu nghiên cứu về mặt mã nguồn. Phần còn lại là **kiểm thử trên
@@ -46,18 +47,19 @@ HttpBridgeServer, BridgeTokenStore, AuthLockout, BridgeWorkItem) ← `Core` (Rev
 
 ### Danh sách lệnh Core
 
-**Revit (30):** ParameterExport, ParameterImport, RemoveUnusedViews, AutoNumbering, BatchExport, HealthReport,
+**Revit (36):** ParameterExport, ParameterImport, RemoveUnusedViews, AutoNumbering, BatchExport, HealthReport,
 ProjectInfo, LevelSetup, GridSetup, FamilyLoader, SleeveAuto, ElevationTag, HangerAuto, PipeSplitter, ConnectorChecker,
 RouteFromLines, DevicePlacement, SizingProposal, ApplySizing, SystemColor, SystemName, FlowNumbering,
-ProjectFromTemplate, TransferStandards, GridFromCsv, SheetBatchCreate, ParameterRuleCheck, ClashDetection, CadLayerMap,
-SpecToConfig.
+ProjectFromTemplate, TransferStandards, GridFromCsv, SheetBatchCreate, **SheetRename, RevisionOnSheets, StylePurge,
+ColorByParameter, FamilyAudit, WarningsExport**, ParameterRuleCheck (+ thresholds), ClashDetection, CadLayerMap, SpecToConfig.
 
-**AutoCAD (11):** LayerExport, LayerImport, DrawingCleanup, AutoNumbering, AttributeExport, AttributeImport, TextReplace,
-LayerStandardCheck, GridExtract, XrefAudit, CadLayerMap. Lệnh dòng lệnh: `DHCB`, `DHCB_*`, `DHCB_EXEC`, `DHCB_CFG`,
+**AutoCAD (15):** LayerExport, LayerImport, DrawingCleanup (+ text/dim style, regapp), AutoNumbering, AttributeExport,
+AttributeImport, TextReplace, LayerStandardCheck, GridExtract, XrefAudit, **LayerTranslate, DrawingCompare, BlockQuantity,
+AttributeIncrement**, CadLayerMap. Lệnh dòng lệnh mới: `DHCB_LAYTRANS`, `DHCB_COMPARE`, `DHCB_BLOCKCOUNT`, `DHCB_ATTR_INC`. Lệnh dòng lệnh: `DHCB`, `DHCB_*`, `DHCB_EXEC`, `DHCB_CFG`,
 `DHCB_AI`, `DHCB_RUN`.
 
 ### Ribbon Revit
-6 panel: Nền tảng · Xuất & Kiểm tra · Dự án & Hồ sơ · MEPF · AI offline & Batch. Nút mới đều theo khuôn
+6 panel: Nền tảng · Xuất & Kiểm tra · Dự án & Hồ sơ · Hồ sơ & Style · MEPF · AI offline & Batch. Nút mới đều theo khuôn
 `CommandRunner`: đọc config JSON ở `%APPDATA%\DHCB\configs\revit\<Lệnh>.json` (tự tạo mẫu lần đầu) → chạy xem trước →
 hỏi xác nhận → chạy thật.
 

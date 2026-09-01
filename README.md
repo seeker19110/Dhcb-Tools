@@ -37,7 +37,7 @@ src/
 scripts/  dhcb_agent.py · dhcb_mcp_server.py · dhcb_ai.py · install-nightly-task.ps1 · check-build.sh
 jobs/     nightly.sample.json · autocad-nightly.sample.json
 configs/  parameter-rules · layer-rules · ai · settings (mẫu)
-tests/    DhcbTools.Shared.Logic.Tests (295 test, chạy trên CI Linux)
+tests/    DhcbTools.Shared.Logic.Tests (322 test, chạy trên CI Linux)
 ```
 
 ## Lệnh
@@ -54,11 +54,13 @@ Ribbon/dòng lệnh, HTTP Bridge, batch runner, lớp AI. Danh mục đầy đ�
 | Kiểm tra | `ParameterRuleCheck`, `ClashDetection` (+ `clash-accepted.json`), `ConnectorChecker` | `LayerStandardCheck`, `TextReplace` |
 | Dự án & hồ sơ | `ProjectFromTemplate`, `TransferStandards`, `LevelSetup`, `GridSetup`, `GridFromCsv`, `FamilyLoader`, `ProjectInfo`, `SheetBatchCreate` | `GridExtract` (layer AXIS → CSV cho `GridFromCsv`) |
 | MEPF | `SleeveAuto`, `ElevationTag`, `HangerAuto`, `PipeSplitter`, `RouteFromLines`, `DevicePlacement`, `SizingProposal` / `ApplySizing`, `SystemColor`, `SystemName` | — |
+| Hồ sơ & style (giai đoạn 7) | `SheetRename`, `RevisionOnSheets`, `StylePurge`, `ColorByParameter`, `FamilyAudit`, `WarningsExport` | `LayerTranslate`, `DrawingCompare`, `BlockQuantity`, `AttributeIncrement` |
 | AI offline | `CadLayerMap`, `SpecToConfig`, nút *Ra lệnh tiếng Việt* | `CadLayerMap`, `DHCB_AI` |
 
 Lệnh AutoCAD trên dòng lệnh: `DHCB` (trợ giúp), `DHCB_LAYER_EXPORT/IMPORT`, `DHCB_CLEANUP`, `DHCB_AUTONUMBER`,
 `DHCB_ATTR_EXPORT/IMPORT`, `DHCB_TEXT_REPLACE`, `DHCB_XREF_AUDIT`, `DHCB_GRID_EXTRACT`, `DHCB_LAYER_CHECK`,
-`DHCB_LAYERMAP`, `DHCB_EXEC <Lệnh>` (config JSON), `DHCB_CFG <Lệnh>` (tạo config mẫu), `DHCB_AI`, `DHCB_RUN` (batch).
+`DHCB_LAYERMAP`, `DHCB_LAYTRANS`, `DHCB_COMPARE`, `DHCB_BLOCKCOUNT`, `DHCB_ATTR_INC`, `DHCB_EXEC <Lệnh>` (config JSON),
+`DHCB_CFG <Lệnh>` (tạo config mẫu), `DHCB_AI`, `DHCB_RUN` (batch).
 
 Nút Ribbon Revit mới dùng chung một khuôn: đọc config ở `%APPDATA%\DHCB\configs\revit\<Lệnh>.json` (tự tạo mẫu lần
 đầu) → chạy **xem trước** → hỏi xác nhận → chạy thật.
@@ -118,7 +120,9 @@ net48, 2025+ dùng net8.0-windows (chọn bằng `-p:RevitVersion`).
 
 ## Trạng thái
 
-Toàn bộ giai đoạn 0–5 và 6.1/6.2 của [`docs/dac-ta-tinh-nang.md`](docs/dac-ta-tinh-nang.md) đã có mã nguồn, biên dịch
-xanh với API Revit 2023/2024/2025 và AutoCAD 2024/2025, 295 test thuần xanh. **Chưa kiểm thử trên Revit/AutoCAD thật** cho
+Toàn bộ giai đoạn 0–5, 6.1/6.2 của [`docs/dac-ta-tinh-nang.md`](docs/dac-ta-tinh-nang.md) và P1 giai đoạn 7
+([`docs/nghien-cuu-tool-thi-truong-va-ke-hoach.md`](docs/nghien-cuu-tool-thi-truong-va-ke-hoach.md) — khoảng trống so với
+pyRevit, DiRoots, Ideate, Colour Splasher, LAYTRANS, Drawing Compare, RevitBatchProcessor) đã có mã nguồn, biên dịch xanh
+với API Revit 2023/2024/2025 và AutoCAD 2024/2025, 322 test thuần xanh. **Chưa kiểm thử trên Revit/AutoCAD thật** cho
 các lệnh mới — kịch bản ở [`docs/dac-ta-kiem-thu.md`](docs/dac-ta-kiem-thu.md) §4. Chi tiết và lỗi còn mở:
 [`docs/progress.md`](docs/progress.md) · lộ trình: [`docs/roadmap.md`](docs/roadmap.md).
