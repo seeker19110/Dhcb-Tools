@@ -53,24 +53,32 @@ là quy ước tự giác. Xem xét thêm gate ở Giai đoạn 0 nếu thấy c
 
 ## Lệnh kiểm tra trước khi mở PR
 
-Hiện tại chưa có test/CI (xem `docs/progress.md`), nên tối thiểu:
+Bắt buộc (CI chạy đúng hai việc này, kể cả trên Linux không cài Revit/AutoCAD):
+
+```bash
+dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj
+./scripts/check-build.sh      # biên dịch toàn bộ Core + vỏ bằng API package NuGet (Revit/AutoCAD 2025)
+```
+
+Trên Windows có cài Revit/AutoCAD, build thật (kèm WPF) cho phiên bản đang dùng:
 
 ```powershell
 dotnet build src/DhcbTools.Revit/DhcbTools.Revit.csproj      -p:RevitVersion=2024
-dotnet build src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj  -p:AcadVersion=2024
+dotnet build src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj  -p:RevitVersion=2024 -p:AcadVersion=2024
+dotnet build src/DhcbTools.BatchRunner/DhcbTools.BatchRunner.csproj
 ```
 
-Khi `DhcbTools.Core.Tests` được thêm (Giai đoạn 0 của roadmap), bổ sung `dotnet test` vào danh
-sách này và coi là bắt buộc trước khi merge — giống cách donghanh dùng `npm run test:coverage`
-làm required check.
+Thêm lệnh Core mới = thêm class + một dòng trong `Shared.Logic/Ai/CommandCatalog.cs` + một `case` trong
+`RevitCommandTable`/`AcadCommandTable` (+ nút Ribbon/CommandMethod nếu cần). Test `CommandCatalogTests` sẽ đỏ nếu thiếu.
 
 ## Quy tắc an toàn
 
 - Không commit file cấu hình/credential cá nhân (đường dẫn cài Revit/AutoCAD máy riêng, API key).
 - Mọi lệnh sửa mô hình phải giữ `DryRun` mặc định bật và chạy trong một transaction duy nhất
   (xem "Nguyên tắc xuyên suốt" trong [`docs/roadmap.md`](docs/roadmap.md)).
-- HTTP Bridge hiện chưa có xác thực (`docs/progress.md`, lỗi #8) — không mở cổng 8765/8766 ra
-  ngoài máy cá nhân cho tới khi có token.
+- HTTP Bridge yêu cầu token (`%APPDATA%\DHCB\bridge-token.txt`) và chỉ bind 127.0.0.1 — không sửa để bind
+  `0.0.0.0`; agent ở máy khác dùng SSH tunnel.
+- Lớp AI phải giữ offline: endpoint model chỉ loopback, không thêm SDK cloud, không commit API key.
 - Thay đổi ở `DhcbTools.Core`/`DhcbTools.Core.AutoCAD` ảnh hưởng cả Ribbon lẫn HTTP Bridge — kiểm
   tra cả hai đường gọi trước khi merge.
 

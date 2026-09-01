@@ -69,17 +69,32 @@ tham số ≤ 0 ném `ArgumentOutOfRangeException` thay vì lặp vô hạn.
 - Bridge: token đủ dài, ngẫu nhiên, chỉ ký tự an toàn cho header; tách `Bearer` không phân biệt hoa
   thường; so sánh thời gian hằng số; chỉ cho qua khi đủ **cả** token đúng lẫn `Content-Type: application/json`.
 
-### 2.6 Test còn thiếu, cần thêm khi làm §0.3 của đặc tả tính năng
+### 2.6 `CommandCatalogTests` — đối chiếu danh mục lệnh với mã nguồn (đã có)
 
-Một test đối chiếu: mọi `ICoreCommand.CommandName` đều có một `case` trong `DispatchCommand` của
-Bridge và một nút Ribbon (hoặc được đánh dấu rõ là "chỉ dùng trong batch"). Đây là cách duy nhất để
-lỗi #11 (Hanger/PipeSplitter viết xong mà không gọi được từ đâu) không tái diễn.
+Đọc thẳng `src/**/*.cs`: mọi `CommandName => "..."` trong hai Core phải có trong `CommandCatalog` và ngược lại; mọi
+lệnh trong catalog phải có `case` trong `RevitCommandTable`/`AcadCommandTable`. Thêm lệnh mà quên khai báo → CI đỏ.
+Nút Ribbon đi qua `CommandRunner` theo tên catalog nên không cần đối chiếu riêng.
 
-### 2.7 Test cần thêm cho batch runner (§1 đặc tả tính năng)
+### 2.7 `BatchTests` — batch runner (đã có)
 
-`JobTokens.Expand` (thay `{outputFolder}`, `{fileName}`, `{yyyy-MM-dd}`), phân giải thứ tự step,
-xử lý file lỗi giữa lô, và ghi/đọc log JSONL — tất cả đều thuần, phải có test trước khi runner chạy
-đêm thật.
+`JobTokens` (token tên không phân biệt hoa thường, mẫu ngày giờ phân biệt, token lạ giữ nguyên, sanitize tên file),
+`BatchJob` (đọc/validate, `onlySteps`, thay token trong config lồng nhau, JSON hỏng báo `InvalidDataException`),
+`RunLog` (round-trip một dòng, bỏ dòng hỏng, mã thoát), `BatchReport` (escape HTML, ô xanh/đỏ/bỏ qua), `AcadScriptGen`.
+
+### 2.8 Hình học và MEP (đã có)
+
+`GridClustering`/`GridNaming` (gom đoạn thẳng hàng theo dung sai, bỏ đoạn ngắn/xiên, tên A,B,C bỏ I/O, CSV round-trip kể
+cả số dấu phẩy), `RouteGraph` (chữ U + T → 2 elbow 1 tee, gộp đầu mút theo dung sai, thẳng hàng không elbow, chu trình bị
+loại và báo, 5 nhánh không hỗ trợ, thứ tự dựng liên tục), `DevicePattern` (lưới cách tường đủ margin, căn giữa, loại điểm
+trong lỗ, chèn thêm khi thiếu phủ, phòng hẹp một thiết bị, phòng chữ L), `DuctSizing`/`PipeSizing` (giá trị đối chiếu
+ASHRAE ductulator và bảng SCH40), `SystemNaming`, `FlowNumbering` (nhánh phân cấp 1.1, 1.2.1, chu trình không lặp),
+`PathFinder3D` (đi thẳng, vòng tường ít rẽ nhất, khoảng hở, bị chặn, giới hạn ô).
+
+### 2.9 Kiểm tra và AI (đã có)
+
+`RuleChecker`, `ClashAcceptance` (khoá ổn định theo cặp id + vị trí làm tròn), `LayerMappingSuggester` (tường 200 đúng
+type, tiếng Việt có/không dấu, loại type bịa), `SpecTextExtractor` (m/mm, tầng hầm âm, tên chuẩn hoá, dòng gốc, cảnh
+báo), `WarningAnalyzer`, `CommandIntentParser` (chỉ trả lệnh trong whitelist, luôn `dryRun:true`).
 
 ## 3. Ngưỡng chất lượng
 
@@ -104,6 +119,8 @@ file `test-drawing.dwg` có layer trùng tên, layer rỗng, linetype chỉ dùn
 | 4 | `POST /execute` đúng token, `Content-Type: text/plain` | 401 |
 | 5 | Gửi lệnh nặng rồi Ctrl-C client | Sau timeout, lệnh **không** chạy tiếp (lỗi #7) |
 | 6 | Kết nối từ máy khác trong LAN | Từ chối (chỉ bind 127.0.0.1) |
+| 7 | `GET /tools` đúng token | Danh sách lệnh khớp `CommandCatalog` |
+| 8 | `POST /chat` "đánh số cửa" | Trả `AutoNumbering`, `dryRun:true`, `requiresConfirmation:true`, mô hình không đổi |
 
 ### 4.2 Từng lệnh Core
 
@@ -125,6 +142,25 @@ file `test-drawing.dwg` có layer trùng tên, layer rỗng, linetype chỉ dùn
 | `ConnectorCheck` | Model có connector hở | Đúng số lượng; view khoanh vùng mở được |
 | `LayerExport`/`LayerImport` | DWG có layer tiếng Việt | Round-trip không mất dấu; layer trùng tên được cập nhật, không nhân đôi |
 | `DrawingCleanup` | Layer hiện hành + linetype chỉ dùng bởi layer | Không xoá nhầm, không hỏng transaction (lỗi #6) |
+| `RouteFromLines` | Tuyến chữ U + nhánh T vẽ bằng model line "DHCB-Route" | Duct liền mạch, elbow + tee đúng type, không warning "not connected"; đoạn ngắn hơn fitting → báo ElementId, phần còn lại vẫn dựng |
+| `DevicePlacement` | Phòng 12×9 m, cột giữa phòng | Lưới cách tường ≥ margin, không có thiết bị trong cột, phủ đủ bán kính |
+| `SizingProposal` → `ApplySizing` | Duct có lưu lượng 500 L/s | Đề xuất ~355 mm ở 1 Pa/m; áp lại đúng đoạn theo ElementId |
+| `SystemColor` / `SystemName` | View template + 3 hệ | Filter tạo đúng, màu đúng hex; tên hệ `MEC-SA-01`; chạy lại không đổi tên đã đặt tay |
+| `FlowNumbering` | Chọn AHU rồi chạy | Số tăng dọc trục chính, nhánh `1.1`, `1.2` |
+| `ProjectFromTemplate` | Template .rte, thư mục trống | File central + workset đúng danh sách; file đã tồn tại → Fail rõ |
+| `TransferStandards` | File chuẩn có 5 view template, 2 trùng tên | Chuyển 3, bỏ 2 có ghi lý do |
+| `GridFromCsv` | CSV từ `DHCB_GRID_EXTRACT` | Trục đúng vị trí ±1 mm, tên A,B,C / 1,2,3; chạy lại không nhân đôi |
+| `SheetBatchCreate` | CSV 5 sheet, 1 trùng số | Tạo 4, đặt view đúng, bỏ 1 có ghi lý do |
+| `ParameterRuleCheck` | Rule Doors Mark `^D-\d{3}$` | HTML đúng số vi phạm, 3D view khoanh vùng |
+| `ClashDetection` | Duct xuyên dầm | Báo đúng, chấp nhận vào `clash-accepted.json` → lần sau không báo |
+| `ElevationUpdater` | Bật trong settings.json, kéo một ống | Tham số cao độ đổi theo; sửa 1 000 ống < 200 ms, vượt → tự tắt và báo |
+| `CadLayerMap` | CSV layer AIA | `A-WALL-200` → tường 200, `E-LTG` cần xem |
+| `SpecToConfig` | Thuyết minh .txt | JSON `levelSetup` đúng cao độ, `dryRun:true` |
+| `AttributeExport`/`AttributeImport` | Block DOOR có MARK | Round-trip đúng theo Handle |
+| `TextReplace` | MText có "TANG 1" | Dry-run liệt kê đúng, chạy thật đổi, attribute cũng đổi |
+| `GridExtract` | Layer AXIS, bản vẽ mm | CSV đúng số trục |
+| `LayerStandardCheck` | layer-rules.sample.json | HTML liệt kê layer sai tên |
+| `DHCB_RUN` qua accoreconsole | Script từ BatchRunner | run.jsonl có đủ dòng, không hộp thoại |
 
 ### 4.3 Kiểm thử hồi quy trước mỗi lần phát hành
 
