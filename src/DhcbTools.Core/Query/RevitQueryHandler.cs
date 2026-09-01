@@ -94,7 +94,7 @@ public static class RevitQueryHandler
 
             return new
             {
-                id           = e.Id.Value,
+                id           = RevitCompat.IdValue(e.Id),
                 category     = e.Category!.Name,
                 name         = e.Name,
                 levelId      = GetLevelId(e),
@@ -119,7 +119,7 @@ public static class RevitQueryHandler
             .OrderBy(l => l.Elevation)
             .Select(l => new
             {
-                id        = l.Id.Value,
+                id        = RevitCompat.IdValue(l.Id),
                 name      = l.Name,
                 elevation = l.Elevation,            // internal unit (feet)
                 elevationMm = l.Elevation * 304.8,  // mm
@@ -161,7 +161,7 @@ public static class RevitQueryHandler
             placedViewIds.TryGetValue(v.Id, out var sheetId);
             return new
             {
-                id           = v.Id.Value,
+                id           = RevitCompat.IdValue(v.Id),
                 name         = v.Name,
                 viewType     = v.ViewType.ToString(),
                 scale        = SafeGet(() => v.Scale),
@@ -169,7 +169,7 @@ public static class RevitQueryHandler
                                ? SafeGet(() => doc.GetElement(v.ViewTemplateId)?.Name)
                                : null,
                 onSheet      = sheetId is not null && sheetId != ElementId.InvalidElementId,
-                sheetId      = sheetId?.Value,
+                sheetId      = sheetId is null ? (long?)null : RevitCompat.IdValue(sheetId),
             };
         }).ToList();
 
@@ -191,11 +191,11 @@ public static class RevitQueryHandler
                 var viewIds = s.GetAllPlacedViews();
                 return new
                 {
-                    id          = s.Id.Value,
+                    id          = RevitCompat.IdValue(s.Id),
                     number      = s.SheetNumber,
                     name        = s.Name,
                     viewCount   = viewIds.Count,
-                    viewIds     = viewIds.Select(v => v.Value).ToList(),
+                    viewIds     = viewIds.Select(v => RevitCompat.IdValue(v)).ToList(),
                     isPlaceholder = s.IsPlaceholder,
                 };
             })
@@ -223,7 +223,7 @@ public static class RevitQueryHandler
 
         var list = rooms.Select(r => new
         {
-            id           = r.Id.Value,
+            id           = RevitCompat.IdValue(r.Id),
             name         = r.Name,
             number       = r.Number,
             levelName    = r.Level?.Name,
@@ -267,7 +267,7 @@ public static class RevitQueryHandler
 
             return new
             {
-                id          = f.Id.Value,
+                id          = RevitCompat.IdValue(f.Id),
                 name        = f.Name,
                 category    = f.FamilyCategory?.Name,
                 typeCount   = typeNames.Count,
@@ -291,7 +291,7 @@ public static class RevitQueryHandler
         var list = warnings.Select(w => new
         {
             description  = w.GetDescriptionText(),
-            elementIds   = w.GetFailingElements().Select(id => id.Value).ToList(),
+            elementIds   = w.GetFailingElements().Select(id => RevitCompat.IdValue(id)).ToList(),
             severity     = w.GetSeverity().ToString(),
         }).ToList();
 
@@ -313,7 +313,7 @@ public static class RevitQueryHandler
                 var linkType = doc.GetElement(l.GetTypeId()) as RevitLinkType;
                 return new
                 {
-                    id          = l.Id.Value,
+                    id          = RevitCompat.IdValue(l.Id),
                     name        = l.Name,
                     isLoaded    = linkType is not null && RevitLinkType.IsLoaded(doc, linkType.Id),
                     pathName    = linkType?.GetExternalFileReference().GetAbsolutePath(),
@@ -360,14 +360,14 @@ public static class RevitQueryHandler
             ?? e.get_Parameter(BuiltInParameter.LEVEL_PARAM);
         if (levelParam is null || levelParam.StorageType != StorageType.ElementId) return null;
         var id = levelParam.AsElementId();
-        return id is null || id == ElementId.InvalidElementId ? null : id.Value;
+        return id is null || id == ElementId.InvalidElementId ? null : RevitCompat.IdValue(id);
     }
 
     private static bool BelongsToLevel(Document doc, Element e, string levelName)
     {
         var id = GetLevelId(e);
         if (id is null) return false;
-        var level = doc.GetElement(new ElementId(id.Value)) as Level;
+        var level = doc.GetElement(RevitCompat.MakeId(id.Value)) as Level;
         return level is not null && string.Equals(level.Name, levelName, StringComparison.OrdinalIgnoreCase);
     }
 

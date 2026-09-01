@@ -16,11 +16,16 @@ public sealed class ParameterExportCommand : ICoreCommand<ParameterExportConfig>
     {
         var categoryIds = ResolveCategoryIds(document, config.Categories, out var unknownCategories);
 
-        // ElementMulticategoryFilter lọc ở tầng native của Revit thay vì kéo hết phần tử vào bộ nhớ
-        // rồi lọc bằng LINQ — nhanh hơn đáng kể trên model lớn nhiều category (lỗi #10).
+        if (categoryIds.Count == 0)
+        {
+            return CommandResult.Fail("Không có category nào hợp lệ: " + string.Join(", ", unknownCategories));
+        }
+
+        // Lỗi #10: lọc bằng ElementMulticategoryFilter để Revit lọc ở tầng dưới thay vì LINQ trong bộ nhớ.
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var collector = new FilteredElementCollector(document)
             .WhereElementIsNotElementType()
-            .WherePasses(new ElementMulticategoryFilter(categoryIds))
+            .WherePasses(new ElementMulticategoryFilter(categoryIds.ToList()))
             .ToList();
 
         var sb = new StringBuilder();
@@ -34,7 +39,7 @@ public sealed class ParameterExportCommand : ICoreCommand<ParameterExportConfig>
         foreach (var element in collector)
         {
             sb.Append(element.Id.ToString()).Append(',')
-              .Append(CsvEscape(element.Category!.Name)).Append(',')
+              .Append(CsvEscape(element.Category?.Name)).Append(',')
               .Append(CsvEscape(element.Name));
 
             foreach (var paramName in config.ParameterNames)
@@ -55,6 +60,11 @@ public sealed class ParameterExportCommand : ICoreCommand<ParameterExportConfig>
         foreach (var unknown in unknownCategories)
         {
             result.Messages.Add($"Bỏ qua category không tồn tại trong mô hình: \"{unknown}\".");
+        }
+
+        if (config.Verbose)
+        {
+            result.Messages.Add($"Thời gian: {stopwatch.ElapsedMilliseconds} ms.");
         }
 
         return result;

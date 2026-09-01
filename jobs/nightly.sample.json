@@ -1,0 +1,26 @@
+{
+  "name": "Chạy đêm - dự án mẫu",
+  "app": "revit",
+  "revitVersion": 2024,
+  "stopOnError": false,
+  "saveMode": "SaveAs",
+  "outputFolder": "D:/DHCB/nightly/{yyyy-MM-dd}",
+  "tokens": { "projectCode": "LMK" },
+  "files": [
+    { "path": "P:/Landmark/ARC.rvt", "worksets": ["Shared Levels and Grids"] },
+    { "path": "P:/Landmark/MEP.rvt", "detachFromCentral": true }
+  ],
+  "steps": [
+    { "command": "HealthReport",       "config": { "outputPath": "{outputFolder}/{fileName}-health.html" } },
+    { "command": "WarningsExport",     "config": { "outputPath": "{outputFolder}/{fileName}-warnings.csv" } },
+    { "command": "FamilyAudit",        "config": { "outputPath": "{outputFolder}/{fileName}-families.csv" } },
+    { "command": "StylePurge",         "config": { "dryRun": true } },
+    { "command": "ParameterRuleCheck", "config": { "rulesPath": "D:/DHCB/configs/parameter-rules.json", "outputPath": "{outputFolder}/{fileName}-rules.html" } },
+    { "command": "ConnectorChecker",   "config": { "create3dView": false } },
+    { "command": "ClashDetection",     "config": { "categoriesA": ["Ducts", "Pipes"], "categoriesB": ["Structural Framing"], "outputPath": "{outputFolder}/{fileName}-clash.html", "acceptedPath": "D:/DHCB/configs/clash-accepted.json", "create3dView": false } },
+    { "command": "BatchExport",        "config": { "outputFolder": "{outputFolder}/pdf/{fileName}", "formats": ["Pdf"] } },
+    { "command": "SleeveAuto",         "config": { "sleeveFamilyName": "DHCB_Sleeve", "dryRun": true } },
+    { "command": "ElevationTag",       "config": { "dryRun": true } },
+    { "command": "HangerAuto",         "config": { "hangerFamilyName": "DHCB_Hanger", "spacingMm": 3000, "dryRun": true } }
+  ]
+}

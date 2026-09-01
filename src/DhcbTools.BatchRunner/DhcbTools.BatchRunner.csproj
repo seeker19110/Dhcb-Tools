@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Console điều phối batch chạy đêm (Giai đoạn 1). KHÔNG tham chiếu Revit/AutoCAD:
+      - Revit: ghi %APPDATA%\DHCB\pending-job.json + journal, mở Revit.exe; add-in DhcbTools.Revit tự chạy job rồi thoát.
+      - AutoCAD: sinh script .scr, chạy accoreconsole.exe cho từng DWG (không cần UI).
+    Sau đó đọc run.jsonl → báo cáo HTML + mã thoát (0/1/2) cho Task Scheduler.
+    net8.0 thuần để build/test được trên CI Linux.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>DhcbTools.BatchRunner</RootNamespace>
+    <AssemblyName>DhcbTools.BatchRunner</AssemblyName>
+    <Platforms>AnyCPU;x64</Platforms>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DhcbTools.Shared.Logic\DhcbTools.Shared.Logic.csproj" />
+  </ItemGroup>
+
+</Project>

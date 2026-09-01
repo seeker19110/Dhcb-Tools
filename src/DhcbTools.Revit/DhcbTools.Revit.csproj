@@ -11,7 +11,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DhcbTools.Core\DhcbTools.Core.csproj" />
-    <ProjectReference Include="..\DhcbTools.Shared.Logic\DhcbTools.Shared.Logic.csproj" />
+    <ProjectReference Include="..\DhcbTools.Shared.Hosting\DhcbTools.Shared.Hosting.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -22,6 +22,14 @@
 
   <ItemGroup>
     <None Include="DhcbTools.Revit.addin" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="DhcbTools.Shared.Hosting" />
+    <Compile Include="..\DhcbTools.Shared.Hosting\Polyfills.cs" Link="Polyfills.cs" Condition="'$(TargetFramework)'=='net48'" />
+    <!-- Build kiểm tra không WPF (Linux/CI): bỏ cửa sổ WPF, mọi thứ khác vẫn phải biên dịch. -->
+    <Compile Remove="UI\**" Condition="'$(DhcbSkipWpf)'=='true'" />
+    <Page Remove="UI\**" Condition="'$(DhcbSkipWpf)'=='true'" />
   </ItemGroup>
 
 </Project>

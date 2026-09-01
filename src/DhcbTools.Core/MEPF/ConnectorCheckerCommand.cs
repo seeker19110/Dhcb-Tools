@@ -32,7 +32,7 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
             var yMm = info.Origin.Y * FtToMm;
             var zMm = info.Origin.Z * FtToMm;
             reportLines.Add(
-                $"Element {info.ElementId.IntegerValue} at ({xMm:F1},{yMm:F1},{zMm:F1}) mm - {info.Domain}");
+                $"Element {RevitCompat.IdValue(info.ElementId)} at ({xMm:F1},{yMm:F1},{zMm:F1}) mm - {info.Domain}");
             elementIds.Add(info.ElementId);
         }
 

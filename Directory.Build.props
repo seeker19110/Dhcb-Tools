@@ -26,6 +26,20 @@
     <TargetFramework>net8.0-windows</TargetFramework>
   </PropertyGroup>
 
+  <!-- Hằng biên dịch theo phiên bản: ElementId.Value (long) thay IntegerValue từ 2024. -->
+  <PropertyGroup Condition="'$(RevitVersion)' != '' And $(RevitVersion) &gt;= 2024">
+    <DefineConstants>$(DefineConstants);REVIT2024_OR_GREATER</DefineConstants>
+  </PropertyGroup>
+
+  <!--
+    Build kiểm tra trên Linux/CI (không có WindowsDesktop SDK): dotnet build -p:EnableWindowsTargeting=true -p:UseWPF=false
+    → vỏ Revit bỏ thư mục UI (WPF) ra khỏi compile; xem scripts/check-build.sh.
+  -->
+  <PropertyGroup Condition="'$(UseWPF)'=='false'">
+    <DhcbSkipWpf>true</DhcbSkipWpf>
+    <DefineConstants>$(DefineConstants);DHCB_SKIP_WPF</DefineConstants>
+  </PropertyGroup>
+
   <!--
     AutoCAD: đường dẫn tới thư mục cài AutoCAD, dùng cho HintPath của AcMgd/AcDbMgd/AcCoreMgd.
     Truyền vào khi build:  dotnet build -p:AcadVersion=2024

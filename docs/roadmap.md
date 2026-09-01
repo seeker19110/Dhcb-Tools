@@ -1,151 +1,76 @@
 # Lộ trình phát triển DHCB Tools
 
-Tài liệu này mô tả **kế hoạch phía trước**. Hiện trạng thực tế (đã làm được gì, còn lỗi gì)
-nằm ở [`progress.md`](progress.md). Đặc tả chi tiết phần chưa làm ở
-[`dac-ta-tinh-nang.md`](dac-ta-tinh-nang.md), kế hoạch kiểm thử ở [`dac-ta-kiem-thu.md`](dac-ta-kiem-thu.md).
-Cơ sở kỹ thuật và khảo sát tính năng nằm ở
-[`nghien-cuu-dhcb-revit-tools.md`](nghien-cuu-dhcb-revit-tools.md).
+Tài liệu này mô tả **kế hoạch phía trước**. Hiện trạng thực tế nằm ở [`progress.md`](progress.md). Đặc tả chi tiết ở
+[`dac-ta-tinh-nang.md`](dac-ta-tinh-nang.md), kế hoạch kiểm thử ở [`dac-ta-kiem-thu.md`](dac-ta-kiem-thu.md), cơ sở kỹ
+thuật ở [`nghien-cuu-dhcb-revit-tools.md`](nghien-cuu-dhcb-revit-tools.md).
 
-Ký hiệu: ✅ xong · 🟡 làm dở · ⬜ chưa bắt đầu.
+Ký hiệu: ✅ xong · 🟡 làm dở · ⬜ chưa bắt đầu · 🧪 code xong, chờ kiểm thử trên phần mềm thật.
 
 ## Nguyên tắc xuyên suốt
 
-1. **Core không biết UI.** Mọi lệnh giữ chữ ký `Document`/`Database` + config → `CommandResult`.
-   Đây là lý do một lệnh chạy được cả trên Ribbon, HTTP Bridge lẫn batch runner mà không sửa logic.
-2. **`DryRun` mặc định bật.** Lệnh nào sửa mô hình cũng phải xem trước được.
-3. **Một lệnh = một transaction**, kèm `IFailuresPreprocessor` để chạy được khi không có người.
-4. **AI chỉ sinh đề xuất.** Mọi thay đổi mô hình đi qua transaction của tool và có kỹ sư duyệt.
+1. **Core không biết UI.** `Document`/`Database` + config → `CommandResult`; một lệnh chạy được từ Ribbon, Bridge, batch, AI.
+2. **`DryRun` mặc định bật.** Ribbon luôn chạy xem trước rồi hỏi; Bridge/MCP ép `dryRun:true` trừ khi xác nhận.
+3. **Một lệnh = một transaction**, `SilentFailuresPreprocessor`.
+4. **AI chỉ sinh đề xuất**, offline, whitelist lệnh — xem [`ai-offline.md`](ai-offline.md).
+5. **Phần tính được thì test được**: thuật toán xuống `Shared.Logic`, CI xanh trước khi lên máy Revit.
 
 ---
 
-## Giai đoạn 0 — Trả nợ kỹ thuật 🟡
+## Giai đoạn 0 — Trả nợ kỹ thuật ✅
 
-**Vì sao đứng trước:** mọi giai đoạn sau đều xây trên `DhcbTools.Core`. Sửa nền móng bây giờ rẻ
-hơn nhiều so với sau khi thêm routing MEPF (khối lượng lớn nhất còn lại).
+Token Bridge · `Shared.Hosting` · Hanger/PipeSplitter gắn Ribbon + Bridge · DrawingCleanup an toàn · timeout huỷ lệnh ·
+collector hiệu năng. Xem bảng lỗi #1–#12 trong `progress.md`.
 
-| Việc | Lý do |
+## Giai đoạn 1 — Batch runner chạy đêm ✅ 🧪
+
+`DhcbTools.BatchRunner` + hook add-in Revit + `DHCB_RUN` cho accoreconsole + Task Scheduler. Chi tiết
+[`batch-runner.md`](batch-runner.md). Cần một đêm chạy thật trên máy có license để chốt.
+
+## Giai đoạn 2 — Khởi tạo dự án & hồ sơ ✅ 🧪
+
+`ProjectFromTemplate`, `TransferStandards`, `GridFromCsv` (CSV từ Excel hoặc từ AutoCAD `GridExtract`),
+`SheetBatchCreate`. Hạn chế API: LineStyles/ObjectStyles không copy được qua `CopyElements` — tool báo rõ, làm tay bằng
+Transfer Project Standards.
+
+## Giai đoạn 3 — MEPF ✅ 🧪
+
+| Bước | Trạng thái |
 |---|---|
-| ✅ Project test xUnit (`tests/DhcbTools.Shared.Logic.Tests`) | Parser CSV, thuật toán đánh số, logic hình học MEPF đều là logic thuần, test được không cần Revit |
-| ✅ Sửa nhóm lỗi âm thầm #1–#5 (test được) | `DhcbTools.Shared.Logic` — xem "Lỗi đã biết" trong `progress.md` |
-| ✅ Sửa #6, #7 (chưa có test, cần compiler xác nhận) | DrawingCleanup AutoCAD, timeout Bridge — xem `progress.md` |
-| ✅ Token xác thực cho HTTP Bridge (#8) | `BridgeAuth` (đã test) + wiring vào cả hai Bridge, token lưu ở `%APPDATA%\DHCB\bridge-token.txt` |
-| 🟡 Tách phần dùng chung — xong `DhcbTools.Shared.Logic`, còn `Shared.Hosting` | `CommandResult`, `ICoreCommand`, phần HTTP chung đang bị nhân đôi giữa Revit và AutoCAD — xem `dac-ta-tinh-nang.md` §0.2 |
-| ✅ Gắn Hanger/PipeSplitter vào Ribbon + Bridge (#11) | Đã có nút trong panel MEPF |
+| Sleeve, tag cao độ, hanger, chia ống, connector hở | ✅ |
+| Routing mức A — theo line vẽ tay | 🧪 `RouteFromLines` (RouteGraph có test) |
+| Routing mức B — rải thiết bị theo phòng | 🧪 `DevicePlacement` (DevicePattern có test) |
+| Sizing (đề xuất → CSV → áp) | 🧪 `SizingProposal` / `ApplySizing` (Duct/PipeSizing có test theo ASHRAE/SCH40) |
+| Màu/filter theo hệ, System Name | 🧪 `SystemColor` / `SystemName` |
+| Đánh số theo dòng chảy | 🧪 `FlowNumbering` |
 
-**Xong khi:** test chạy xanh trong CI, Bridge yêu cầu token, không còn class trùng lặp giữa hai Core.
+**Việc tiếp theo cho routing:** kiểm thử trên model mẫu chữ U + nhánh T (DoD §3.1), đo tỉ lệ fitting dựng được với 3 bộ
+family khác nhau; bổ sung fallback dời điểm khi đoạn ngắn hơn fitting.
 
----
+## Giai đoạn 4 — Tự động hoá cấp 2 ✅ 🧪
 
-## Giai đoạn 1 — Batch runner chạy đêm ⬜
+`ElevationUpdater` (tắt mặc định, tự tắt khi > 200 ms/lần), `ParameterRuleCheck`, `ClashDetection` + `clash-accepted.json`.
+**Việc tiếp theo:** đo hiệu năng updater trên dự án thật rồi mới bật mặc định.
 
-**Đã có nguyên liệu, chưa có bản thân batch runner.** `BatchExportCommand`, `HealthReportCommand`
-và các lệnh nền tảng đều xử lý **một file đang mở**. Còn thiếu lớp điều phối chạy nhiều file
-không người trực — đây mới là "đích của dự án" theo tài liệu nghiên cứu (tự động hoá cấp 3).
+## Giai đoạn 5 — Lớp AI ✅ (offline)
 
-| Việc | Ghi chú |
-|---|---|
-| Batch runner: mở → xử lý → lưu → đóng từng file theo danh sách | Mọi lệnh hiện có cắm thẳng vào được, không cần sửa logic |
-| Chạy theo lịch qua Windows Task Scheduler | Vẫn cần một máy có license Revit — không có headless mode chính thức |
-| Log tập trung + báo cáo tổng hợp sau mỗi lần chạy | Điều kiện để tin được kết quả chạy đêm |
+Map layer → type, thuyết minh → config, phân tích cảnh báo, ra lệnh tiếng Việt. Heuristic mặc định, Ollama local tuỳ chọn.
+**Việc tiếp theo:** bổ sung từ điển đồng nghĩa layer theo chuẩn từng công ty (file JSON ngoài repo), thêm mẫu regex cho
+thuyết minh thực tế.
 
-**Vì sao vẫn ưu tiên cao nhất:** biến toàn bộ lệnh đã có (kể cả MEPF nền tảng) thành giá trị chạy
-đêm ngay lập tức, và hoàn tất ý nghĩa cho HTTP Bridge đã xây từ sớm (xem "Ghi chú về thứ tự" bên dưới).
+## Giai đoạn 6 — Tuỳ nhu cầu 🟡
 
-**Xong khi:** một file danh sách dự án + một lệnh hẹn giờ là đủ để sáng hôm sau có PDF, health
-report, và log kết quả sleeve/tag/hanger đã chạy qua đêm.
+- **Routing mức C:** `PathFinder3D` (A* lưới 3D, phạt rẽ, khoảng hở) ✅ phần thuần; ⬜ lệnh Core: chọn 2 điểm + hộp tìm
+  kiếm → polyline → model line → `RouteFromLines`.
+- **MCP server:** ✅ `scripts/dhcb_mcp_server.py`.
 
----
+## Giai đoạn 7 — Khoảng trống so với tool thị trường ✅ P1 🧪 · ⬜ P2
 
-## Giai đoạn 2 — Khởi tạo dự án & hồ sơ bản vẽ 🟡
+Khảo sát và kế hoạch: [`nghien-cuu-tool-thi-truong-va-ke-hoach.md`](nghien-cuu-tool-thi-truong-va-ke-hoach.md).
+P1 (7.1–7.14) đã có mã nguồn và test phần thuần. P2: ống dốc/kick-90, BOM spool, lệnh nối PathFinder3D → RouteFromLines,
+vỏ AutoCAD core-only cho accoreconsole, xuất theo schedule, copy viewport.
 
-**Đã xong:** `ProjectInit/*` — dựng Level, Grid, load family theo danh mục, gán project info,
-tất cả từ config JSON.
+## Sau đó
 
-**Còn thiếu:**
-- Tạo file từ template chuẩn công ty (đặt tên theo quy tắc, tạo workset) — hiện `ProjectInit`
-  giả định file đã tồn tại, chưa tự sinh file mới từ template.
-- Transfer project standards (browser organization, view template, filter) từ file chuẩn.
-- Grid/level sinh từ **bản CAD** hoặc bảng Excel — hiện chỉ nhận config JSON viết tay.
-- Tạo sheet hàng loạt, tag và dim hàng loạt (thuộc Giai đoạn 4 quy trình A→Z).
-
----
-
-## Giai đoạn 3 — MEPF 🟡
-
-Khối lượng lớn nhất của toàn dự án. Phần nền tảng (làm từ dưới lên) đã xong; routing là phần còn
-lại và nặng nhất.
-
-| Bước | Trạng thái | Ghi chú |
-|---|---|---|
-| 1. Sleeve/opening tại giao cắt tường-sàn-dầm | ✅ | `MEPF/SleeveCommand`, lọc 2 lớp BoundingBox → IntersectsSolid |
-| 2. Tag hàng loạt + điền cao độ đáy/đỉnh/tim | ✅ | `MEPF/ElevationTagCommand` |
-| Hanger/support theo khoảng cách chuẩn | ✅ | `MEPF/HangerCommand`  |
-| Chia ống/máng theo cây 3m/6m | ✅ | `MEPF/PipeSplitterCommand` (`BreakCurve`)  |
-| Kiểm tra connector hở toàn mô hình | ✅ | `MEPF/ConnectorCheckerCommand`, tuỳ chọn tạo 3D view khoanh vùng |
-| 3. Routing mức A — bán tự động theo tuyến | ⬜ | Kỹ sư vẽ model line, tool dựng duct/pipe/tray hoàn chỉnh với fitting đúng routing preference |
-| 5. Routing mức B — tự động cục bộ theo quy tắc | ⬜ | Rải sprinkler/miệng gió theo pattern chuẩn rồi nối về trục chính |
-| 6. Sizing theo hệ | ⬜ | Chỉ ở mức *đề xuất*, kỹ sư duyệt |
-| Tô màu/filter theo hệ, cập nhật System Name | ⬜ | |
-| Đánh số thiết bị/đoạn theo tuyến hoặc phòng | ⬜ | Sắp theo connector graph |
-
-Chi tiết từng hệ (HVAC / Nước / Điện / PCCC) xem mục 4.3 của tài liệu nghiên cứu.
-
-**Rủi ro cho phần routing:** chất lượng kết quả phụ thuộc family fitting và routing preference của
-từng dự án — phải đọc `RoutingPreferenceManager` thay vì hard-code, và báo lỗi rõ khi thiếu fitting.
-Auto-connect có thể fail khi góc lệch nhỏ/đoạn ngắn hơn fitting — cần fallback (dời điểm, báo user)
-thay vì rollback cả transaction.
-
----
-
-## Giai đoạn 4 — Tự động hoá cấp 2 (theo sự kiện) ⬜
-
-- `IUpdater` điền cao độ và cập nhật tham số theo thời gian thực — hiện `ElevationTagCommand` chỉ
-  chạy theo lệnh (cấp 1), chưa chạy real-time.
-- Checker: tham số thiếu, đặt tên sai quy tắc (connector hở đã có ở cấp 1, xem Giai đoạn 3).
-- Clash detection nội bộ + báo cáo.
-
-**Rủi ro:** `IUpdater` chạy trong mọi transaction của người dùng — một lỗi ở đây làm chậm toàn bộ
-Revit. Cần đo hiệu năng trước khi bật mặc định.
-
----
-
-## Giai đoạn 5 — Lớp AI ⬜
-
-Hai điểm cắm ROI cao nhất, làm trước:
-
-1. **Map layer/block CAD → Revit type.** Gửi danh sách layer + danh mục type của template,
-   nhận bảng mapping JSON đúng schema. Kỹ sư duyệt bảng thay vì map tay hàng trăm dòng.
-2. **PDF thuyết minh/spec → config khởi tạo dự án.** Gửi PDF thẳng lên API, trích số tầng,
-   cao độ, hệ thống, tiêu chuẩn — đúng định dạng config mà `ProjectInit/*` đã nhận sẵn.
-
-Về sau: phân tích báo cáo clash/warning (chạy đêm bằng Batch API), và tool use với whitelist
-lệnh Core để ra lệnh bằng tiếng Việt — endpoint `/query` của Bridge (đọc ngữ cảnh model, không
-ghi transaction) đã là bước chuẩn bị cho hướng này.
-
-API key lưu ngoài repo (biến môi trường hoặc DPAPI), không commit.
-
----
-
-## Giai đoạn 6 — Tuỳ nhu cầu ⬜
-
-- **Routing mức C** — pathfinding 3D (A*) né va chạm. Giới hạn phạm vi (1 hệ, 1 tầng, hành lang)
-  để khả thi; nếu không sẽ là hố đen thời gian.
-- Mở rộng HTTP Bridge thành MCP server.
-
----
-
-## Ghi chú về thứ tự
-
-Tài liệu nghiên cứu (mục 6) xếp HTTP Bridge là việc **cuối cùng, tuỳ chọn**, nhưng thực tế nó đã
-được làm ngay sau giai đoạn nền tảng — và kể từ đó, một lượng lớn tính năng (Giai đoạn 5+0, MEPF
-nền tảng) đã được thêm vào **trước** khi có batch runner. Hệ quả: Bridge và các lệnh mới đều đã
-sẵn sàng, nhưng chỉ chạy được từng file một, có người bấm nút — chưa ai được hưởng lợi ích "chạy
-đêm, sáng ra có kết quả" mà tài liệu nghiên cứu đặt làm đích.
-
-Đây là lý do **Giai đoạn 1 (batch runner) vẫn giữ ưu tiên cao nhất**, giờ còn cấp thiết hơn lúc
-trước: càng nhiều lệnh nền tảng có sẵn mà chưa chạy được hàng loạt, chi phí cơ hội của việc
-thiếu batch runner càng lớn.
-
-Rủi ro còn lại: routing MEPF (mức A/B/C) là phần nặng nhất chưa động tới, và không có gì đảm bảo
-chất lượng nếu thiếu Giai đoạn 0 (test) đi trước — logic hình học (giao cắt, khoảng cách, dung
-sai) sai rất dễ xảy ra và khó phát hiện bằng mắt thường trên model lớn.
+- Test tích hợp chạy **bên trong** Revit (add-in test runner kích bằng batch runner) — hạ tầng đã có.
+- WPF form cho các lệnh hay dùng (hiện config JSON + xem trước) khi có phản hồi người dùng.
+- `ParameterImport` đọc CSV theo luồng ký tự (ô có xuống dòng).

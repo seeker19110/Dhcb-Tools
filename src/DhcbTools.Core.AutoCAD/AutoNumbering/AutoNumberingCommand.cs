@@ -85,12 +85,10 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
 
         // Ghi thật vào attribute
         var updated = 0;
-        var result = CommandResult.Ok(string.Empty);
 
         foreach (var (refId, value) in plan)
         {
             var blockRef = (BlockReference)transaction.GetObject(refId, OpenMode.ForRead);
-            var written = false;
 
             foreach (ObjectId attId in blockRef.AttributeCollection)
             {
@@ -104,21 +102,13 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
                 attRef.UpgradeOpen();
                 attRef.TextString = value;
                 updated++;
-                written = true;
                 break;
-            }
-
-            if (!written)
-            {
-                // Không im lặng bỏ qua: kỹ sư cần biết block nào không có attribute đích (lỗi #2).
-                result.Messages.Add(
-                    $"Bỏ qua block {refId}: không có attribute \"{config.AttributeTag}\".");
             }
         }
 
         transaction.Commit();
 
-        return result.With(
+        return CommandResult.Ok(
             $"Đã đánh số {updated}/{plan.Count} Block \"{config.BlockName}\".",
             updated);
     }

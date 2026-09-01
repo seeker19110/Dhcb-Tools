@@ -1,536 +1,132 @@
-using System.Net;
-using System.Text;
-using Autodesk.Revit.DB;
+using System.Collections.Concurrent;
+using System.Reflection;
 using Autodesk.Revit.UI;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using DhcbTools.Core;
-using DhcbTools.Core.AutoNumbering;
-using DhcbTools.Core.Export;
-using DhcbTools.Core.Health;
-using DhcbTools.Core.MEPF;
-using DhcbTools.Core.ModelCleanup;
-using DhcbTools.Core.ParameterSync;
-using DhcbTools.Core.ProjectInit;
 using DhcbTools.Core.Query;
-using DhcbTools.Shared.Logic;
+using DhcbTools.Shared.Logic.Ai;
+using Newtonsoft.Json;
 
 namespace DhcbTools.Revit.Bridge;
 
 /// <summary>
-/// HTTP Bridge cho phép agent AI (hoặc bất kỳ HTTP client nào) gửi lệnh vào Revit
-/// đang chạy và nhận kết quả JSON trả về — không cần mở UI, không cần click chuột.
+/// HTTP Bridge Revit (port 8765) — phần HTTP/xác thực/timeout nằm trong <see cref="HttpBridgeServer"/> dùng chung với
+/// AutoCAD (mục 0.2). Phần riêng của Revit ở đây chỉ còn: marshal về main thread qua <see cref="ExternalEvent"/>
+/// và dispatch qua <see cref="RevitCommandTable"/>.
 ///
-/// Luồng thực thi:
-///   POST http://localhost:8765/execute  { "command": "AutoNumbering", "config": {...} }
-///   → HttpListener (background thread) nhận request
-///   → đưa vào CommandQueue, gọi ExternalEvent.Raise()
-///   → Revit main thread chạy IExternalEventHandler.Execute()
-///   → CommandResult → JSON → HTTP response
-///
-///   POST http://localhost:8765/query  { "query": "document_info" }
-///   → tương tự nhưng trả về dữ liệu đọc (không transaction ghi)
-///
-///   GET  http://localhost:8765/health  → { "status": "ok", "version": "..." } (không cần token)
-///
-/// Khởi động: App.cs gọi DhcbHttpBridge.Start() khi add-in load.
-/// Dừng:      App.cs gọi DhcbHttpBridge.Stop() khi add-in unload.
+///   GET  /health · GET /tools · POST /execute · POST /query · POST /chat (đề xuất lệnh từ tiếng Việt, không chạy)
+/// Token: %APPDATA%\DHCB\bridge-token.txt (mục 0.1). Lệnh client bỏ đi vì timeout không được chạy (mục 0.5).
 /// </summary>
 public sealed class DhcbHttpBridge : IDisposable
 {
     public const int Port = 8765;
-    private const string Version = "0.1";
 
-    private readonly HttpListener _listener = new();
+    private readonly HttpBridgeServer _server;
     private readonly ExternalEvent _externalEvent;
     private readonly BridgeEventHandler _handler;
-    private readonly string _token = BridgeTokenStore.LoadOrCreate();
-    private readonly BridgeRateLimiter _rateLimiter = new();
-    private CancellationTokenSource? _cts;
-    private Task? _listenTask;
     private bool _disposed;
 
     public DhcbHttpBridge()
     {
         _handler = new BridgeEventHandler();
         _externalEvent = ExternalEvent.Create(_handler);
-    }
-
-    public void Start()
-    {
-        _listener.Prefixes.Add($"http://localhost:{Port}/");
-        _listener.Start();
-
-        _cts = new CancellationTokenSource();
-        _listenTask = Task.Run(() => ListenLoop(_cts.Token));
-    }
-
-    public void Stop()
-    {
-        _cts?.Cancel();
-        try { _listener.Stop(); } catch { /* đang dừng */ }
-        try { _listenTask?.Wait(2000); } catch { /* timeout ok */ }
-    }
-
-    private async Task ListenLoop(CancellationToken ct)
-    {
-        while (!ct.IsCancellationRequested)
+        _server = new HttpBridgeServer(Port, "Revit", Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0")
         {
-            HttpListenerContext ctx;
-            try
+            ExecuteAsync = item =>
             {
-                ctx = await _listener.GetContextAsync();
-            }
-            catch
+                _handler.Commands.Enqueue(item);
+                _externalEvent.Raise();
+                return Task.CompletedTask;
+            },
+            QueryAsync = item =>
             {
-                break; // listener đã stop
-            }
-
-            _ = Task.Run(() => HandleRequest(ctx), ct);
-        }
+                _handler.Queries.Enqueue(item);
+                _externalEvent.Raise();
+                return Task.CompletedTask;
+            },
+            Chat = text => CommandIntentParser.Parse(text, CommandCatalog.Revit).ToPayload(),
+            ListTools = () => CommandCatalog.Describe(CommandCatalog.Revit),
+            Log = _ => { },
+        };
     }
 
-    private void HandleRequest(HttpListenerContext ctx)
-    {
-        var req = ctx.Request;
-        var res = ctx.Response;
+    public string? TokenPath => Shared.Hosting.BridgeTokenStore.DefaultPath;
 
-        // ── Health check (không cần token, không lộ tên file/lệnh — chỉ báo add-in còn sống) ──
-        if (req.HttpMethod == "GET" && req.Url?.AbsolutePath == "/health")
-        {
-            WriteJson(res, 200, new { status = "ok", version = Version });
-            return;
-        }
+    public void Start() => _server.Start();
 
-        // ── Chặn brute-force trước khi so token (lỗi #8) ──────────
-        if (_rateLimiter.IsLockedOut())
-        {
-            WriteJson(res, 429, new { error = "too_many_attempts" });
-            return;
-        }
-
-        // ── Xác thực token + Content-Type (lỗi #8) ────────────────
-        // Không có token thì bất kỳ tiến trình nào trên máy cũng gửi được lệnh xoá với dryRun=false.
-        if (!BridgeAuth.IsAuthorized(_token, req.Headers["Authorization"], req.ContentType))
-        {
-            _rateLimiter.RecordFailure();
-            WriteJson(res, 401, new { error = "unauthorized" });
-            return;
-        }
-
-        // ── Chỉ chấp nhận POST ────────────────────────────────────
-        if (req.HttpMethod != "POST")
-        {
-            WriteJson(res, 405, new { error = "Chỉ hỗ trợ GET /health, POST /execute, POST /query" });
-            return;
-        }
-
-        string body;
-        using (var reader = new System.IO.StreamReader(req.InputStream, req.ContentEncoding))
-        {
-            body = reader.ReadToEnd();
-        }
-
-        var path = req.Url?.AbsolutePath ?? string.Empty;
-
-        // ── POST /execute ─────────────────────────────────────────
-        if (path == "/execute")
-        {
-            HandleExecute(res, body);
-            return;
-        }
-
-        // ── POST /query ───────────────────────────────────────────
-        if (path == "/query")
-        {
-            HandleQuery(res, body);
-            return;
-        }
-
-        WriteJson(res, 404, new { error = $"Endpoint không tồn tại: {path}. Dùng /execute hoặc /query." });
-    }
-
-    // ──────────────────────────────────────────────────────────────
-    // /execute — ghi vào mô hình (qua ExternalEvent)
-    // ──────────────────────────────────────────────────────────────
-    private void HandleExecute(HttpListenerResponse res, string body)
-    {
-        BridgeRequest? bridgeReq;
-        try
-        {
-            bridgeReq = JsonConvert.DeserializeObject<BridgeRequest>(body);
-        }
-        catch (System.Exception ex)
-        {
-            WriteJson(res, 400, new { error = $"JSON không hợp lệ: {ex.Message}" });
-            return;
-        }
-
-        if (bridgeReq is null || string.IsNullOrWhiteSpace(bridgeReq.Command))
-        {
-            WriteJson(res, 400, new { error = "Thiếu trường 'command'." });
-            return;
-        }
-
-        // Marshal sang Revit main thread qua ExternalEvent. Item mang theo cờ huỷ: nếu client đã
-        // hết thời gian chờ thì handler bỏ qua, không chạy lệnh sau lưng người dùng (lỗi #7).
-        var tcs = new TaskCompletionSource<CommandResult>();
-        var item = new BridgeWorkItem<CommandResult>(bridgeReq, tcs);
-        _handler.EnqueueCommand(item);
-        _externalEvent.Raise();
-
-        CommandResult result;
-        try
-        {
-            if (tcs.Task.Wait(30_000))
-            {
-                result = tcs.Task.Result;
-            }
-            else
-            {
-                item.Cancel();
-                result = CommandResult.Fail("Timeout: Revit không xử lý trong 30 giây; lệnh đã bị huỷ, mô hình không bị thay đổi.");
-            }
-        }
-        catch (System.Exception ex)
-        {
-            result = CommandResult.Fail($"Lỗi thực thi: {ex.Message}");
-        }
-
-        WriteJson(res, result.Success ? 200 : 500, new
-        {
-            success              = result.Success,
-            summary              = result.Summary,
-            affectedElementCount = result.AffectedElementCount,
-            messages             = result.Messages,
-            errors               = result.Errors,
-        });
-    }
-
-    // ──────────────────────────────────────────────────────────────
-    // /query — đọc ngữ cảnh (qua ExternalEvent, không ghi)
-    // ──────────────────────────────────────────────────────────────
-    private void HandleQuery(HttpListenerResponse res, string body)
-    {
-        QueryRequest? queryReq;
-        try
-        {
-            queryReq = JsonConvert.DeserializeObject<QueryRequest>(body);
-        }
-        catch (System.Exception ex)
-        {
-            WriteJson(res, 400, new { error = $"JSON không hợp lệ: {ex.Message}" });
-            return;
-        }
-
-        if (queryReq is null || string.IsNullOrWhiteSpace(queryReq.Query))
-        {
-            WriteJson(res, 400, new { error = "Thiếu trường 'query'." });
-            return;
-        }
-
-        var tcs = new TaskCompletionSource<object>();
-        var item = new BridgeWorkItem<object>(queryReq, tcs);
-        _handler.EnqueueQuery(item);
-        _externalEvent.Raise();
-
-        object queryResult;
-        try
-        {
-            if (tcs.Task.Wait(30_000))
-            {
-                queryResult = tcs.Task.Result;
-            }
-            else
-            {
-                item.Cancel();
-                queryResult = new { error = "Timeout: Revit không xử lý trong 30 giây; truy vấn đã bị huỷ." };
-            }
-        }
-        catch (System.Exception ex)
-        {
-            queryResult = new { error = $"Lỗi truy vấn: {ex.Message}" };
-        }
-
-        WriteJson(res, 200, queryResult);
-    }
-
-    private static void WriteJson(HttpListenerResponse res, int statusCode, object payload)
-    {
-        var json = JsonConvert.SerializeObject(payload, Formatting.Indented);
-        var bytes = Encoding.UTF8.GetBytes(json);
-        res.StatusCode = statusCode;
-        res.ContentType = "application/json; charset=utf-8";
-        res.ContentLength64 = bytes.Length;
-        try
-        {
-            res.OutputStream.Write(bytes, 0, bytes.Length);
-            res.OutputStream.Close();
-        }
-        catch { /* client đã ngắt */ }
-    }
+    public void Stop() => _server.Stop();
 
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
-        Stop();
+        _server.Dispose();
         _externalEvent.Dispose();
-        _listener.Close();
     }
 }
 
-// ──────────────────────────────────────────────────────────────
-// Token persistence + rate limit — phần "vỏ" (I/O, trạng thái) của lỗi #8.
-// Logic thuần (sinh/so khớp token) nằm ở DhcbTools.Shared.Logic.BridgeAuth, đã có test.
-// Trùng với DhcbTools.AutoCAD/Bridge/DhcbHttpBridge.cs — sẽ gộp khi có DhcbTools.Shared.Hosting
-// (xem docs/dac-ta-tinh-nang.md §0.2).
-// ──────────────────────────────────────────────────────────────
-
-internal static class BridgeTokenStore
-{
-    public static string TokenFilePath => System.IO.Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DHCB", "bridge-token.txt");
-
-    public static string LoadOrCreate()
-    {
-        var path = TokenFilePath;
-        try
-        {
-            if (System.IO.File.Exists(path))
-            {
-                var existing = System.IO.File.ReadAllText(path).Trim();
-                if (existing.Length >= 32)
-                {
-                    return existing;
-                }
-            }
-        }
-        catch (System.IO.IOException)
-        {
-            // Không đọc được thì sinh mới bên dưới.
-        }
-
-        var token = BridgeAuth.GenerateToken();
-        var directory = System.IO.Path.GetDirectoryName(path)!;
-        System.IO.Directory.CreateDirectory(directory);
-        System.IO.File.WriteAllText(path, token);
-        return token;
-    }
-}
-
-/// <summary>Khoá tạm 5 phút sau 5 lần sai token trong 60 giây, chặn dò token bằng brute-force.</summary>
-internal sealed class BridgeRateLimiter
-{
-    private static readonly TimeSpan FailureWindow = TimeSpan.FromSeconds(60);
-    private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(5);
-    private const int MaxFailuresBeforeLockout = 5;
-
-    private readonly object _gate = new();
-    private readonly Queue<DateTime> _recentFailures = new();
-    private DateTime? _lockedUntilUtc;
-
-    public bool IsLockedOut()
-    {
-        lock (_gate)
-        {
-            return _lockedUntilUtc is { } until && DateTime.UtcNow < until;
-        }
-    }
-
-    public void RecordFailure()
-    {
-        lock (_gate)
-        {
-            var now = DateTime.UtcNow;
-            _recentFailures.Enqueue(now);
-            while (_recentFailures.Count > 0 && now - _recentFailures.Peek() > FailureWindow)
-            {
-                _recentFailures.Dequeue();
-            }
-
-            if (_recentFailures.Count >= MaxFailuresBeforeLockout)
-            {
-                _lockedUntilUtc = now + LockoutDuration;
-                _recentFailures.Clear();
-            }
-        }
-    }
-}
-
-// ──────────────────────────────────────────────────────────────
-// IExternalEventHandler: chạy trên Revit main thread
-// ──────────────────────────────────────────────────────────────
-
-/// <summary>
-/// Một việc đang chờ Revit main thread xử lý. <see cref="Cancel"/> được gọi khi client đã hết thời
-/// gian chờ — handler thấy cờ này thì bỏ qua thay vì chạy lệnh khi không còn ai nhận kết quả (lỗi #7).
-/// </summary>
-internal sealed class BridgeWorkItem<TResult>
-{
-    private int _cancelled;
-
-    public BridgeWorkItem(object request, TaskCompletionSource<TResult> tcs)
-    {
-        Request = request;
-        Tcs = tcs;
-    }
-
-    public object Request { get; }
-    public TaskCompletionSource<TResult> Tcs { get; }
-    public bool IsCancelled => System.Threading.Volatile.Read(ref _cancelled) != 0;
-
-    public void Cancel() => System.Threading.Interlocked.Exchange(ref _cancelled, 1);
-}
-
+/// <summary>Chạy trên main thread Revit. Kiểm tra <c>TryClaim()</c> trước khi chạy để bỏ việc client đã timeout.</summary>
 internal sealed class BridgeEventHandler : IExternalEventHandler
 {
-    private readonly System.Collections.Concurrent.ConcurrentQueue<BridgeWorkItem<CommandResult>>
-        _commandQueue = new();
+    public ConcurrentQueue<BridgeWorkItem<BridgeRequest, CommandResult>> Commands { get; } = new();
 
-    private readonly System.Collections.Concurrent.ConcurrentQueue<BridgeWorkItem<object>>
-        _queryQueue = new();
-
-    public void EnqueueCommand(BridgeWorkItem<CommandResult> item) => _commandQueue.Enqueue(item);
-
-    public void EnqueueQuery(BridgeWorkItem<object> item) => _queryQueue.Enqueue(item);
+    public ConcurrentQueue<BridgeWorkItem<BridgeQuery, object>> Queries { get; } = new();
 
     public string GetName() => "DHCB HTTP Bridge";
 
     public void Execute(UIApplication app)
     {
-        // Xử lý lệnh ghi
-        while (_commandQueue.TryDequeue(out var item))
+        while (Commands.TryDequeue(out var item))
         {
-            if (item.IsCancelled)
+            if (!item.TryClaim())
             {
+                // Lỗi #7: client đã bỏ đi — không mở transaction.
                 continue;
             }
 
-            var req = (BridgeRequest)item.Request;
-            var tcs = item.Tcs;
             try
             {
                 var doc = app.ActiveUIDocument?.Document;
                 if (doc is null)
                 {
-                    tcs.SetResult(CommandResult.Fail("Không có document nào đang mở trong Revit."));
+                    item.Completion.TrySetResult(CommandResult.Fail("Không có document nào đang mở trong Revit."));
                     continue;
                 }
-                tcs.SetResult(DispatchCommand(doc, req));
+
+                item.Completion.TrySetResult(RevitCommandTable.Dispatch(doc, item.Request.Command, item.Request.ConfigJson));
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
-                tcs.SetException(ex);
+                item.Completion.TrySetException(ex);
             }
         }
 
-        // Xử lý truy vấn đọc
-        while (_queryQueue.TryDequeue(out var item))
+        while (Queries.TryDequeue(out var item))
         {
-            if (item.IsCancelled)
+            if (!item.TryClaim())
             {
                 continue;
             }
 
-            var req = (QueryRequest)item.Request;
-            var tcs = item.Tcs;
             try
             {
                 var doc = app.ActiveUIDocument?.Document;
                 if (doc is null)
                 {
-                    tcs.SetResult(new { error = "Không có document nào đang mở trong Revit." });
+                    item.Completion.TrySetResult(new { error = "Không có document nào đang mở trong Revit." });
                     continue;
                 }
-                tcs.SetResult(RevitQueryHandler.Handle(doc, req));
+
+                var request = new QueryRequest
+                {
+                    Query = item.Request.Query,
+                    Params = JsonConvert.DeserializeObject<QueryParams>(item.Request.ParamsJson) ?? new QueryParams(),
+                };
+                item.Completion.TrySetResult(RevitQueryHandler.Handle(doc, request));
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
-                tcs.SetResult(new { error = ex.Message });
+                item.Completion.TrySetResult(new { error = ex.Message });
             }
         }
     }
-
-    private static CommandResult DispatchCommand(Document doc, BridgeRequest req)
-    {
-        var configJson = req.Config?.ToString() ?? "{}";
-
-        return req.Command.ToUpperInvariant() switch
-        {
-            "PARAMETEREXPORT" => new ParameterExportCommand().Execute(
-                doc, Deserialize<ParameterExportConfig>(configJson)),
-
-            "PARAMETERIMPORT" => new ParameterImportCommand().Execute(
-                doc, Deserialize<ParameterImportConfig>(configJson)),
-
-            "REMOVEUNUSEDVIEWS" or "CLEANUP" => new RemoveUnusedViewsCommand().Execute(
-                doc, Deserialize<CleanupConfig>(configJson)),
-
-            "AUTONUMBERING" or "AUTONUMBER" => new AutoNumberingCommand().Execute(
-                doc, Deserialize<AutoNumberingConfig>(configJson)),
-
-            // ── Phase 1: Export + Health ──────────────────────────
-            "BATCHEXPORT" or "EXPORT" => new BatchExportCommand().Execute(
-                doc, Deserialize<ExportConfig>(configJson)),
-
-            "HEALTHREPORT" or "HEALTH" => new HealthReportCommand().Execute(
-                doc, Deserialize<HealthReportConfig>(configJson)),
-
-            // ── Phase 2: Project Init ─────────────────────────────
-            "PROJECTINFO" => new ProjectInfoCommand().Execute(
-                doc, Deserialize<ProjectInfoConfig>(configJson)),
-
-            "LEVELSETUP" or "CREATELEVELS" => new LevelSetupCommand().Execute(
-                doc, Deserialize<LevelSetupConfig>(configJson)),
-
-            "GRIDSETUP" or "CREATEGRIDS" => new GridSetupCommand().Execute(
-                doc, Deserialize<GridSetupConfig>(configJson)),
-
-            "FAMILYLOADER" or "LOADFAMILIES" => new FamilyLoaderCommand().Execute(
-                doc, Deserialize<FamilyLoaderConfig>(configJson)),
-
-            // ── Phase 3: MEPF ─────────────────────────────────────
-            "SLEEVE" or "SLEEVES" => new SleeveCommand().Execute(
-                doc, Deserialize<SleeveConfig>(configJson)),
-
-            "ELEVATIONTAG" or "SETELEV" => new ElevationTagCommand().Execute(
-                doc, Deserialize<ElevationTagConfig>(configJson)),
-
-            "HANGER" or "HANGERS" => new HangerCommand().Execute(
-                doc, Deserialize<HangerConfig>(configJson)),
-
-            "CONNECTORCHECK" or "CHECKCONNECTORS" => new ConnectorCheckerCommand().Execute(
-                doc, Deserialize<ConnectorCheckerConfig>(configJson)),
-
-            "PIPESPLIT" or "SPLITPIPES" => new PipeSplitterCommand().Execute(
-                doc, Deserialize<PipeSplitterConfig>(configJson)),
-
-            _ => CommandResult.Fail($"Lệnh không xác định: \"{req.Command}\". " +
-                 "Hợp lệ: ParameterExport, ParameterImport, Cleanup, AutoNumbering, " +
-                 "BatchExport, HealthReport, ProjectInfo, LevelSetup, GridSetup, FamilyLoader, " +
-                 "Sleeve, ElevationTag, Hanger, ConnectorCheck, PipeSplit."),
-        };
-    }
-
-    private static T Deserialize<T>(string json)
-    {
-        var result = JsonConvert.DeserializeObject<T>(json);
-        if (result is null)
-            throw new InvalidOperationException($"Không thể deserialize config thành {typeof(T).Name}.");
-        return result;
-    }
-}
-
-// ──────────────────────────────────────────────────────────────
-// DTOs
-// ──────────────────────────────────────────────────────────────
-
-public sealed class BridgeRequest
-{
-    [JsonProperty("command")]
-    public string Command { get; set; } = string.Empty;
-
-    [JsonProperty("config")]
-    public JObject? Config { get; set; }
 }

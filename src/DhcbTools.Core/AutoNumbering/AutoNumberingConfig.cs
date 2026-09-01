@@ -40,13 +40,6 @@ public sealed class AutoNumberingConfig
     /// <summary>Hướng quét để xác định thứ tự đánh số theo vị trí hình học.</summary>
     public NumberingDirection Direction { get; init; } = NumberingDirection.LeftToRightThenTopToBottom;
 
-    /// <summary>
-    /// Dung sai gom hàng, đơn vị mm. Hai phần tử lệch nhau ít hơn giá trị này theo trục quét chính
-    /// được coi là cùng một hàng (hoặc cùng một cột), nhờ đó tiêu chí sắp xếp phụ mới có tác dụng.
-    /// Đặt 0 để sắp thuần theo toạ độ như trước.
-    /// </summary>
-    public double RowToleranceMm { get; init; } = 300;
-
     /// <summary>Chỉ xem trước, không ghi vào mô hình.</summary>
     public bool DryRun { get; init; } = true;
 }
