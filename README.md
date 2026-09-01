@@ -19,9 +19,10 @@ src/
 │   └── AutoNumbering/             # #3: đánh số hàng loạt theo vị trí hình học
 │
 ├── DhcbTools.Revit/               # Vỏ Revit: Ribbon, TaskDialog, WPF
-│   ├── App.cs                     # IExternalApplication
+│   ├── App.cs                     # IExternalApplication — khởi động cả Ribbon + HTTP Bridge
 │   ├── DhcbTools.Revit.addin
-│   ├── Commands/                  # IExternalCommand — vỏ mỏng gọi Core
+│   ├── Bridge/DhcbHttpBridge.cs   # HttpListener port 8765 — agent AI gọi lệnh Core qua HTTP
+│   ├── Commands/                  # IExternalCommand — vỏ mỏng gọi Core (kể cả Export/Health/MEPF/ProjectInit)
 │   └── UI/                        # WPF config windows
 │
 ├── DhcbTools.Core.AutoCAD/        # Core AutoCAD — logic thuần, KHÔNG Editor/WPF
@@ -29,11 +30,26 @@ src/
 │   ├── CommandResult.cs
 │   ├── LayerSync/                 # #1: xuất/nhập layer qua CSV (≈ ParameterSync)
 │   ├── DrawingCleanup/            # #2: dọn layer/block/linetype thừa (≈ ModelCleanup)
-│   └── AutoNumbering/             # #3: đánh số Block Reference theo attribute tag
+│   ├── AutoNumbering/             # #3: đánh số Block Reference theo attribute tag
+│   └── Query/                     # đọc ngữ cảnh drawing qua Bridge (không transaction ghi)
 │
 └── DhcbTools.AutoCAD/             # Vỏ AutoCAD: IExtensionApplication, CommandMethod
-    ├── App.cs                     # IExtensionApplication — khởi tạo plugin
+    ├── App.cs                     # IExtensionApplication — khởi tạo plugin + HTTP Bridge
+    ├── Bridge/DhcbHttpBridge.cs   # HttpListener port 8766 — agent AI gọi lệnh Core qua HTTP
     └── Commands/DhcbCommands.cs   # 4 lệnh: DHCB_LAYER_EXPORT/IMPORT, DHCB_CLEANUP, DHCB_AUTONUMBER
+```
+
+`DhcbTools.Core/Export`, `Health`, `MEPF`, `ProjectInit`, `Query` (Revit) — nhóm lệnh mở rộng từ
+khung nền tảng: batch export PDF/DWG/IFC/NWC, health report HTML, sleeve/tag cao độ/hanger/chia
+ống/connector checker cho MEPF, khởi tạo dự án (grid/level/family/project info), và query đọc
+ngữ cảnh model qua Bridge.
+
+`scripts/dhcb_agent.py` — client Python (không cần dependency ngoài) gọi HTTP Bridge từ terminal,
+Hermes, hoặc bất kỳ agent AI nào:
+
+```bash
+python scripts/dhcb_agent.py revit Cleanup --dry-run
+python scripts/dhcb_agent.py autocad LayerExport --output C:/tmp/layers.csv
 ```
 
 ### Tương đồng giữa hai nền tảng
@@ -86,5 +102,17 @@ Các lệnh AutoCAD sau khi load:
 
 ## Trạng thái
 
-Khung solution 2-trong-1 (Revit + AutoCAD) đã dựng xong. Các bước tiếp theo (HTTP Bridge để
-kết nối trực tiếp từ agent AI, batch runner, MEPF, IUpdater) nằm trong tài liệu nghiên cứu.
+**Đã xong**
+- Khung solution 2-trong-1 (Revit + AutoCAD), tách Core (logic thuần) khỏi vỏ UI.
+- 3 nhóm lệnh nền tảng trên cả hai nền tảng: đồng bộ dữ liệu qua CSV, dọn dẹp, đánh số hàng loạt.
+- HTTP Bridge cho agent AI: Revit port 8765, AutoCAD port 8766, kèm client `scripts/dhcb_agent.py`.
+- Batch export (PDF/DWG/IFC/NWC), health report, khởi tạo dự án (grid/level/family/project info).
+- MEPF phần nền tảng: sleeve tại giao cắt, tag cao độ, hanger, chia ống, connector checker.
+
+**Đang tới** — routing MEPF (mức A/B/C), `IUpdater` chạy theo sự kiện, lớp AI, batch runner chạy
+đêm theo lịch.
+
+Chi tiết:
+- [`docs/progress.md`](docs/progress.md) — hiện trạng đầy đủ và danh sách lỗi đã biết.
+- [`docs/roadmap.md`](docs/roadmap.md) — lộ trình theo giai đoạn.
+- [`docs/nghien-cuu-dhcb-revit-tools.md`](docs/nghien-cuu-dhcb-revit-tools.md) — khảo sát kỹ thuật.

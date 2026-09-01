@@ -15,7 +15,7 @@ public sealed class ParameterImportCommand : IExternalCommand
     {
         var document = commandData.Application.ActiveUIDocument.Document;
 
-        var dialog = new OpenFileDialog
+        var dialog = new Microsoft.Win32.OpenFileDialog
         {
             Title = "DHCB Tools - Chọn file CSV đã chỉnh sửa",
             Filter = "CSV (*.csv)|*.csv",
