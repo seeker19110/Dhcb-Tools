@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>DhcbTools.Core</RootNamespace>
+    <AssemblyName>DhcbTools.Core</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      RevitAPI.dll / RevitAPIUI.dll không có trên NuGet chính thức của Autodesk cho mọi bản;
+      cách chuẩn là tham chiếu trực tiếp tới thư mục cài Revit trên máy build, ví dụ:
+        %ProgramFiles%\Autodesk\Revit <version>\RevitAPI.dll
+      Hoặc dùng package cộng đồng Nice3point.Revit.Api.RevitAPI (khuyến nghị cho CI).
+      Core CHỈ tham chiếu RevitAPI (đọc/ghi Document), KHÔNG tham chiếu RevitAPIUI.
+    -->
+    <PackageReference Include="Nice3point.Revit.Api.RevitAPI" Version="$(RevitVersion).*" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+</Project>
