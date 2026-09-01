@@ -55,6 +55,43 @@ namespace DhcbTools.Shared.Logic.Ai
 
         private static readonly Regex PathLike = new Regex(@"(?<p>[A-Za-z]:[\\/][^\s\""']+|/[^\s\""']+|[\w\-. ]+\.(?:csv|json|html|txt|rvt|rte|dwg|pdf))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+        /// <summary>
+        /// Danh sách ≤ <paramref name="max"/> lệnh ứng viên theo điểm từ khoá — đầu vào cho model local (giới hạn ~8 tool
+        /// một lượt với model 7–14B). Không khớp gì thì trả các lệnh hay dùng nhất để model vẫn có cái để chọn.
+        /// </summary>
+        public static List<CommandDescriptor> Candidates(string text, string app, int max = 8)
+        {
+            var normalized = LayerMappingSuggester.RemoveDiacritics(text ?? string.Empty).ToLowerInvariant();
+            var scored = new List<(CommandDescriptor Cmd, double Score)>();
+            foreach (var cmd in CommandCatalog.For(app))
+            {
+                var best = 0.0;
+                foreach (var kw in cmd.Keywords.Concat(new[] { cmd.Name }).Concat(cmd.Aliases))
+                {
+                    var k = LayerMappingSuggester.RemoveDiacritics(kw).ToLowerInvariant();
+                    if (k.Length >= 3 && normalized.Contains(k))
+                    {
+                        best = Math.Max(best, Math.Min(1.0, 0.5 + k.Length / 30.0));
+                    }
+                    else
+                    {
+                        // Điểm phụ theo số từ chung để có thứ hạng khi không khớp trọn cụm.
+                        var words = k.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                        var hit = words.Count(w => w.Length >= 3 && normalized.Contains(w));
+                        if (hit > 0)
+                        {
+                            best = Math.Max(best, 0.2 * hit / words.Length);
+                        }
+                    }
+                }
+
+                scored.Add((cmd, best));
+            }
+
+            return scored.OrderByDescending(s => s.Score).ThenBy(s => s.Cmd.Name, StringComparer.Ordinal)
+                .Select(s => s.Cmd).GroupBy(c => c.Name).Select(g => g.First()).Take(Math.Max(1, max)).ToList();
+        }
+
         public static CommandIntent Parse(string text, string app)
         {
             if (string.IsNullOrWhiteSpace(text))

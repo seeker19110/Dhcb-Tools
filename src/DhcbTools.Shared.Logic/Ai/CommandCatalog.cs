@@ -163,6 +163,26 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("inputPath", "SheetNumber,SheetName,TitleBlockType,ViewsToPlace").Field("dryRun", "xem trước")
                 .Words("tạo sheet", "sheet hàng loạt", "create sheets"),
 
+            // ── Revit — hồ sơ & style (giai đoạn 7, học từ pyRevit/DiRoots/Ideate/Colour Splasher) ──
+            new CommandDescriptor("SheetRename", Revit, "Đổi số/tên sheet hoặc view theo mẫu token + regex, chống trùng", true, "RenameSheets", "RenameViews")
+                .Field("target", "Sheets | Views").Field("numberPattern", "mẫu số, ví dụ A-{Level}-{n:00}").Field("namePattern", "mẫu tên").Field("find", "regex tìm").Field("replace", "thay").Field("filterContains", "lọc số/tên chứa").Field("dryRun", "xem trước")
+                .Words("đổi tên sheet", "đổi số sheet", "rename sheet", "đổi tên view", "đánh số sheet"),
+            new CommandDescriptor("RevisionOnSheets", Revit, "Gán hoặc bỏ một revision trên nhiều sheet", true, "SetRevisions")
+                .Field("revisionSequence", "số thứ tự revision").Field("sheetNumberContains", "lọc sheet").Field("remove", "bỏ thay vì gán").Field("dryRun", "xem trước")
+                .Words("revision", "gán revision", "phát hành", "set revision"),
+            new CommandDescriptor("StylePurge", Revit, "Liệt kê và xoá style không được tham chiếu: view template, filter, line/fill pattern, text/dim type, material", true, "PurgeStyles", "Wipe")
+                .Field("kinds", "ViewTemplates/Filters/LinePatterns/FillPatterns/TextTypes/DimensionTypes/Materials").Field("keepNameContains", "giữ lại").Field("dryRun", "xem trước")
+                .Words("purge style", "xoá view template thừa", "xoá filter thừa", "dọn style", "wipe"),
+            new CommandDescriptor("ColorByParameter", Revit, "Tô màu phần tử trong view theo giá trị tham số (palette tự sinh) + chú giải CSV", true, "ColorSplasher", "ColourSplasher")
+                .Field("viewName", "view (rỗng = view đang mở)").Field("categories", "category").Field("parameterName", "tham số").Field("legendCsvPath", "chú giải").Field("reset", "xoá override").Field("dryRun", "xem trước")
+                .Words("tô màu theo tham số", "color splasher", "màu theo", "tô màu phần tử"),
+            new CommandDescriptor("FamilyAudit", Revit, "Kiểm kê family/type (instance, in-place, không dùng) ra CSV; đổi tên theo mẫu", true, "FamilyReviser")
+                .Field("outputPath", "CSV kiểm kê").Field("renamePattern", "mẫu tên family, ví dụ DHCB_{Category:upper}_{Name}").Field("categories", "lọc").Field("dryRun", "xem trước")
+                .Words("kiểm kê family", "đổi tên family", "family audit", "family reviser", "family không dùng"),
+            new CommandDescriptor("WarningsExport", Revit, "Xuất toàn bộ warning ra CSV kèm ElementId/category, đếm theo loại", false, "ExportWarnings")
+                .Field("outputPath", "file CSV")
+                .Words("xuất warning", "danh sách warning", "warning csv", "review warnings"),
+
             // ── Revit — kiểm tra (cấp 2) ────────────────────────────────────
             new CommandDescriptor("ParameterRuleCheck", Revit, "Kiểm tra tham số thiếu / sai quy tắc đặt tên → HTML", false, "RuleCheck")
                 .Field("rulesPath", "file JSON quy tắc").Field("outputPath", "file HTML")
@@ -186,8 +206,8 @@ namespace DhcbTools.Shared.Logic.Ai
             new CommandDescriptor("LayerImport", AutoCad, "Nhập layer từ CSV", true)
                 .Field("inputPath", "file CSV").Field("createMissing", "tạo layer thiếu").Field("dryRun", "xem trước")
                 .Words("nhập layer", "import layer"),
-            new CommandDescriptor("DrawingCleanup", AutoCad, "Dọn layer rỗng, block/linetype không dùng", true, "Cleanup")
-                .Field("dryRun", "xem trước")
+            new CommandDescriptor("DrawingCleanup", AutoCad, "Dọn layer rỗng, block/linetype/textstyle/dimstyle/regapp không dùng", true, "Cleanup", "Purge")
+                .Field("purgeUnusedTextStyles", "text style").Field("purgeUnusedDimStyles", "dim style").Field("purgeRegApps", "regapp").Field("dryRun", "xem trước")
                 .Words("dọn bản vẽ", "purge", "cleanup drawing", "dọn layer"),
             new CommandDescriptor("AutoNumbering", AutoCad, "Đánh số Block Reference theo attribute", true, "AutoNumber")
                 .Field("blockName", "tên block").Field("attributeTag", "tag").Field("prefix", "tiền tố").Field("dryRun", "xem trước")
@@ -210,6 +230,18 @@ namespace DhcbTools.Shared.Logic.Ai
             new CommandDescriptor("XrefAudit", AutoCad, "Liệt kê xref, đường dẫn thiếu, xref chưa load", false)
                 .Field("outputPath", "file CSV (tuỳ chọn)")
                 .Words("xref", "kiểm tra xref", "xref thiếu"),
+            new CommandDescriptor("LayerTranslate", AutoCad, "Map layer cũ → layer chuẩn theo CSV (đổi entity, merge, đặt thuộc tính) — như LAYTRANS", true, "LayTrans")
+                .Field("mapCsvPath", "Source,Target,Color,Linetype,Lineweight,Plottable").Field("deleteEmptySource", "xoá layer nguồn rỗng").Field("dryRun", "xem trước")
+                .Words("layer translate", "laytrans", "đổi layer theo chuẩn", "map layer chuẩn"),
+            new CommandDescriptor("DrawingCompare", AutoCad, "So bản vẽ hiện tại với DWG khác theo handle (thêm/xoá/đổi layer/dời/đổi text) → CSV/HTML", false, "Compare")
+                .Field("otherPath", "DWG so sánh").Field("outputPath", "CSV hoặc HTML").Field("moveToleranceMm", "dung sai dời")
+                .Words("so sánh bản vẽ", "drawing compare", "khác nhau giữa hai bản"),
+            new CommandDescriptor("BlockQuantity", AutoCad, "Đếm block theo tên (và nhóm theo attribute) → CSV BOM", false, "BlockCount", "Bom")
+                .Field("outputPath", "file CSV").Field("groupByAttribute", "tag attribute để nhóm").Field("blockNameContains", "lọc")
+                .Words("đếm block", "thống kê block", "bom block", "block quantity"),
+            new CommandDescriptor("AttributeIncrement", AutoCad, "Gán attribute tăng dần theo mẫu {n:000} theo thứ tự vị trí (Lee Mac BATTE)", true, "BatchAttribute")
+                .Field("blockName", "tên block").Field("attributeTag", "tag").Field("pattern", "mẫu, ví dụ P-{n:000}").Field("startNumber", "bắt đầu").Field("dryRun", "xem trước")
+                .Words("attribute tăng dần", "đánh số attribute", "batte", "increment attribute"),
             new CommandDescriptor("CadLayerMap", AutoCad, "AI offline: gợi ý map layer → Revit type từ danh sách type", false, "LayerMap")
                 .Field("revitTypesPath", "file .txt danh sách type").Field("outputPath", "CSV mapping").Field("useOllama", "dùng model local nếu có")
                 .Words("map layer", "ánh xạ layer"),

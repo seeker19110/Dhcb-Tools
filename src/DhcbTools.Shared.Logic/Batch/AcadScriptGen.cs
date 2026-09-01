@@ -16,7 +16,7 @@ namespace DhcbTools.Shared.Logic.Batch
         /// Một dòng script cho mỗi step. JSON được ghi ra file riêng (đường dẫn truyền vào lệnh) vì dòng lệnh
         /// AutoCAD không chịu dấu nháy/kí tự đặc biệt tốt; DHCB_RUN đọc file đó.
         /// </summary>
-        public static string Build(string pluginDllPath, IReadOnlyList<string> stepJsonPaths, string? saveAsPath, string runLogPath, string sourceFile)
+        public static string Build(string pluginDllPath, IReadOnlyList<string> stepJsonPaths, string? saveAsPath, string runLogPath, string sourceFile, string? plotScript = null)
         {
             if (string.IsNullOrWhiteSpace(pluginDllPath))
             {
@@ -32,6 +32,11 @@ namespace DhcbTools.Shared.Logic.Batch
                 sb.Append("DHCB_RUN \"").Append(Escape(stepPath)).Append("\" \"").Append(Escape(runLogPath)).Append("\" \"").Append(Escape(sourceFile)).Append("\"\n");
             }
 
+            if (!string.IsNullOrEmpty(plotScript))
+            {
+                sb.Append(plotScript);
+            }
+
             if (!string.IsNullOrEmpty(saveAsPath))
             {
                 sb.Append("SAVEAS 2018 \"").Append(Escape(saveAsPath!)).Append("\"\n");
@@ -39,6 +44,51 @@ namespace DhcbTools.Shared.Logic.Batch
 
             sb.Append("FILEDIA 1\n");
             sb.Append("QUIT Y\n");
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Bước in PDF không hộp thoại bằng <c>-PLOT</c> (mục 7.13, thay batch plot): layout, thiết bị "DWG To PDF.pc3",
+        /// khổ giấy, hướng, tỉ lệ Fit, vùng in Extents/Layout, plot style. Mỗi tham số một dòng theo đúng thứ tự prompt của
+        /// AutoCAD 2018+. Layout rỗng = "Model".
+        /// </summary>
+        public static string PlotPdf(string outputPdfPath, string layout = "Model", string paperSize = "ISO A3 (420.00 x 297.00 MM)",
+            string orientation = "Landscape", string plotArea = "Extents", string plotStyle = "monochrome.ctb", string device = "DWG To PDF.pc3")
+        {
+            if (string.IsNullOrWhiteSpace(outputPdfPath))
+            {
+                throw new ArgumentException("Thiếu đường dẫn PDF.", nameof(outputPdfPath));
+            }
+
+            var isModel = string.IsNullOrEmpty(layout) || layout.Equals("Model", StringComparison.OrdinalIgnoreCase);
+            var sb = new StringBuilder();
+            sb.Append("-PLOT\n");
+            sb.Append("Y\n");                                   // Detailed plot configuration? Yes
+            sb.Append(isModel ? "Model\n" : Escape(layout) + "\n"); // layout name
+            sb.Append(Escape(device)).Append("\n");              // output device
+            sb.Append(Escape(paperSize)).Append("\n");           // paper size
+            sb.Append("M\n");                                   // paper units: Millimeters
+            sb.Append(Escape(orientation)).Append("\n");         // orientation
+            sb.Append("N\n");                                   // plot upside down? No
+            sb.Append(Escape(plotArea)).Append("\n");            // plot area: Extents / Layout / Display
+            sb.Append("Fit\n");                                 // scale
+            sb.Append("Center\n");                              // plot offset
+            sb.Append("Y\n");                                   // plot with plot styles
+            sb.Append(Escape(plotStyle)).Append("\n");           // plot style table
+            sb.Append("Y\n");                                   // plot with lineweights
+            if (!isModel)
+            {
+                sb.Append("N\n");                               // scale lineweights with plot scale? No
+                sb.Append("N\n");                               // plot paper space first? No
+                sb.Append("N\n");                               // hide paperspace objects? No
+            }
+            else
+            {
+                sb.Append("A\n");                               // shade plot: As displayed
+            }
+            sb.Append(Escape(outputPdfPath)).Append("\n");       // file name
+            sb.Append("N\n");                                   // save changes to page setup? No
+            sb.Append("Y\n");                                   // proceed with plot
             return sb.ToString();
         }
 

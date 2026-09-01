@@ -20,9 +20,9 @@ namespace DhcbTools.Shared.Logic.Ai
         [JsonProperty("endpoint")]
         public string Endpoint { get; set; } = "http://127.0.0.1:11434";
 
-        /// <summary>Tên model đã pull sẵn, ví dụ "qwen2.5:7b", "llama3.1:8b".</summary>
+        /// <summary>Tên model đã pull sẵn. Mặc định qwen3 — dòng ổn nhất cho tool-calling/JSON trong benchmark 2026 (gemma3 không hỗ trợ tool).</summary>
         [JsonProperty("model")]
-        public string Model { get; set; } = "qwen2.5:7b";
+        public string Model { get; set; } = "qwen3:8b";
 
         [JsonProperty("timeoutSeconds")]
         public int TimeoutSeconds { get; set; } = 120;
@@ -76,7 +76,15 @@ namespace DhcbTools.Shared.Logic.Ai
         public bool IsUsable => _settings.Enabled && _settings.IsLoopback() && !string.IsNullOrWhiteSpace(_settings.Model);
 
         /// <summary>Sinh văn bản. Trả null nếu tắt, không loopback, hoặc lỗi.</summary>
-        public string? Generate(string prompt, string? system = null, bool jsonMode = false)
+        public string? Generate(string prompt, string? system = null, bool jsonMode = false) => Generate(prompt, system, jsonMode ? (JToken)"json" : null);
+
+        /// <summary>
+        /// Sinh với <c>format</c> = JSON Schema (structured outputs của Ollama): ép cú pháp hợp lệ ở tầng token — cách đáng tin
+        /// hơn <c>format:"json"</c> với model 7–9B. Schema càng phẳng, càng ít trường bắt buộc càng tốt.
+        /// </summary>
+        public string? GenerateStructured(string prompt, JObject schema, string? system = null) => Generate(prompt, system, schema);
+
+        private string? Generate(string prompt, string? system, JToken? format)
         {
             if (!IsUsable)
             {
@@ -97,9 +105,9 @@ namespace DhcbTools.Shared.Logic.Ai
                     body["system"] = system;
                 }
 
-                if (jsonMode)
+                if (format != null)
                 {
-                    body["format"] = "json";
+                    body["format"] = format;
                 }
 
                 var request = (HttpWebRequest)WebRequest.Create(_settings.Endpoint.TrimEnd('/') + "/api/generate");
@@ -149,13 +157,78 @@ namespace DhcbTools.Shared.Logic.Ai
                 prompt.Append("- ").Append(l).Append('\n');
             }
 
-            var text = Generate(prompt.ToString(), null, jsonMode: true);
+            var text = GenerateStructured(prompt.ToString(), MappingSchema);
             if (text == null)
             {
                 return null;
             }
 
             return ParseMappingJson(text, revitTypes, rejected);
+        }
+
+        /// <summary>JSON Schema phẳng cho kết quả map layer.</summary>
+        public static readonly JObject MappingSchema = JObject.Parse(@"{
+          ""type"": ""object"",
+          ""properties"": {
+            ""mappings"": { ""type"": ""array"", ""items"": { ""type"": ""object"",
+              ""properties"": { ""layer"": {""type"":""string""}, ""revitType"": {""type"":[""string"",""null""]}, ""confidence"": {""type"":""number""}, ""reason"": {""type"":""string""} },
+              ""required"": [""layer"", ""revitType"", ""confidence""] } }
+          },
+          ""required"": [""mappings""]
+        }");
+
+        /// <summary>JSON Schema cho việc chọn lệnh trong danh sách ứng viên (mục 7.14).</summary>
+        public static readonly JObject ChoiceSchema = JObject.Parse(@"{
+          ""type"": ""object"",
+          ""properties"": { ""command"": {""type"":[""string"",""null""]}, ""confidence"": {""type"":""number""}, ""reason"": {""type"":""string""} },
+          ""required"": [""command"", ""confidence""]
+        }");
+
+        /// <summary>
+        /// Nhờ model CHỌN một lệnh trong ≤ 8 ứng viên (đã lọc bằng heuristic) — giới hạn thực tế của model local với nhiều tool.
+        /// Trả null nếu tắt/lỗi/model chọn ngoài danh sách. Không bao giờ sinh lệnh mới.
+        /// </summary>
+        public string? ChooseCommand(string userText, IReadOnlyList<CommandDescriptor> candidates, out double confidence, out string? reason)
+        {
+            confidence = 0;
+            reason = null;
+            if (!IsUsable || candidates.Count == 0)
+            {
+                return null;
+            }
+
+            var prompt = new StringBuilder();
+            prompt.Append("Người dùng (kỹ sư BIM) nói: \"").Append(userText).Append("\"\n\n")
+                  .Append("Chọn ĐÚNG MỘT lệnh phù hợp nhất trong danh sách, hoặc null nếu không lệnh nào khớp. Chỉ trả tên lệnh y nguyên.\n");
+            foreach (var c in candidates.Take(8))
+            {
+                prompt.Append("- ").Append(c.Name).Append(": ").Append(c.Description).Append('\n');
+            }
+
+            var text = GenerateStructured(prompt.ToString(), ChoiceSchema);
+            if (text == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                var json = JObject.Parse(text);
+                var name = json["command"]?.Type == JTokenType.Null ? null : json["command"]?.ToString();
+                confidence = json["confidence"]?.Type == JTokenType.Float || json["confidence"]?.Type == JTokenType.Integer ? json["confidence"]!.Value<double>() : 0.5;
+                reason = json["reason"]?.ToString();
+                if (name == null)
+                {
+                    return null;
+                }
+
+                var match = candidates.FirstOrDefault(c => c.Matches(name));
+                return match?.Name; // ngoài danh sách → null (whitelist)
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
         }
 
         /// <summary>Đọc JSON mappings của model (kể cả khi bọc trong ```json). Thuần, test được.</summary>
