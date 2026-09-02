@@ -63,11 +63,12 @@ thuyết minh thực tế.
   kiếm → polyline → model line → `RouteFromLines`.
 - **MCP server:** ✅ `scripts/dhcb_mcp_server.py`.
 
-## Giai đoạn 7 — Khoảng trống so với tool thị trường ✅ P1 🧪 · ⬜ P2
+## Giai đoạn 7 — Khoảng trống so với tool thị trường ✅ P1 + P2 🧪
 
 Khảo sát và kế hoạch: [`nghien-cuu-tool-thi-truong-va-ke-hoach.md`](nghien-cuu-tool-thi-truong-va-ke-hoach.md).
-P1 (7.1–7.14) đã có mã nguồn và test phần thuần. P2: ống dốc/kick-90, BOM spool, lệnh nối PathFinder3D → RouteFromLines,
-vỏ AutoCAD core-only cho accoreconsole, xuất theo schedule, copy viewport.
+P1 (7.1–7.14) và P2 (7.15–7.21: ống dốc, kick, BOM spool, AutoRoute mức C → A, ScheduleExport, ViewportCopy, vỏ AutoCAD
+core-only) đã có mã nguồn và test phần thuần. **Việc tiếp theo:** kiểm thử trên model thật theo `dac-ta-kiem-thu.md` §4.2,
+đặc biệt PipeKick (phụ thuộc cút 45° trong routing preference) và AutoRoute (đo thời gian A* với bước 100 mm).
 
 ## Sau đó
 

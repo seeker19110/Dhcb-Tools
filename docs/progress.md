@@ -24,8 +24,9 @@
 | Lớp AI (offline) | ✅ [`ai-offline.md`](ai-offline.md) — heuristic mặc định, Ollama local tuỳ chọn |
 | Routing C (A* 3D) | ✅ Phần thuần `PathFinder3D`, chưa có lệnh Core dựng trực tiếp (kết quả là polyline cho routing A) |
 | MCP server | ✅ `scripts/dhcb_mcp_server.py` |
+| Giai đoạn 7 P2 | ✅ Mã nguồn: SlopePipes, PipeKick, SystemBom, AutoRoute (mức C → mức A), ScheduleExport, ViewportCopy; vỏ `DhcbTools.AutoCAD.Core` cho accoreconsole |
 | Giai đoạn 7 — khoảng trống so với tool thị trường ([`nghien-cuu-tool-thi-truong-va-ke-hoach.md`](nghien-cuu-tool-thi-truong-va-ke-hoach.md)) | ✅ P1 xong mã nguồn: SheetRename, RevisionOnSheets, StylePurge, ColorByParameter, FamilyAudit, WarningsExport, checkset ngưỡng; AutoCAD LayerTranslate, DrawingCompare, BlockQuantity, AttributeIncrement, purge text/dim/regapp; batch autodetect phiên bản + PlotPdf; AI structured outputs + ≤8 ứng viên; MCP read-only/nhóm |
-| Kiểm thử tự động | ✅ 322 test xUnit, chạy trên CI Linux |
+| Kiểm thử tự động | ✅ 340 test xUnit, chạy trên CI Linux |
 | CI | ✅ test + check-build toàn bộ Core/vỏ bằng API package (RevitVersion=2025) |
 
 Ước tính: hoàn thành khoảng **90 %** phạm vi tài liệu nghiên cứu về mặt mã nguồn. Phần còn lại là **kiểm thử trên
@@ -47,11 +48,12 @@ HttpBridgeServer, BridgeTokenStore, AuthLockout, BridgeWorkItem) ← `Core` (Rev
 
 ### Danh sách lệnh Core
 
-**Revit (36):** ParameterExport, ParameterImport, RemoveUnusedViews, AutoNumbering, BatchExport, HealthReport,
+**Revit (42):** ParameterExport, ParameterImport, RemoveUnusedViews, AutoNumbering, BatchExport, HealthReport,
 ProjectInfo, LevelSetup, GridSetup, FamilyLoader, SleeveAuto, ElevationTag, HangerAuto, PipeSplitter, ConnectorChecker,
 RouteFromLines, DevicePlacement, SizingProposal, ApplySizing, SystemColor, SystemName, FlowNumbering,
 ProjectFromTemplate, TransferStandards, GridFromCsv, SheetBatchCreate, **SheetRename, RevisionOnSheets, StylePurge,
-ColorByParameter, FamilyAudit, WarningsExport**, ParameterRuleCheck (+ thresholds), ClashDetection, CadLayerMap, SpecToConfig.
+ColorByParameter, FamilyAudit, WarningsExport**, **SlopePipes, PipeKick, SystemBom, AutoRoute, ScheduleExport, ViewportCopy** (P2),
+ParameterRuleCheck (+ thresholds), ClashDetection, CadLayerMap, SpecToConfig.
 
 **AutoCAD (15):** LayerExport, LayerImport, DrawingCleanup (+ text/dim style, regapp), AutoNumbering, AttributeExport,
 AttributeImport, TextReplace, LayerStandardCheck, GridExtract, XrefAudit, **LayerTranslate, DrawingCompare, BlockQuantity,

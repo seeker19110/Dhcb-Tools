@@ -70,12 +70,22 @@ Nguyên tắc chọn: (a) nhiều người dùng tool khác vì thiếu nó, (b)
 | 7.13 | Batch: **tự nhận phiên bản Revit từ header .rvt**, chọn Revit.exe theo file; `PlotPdf` bằng `-PLOT` trong script accoreconsole | Batch | RevitBatchProcessor, batch plot | `RvtFileInfo`, `AcadScriptGen.PlotPdf` |
 | 7.14 | AI: `OllamaClient` structured outputs (JSON Schema), gợi ý lệnh bằng model chỉ trong **≤ 8 ứng viên** lọc trước, mặc định `qwen3`; MCP `--read-only`, tool gom nhóm | AI | Ollama, Revit 2027 MCP | `CommandIntentParser.Candidates` |
 
-### P2 — sau khi P1 chạy trên máy thật
+### P2 — đã có mã nguồn (chờ kiểm thử trên máy thật)
 
-- Ống dốc (slope) + kick-90 cho routing A; BOM/spool theo hệ; lệnh Core nối `PathFinder3D` → `RouteFromLines`.
-- Vỏ AutoCAD "core-only" (`acdbmgd`/`accoremgd`) để `DHCB_RUN` chắc chắn chạy trong accoreconsole mọi phiên bản.
-- Xuất theo **schedule** (SheetLink), copy viewport giữa sheet.
-- Design Automation (cloud) là lựa chọn ngoài phạm vi offline; chỉ tài liệu hoá cách cắm `RevitCommandTable` vào `DesignAutomationBridge`.
+| # | Tính năng | Học từ | Phần thuần (test) |
+|---|---|---|---|
+| 7.15 | `SlopePipes`: đặt/kiểm tra dốc ống thoát nước theo % hoặc bảng tối thiểu theo DN (TCVN 4474 / IPC 704.1) | Naviate MEP | `SlopeMath` |
+| 7.16 | `PipeKick`: kick/jog ống bằng hai cút 45°/90°, tách 3 đoạn + `NewElbowFitting`, hoàn tác nếu lỗi | Naviate kick-90, Victaulic | `SlopeMath.Kick` |
+| 7.17 | `SystemBom`: BOM theo hệ/spool — ống theo mét + số cây (hao hụt %), fitting theo số lượng | Victaulic Procurement, Naviate spool | `BomAggregator` |
+| 7.18 | `AutoRoute`: A* né chướng ngại (`PathFinder3D`) → model line → tuỳ chọn `RouteFromLines` dựng luôn | eVolve, MagiCAD | `PolylineSimplifier` |
+| 7.19 | `ScheduleExport`: schedule → CSV đúng cột/hàng hiển thị | DiRoots SheetLink | — |
+| 7.20 | `ViewportCopy`: copy legend/schedule sang nhiều sheet cùng vị trí, ghim | pyRevit Sheets | — |
+| 7.21 | Vỏ `DhcbTools.AutoCAD.Core` chỉ tham chiếu AcDbMgd/AcCoreMgd (package `AutoCAD.NET.Core/.Model`) để `DHCB_RUN` chắc chắn NETLOAD trong accoreconsole; BatchRunner ưu tiên DLL này | accoreconsole | kiểm bằng metadata assembly |
+
+Phát hiện khi làm: package `AutoCAD.NET 25.1.x` (AutoCAD 2026.1) đã chuyển sang **.NET 10** — `Directory.Build.props` map
+năm → phiên bản package (≤2024: 24.*, 2025: 25.0.*, 2026+: 25.1.*) để build đúng.
+
+Ngoài phạm vi offline (chỉ tài liệu hoá): Design Automation (cloud) có thể cắm `RevitCommandTable` vào `DesignAutomationBridge`.
 
 ### Thứ tự code
 

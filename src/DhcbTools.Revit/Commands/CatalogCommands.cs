@@ -1,6 +1,7 @@
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using DhcbTools.Core;
 using Newtonsoft.Json.Linq;
 
 namespace DhcbTools.Revit.Commands;
@@ -194,6 +195,61 @@ public sealed class WarningsExportCommand : IExternalCommand
 {
     public Result Execute(ExternalCommandData c, ref string m, ElementSet e) => CommandRunner.Run(c, "WarningsExport",
         new JObject { ["outputPath"] = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "DHCB_Warnings.csv") });
+}
+
+// ── P2 giai đoạn 7 ────────────────────────────────────────────────────────────────────────────────
+
+[Transaction(TransactionMode.Manual)] [Regeneration(RegenerationOption.Manual)]
+public sealed class SlopePipesCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData c, ref string m, ElementSet e) => CommandRunner.Run(c, "SlopePipes",
+        new JObject { ["slopePercent"] = null, ["systemContains"] = "Sanitary", ["levelName"] = "", ["lowerEnd"] = "End", ["checkOnly"] = false, ["dryRun"] = true });
+}
+
+[Transaction(TransactionMode.Manual)] [Regeneration(RegenerationOption.Manual)]
+public sealed class PipeKickCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData c, ref string m, ElementSet e)
+    {
+        var sel = c.Application.ActiveUIDocument.Selection.GetElementIds().FirstOrDefault();
+        return CommandRunner.Run(c, "PipeKick",
+            new JObject { ["elementId"] = sel != null ? RevitCompat.IdValue(sel).ToString() : "<Id ống>", ["offsetMm"] = 300, ["offsetDirection"] = "Up", ["elbowAngleDeg"] = 45, ["distanceFromStartMm"] = 500, ["dryRun"] = true });
+    }
+}
+
+[Transaction(TransactionMode.Manual)] [Regeneration(RegenerationOption.Manual)]
+public sealed class SystemBomCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData c, ref string m, ElementSet e) => CommandRunner.Run(c, "SystemBom",
+        new JObject { ["outputPath"] = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "DHCB_BOM.csv"), ["systemContains"] = "", ["spoolParameter"] = "", ["stockLengthMm"] = 6000, ["wastePercent"] = 5 });
+}
+
+[Transaction(TransactionMode.Manual)] [Regeneration(RegenerationOption.Manual)]
+public sealed class AutoRouteCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData c, ref string m, ElementSet e) => CommandRunner.Run(c, "AutoRoute",
+        new JObject
+        {
+            ["startMm"] = new JObject { ["x"] = 0, ["y"] = 0, ["z"] = 3200 }, ["endMm"] = new JObject { ["x"] = 12000, ["y"] = 6000, ["z"] = 3200 },
+            ["searchMarginMm"] = 3000, ["stepMm"] = 100, ["clearanceMm"] = 100, ["turnPenalty"] = 20, ["allowVertical"] = true,
+            ["obstacleCategories"] = new JArray(), ["lineStyleName"] = "DHCB-Route", ["buildRoute"] = false,
+            ["routeConfig"] = new JObject { ["elementType"] = "Duct", ["typeName"] = "", ["systemType"] = "Supply Air", ["sizeMm"] = new JObject { ["width"] = 400, ["height"] = 200 } },
+            ["dryRun"] = true,
+        });
+}
+
+[Transaction(TransactionMode.Manual)] [Regeneration(RegenerationOption.Manual)]
+public sealed class ScheduleExportCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData c, ref string m, ElementSet e) => CommandRunner.Run(c, "ScheduleExport",
+        new JObject { ["outputFolder"] = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "DHCB_Schedules"), ["nameContains"] = "", ["names"] = new JArray(), ["includeHeader"] = true });
+}
+
+[Transaction(TransactionMode.Manual)] [Regeneration(RegenerationOption.Manual)]
+public sealed class ViewportCopyCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData c, ref string m, ElementSet e) => CommandRunner.Run(c, "ViewportCopy",
+        new JObject { ["sourceSheetNumber"] = "A-101", ["targetSheetNumbers"] = new JArray(), ["targetSheetContains"] = "A-1", ["pinAfterCopy"] = true, ["dryRun"] = true });
 }
 
 /// <summary>Chạy một job batch ngay trong phiên Revit đang mở (không cần console) — job JSON chọn trong config.</summary>

@@ -183,10 +183,13 @@ public static class Program
             return 2;
         }
 
-        var plugin = opts.PluginDll ?? Path.Combine(AppContext.BaseDirectory, "DhcbTools.AutoCAD.dll");
+        // Ưu tiên vỏ core-only (không AcMgd) — NETLOAD chắc chắn trong accoreconsole; vỏ đầy đủ là dự phòng.
+        var plugin = opts.PluginDll
+                     ?? new[] { "DhcbTools.AutoCAD.Core.dll", "DhcbTools.AutoCAD.dll" }.Select(n => Path.Combine(AppContext.BaseDirectory, n)).FirstOrDefault(File.Exists)
+                     ?? Path.Combine(AppContext.BaseDirectory, "DhcbTools.AutoCAD.Core.dll");
         if (!File.Exists(plugin))
         {
-            Console.Error.WriteLine("Không tìm thấy DhcbTools.AutoCAD.dll (dùng --plugin-dll).");
+            Console.Error.WriteLine("Không tìm thấy DhcbTools.AutoCAD.Core.dll / DhcbTools.AutoCAD.dll (dùng --plugin-dll).");
             return 2;
         }
 

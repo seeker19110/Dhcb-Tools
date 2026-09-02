@@ -183,6 +183,26 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("outputPath", "file CSV")
                 .Words("xuất warning", "danh sách warning", "warning csv", "review warnings"),
 
+            // ── Revit — P2 giai đoạn 7 (Naviate/Victaulic/eVolve/pyRevit/SheetLink) ──
+            new CommandDescriptor("SlopePipes", Revit, "Đặt hoặc kiểm tra dốc ống thoát nước theo % hoặc bảng tối thiểu theo DN", true, "PipeSlope")
+                .Field("slopePercent", "% (rỗng = theo DN)").Field("systemContains", "lọc hệ").Field("levelName", "tầng").Field("lowerEnd", "End|Start").Field("checkOnly", "chỉ kiểm").Field("dryRun", "xem trước")
+                .Words("ống dốc", "độ dốc", "slope pipe", "đặt dốc", "kiểm tra dốc"),
+            new CommandDescriptor("PipeKick", Revit, "Kick/jog một ống bằng hai cút 45° hoặc 90° (dịch ngang/lên/xuống)", true, "Kick90", "Jog")
+                .Field("elementId", "Id ống").Field("offsetMm", "khoảng dịch").Field("offsetDirection", "Up|Down|Left|Right").Field("elbowAngleDeg", "45|90").Field("distanceFromStartMm", "vị trí").Field("dryRun", "xem trước")
+                .Words("kick", "kick-90", "jog ống", "né ống", "dịch ống"),
+            new CommandDescriptor("SystemBom", Revit, "BOM theo hệ/spool: ống theo mét + số cây, fitting/phụ kiện theo số lượng → CSV", false, "Bom", "Spool")
+                .Field("outputPath", "file CSV").Field("systemContains", "lọc hệ").Field("spoolParameter", "tham số spool").Field("stockLengthMm", "chiều dài cây")
+                .Words("bom", "bảng khối lượng", "spool", "khối lượng ống", "bill of material"),
+            new CommandDescriptor("AutoRoute", Revit, "Routing mức C: A* né chướng ngại giữa 2 điểm → model line → (tuỳ chọn) dựng duct/pipe", true, "RouteC", "PathFind")
+                .Field("startMm", "{x,y,z}").Field("endMm", "{x,y,z}").Field("searchMarginMm", "biên hộp tìm").Field("obstacleCategories", "chướng ngại").Field("lineStyleName", "line style").Field("buildRoute", "dựng luôn").Field("dryRun", "xem trước")
+                .Words("tự động tìm tuyến", "auto route", "pathfinding", "né va chạm", "routing tự động"),
+            new CommandDescriptor("ScheduleExport", Revit, "Xuất schedule ra CSV đúng cột/hàng đang hiển thị", false, "ExportSchedules")
+                .Field("outputFolder", "thư mục").Field("nameContains", "lọc tên").Field("names", "danh sách tên")
+                .Words("xuất schedule", "schedule csv", "export schedule", "bảng thống kê ra excel"),
+            new CommandDescriptor("ViewportCopy", Revit, "Copy legend/schedule từ một sheet sang nhiều sheet, cùng vị trí, ghim lại", true, "CopyViewports")
+                .Field("sourceSheetNumber", "sheet nguồn").Field("targetSheetNumbers", "sheet đích").Field("targetSheetContains", "lọc đích").Field("pinAfterCopy", "ghim").Field("dryRun", "xem trước")
+                .Words("copy viewport", "copy legend", "chép legend sang sheet", "copy schedule sang sheet"),
+
             // ── Revit — kiểm tra (cấp 2) ────────────────────────────────────
             new CommandDescriptor("ParameterRuleCheck", Revit, "Kiểm tra tham số thiếu / sai quy tắc đặt tên → HTML", false, "RuleCheck")
                 .Field("rulesPath", "file JSON quy tắc").Field("outputPath", "file HTML")

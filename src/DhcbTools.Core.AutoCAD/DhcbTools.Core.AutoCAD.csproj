@@ -19,7 +19,8 @@
       Version "24.*" tương ứng AutoCAD 2024 (internal version 24.x).
       Revit dùng cách tương tự với Nice3point.Revit.Api.RevitAPI.
     -->
-    <PackageReference Include="AutoCAD.NET" Version="24.*" />
+    <PackageReference Include="AutoCAD.NET.Core" Version="$(AcadNetVersion)" />
+    <PackageReference Include="AutoCAD.NET.Model" Version="$(AcadNetVersion)" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
