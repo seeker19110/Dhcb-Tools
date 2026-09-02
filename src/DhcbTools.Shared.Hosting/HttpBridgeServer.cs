@@ -49,6 +49,12 @@ namespace DhcbTools.Shared.Hosting
         /// <summary>Thời gian tối đa chờ luồng UI xử lý một request.</summary>
         public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
 
+        /// <summary>
+        /// Trần cho <c>timeoutSeconds</c> của từng request (giai đoạn 10.5). Có trần để một client
+        /// không giữ hàng đợi vô hạn — Revit chỉ có một luồng, lệnh nào cũng phải nhường chỗ.
+        /// </summary>
+        public TimeSpan MaxTimeout { get; set; } = TimeSpan.FromMinutes(10);
+
         /// <summary>Token hiện hành (nạp từ <see cref="BridgeTokenStore"/> khi Start). Không bao giờ log.</summary>
         public string? Token { get; private set; }
 
@@ -218,10 +224,13 @@ namespace DhcbTools.Shared.Hosting
                 return;
             }
 
+            var timeout = ResolveTimeout(request.TimeoutSeconds);
             var item = new BridgeWorkItem<BridgeRequest, CommandResult>(request);
             var result = Await(item, item.Completion.Task, () => ExecuteAsync(item),
-                () => CommandResult.Fail("Timeout: " + AppName + " không xử lý trong " + (int)Timeout.TotalSeconds + " giây. Lệnh đã bị huỷ, không chạy."),
-                ex => CommandResult.Fail("Lỗi thực thi: " + ex.Message), out var timedOut);
+                () => CommandResult.Fail("Timeout: " + AppName + " không xử lý trong " + (int)timeout.TotalSeconds
+                    + " giây. Lệnh đã bị huỷ, không chạy. Lệnh chạy lâu (SleeveAuto, AutoRoute) thì gửi kèm"
+                    + " \"timeoutSeconds\" lớn hơn."),
+                ex => CommandResult.Fail("Lỗi thực thi: " + ex.Message), out var timedOut, timeout);
 
             WriteJson(res, timedOut ? 504 : result.Success ? 200 : 500, new
             {
@@ -229,6 +238,8 @@ namespace DhcbTools.Shared.Hosting
                 summary = result.Summary,
                 affectedCount = result.AffectedCount,
                 affectedElementCount = result.AffectedCount,
+                // Giai đoạn 10.2 — id phần tử vừa đổi, để agent kiểm lại/zoom đúng chỗ thay vì chỉ biết số đếm.
+                changedIds = result.ChangedIds,
                 messages = result.Messages,
                 errors = result.Errors,
             });
@@ -295,19 +306,39 @@ namespace DhcbTools.Shared.Hosting
             WriteJson(res, 200, Chat(chat.Text));
         }
 
+        /// <summary>Thời gian chờ hiệu lực cho request hiện tại.</summary>
+        private TimeSpan ResolveTimeout(int? requested) => ResolveTimeout(requested, Timeout, MaxTimeout);
+
+        /// <summary>
+        /// Chọn thời gian chờ: theo request nếu là số dương, chặn trên bởi <paramref name="max"/>,
+        /// còn lại dùng <paramref name="fallback"/>. Tách ra static để test được — chọn sai ở đây thì
+        /// hoặc lệnh nặng chết oan vì timeout, hoặc một client giữ hàng đợi Revit vô hạn.
+        /// </summary>
+        public static TimeSpan ResolveTimeout(int? requested, TimeSpan fallback, TimeSpan max)
+        {
+            if (requested is not > 0)
+            {
+                return fallback;
+            }
+
+            var wanted = TimeSpan.FromSeconds(requested.Value);
+            return wanted > max ? max : wanted;
+        }
+
         private TResult Await<TRequest, TResult>(
             BridgeWorkItem<TRequest, TResult> item,
             Task<TResult> task,
             Func<Task> dispatch,
             Func<TResult> onTimeout,
             Func<Exception, TResult> onError,
-            out bool timedOut)
+            out bool timedOut,
+            TimeSpan? timeout = null)
         {
             timedOut = false;
             try
             {
                 var dispatchTask = dispatch();
-                if (task.Wait(Timeout))
+                if (task.Wait(timeout ?? Timeout))
                 {
                     return task.Result;
                 }

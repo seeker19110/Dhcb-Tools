@@ -8,3 +8,6 @@ __pycache__/
 # Rác do build target của package AutoCAD.NET sinh ra ở gốc repo.
 build_temp/
 build_v2/
+
+# Gói phát hành dựng tại chỗ: zip/exe của release.yml và .mcpb của scripts/pack-mcpb.ps1.
+dist/

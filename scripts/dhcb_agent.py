@@ -80,14 +80,28 @@ def request(app: str, method: str, path: str, payload=None, timeout: int = 35) -
         return {"success": False, "summary": f"Không kết nối được ({e.reason}). {app.capitalize()} có đang mở và plugin đã load chưa?"}
 
 
-def send(app: str, command: str, config: dict) -> dict:
-    return request(app, "POST", "/execute", {"command": command, "config": config})
+def send(app: str, command: str, config: dict, timeout_seconds: int = 0) -> dict:
+    """Chạy một lệnh. timeout_seconds > 0 thì xin server chờ lâu hơn mặc định 30 s —
+    cần cho lệnh nặng như SleeveAuto/AutoRoute trên model thật (giai đoạn 10.5)."""
+    payload = {"command": command, "config": config}
+    if timeout_seconds > 0:
+        payload["timeoutSeconds"] = timeout_seconds
+
+    # Client phải chờ lâu hơn server một chút, nếu không chính client bỏ đi trước khi server kịp trả lời.
+    return request(app, "POST", "/execute", payload,
+                   timeout=timeout_seconds + 10 if timeout_seconds > 0 else 35)
 
 
 def print_result(result: dict):
     if "success" in result:
         icon = "✓" if result.get("success") else "✗"
         print(f"\n{icon} {result.get('summary', '')}")
+        changed = result.get("changedIds") or []
+        if changed:
+            # Giai đoạn 10.2 — in ra để còn zoom tới đúng phần tử vừa đổi.
+            shown = ", ".join(str(i) for i in changed[:20])
+            more = f" … (+{len(changed) - 20})" if len(changed) > 20 else ""
+            print(f"  Phần tử đã đổi: {shown}{more}")
         for msg in result.get("messages", []):
             print(f"  • {msg}")
         for err in result.get("errors", []):

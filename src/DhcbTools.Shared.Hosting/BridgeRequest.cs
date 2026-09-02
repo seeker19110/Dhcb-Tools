@@ -12,6 +12,19 @@ namespace DhcbTools.Shared.Hosting
         [JsonProperty("config")]
         public JObject? Config { get; set; }
 
+        /// <summary>
+        /// Thời gian chờ riêng cho lệnh này, tính bằng giây (giai đoạn 10.5). Bỏ trống = dùng mặc định
+        /// của server (30 s).
+        /// <para>
+        /// Vì sao cần: 30 s cố định là đủ cho lệnh đọc nhưng không đủ cho <c>SleeveAuto</c>/<c>AutoRoute</c>
+        /// trên model thật — client bỏ đi, lệnh bị đánh dấu huỷ, và người dùng thấy "timeout" dù chẳng có
+        /// gì sai. Server tự chặn trên ở <see cref="HttpBridgeServer.MaxTimeout"/> để một request không
+        /// giữ hàng đợi mãi mãi.
+        /// </para>
+        /// </summary>
+        [JsonProperty("timeoutSeconds")]
+        public int? TimeoutSeconds { get; set; }
+
         /// <summary>Config dưới dạng chuỗi JSON ("{}" nếu thiếu) — để vỏ deserialize sang kiểu config cụ thể.</summary>
         public string ConfigJson => Config?.ToString(Formatting.None) ?? "{}";
     }

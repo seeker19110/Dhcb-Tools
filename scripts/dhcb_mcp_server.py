@@ -98,9 +98,12 @@ def call_tool(name: str, arguments: dict) -> dict:
             return {"success": False, "summary": f"Server đang chạy --read-only; lệnh ghi '{name}' bị chặn."}
     config = dict(arguments)
     confirm = bool(config.pop("confirm", False))
+    # Lệnh nặng (SleeveAuto, AutoRoute, ClashDetection) vượt 30 s mặc định trên model thật;
+    # server chặn trên ở 10 phút nên không sợ giữ hàng đợi mãi (giai đoạn 10.5).
+    timeout_seconds = int(config.pop("timeoutSeconds", 0) or 0)
     # Nguyên tắc: AI chỉ đề xuất, kỹ sư xác nhận — không confirm thì luôn xem trước.
     config["dryRun"] = not confirm
-    return dhcb_agent.send(APP, name, config)
+    return dhcb_agent.send(APP, name, config, timeout_seconds=timeout_seconds)
 
 
 def respond(msg_id, result=None, error=None):

@@ -95,8 +95,43 @@ Không có gì trong giai đoạn 10 nới lỏng các rào đã có:
 - `snapshot` chỉ đọc và ghi ảnh vào thư mục tạm; không đụng mô hình.
 - `selection`/`show_elements` chỉ đổi lựa chọn trên màn hình, không sửa mô hình, không mở transaction.
 
+## Playbook nghiệp vụ
+
+Thứ 138 tool rời rạc không có: **trình tự làm việc**. Trong [`skills/`](../skills/):
+
+| Playbook | Dùng khi |
+|---|---|
+| `kiem-model-truoc-sync` | "kiểm model", "trước khi sync", "model có sạch không" |
+| `danh-so-hang-loat` | "đánh số cửa", "đánh lại Mark", "numbering" |
+| `xu-ly-nhom-canh-bao` | "nhiều warning quá", "dọn warning" |
+
+Mỗi playbook có mục **Không được làm** — phần quan trọng không kém phần hướng dẫn, vì nó chặn những việc
+trông có vẻ hữu ích mà thực ra làm hỏng mô hình (xoá phần tử cho hết cảnh báo, chạy thật khi chưa xem trước).
+
+## Cài vào Claude Desktop
+
+```powershell
+.\scripts\pack-mcpb.ps1
+```
+
+Ra `dist/dhcb-revit-<phiên bản>.mcpb`; mở bằng Claude Desktop là xong, không phải sửa file cấu hình.
+Cài add-in trước ([installer](../installer/dhcb-tools.iss)) để có Bridge mà nối. Chi tiết:
+[`tools/mcpb/README.md`](../tools/mcpb/README.md).
+
+## Lệnh chạy lâu
+
+Mặc định Bridge chờ 30 giây — đủ cho lệnh đọc, không đủ cho `SleeveAuto`/`AutoRoute`/`ClashDetection` trên
+model thật. Gửi kèm `timeoutSeconds`:
+
+```json
+{ "command": "SleeveAuto", "config": { ... }, "timeoutSeconds": 300 }
+```
+
+Server chặn trên ở 10 phút: Revit chỉ có một luồng nên không thể để một request giữ hàng đợi vô hạn.
+
 ## Còn lại của giai đoạn 10
 
-- **10.3** Playbook nghiệp vụ dạng skill (kiểm model trước sync, xử lý một nhóm warning, dựng grid/level từ CAD).
-- **10.4** Đóng gói `.mcpb` cho Claude Desktop, tự tìm cổng và token.
-- **10.5** Timeout theo lệnh + `/progress/<id>` cho lệnh chạy lâu (`SleeveAuto`, `AutoRoute` vượt 30 s).
+- Phần AutoCAD tương ứng của các query mới.
+- `/progress/<id>` để theo dõi lệnh chạy lâu thay vì chỉ ngồi chờ.
+- MCP server chịu được khi Revit chưa mở (hiện `tools/list` báo lỗi kết nối).
+- Hai playbook còn lại: dựng grid/level từ CAD, xuất bộ PDF theo revision.
