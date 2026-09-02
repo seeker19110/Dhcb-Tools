@@ -73,3 +73,24 @@ jobs:
         if: matrix.version == '2025'   # không phụ thuộc TFM, chạy một lần là đủ
         run: |
           node -e "const fs=require('fs');const s=fs.readFileSync('tools/autocad-mcp-server/panel.html','utf8');const m=s.match(/<script>([\\s\\S]*?)<\\/script>/);if(!m)throw Error('script missing');new Function(m[1]);if(!s.includes('runCleanup(false)'))throw Error('real cleanup path missing');"
+
+  # Build ĐẦY ĐỦ có WPF trên Windows — đúng thứ release.yml đóng gói.
+  # Job check-build ở trên chạy UseWPF=false (Linux không có WindowsDesktop SDK), mà bật WPF
+  # thì SDK BỎ System.IO khỏi implicit usings (tránh nhập nhằng System.IO.Path với
+  # System.Windows.Shapes.Path). Vì thế add-in Revit từng hỏng CS0103 ở bản build thật trong khi
+  # CI vẫn xanh — release.yml chỉ chạy khi đẩy tag nên không ai bắt được. Job này đóng khe hở đó.
+  build-wpf-windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        revit: ['2025', '2024', '2023']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build đầy đủ vỏ Revit (WPF, Revit ${{ matrix.revit }})
+        run: dotnet build src/DhcbTools.Revit/DhcbTools.Revit.csproj -c Release -p:RevitVersion=${{ matrix.revit }}
