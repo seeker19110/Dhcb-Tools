@@ -1,0 +1,5 @@
+{
+  "_comment": "Copy thành %APPDATA%\\DHCB\\settings.json. IUpdater cao độ mặc định TẮT (mục 4.1) — bật sau khi đo hiệu năng trên dự án thật.",
+  "updaters": { "elevation": false },
+  "maxExecuteMs": 200
+}

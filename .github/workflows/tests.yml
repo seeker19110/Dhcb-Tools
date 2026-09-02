@@ -1,0 +1,57 @@
+# CI: test tầng logic thuần + build kiểm tra toàn bộ Core/vỏ bằng API package NuGet (không cần cài Revit/AutoCAD).
+# Vỏ Revit build với UseWPF=false (bỏ thư mục UI) vì runner Linux không có WindowsDesktop SDK — xem scripts/check-build.sh.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  logic-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj
+
+      - name: Build
+        run: dotnet build tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj --no-restore -c Release
+
+      - name: Test
+        run: dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj --no-build -c Release --logger "trx;LogFileName=test-results.trx"
+
+      - name: Tải kết quả test
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/test-results.trx'
+
+  check-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build BatchRunner
+        run: dotnet build src/DhcbTools.BatchRunner/DhcbTools.BatchRunner.csproj -c Release
+
+      - name: Check-build Core + vỏ (Revit/AutoCAD 2025 API từ NuGet)
+        run: |
+          for proj in src/DhcbTools.Core/DhcbTools.Core.csproj src/DhcbTools.Core.AutoCAD/DhcbTools.Core.AutoCAD.csproj \
+                      src/DhcbTools.Revit/DhcbTools.Revit.csproj src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj \
+                      src/DhcbTools.AutoCAD.Core/DhcbTools.AutoCAD.Core.csproj; do
+            dotnet build "$proj" -p:EnableWindowsTargeting=true -p:RevitVersion=2025 -p:AcadVersion=2025 -p:UseWPF=false -c Release
+          done
+
+      - name: Kiểm tra script Python
+        run: python3 -m py_compile scripts/dhcb_agent.py scripts/dhcb_mcp_server.py scripts/dhcb_ai.py

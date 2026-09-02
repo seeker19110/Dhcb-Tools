@@ -1,0 +1,7 @@
+{
+  "_comment": "Copy thành %APPDATA%\\DHCB\\ai.json. Tuỳ chọn — không có file này thì mọi tính năng AI dùng heuristic offline. Endpoint bắt buộc loopback.",
+  "enabled": false,
+  "endpoint": "http://127.0.0.1:11434",
+  "model": "qwen2.5:7b",
+  "timeoutSeconds": 120
+}
