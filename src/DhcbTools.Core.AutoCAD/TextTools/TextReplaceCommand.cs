@@ -102,14 +102,16 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
             var obj = transaction.GetObject(id, OpenMode.ForWrite);
             switch (obj)
             {
+                // AttributeReference kế thừa DBText trong AutoCAD API — phải khớp trước DBText,
+                // nếu không case DBText sẽ "nuốt" mất case này (CS8120: unreachable).
+                case AttributeReference attRef:
+                    attRef.TextString = newValue;
+                    break;
                 case DBText text:
                     text.TextString = newValue;
                     break;
                 case MText mtext:
                     mtext.Contents = newValue;
-                    break;
-                case AttributeReference attRef:
-                    attRef.TextString = newValue;
                     break;
             }
         }
