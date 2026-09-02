@@ -96,7 +96,7 @@ public sealed class HealthReportCommand : ICoreCommand<HealthReportConfig>
 
             // --- Generate HTML ----------------------------------------------
             string html = BuildHtml(document, config, metrics);
-            string dir = Path.GetDirectoryName(config.OutputPath);
+            string? dir = Path.GetDirectoryName(config.OutputPath);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
             File.WriteAllText(config.OutputPath, html, Encoding.UTF8);

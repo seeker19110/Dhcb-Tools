@@ -128,7 +128,7 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private static FamilySymbol FindFamilySymbol(Document doc, string name)
+    private static FamilySymbol? FindFamilySymbol(Document doc, string name)
     {
         return new FilteredElementCollector(doc)
             .OfClass(typeof(FamilySymbol))

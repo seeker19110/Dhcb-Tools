@@ -213,7 +213,7 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private static FamilySymbol FindFamilySymbol(Document doc, string name)
+    private static FamilySymbol? FindFamilySymbol(Document doc, string name)
     {
         return new FilteredElementCollector(doc)
             .OfClass(typeof(FamilySymbol))

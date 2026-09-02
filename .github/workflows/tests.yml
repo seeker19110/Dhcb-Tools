@@ -38,9 +38,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 2025 = net8.0-windows, 2024 = net48. Trước đây CI chỉ build nhánh 2025, nên lỗi chỉ
-        # xảy ra trên net48 (ví dụ Dictionary.GetValueOrDefault) lọt qua tới tận máy người dùng.
-        version: ['2025', '2024']
+        # Đúng bộ phiên bản mà release.yml đóng gói. 2025 = net8.0-windows, 2024/2023 = net48.
+        # Trước đây CI chỉ build 2025, nên lỗi chỉ xảy ra trên net48 (Dictionary.GetValueOrDefault)
+        # hoặc chỉ trên Revit ≤ 2023 (ElementId.Value) lọt tới tận bước phát hành.
+        version: ['2025', '2024', '2023']
     steps:
       - uses: actions/checkout@v4
 
