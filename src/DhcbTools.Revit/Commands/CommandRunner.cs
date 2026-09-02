@@ -7,9 +7,11 @@ using Newtonsoft.Json.Linq;
 namespace DhcbTools.Revit.Commands;
 
 /// <summary>
-/// Chạy một lệnh Core theo tên, lấy cấu hình từ file JSON thay cho cửa sổ WPF.
-/// Dùng cho bản build không WPF (<c>DHCB_SKIP_WPF</c>) và cho những lệnh chưa có cửa sổ riêng:
-/// xem trước (<c>dryRun = true</c>) → hỏi → chạy thật, đúng nguyên tắc xuyên suốt trong roadmap.
+/// Chạy một lệnh Core theo tên. Bản có WPF mở <see cref="UI.CommandFormWindow"/> — form dựng ô nhập
+/// từ <c>CommandCatalog</c> nên mọi lệnh đều có giao diện thật (giai đoạn 9.1). Bản không WPF
+/// (<c>DHCB_SKIP_WPF</c>, dùng cho build kiểm tra trên CI) rơi về đường cũ: đọc config JSON ở
+/// <c>%APPDATA%\DHCB\configs\revit</c> → xem trước → hỏi → chạy thật.
+/// <para>Cả hai đường đều giữ nguyên tắc xuyên suốt: <c>DryRun</c> chạy trước, kỹ sư xác nhận mới ghi.</para>
 /// </summary>
 internal static class CommandRunner
 {
@@ -40,6 +42,25 @@ internal static class CommandRunner
             TaskDialog.Show(commandName, $"Không đọc được cấu hình:{Environment.NewLine}{ex.Message}");
             return Result.Failed;
         }
+
+#if !DHCB_SKIP_WPF
+        var descriptor = DhcbTools.Shared.Logic.Ai.CommandCatalog.Find(
+            DhcbTools.Shared.Logic.Ai.CommandCatalog.Revit, commandName);
+
+        if (descriptor != null)
+        {
+            var window = new UI.CommandFormWindow(uiDocument.Document, descriptor, config, ConfigPath(commandName));
+
+            // Gắn cửa sổ vào Revit để nó luôn nổi lên trên và Revit không nhận thao tác khi form đang mở.
+            // Dùng handle cửa sổ chính của tiến trình thay vì Autodesk.Windows (AdWindows.dll không được
+            // tham chiếu qua package API, thêm vào chỉ để lấy owner là không đáng).
+            new System.Windows.Interop.WindowInteropHelper(window).Owner =
+                System.Diagnostics.Process.GetCurrentProcess().MainWindowHandle;
+
+            window.ShowDialog();
+            return window.Executed ? Result.Succeeded : Result.Cancelled;
+        }
+#endif
 
         // Bước 1 — xem trước, không ghi vào mô hình.
         var preview = Dispatch(uiDocument.Document, commandName, config, dryRun: true);

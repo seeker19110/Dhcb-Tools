@@ -20,6 +20,49 @@ namespace DhcbTools.Shared.Hosting
         /// <summary>Số phần tử/object bị ảnh hưởng.</summary>
         public int AffectedCount { get; set; }
 
+        /// <summary>
+        /// ElementId của những phần tử lệnh vừa tạo/sửa/xoá (giai đoạn 10.2).
+        /// <para>
+        /// Chỉ có số đếm thì agent biết "đã đổi 37 phần tử" mà không chỉ được ra phần tử nào, nên
+        /// không tự kiểm được kết quả và cũng không zoom cho kỹ sư xem được. Có danh sách này thì
+        /// khép được vòng: chạy lệnh → <c>/query show_elements</c> hoặc <c>element_geometry</c> trên
+        /// đúng những id vừa đổi → <c>snapshot</c> để nhìn.
+        /// </para>
+        /// <para>Giới hạn <see cref="MaxChangedIds"/> phần tử để một lệnh sửa cả vạn phần tử không
+        /// làm phình response; <see cref="AffectedCount"/> vẫn là con số đầy đủ.</para>
+        /// </summary>
+        public List<long> ChangedIds { get; } = new List<long>();
+
+        /// <summary>Số ElementId tối đa đưa vào <see cref="ChangedIds"/>.</summary>
+        public const int MaxChangedIds = 500;
+
+        /// <summary>Ghi nhận một phần tử vừa thay đổi. Bỏ qua khi đã đủ <see cref="MaxChangedIds"/>.</summary>
+        public CommandResult WithChanged(long elementId)
+        {
+            if (ChangedIds.Count < MaxChangedIds)
+            {
+                ChangedIds.Add(elementId);
+            }
+
+            return this;
+        }
+
+        /// <summary>Ghi nhận nhiều phần tử vừa thay đổi.</summary>
+        public CommandResult WithChanged(IEnumerable<long> elementIds)
+        {
+            foreach (var id in elementIds)
+            {
+                if (ChangedIds.Count >= MaxChangedIds)
+                {
+                    break;
+                }
+
+                ChangedIds.Add(id);
+            }
+
+            return this;
+        }
+
         /// <summary>Tên cũ bên Revit — giữ để code hiện có không phải đổi; cùng giá trị với <see cref="AffectedCount"/>.</summary>
         [JsonIgnore]
         public int AffectedElementCount

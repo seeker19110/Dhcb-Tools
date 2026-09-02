@@ -90,6 +90,7 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
 
         // 4. Place hangers in single transaction
         int placed = 0;
+        var placedIds = new List<long>();   // giai đoạn 10.2
         using var tx = new Transaction(document, "DHCB - Đặt hanger");
         tx.Start();
         RevitCompat.ApplyFailurePolicy(tx);
@@ -113,6 +114,7 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
                 }
 
                 placed++;
+                placedIds.Add(RevitCompat.IdValue(inst.Id));
             }
             catch (System.Exception)
             {
@@ -121,7 +123,8 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
         }
 
         tx.Commit();
-        return CommandResult.Ok($"Đã đặt {placed} hanger trên {elements.Count} phần tử MEP.", placed);
+        return CommandResult.Ok($"Đã đặt {placed} hanger trên {elements.Count} phần tử MEP.", placed)
+            .WithChanged(placedIds);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
@@ -183,7 +186,7 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
 
     private static bool BelongsToLevel(Document doc, Element elem, string levelName)
     {
-        var levelParam = elem.LookupParameter("Level")
+        var levelParam = RevitCompat.Lookup(elem, "level")
             ?? elem.get_Parameter(BuiltInParameter.FAMILY_LEVEL_PARAM)
             ?? elem.get_Parameter(BuiltInParameter.LEVEL_PARAM)
             ?? elem.get_Parameter(BuiltInParameter.RBS_START_LEVEL_PARAM);

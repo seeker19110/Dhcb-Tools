@@ -113,9 +113,9 @@ public sealed class ElevationUpdater : IUpdater
                 }
 
                 var e = MepLayout.Elevations(bb.Min.Z, bb.Max.Z);
-                SetIfPossible(el, _config.BottomElevParamName, e.BottomMm);
-                SetIfPossible(el, _config.TopElevParamName, e.TopMm);
-                SetIfPossible(el, _config.CenterElevParamName, e.CentreMm);
+                SetIfPossible(el, "bottomElevation", _config.BottomElevParamName, e.BottomMm);
+                SetIfPossible(el, "topElevation", _config.TopElevParamName, e.TopMm);
+                SetIfPossible(el, "centreElevation", _config.CenterElevParamName, e.CentreMm);
             }
         }
         catch
@@ -133,9 +133,10 @@ public sealed class ElevationUpdater : IUpdater
         }
     }
 
-    private static void SetIfPossible(Element el, string paramName, double mm)
+    /// <summary>Ghi qua từ điển tên tham số (giai đoạn 9.2); paramName là tên người dùng chỉ định, có thể null.</summary>
+    private static void SetIfPossible(Element el, string key, string? paramName, double mm)
     {
-        var p = el.LookupParameter(paramName);
+        var p = RevitCompat.Lookup(el, key, paramName);
         if (p == null || p.IsReadOnly)
         {
             return;

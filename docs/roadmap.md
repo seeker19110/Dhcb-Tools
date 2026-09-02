@@ -57,21 +57,21 @@ Bốn việc này phải xong **trước** mọi hướng mới; bỏ qua thì h
 
 ---
 
-## Giai đoạn 9 — Từ hình dáng agent sang hình dáng kỹ sư ⬜ (tuần 3–4)
+## Giai đoạn 9 — Từ hình dáng agent sang hình dáng kỹ sư 🟡 (tuần 3–4)
 
 32/42 nút Ribbon hiện là runner JSON chung không có form, và file config **không tự sinh** như README nói
 (`CommandRunner.LoadConfig` trả `JObject` rỗng). Không kỹ sư nào sửa JSON trong `%APPDATA%` để dùng tool.
 
 | # | Việc | Chi tiết |
 |---|---|---|
-| 9.1 | **Form động từ `CommandCatalog`** | Một cửa sổ WPF chung đọc `Field()` của lệnh → textbox/số/bật-tắt/combo; trường kiểu category/parameter/family/level/view chọn từ model thật; nút *Xem trước* chạy `dryRun` và hiện `Messages`; *Chạy* mới ghi. Lưu JSON đúng chỗ. Thay toàn bộ `CoreRibbonCommands` bằng đường này. Catalog cần thêm kiểu trường (`FieldKind`) — phần thuần, có test |
-| 9.2 | **Lớp từ điển tham số & family** | `%APPDATA%\DHCB\dictionary.json` (mẫu trong `configs/`): tên tham số theo ngôn ngữ UI (`Level`↔`Tầng`), family sleeve/hanger/tag mặc định, shared parameter cao độ. `RevitCompat.Lookup(doc, key)` là điểm duy nhất tra tham số; **thiếu → `CommandResult.Errors`**, không bao giờ no-op rồi báo thành công. Gỡ hết literal `M_Generic Model`, `Nominal Width`, `DHCB_Bottom_Elevation`, `Outer Diameter` khỏi Core |
+| 9.1 ✅ | **Form động từ `CommandCatalog`** | `FieldKind` + `FieldSpec` trong catalog, kiểu suy ra từ tên trường (`FieldKindGuess`, thuần, có test cho cả 107 trường thật). `CommandFormWindow` dựng ô nhập theo kiểu: checkbox, ô số theo culture, ô đường dẫn kèm nút chọn file/thư mục, combo lấy từ mô hình đang mở (`ModelChoices`: category, tham số, level, view template, family type). *Xem trước* chạy `dryRun` và hiện `Summary`+`Messages`; nút *Chạy thật* chỉ mở sau khi xem trước thành công. Config tự lưu lại. Ba vỏ MEPF viết tay (SleeveAuto/ElevationTag/ConnectorChecker) nay cũng đi qua form — gỡ luôn `SleeveFamilyName = "M_Generic Model"` gắn cứng. MCP `inputSchema` nhận kiểu JSON đúng (number/boolean/array) thay vì tất cả là string |
+| 9.2 ✅ | **Lớp từ điển tham số & family** | `ParameterDictionary` (thuần, có test) đọc `%APPDATA%\DHCB\dictionary.json` — mẫu ở [`configs/dictionary.sample.json`](../configs/dictionary.sample.json). Mỗi khoá logic (`level`, `diameter`, `bottomElevation`…) có danh sách tên đồng nghĩa Anh–Việt; tên trong file đứng **trước** tên dựng sẵn chứ không thay thế, nên dự án dùng thư viện chuẩn vẫn chạy mà không cần file. `RevitCompat.Lookup(element, key, preferred)` là điểm tra tham số duy nhất của Core (instance rồi type). Đã gỡ literal khỏi Core: `"Level"` (5 chỗ), `"Outer Diameter"`/`"Width"`/`"Height"`, `"Department"`/`"Occupancy"`, mặc định `DHCB_*_Elevation` và `M_Generic Model`. **Tra không ra là báo lỗi có mã `E-PARAM-MISSING` kèm danh sách tên đã thử** — `SleeveAuto` báo số phần tử không tra được kích thước, `ElevationTag` trả `Success=false` khi không ghi được phần tử nào (trước đây báo "Đã gán cao độ cho 0/N" như thể bình thường) |
 | 9.3 | **Tiếng Việt hoá thông báo** | Mọi `Messages`/`Errors` của Core có tiếng Việt kèm mã lỗi ổn định (ví dụ `E-PARAM-MISSING`) để tra tài liệu và để agent hiểu |
 | 9.4 | **Đưa cho một nhóm kỹ sư dùng thật** | Phát hành v1.1, thu phản hồi theo mẫu (lệnh nào dùng hằng tuần, lệnh nào bấm rồi bỏ). Số liệu này quyết định giai đoạn 10/11 đi sâu vào đâu |
 
 ---
 
-## Giai đoạn 10 — Agent khép vòng cho Revit 2021–2026 ⬜ (tuần 5–8) — **hướng khác biệt lớn nhất**
+## Giai đoạn 10 — Agent khép vòng cho Revit 2021–2026 🟡 (tuần 5–8) — **hướng khác biệt lớn nhất**
 
 Autodesk Revit 2027 MCP Server chỉ **đọc** và chỉ chạy trên **2027**; các dự án revit-mcp mã mở có 100+ tool nhưng
 không có `dryRun`, token, batch, AutoCAD song hành hay tiếng Việt. DHCB đã có Bridge, token, `ExternalEvent`,
@@ -79,11 +79,11 @@ catalog, MCP — thiếu đúng phần làm agent *nhìn, chỉ, kiểm* đượ
 
 | # | Việc | Chi tiết |
 |---|---|---|
-| 10.1 | **Mở rộng phía đọc** `RevitQueryHandler` (hiện 10 loại) | `selection` (đọc + đặt qua `UIDocument`), `show_elements`/zoom, `active_view`, `element_geometry` (bounding box, đường tâm, connector, host/level), `schedule_rows` (bảng dạng hàng, không ghi file), `parameters_of` (category/type → tên, kiểu, đơn vị, read-only), `snapshot` (`ExportImage` view hiện tại → PNG base64). AutoCAD tương ứng: `selection`, `zoom`, `entity_geometry`, `snapshot` |
-| 10.2 | **Khép vòng ghi** | Mọi `/execute` trả `changedIds` (thêm/sửa/xoá) và tuỳ chọn `snapshotBefore/After`; agent và kỹ sư thấy được kết quả, không chỉ đọc số đếm |
-| 10.3 | **Playbook nghiệp vụ** cho Claude (thư mục `skills/`) | 5 kịch bản đầu: *kiểm model trước sync*, *đánh số cửa/thiết bị theo tầng*, *tìm và xử lý một nhóm warning*, *dựng grid/level từ CAD*, *xuất bộ PDF theo revision*. Mỗi playbook = trình tự query → xem trước → xác nhận → kiểm lại, có model mẫu để chạy thử trong 8.3 |
-| 10.4 | **Đóng gói `.mcpb`** cho Claude Desktop | Một cú cài; tự tìm cổng 8765/8766 và token; MCP server chịu được khi Revit chưa mở (trả tool list từ cache thay vì lỗi) |
-| 10.5 | **Bridge chịu tải** | Nâng timeout theo lệnh (Sleeve/AutoRoute cần > 30 s) với tiến độ `/progress/<id>`; chỉ một lệnh ghi tại một thời điểm, query đọc xếp hàng sau |
+| 10.1 ✅ | **Mở rộng phía đọc** `RevitQueryHandler` (10 → 17 loại) | Đã có cho Revit: `element_geometry` (hộp bao, đường tâm, **connector kèm tình trạng nối**, host, level — toạ độ trả ra mm), `parameters_of` (tham số của category: tên, `storageType`, chỉ đọc, giá trị mẫu), `schedule_rows` (bảng dạng hàng, không ghi file), `snapshot` (`Document.ExportImage` → PNG base64, nên vẫn ở Core không cần RevitAPIUI); và ở vỏ Revit (`UiQueryHandler`, cần `UIDocument`): `selection` (đọc + **đặt**), `show_elements` (zoom + chọn), `active_view`. Xem [`agent-khep-vong.md`](agent-khep-vong.md). ⬜ Phần AutoCAD tương ứng |
+| 10.2 ✅ | **Khép vòng ghi** | `CommandResult.ChangedIds` — ElementId của phần tử vừa tạo/sửa, giới hạn 500 id một lượt để không phình response (`AffectedCount` vẫn là số đầy đủ). Đã gắn cho `SleeveAuto`, `HangerAuto`, `AutoNumbering`, `ElevationTag`, `SheetRename`. Agent nay chạy được vòng: xem trước → chạy → `element_geometry`/`show_elements` trên đúng id vừa đổi → `snapshot` để nhìn |
+| 10.3 🟡 | **Playbook nghiệp vụ** cho Claude (thư mục `skills/`) | ✅ 3 playbook đầu trong [`skills/`](../skills/): *kiểm model trước sync*, *đánh số hàng loạt*, *xử lý một nhóm cảnh báo*. Mỗi cái là trình tự `parameters_of` → xem trước → xác nhận → kiểm lại bằng `changedIds` → `show_elements`/`snapshot`, kèm mục **Không được làm**. ⬜ Còn *dựng grid/level từ CAD* và *xuất bộ PDF theo revision* |
+| 10.4 ✅ | **Đóng gói `.mcpb`** cho Claude Desktop | ✅ [`tools/mcpb/manifest.json`](../tools/mcpb/manifest.json) + [`scripts/pack-mcpb.ps1`](../scripts/pack-mcpb.ps1) → `dist/dhcb-<app>-<phiên bản>.mcpb`, mở bằng Claude Desktop là xong. Token để trống thì tự đọc `bridge-token.txt`. **Đã đóng gói thật**: 9,1 KB, 4 file, không dependency ngoài. MCP server chịu được khi Revit chưa mở: nhớ danh mục lệnh vào cache nên vẫn liệt kê đủ lệnh kèm ghi chú "Revit chưa mở" thay vì trả danh sách rỗng làm người dùng tưởng gói hỏng |
+| 10.5 🟡 | **Bridge chịu tải** | ✅ `timeoutSeconds` theo từng request (`BridgeRequest`), chặn trên 10 phút để một client không giữ hàng đợi Revit vô hạn; `dhcb_agent.send()` và MCP truyền xuống, client tự chờ lâu hơn server 10 s. Hàm chọn timeout tách static nên có test. ⬜ `/progress/<id>` cho lệnh chạy lâu |
 
 **Chỉ số:** agent tự tìm và xử lý **20 warning trên Snowdon Towers** trong một phiên, mỗi bước có ảnh chụp, kỹ sư chỉ bấm xác nhận.
 

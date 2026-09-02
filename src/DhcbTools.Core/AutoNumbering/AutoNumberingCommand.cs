@@ -85,6 +85,7 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
 
             parameter.Set(value);
             updated++;
+            result.WithChanged(RevitCompat.IdValue(element.Id));
         }
 
         if (unknown.Count > 0)
@@ -96,7 +97,8 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
 
         // Lỗi #2: bản cũ `return CommandResult.Ok(...)` tạo object mới nên toàn bộ dòng "Bỏ qua phần tử X"
         // gom trong `result` bị mất — kỹ sư thấy "40/120" mà không biết 80 phần tử kia hỏng vì lý do gì.
-        var final = CommandResult.Ok($"Đã đánh số {updated}/{plan.Count} phần tử \"{config.Category}\".", updated);
+        var final = CommandResult.Ok($"Đã đánh số {updated}/{plan.Count} phần tử \"{config.Category}\".", updated)
+            .WithChanged(result.ChangedIds);   // giai đoạn 10.2: object mới cũng phải mang theo ChangedIds
         final.Messages.AddRange(result.Messages);
         return final;
     }
@@ -105,7 +107,7 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
     {
         // Không phải mọi category đều có property Level thống nhất trong API (Room dùng SpatialElement.Level,
         // cửa/thiết bị dùng tham số instance "Level"...) nên tra theo tham số để dùng chung cho mọi category.
-        var levelParameter = element.LookupParameter("Level")
+        var levelParameter = RevitCompat.Lookup(element, "level")
             ?? element.get_Parameter(BuiltInParameter.FAMILY_LEVEL_PARAM)
             ?? element.get_Parameter(BuiltInParameter.LEVEL_PARAM);
 

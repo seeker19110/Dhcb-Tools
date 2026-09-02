@@ -1,0 +1,60 @@
+{
+  "manifest_version": "0.2",
+  "name": "dhcb-revit",
+  "display_name": "DHCB Tools — Revit",
+  "version": "0.9.0",
+  "description": "Điều khiển Revit đang mở từ Claude: đọc mô hình, chạy lệnh tự động hoá có xem trước, chỉ và chụp lại kết quả.",
+  "long_description": "Nối Claude vào Revit desktop qua HTTP Bridge chạy trong add-in DHCB Tools (127.0.0.1:8765, có token).\n\nKhác với Revit 2027 MCP Server của Autodesk (chỉ đọc, chỉ chạy trên 2027), bản này chạy với Revit 2021–2026 và có ghi — nhưng mọi lệnh sửa mô hình đều chạy xem trước trước, chỉ ghi thật khi truyền confirm.\n\nAgent nhìn và kiểm được kết quả: element_geometry trả hộp bao/đường tâm/connector theo mm, snapshot trả ảnh PNG của view, show_elements zoom cho kỹ sư nhìn, và mọi lệnh ghi trả về changedIds.",
+  "author": {
+    "name": "DHCB",
+    "url": "https://github.com/seeker19110/Dhcb-Tools"
+  },
+  "homepage": "https://github.com/seeker19110/Dhcb-Tools",
+  "documentation": "https://github.com/seeker19110/Dhcb-Tools/blob/main/docs/agent-khep-vong.md",
+  "license": "MIT",
+  "keywords": [
+    "revit",
+    "bim",
+    "aec",
+    "autocad",
+    "mep"
+  ],
+  "server": {
+    "type": "python",
+    "entry_point": "scripts/dhcb_mcp_server.py",
+    "mcp_config": {
+      "command": "python",
+      "args": [
+        "${__dirname}/scripts/dhcb_mcp_server.py",
+        "revit"
+      ],
+      "env": {
+        "DHCB_BRIDGE_TOKEN": "${user_config.bridge_token}"
+      }
+    }
+  },
+  "user_config": {
+    "bridge_token": {
+      "type": "string",
+      "title": "Token Bridge",
+      "description": "Bỏ trống thì tự đọc %APPDATA%\\DHCB\\bridge-token.txt do add-in sinh ra. Chỉ điền khi chạy Bridge trên máy khác qua SSH tunnel.",
+      "sensitive": true,
+      "required": false,
+      "default": ""
+    }
+  },
+  "compatibility": {
+    "platforms": [
+      "win32"
+    ],
+    "runtimes": {
+      "python": ">=3.9"
+    }
+  },
+  "//": [
+    "Đóng gói:  npx @anthropic-ai/mcpb pack tools/mcpb dist/dhcb-revit.mcpb",
+    "Cài: mở file .mcpb bằng Claude Desktop.",
+    "Yêu cầu: Revit đang mở, add-in DHCB Tools đã nạp (Bridge nghe ở 127.0.0.1:8765).",
+    "Không có dependency Python ngoài — dhcb_mcp_server.py chỉ dùng thư viện chuẩn."
+  ]
+}

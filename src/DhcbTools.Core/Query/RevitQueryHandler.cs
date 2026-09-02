@@ -24,8 +24,16 @@ public static class RevitQueryHandler
             "WARNINGS"      => GetWarnings(doc, req.Params),
             "LINKS"         => GetLinks(doc),
             "STATS"         => GetStats(doc),
+
+            // Giai đoạn 10.1 — phần đọc sâu để agent nhìn, chỉ và kiểm được kết quả.
+            "ELEMENT_GEOMETRY" => GeometryQueries.ElementGeometry(doc, req.Params),
+            "PARAMETERS_OF"    => GeometryQueries.ParametersOf(doc, req.Params),
+            "SCHEDULE_ROWS"    => GeometryQueries.ScheduleRows(doc, req.Params),
+            "SNAPSHOT"         => SnapshotQuery.Snapshot(doc, req.Params),
+
             _ => new { error = $"Query không xác định: \"{req.Query}\". " +
-                 "Hợp lệ: document_info, elements, levels, views, sheets, rooms, families, warnings, links, stats." }
+                 "Hợp lệ: document_info, elements, levels, views, sheets, rooms, families, warnings, links, stats, " +
+                 "element_geometry, parameters_of, schedule_rows, snapshot, selection, show_elements, active_view." }
         };
     }
 
@@ -229,8 +237,8 @@ public static class RevitQueryHandler
             levelName    = r.Level?.Name,
             areaSqm      = Math.Round(RevitCompat.SqFtToSqm(r.Area), 3),  // ft² → m²
             perimeterM   = Math.Round(r.Perimeter * 0.3048, 3),    // ft → m
-            department   = SafeGet(() => r.LookupParameter("Department")?.AsString()),
-            occupancy    = SafeGet(() => r.LookupParameter("Occupancy")?.AsString()),
+            department   = SafeGet(() => RevitCompat.Lookup(r, "department")?.AsString()),
+            occupancy    = SafeGet(() => RevitCompat.Lookup(r, "occupancy")?.AsString()),
             locationX    = (r.Location as LocationPoint)?.Point.X,
             locationY    = (r.Location as LocationPoint)?.Point.Y,
             locationZ    = (r.Location as LocationPoint)?.Point.Z,
@@ -355,7 +363,7 @@ public static class RevitQueryHandler
 
     private static long? GetLevelId(Element e)
     {
-        var levelParam = e.LookupParameter("Level")
+        var levelParam = RevitCompat.Lookup(e, "level")
             ?? e.get_Parameter(BuiltInParameter.FAMILY_LEVEL_PARAM)
             ?? e.get_Parameter(BuiltInParameter.LEVEL_PARAM);
         if (levelParam is null || levelParam.StorageType != StorageType.ElementId) return null;

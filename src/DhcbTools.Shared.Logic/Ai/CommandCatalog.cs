@@ -59,12 +59,25 @@ namespace DhcbTools.Shared.Logic.Ai
         /// <summary>Tên trường config → mô tả ngắn (dùng cho MCP inputSchema và cho intent parser).</summary>
         public Dictionary<string, string> ConfigFields { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// Trường config kèm kiểu, theo đúng thứ tự khai báo — form động (giai đoạn 9.1) dựng ô nhập từ đây.
+        /// Cùng dữ liệu với <see cref="ConfigFields"/>, chỉ thêm kiểu và giữ thứ tự.
+        /// </summary>
+        public List<FieldSpec> Fields { get; } = new List<FieldSpec>();
+
         /// <summary>Từ khoá tiếng Việt/Anh để nhận dạng ý định.</summary>
         public List<string> Keywords { get; } = new List<string>();
 
-        public CommandDescriptor Field(string name, string description)
+        /// <summary>Khai báo một trường; kiểu suy ra từ tên theo <see cref="FieldKindGuess"/>.</summary>
+        public CommandDescriptor Field(string name, string description) =>
+            Field(name, description, FieldKindGuess.Of(name));
+
+        /// <summary>Khai báo một trường với kiểu chỉ định — dùng khi suy đoán theo tên sai.</summary>
+        public CommandDescriptor Field(string name, string description, FieldKind kind)
         {
             ConfigFields[name] = description;
+            Fields.RemoveAll(f => string.Equals(f.Name, name, StringComparison.OrdinalIgnoreCase));
+            Fields.Add(new FieldSpec(name, description, kind));
             return this;
         }
 
@@ -336,10 +349,25 @@ namespace DhcbTools.Shared.Logic.Ai
                     inputSchema = new
                     {
                         type = "object",
-                        properties = c.ConfigFields.ToDictionary(k => k.Key, k => (object)new { description = k.Value }),
+                        properties = c.Fields.ToDictionary(
+                            f => f.Name,
+                            f => (object)new { type = JsonTypeOf(f.Kind), description = f.Description }),
                     },
                 }).ToList(),
             };
+        }
+
+        /// <summary>Kiểu JSON Schema tương ứng — model local bám schema tốt hơn khi biết đâu là số/bool/mảng.</summary>
+        private static string JsonTypeOf(FieldKind kind)
+        {
+            switch (kind)
+            {
+                case FieldKind.Number: return "number";
+                case FieldKind.Bool: return "boolean";
+                case FieldKind.TextList:
+                case FieldKind.Category: return "array";
+                default: return "string";
+            }
         }
     }
 }
