@@ -11,6 +11,7 @@ Cấu hình Claude Desktop (claude_desktop_config.json):
 """
 
 import json
+import os
 import sys
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0] if "/" in __file__ else ".")
@@ -45,10 +46,36 @@ GROUPS = {
 
 PROTOCOL_VERSION = "2024-11-05"
 
+# Claude Desktop gọi tools/list ngay khi khởi động, thường là lúc Revit chưa mở — trước đây lúc đó
+# server trả về DUY NHẤT tool query/chat và người dùng tưởng gói cài hỏng. Nay danh mục lệnh được
+# nhớ lại sau mỗi lần lấy được, nên vẫn liệt kê đủ lệnh kèm ghi chú "chưa kết nối".
+CATALOG_CACHE = os.path.join(
+    os.environ.get("APPDATA") or os.path.expanduser("~"), "DHCB", f"tools-cache-{APP}.json")
+
+
+def _load_catalog() -> tuple:
+    """Trả (catalog, còn sống). Bridge chạy thì lấy mới và ghi cache; không thì đọc cache."""
+    catalog = dhcb_agent.request(APP, "GET", "/tools")
+    if catalog.get("tools"):
+        try:
+            os.makedirs(os.path.dirname(CATALOG_CACHE), exist_ok=True)
+            with open(CATALOG_CACHE, "w", encoding="utf-8") as f:
+                json.dump(catalog, f, ensure_ascii=False)
+        except OSError:
+            pass  # Không ghi được cache thì thôi, lần sau lấy lại từ Bridge.
+        return catalog, True
+
+    try:
+        with open(CATALOG_CACHE, encoding="utf-8") as f:
+            return json.load(f), False
+    except (OSError, ValueError):
+        return catalog, False
+
 
 def tool_list() -> list:
     tools = []
-    catalog = dhcb_agent.request(APP, "GET", "/tools")
+    catalog, live = _load_catalog()
+    offline_note = "" if live else f" [{APP.capitalize()} chưa mở — mở phần mềm rồi thử lại]"
     allowed = set(n.lower() for n in GROUPS.get(GROUP, ())) if GROUP else None
     for t in catalog.get("tools", []):
         if READ_ONLY and t.get("writesModel"):
@@ -60,7 +87,9 @@ def tool_list() -> list:
             props["confirm"] = {"type": "boolean", "description": "true = chạy THẬT (mặc định chỉ xem trước dryRun)"}
         tools.append({
             "name": t["name"],
-            "description": t.get("description", "") + (" (sửa mô hình — mặc định xem trước)" if t.get("writesModel") else ""),
+            "description": t.get("description", "")
+                           + (" (sửa mô hình — mặc định xem trước)" if t.get("writesModel") else "")
+                           + offline_note,
             "inputSchema": {"type": "object", "properties": props},
         })
     tools.append({

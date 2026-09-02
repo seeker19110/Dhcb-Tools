@@ -133,5 +133,4 @@ Server chặn trên ở 10 phút: Revit chỉ có một luồng nên không th�
 
 - Phần AutoCAD tương ứng của các query mới.
 - `/progress/<id>` để theo dõi lệnh chạy lâu thay vì chỉ ngồi chờ.
-- MCP server chịu được khi Revit chưa mở (hiện `tools/list` báo lỗi kết nối).
 - Hai playbook còn lại: dựng grid/level từ CAD, xuất bộ PDF theo revision.
