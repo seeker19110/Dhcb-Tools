@@ -206,7 +206,8 @@ BD1.6 - KeyPlan TTA-RANH PHU HOP QH,10,Continuous,LineWeight000,true,
 | `query: xrefs` | ✅ | 0 xref (không có external ref) |
 | `execute: LayerExport` | ✅ | 171 layers → CSV file |
 | `execute: DrawingCleanup (DryRun)` | ✅ | Phát hiện 15 object thừa |
-| `execute: AutoNumbering (DryRun)` | ⚠️ | Block name rỗng → cần chỉ định blockName |
+| `execute: AutoNumbering` | ✅ | **21/21 thật** — attribute A=DC1→DC21 đã ghi vào DWG |
+| `execute: AutoNumbering (thật)` | ✅ | **21/21 blocks ghi attribute "A" = DC1–DC21** |
 
 **Kết luận:** AutoCAD Bridge hoạt động đầy đủ trên AutoCAD 2026 (dù build target 2024).  
 API tương thích ngược giữa AutoCAD 2024 → 2026.
