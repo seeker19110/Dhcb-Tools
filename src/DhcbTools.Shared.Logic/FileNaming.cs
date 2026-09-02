@@ -21,7 +21,7 @@ namespace DhcbTools.Shared.Logic
         /// </summary>
         public static string Sanitize(string? name)
         {
-            if (string.IsNullOrEmpty(name))
+            if (StringGuard.IsEmpty(name))
             {
                 return Fallback;
             }
@@ -50,7 +50,7 @@ namespace DhcbTools.Shared.Logic
         /// </summary>
         public static string ApplyPattern(string pattern, string sheetNumber, string sheetName, string projectNumber)
         {
-            if (string.IsNullOrEmpty(pattern))
+            if (StringGuard.IsEmpty(pattern))
             {
                 pattern = "{SheetNumber}-{SheetName}";
             }

@@ -452,6 +452,6 @@ public class PathFinder3DTests
         var low = new Box3(4000, -1, 0, 5000, 10001, 1000);
         var r = PathFinder3D.FindPath(new Point3(0, 0, 0), new Point3(9000, 0, 0), new[] { low }, Bounds, new PathFinderOptions { StepMm = 500, ClearanceMm = 0, AllowVertical = true });
         Assert.True(r.Found, r.Reason);
-        Assert.True(r.Polyline.Any(p => p.Z > 1000));
+        Assert.Contains(r.Polyline, p => p.Z > 1000);
     }
 }

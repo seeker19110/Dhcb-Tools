@@ -1,8 +1,10 @@
 # DHCB Tools — Revit & AutoCAD
 
 Add-in **2-trong-1** (C#) tự động hoá các tác vụ lặp lại cho kỹ sư xây dựng, chạy trực tiếp trên **Revit desktop**
-và **AutoCAD desktop**, có **batch chạy đêm**, **HTTP Bridge/MCP cho agent AI**, và **lớp AI offline** (không dữ liệu
-nào rời máy). Nghiên cứu và lộ trình ở [`docs/nghien-cuu-dhcb-revit-tools.md`](docs/nghien-cuu-dhcb-revit-tools.md),
+và **AutoCAD desktop**, có **batch chạy đêm**, **HTTP Bridge/MCP cho agent AI**, và **lớp AI offline** (heuristic +
+Ollama local — không dữ liệu nào rời máy). Ngoại lệ duy nhất: **panel web AutoCAD** (`tools/autocad-mcp-server`) gọi
+Hermes CLI nên prompt kèm nội dung bản vẽ **được gửi tới provider inference đang cấu hình** — xem
+[`tools/autocad-mcp-server/README.md`](tools/autocad-mcp-server/README.md#dữ-liệu-đi-đâu). Nghiên cứu và lộ trình ở [`docs/nghien-cuu-dhcb-revit-tools.md`](docs/nghien-cuu-dhcb-revit-tools.md),
 hiện trạng ở [`docs/progress.md`](docs/progress.md).
 
 ## Cấu trúc solution
@@ -29,7 +31,8 @@ src/
 │   ├── Updaters/                  # ElevationUpdater (IUpdater, tắt mặc định)
 │   ├── Ai/                        # CadLayerMap, SpecToConfig
 │   └── Batch/                     # BatchJobRunner (mở → chạy step → lưu → đóng)
-├── DhcbTools.Revit/               # Vỏ Revit: Ribbon 5 panel, Bridge 8765, hook batch, WPF (AutoNumbering, AI chat)
+├── DhcbTools.Revit/               # Vỏ Revit: Ribbon 6 panel phủ đủ 42 lệnh, Bridge 8765, hook batch
+│                                  #   (pending-job.json), ElevationUpdater, WPF AutoNumbering
 ├── DhcbTools.Core.AutoCAD/        # Core AutoCAD: AcadCommandTable, LayerSync, DrawingCleanup, AutoNumbering, Attributes,
 │                                  #   Text (TextReplace), Standards (LayerStandardCheck, GridExtract, XrefAudit, CadLayerMap), Query
 ├── DhcbTools.AutoCAD/             # Vỏ AutoCAD: CommandMethod DHCB_*, Bridge 8766, DHCB_RUN cho batch, DHCB_AI
@@ -38,7 +41,7 @@ src/
 scripts/  dhcb_agent.py · dhcb_mcp_server.py · dhcb_ai.py · install-nightly-task.ps1 · check-build.sh
 jobs/     nightly.sample.json · autocad-nightly.sample.json
 configs/  parameter-rules · layer-rules · ai · settings (mẫu)
-tests/    DhcbTools.Shared.Logic.Tests (340 test, chạy trên CI Linux)
+tests/    DhcbTools.Shared.Logic.Tests (345 test, chạy trên CI Linux)
 ```
 
 ## Lệnh
@@ -143,7 +146,7 @@ Quy trình đầy đủ (build → cài → file mẫu → checklist Revit/AutoC
 Toàn bộ giai đoạn 0–5, 6.1/6.2 của [`docs/dac-ta-tinh-nang.md`](docs/dac-ta-tinh-nang.md) và P1 giai đoạn 7
 ([`docs/nghien-cuu-tool-thi-truong-va-ke-hoach.md`](docs/nghien-cuu-tool-thi-truong-va-ke-hoach.md) — khoảng trống so với
 pyRevit, DiRoots, Ideate, Colour Splasher, LAYTRANS, Drawing Compare, RevitBatchProcessor) đã có mã nguồn, biên dịch xanh
-với API Revit 2023/2024/2025 và AutoCAD 2024/2025, 340 test thuần xanh. P2 giai đoạn 7 (ống dốc, kick, BOM spool, AutoRoute,
+với API Revit 2023/2024/2025 và AutoCAD 2024/2025, 345 test thuần xanh. P2 giai đoạn 7 (ống dốc, kick, BOM spool, AutoRoute,
 ScheduleExport, ViewportCopy, vỏ AutoCAD core-only) cũng đã có mã nguồn. **Chưa kiểm thử trên Revit/AutoCAD thật** cho
 các lệnh mới — kịch bản ở [`docs/dac-ta-kiem-thu.md`](docs/dac-ta-kiem-thu.md) §4. Chi tiết và lỗi còn mở:
 [`docs/progress.md`](docs/progress.md) · lộ trình: [`docs/roadmap.md`](docs/roadmap.md).
