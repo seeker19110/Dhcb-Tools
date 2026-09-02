@@ -57,18 +57,32 @@ Map layer → type, thuyết minh → config, phân tích cảnh báo, ra lệnh
 **Việc tiếp theo:** bổ sung từ điển đồng nghĩa layer theo chuẩn từng công ty (file JSON ngoài repo), thêm mẫu regex cho
 thuyết minh thực tế.
 
-## Giai đoạn 6 — Tuỳ nhu cầu 🟡
+## Giai đoạn 6 — Tuỳ nhu cầu ✅ 🧪
 
-- **Routing mức C:** `PathFinder3D` (A* lưới 3D, phạt rẽ, khoảng hở) ✅ phần thuần; ⬜ lệnh Core: chọn 2 điểm + hộp tìm
-  kiếm → polyline → model line → `RouteFromLines`.
-- **MCP server:** ✅ `scripts/dhcb_mcp_server.py`.
+- **Routing mức C:** `PathFinder3D` (A* lưới 3D, phạt rẽ, khoảng hở) ✅ phần thuần; ✅ lệnh Core `AutoRoute` (2 điểm + hộp
+  tìm kiếm → polyline rút gọn → model line → tuỳ chọn `RouteFromLines`) — 🧪 cần đo thời gian trên model thật.
+- **MCP server:** ✅ `scripts/dhcb_mcp_server.py`, có `--read-only` và `--group` (mục 7.14).
 
 ## Giai đoạn 7 — Khoảng trống so với tool thị trường ✅ P1 + P2 🧪
 
 Khảo sát và kế hoạch: [`nghien-cuu-tool-thi-truong-va-ke-hoach.md`](nghien-cuu-tool-thi-truong-va-ke-hoach.md).
-P1 (7.1–7.14) và P2 (7.15–7.21: ống dốc, kick, BOM spool, AutoRoute mức C → A, ScheduleExport, ViewportCopy, vỏ AutoCAD
-core-only) đã có mã nguồn và test phần thuần. **Việc tiếp theo:** kiểm thử trên model thật theo `dac-ta-kiem-thu.md` §4.2,
-đặc biệt PipeKick (phụ thuộc cút 45° trong routing preference) và AutoRoute (đo thời gian A* với bước 100 mm).
+
+| Đợt | Nội dung | Trạng thái |
+|---|---|---|
+| P1 (7.1–7.14) | SheetRename, RevisionOnSheets, StylePurge, ColorByParameter, FamilyAudit, WarningsExport, checkset ngưỡng; LayerTranslate, DrawingCompare, BlockQuantity, AttributeIncrement, purge sâu; batch autodetect + PlotPdf; AI structured outputs, MCP read-only/nhóm | ✅ merge #11 · 🧪 |
+| P2 (7.15–7.21) | SlopePipes, PipeKick, SystemBom, AutoRoute, ScheduleExport, ViewportCopy; vỏ `DhcbTools.AutoCAD.Core` cho accoreconsole | ✅ merge #12 · 🧪 |
+| P3 (chưa chốt) | Chỉ mở sau vòng kiểm thử 1: BOM ra bản vẽ spool (sheet + tag tự động), sizing có tổn thất áp suất theo fitting (MagiCAD), từ điển layer theo chuẩn công ty, copy view thường qua Duplicate + đặt lại (pyRevit), Layer Director cho AutoCAD | ⬜ |
+
+**Việc tiếp theo (ưu tiên cao nhất toàn dự án):** vòng kiểm thử 1 theo
+[`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md) — đặc biệt PipeKick (cút 45° trong
+routing preference), AutoRoute (thời gian A*), SlopePipes (ống đã nối hai đầu), PlotPdf (thứ tự prompt theo phiên bản).
+
+## Nền tảng — .NET 10 ⬜
+
+Microsoft ngừng hỗ trợ .NET 8 ngày 10/11/2026; Autodesk đang preview di trú Revit 2025/2026 lên .NET 10, AutoCAD 2026.1
+(package `AutoCAD.NET 25.1.x`) đã ở .NET 10. Việc cần làm khi SDK và phần mềm sẵn: thêm nhánh TFM `net10.0-windows` trong
+`Directory.Build.props` (điều kiện `RevitVersion >= 2027` / `AcadVersion >= 2026`), chạy `check-build.sh` với tham số mới,
+kiểm `Shared.*` (netstandard2.0) nạp được. Không đổi logic.
 
 ## Sau đó
 
