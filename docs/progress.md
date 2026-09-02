@@ -51,20 +51,25 @@ nhưng file không có trong repo — CI bắt được vì bảng lệnh và ca
 | Nhóm | Tài liệu nói | Thực tế trong repo |
 |---|---|---|
 | Vỏ Revit (Ribbon) | 6 panel, 16 nút MEPF, AI chat WPF, đăng ký `ElevationUpdater`, hook batch `pending-job.json` | `App.cs` có **4 panel / 10 nút**; không có AI chat, không đăng ký updater, không có hook batch |
-| Lệnh AutoCAD trong Core | 15 lệnh | **4 lệnh**: `LayerExport`, `LayerImport`, `DrawingCleanup`, `AutoNumbering` |
-| Lệnh dòng lệnh AutoCAD | `DHCB_EXEC`, `DHCB_CFG`, `DHCB_AI`, `DHCB_RUN`, `DHCB_LAYTRANS`, `DHCB_COMPARE`, `DHCB_BLOCKCOUNT`, `DHCB_ATTR_INC`… | **4 lệnh**: `DHCB_LAYER_EXPORT`, `DHCB_LAYER_IMPORT`, `DHCB_CLEANUP`, `DHCB_AUTONUMBER` (vỏ `DhcbTools.AutoCAD.Core` có thêm `DHCB_RUN`) |
 
-### Lệnh AutoCAD còn thiếu
+### Lệnh AutoCAD — nay đã đủ 15 lệnh có mã nguồn
 
-Mười một lệnh vẫn nằm trong `CommandCatalog` nhưng đánh dấu `.Pending()` — giữ nguyên đặc tả (mô tả, trường config,
-từ khoá tiếng Việt) để khi viết chỉ việc bỏ dấu, nhưng **không** được chào ra `GET /tools`, MCP hay lớp ra lệnh
-tiếng Việt, để agent không gọi một lệnh không tồn tại:
+11 lệnh còn lại từng đánh dấu `.Pending()` trong `CommandCatalog` (`AttributeExport`, `AttributeImport`,
+`TextReplace`, `LayerStandardCheck`, `GridExtract`, `XrefAudit`, `LayerTranslate`, `DrawingCompare`,
+`BlockQuantity`, `AttributeIncrement`, `CadLayerMap`) **đã có mã nguồn** trong `Core.AutoCAD` (thư mục
+`Attributes/`, `TextTools/`, `LayerTools/`, `Reporting/`), dây vào `AcadCommandTable` và có vỏ lệnh
+`[CommandMethod]` tương ứng trong `DhcbTools.AutoCAD`; `.Pending()` đã được gỡ nên giờ chào ra `GET /tools`,
+MCP và lớp ra lệnh tiếng Việt bình thường. **Chưa chạy thử trên AutoCAD thật** — chỉ mới đọc kỹ mã nguồn thủ
+công (không có `dotnet` trong môi trường viết code để build/test), rủi ro lỗi biên dịch hoặc sai tên API vẫn còn.
 
-`AttributeExport`, `AttributeImport`, `TextReplace`, `LayerStandardCheck`, `GridExtract`, `XrefAudit`,
-`LayerTranslate`, `DrawingCompare`, `BlockQuantity`, `AttributeIncrement`, `CadLayerMap`.
+Hai đơn giản hoá đáng chú ý so với đặc tả gốc:
+- **`DrawingCompare`**: so sánh **mức layer** (đếm entity theo layer giữa hai file) thay vì so từng entity theo
+  Handle như mô tả ban đầu — Handle của hai file DWG độc lập không đáng tin để đối chiếu 1-1.
+- **`GridExtract`**: đặt tên trục là `AXIS-<số thứ tự>` thay vì dò tìm `DBText` gần đường Line để lấy tên thật,
+  vì khớp text theo khoảng cách hình học dễ sai trên bản vẽ dày đặc.
 
-Kéo theo: `jobs/autocad-nightly.sample.json` tham chiếu vài lệnh trong số này nên chưa chạy được nguyên vẹn, và các
-mục `C16`, `B12`, phần `DrawingCompare` trong hướng dẫn kiểm thử thủ công chưa kiểm được.
+Kéo theo: `jobs/autocad-nightly.sample.json` và các mục `C16`, `B12`, phần `DrawingCompare` trong hướng dẫn kiểm
+thử thủ công nay có mã nguồn để chạy, nhưng vẫn **chưa được kiểm trên AutoCAD thật**.
 
 ---
 
@@ -89,9 +94,14 @@ ProjectFromTemplate, TransferStandards, GridFromCsv, SheetBatchCreate, **SheetRe
 ColorByParameter, FamilyAudit, WarningsExport**, **SlopePipes, PipeKick, SystemBom, AutoRoute, ScheduleExport, ViewportCopy** (P2),
 ParameterRuleCheck (+ thresholds), ClashDetection, CadLayerMap, SpecToConfig.
 
-**AutoCAD (4):** LayerExport, LayerImport, DrawingCleanup, AutoNumbering. Lệnh dòng lệnh: `DHCB_LAYER_EXPORT`,
-`DHCB_LAYER_IMPORT`, `DHCB_CLEANUP`, `DHCB_AUTONUMBER`. Vỏ `DhcbTools.AutoCAD.Core` chỉ có `DHCB_RUN` — dùng cho
-accoreconsole. Mười một lệnh còn lại: xem [Lệnh AutoCAD còn thiếu](#lệnh-autocad-còn-thiếu).
+**AutoCAD (15):** LayerExport, LayerImport, DrawingCleanup, AutoNumbering, AttributeExport, AttributeImport,
+TextReplace, LayerStandardCheck, GridExtract, XrefAudit, LayerTranslate, DrawingCompare, BlockQuantity,
+AttributeIncrement, CadLayerMap. Lệnh dòng lệnh: `DHCB_LAYER_EXPORT`, `DHCB_LAYER_IMPORT`, `DHCB_CLEANUP`,
+`DHCB_AUTONUMBER`, `DHCB_ATTR_EXPORT`, `DHCB_ATTR_IMPORT`, `DHCB_TEXT_REPLACE`, `DHCB_LAYER_CHECK`,
+`DHCB_GRID_EXTRACT`, `DHCB_XREF_AUDIT`, `DHCB_LAYER_TRANSLATE`, `DHCB_DRAWING_COMPARE`, `DHCB_BLOCK_QUANTITY`,
+`DHCB_ATTR_INCREMENT`, `DHCB_LAYER_MAP`. Vỏ `DhcbTools.AutoCAD.Core` chỉ có `DHCB_RUN` — dùng cho accoreconsole.
+Xem [Lệnh AutoCAD — nay đã đủ 15 lệnh có mã nguồn](#lệnh-autocad--nay-đã-đủ-15-lệnh-có-mã-nguồn) cho các đơn
+giản hoá so với đặc tả gốc.
 
 ### Ribbon Revit
 4 panel: Nền tảng · Xuất & Báo cáo · Khởi tạo dự án · MEPF (10 nút). `CommandRunner` đọc config JSON ở
