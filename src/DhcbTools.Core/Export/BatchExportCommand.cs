@@ -106,45 +106,79 @@ public sealed class BatchExportCommand : ICoreCommand<ExportConfig>
     }
 
     // ---- PDF -----------------------------------------------------------------
+    // Xuất từng sheet một với Combine=true + FileName: đó là cách duy nhất để Revit đặt tên file theo
+    // mẫu của mình. Gọi bulk Export(folder, ids, opts) thì Revit tự đặt "Sheet-<tên>.pdf", bỏ qua
+    // FileNamePattern và hai sheet trùng tên ghi đè nhau (lộ ra khi chạy thật trên Revit 2024).
     private int ExportPdf(Document doc, List<ViewSheet> sheets,
         ExportConfig config, string projectNumber)
     {
-        var sheetIds = sheets.Select(s => s.Id).ToList();
-
-        var opts = new PDFExportOptions
+        var used = new HashSet<string>();
+        int count = 0;
+        foreach (var sheet in sheets)
         {
-            PaperFormat = ExportPaperFormat.ISO_A1,
-            ColorDepth = ColorDepthType.Color,
-            ZoomType = ZoomType.Zoom,
-            ZoomPercentage = 100,
-            Combine = false,   // one file per sheet
-            FileName = "batch_export",   // will be overridden per-sheet if Combine=false not valid
-        };
-
-        // Revit 2022+ bulk export: one call exports all sheets
-        doc.Export(config.OutputFolder, sheetIds, opts);
-        return sheets.Count;
+            string name = FileNaming.MakeUnique(ApplyPattern(config.FileNamePattern, sheet, projectNumber), used);
+            var opts = new PDFExportOptions
+            {
+                PaperFormat = ExportPaperFormat.ISO_A1,
+                ColorDepth = ColorDepthType.Color,
+                ZoomType = ZoomType.Zoom,
+                ZoomPercentage = 100,
+                Combine = true,
+                FileName = name,
+            };
+            if (doc.Export(config.OutputFolder, new List<ElementId> { sheet.Id }, opts))
+                count++;
+        }
+        return count;
     }
 
     // ---- DWG -----------------------------------------------------------------
     private int ExportDwg(Document doc, List<ViewSheet> sheets,
         ExportConfig config, string projectNumber)
     {
-        var opts = new DWGExportOptions();
-
         // Map version string to ACADVersion enum
         if (!TryParseAcadVersion(config.DwgVersion, out var acadVer))
         {
             throw new NotSupportedException(
                 $"Không nhận ra phiên bản DWG \"{config.DwgVersion}\". Dùng dạng \"AcadRelease2018\" hoặc \"2013\".");
         }
-        opts.FileVersion = acadVer;
 
-        var sheetIds = sheets.Select(s => s.Id).ToList();
+        var used = new HashSet<string>();
+        int count = 0;
+        foreach (var sheet in sheets)
+        {
+            string name = FileNaming.MakeUnique(ApplyPattern(config.FileNamePattern, sheet, projectNumber), used);
+            var opts = new DWGExportOptions
+            {
+                FileVersion = acadVer,
+                // Gộp view trên sheet vào một DWG; mặc định Revit tách mỗi view thành một DWG xref riêng.
+                MergedViews = true,
+            };
+            // Xuất một view với tên cụ thể → Revit ghi "<name>.dwg". Xuất cả lô với tên rỗng thì Revit
+            // tự đặt "<Tên dự án>-Sheet - <số> - <tên>.dwg", bỏ qua FileNamePattern.
+            if (doc.Export(config.OutputFolder, name, new List<ElementId> { sheet.Id }, opts))
+            {
+                count++;
+                NormalizeDwgName(config.OutputFolder, name);
+            }
+        }
+        return count;
+    }
 
-        // Export: Document.Export(folder, filename-base, viewIds, dwgOpts)
-        doc.Export(config.OutputFolder, string.Empty, sheetIds, opts);
-        return sheets.Count;
+    /// <summary>
+    /// Một số bản Revit vẫn nối "-Sheet - ..." vào tên khi xuất DWG dù chỉ một view; đổi về đúng "&lt;name&gt;.dwg".
+    /// </summary>
+    private static void NormalizeDwgName(string folder, string name)
+    {
+        string wanted = Path.Combine(folder, name + ".dwg");
+        if (File.Exists(wanted)) return;
+        var candidates = Directory.GetFiles(folder, name + "-*.dwg");
+        if (candidates.Length == 1)
+        {
+            File.Move(candidates[0], wanted);
+            string pcp = Path.ChangeExtension(candidates[0], ".pcp");
+            if (File.Exists(pcp)) File.Move(pcp, Path.Combine(folder, name + ".pcp"));
+        }
     }
 
     // ---- IFC -----------------------------------------------------------------
