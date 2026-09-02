@@ -126,7 +126,7 @@ public sealed class HealthReportCommand : ICoreCommand<HealthReportConfig>
 
             foreach (var elem in mepElements)
             {
-                ConnectorManager cm = null;
+                ConnectorManager? cm = null;
                 try
                 {
                     if (elem is MEPCurve curve)

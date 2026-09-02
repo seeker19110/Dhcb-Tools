@@ -27,7 +27,7 @@ public sealed class BatchExportCommand : IExternalCommand
             SanitizeFileName(doc.Title ?? "project"));
 
         // Ask user via TaskDialog with custom input
-        string outputFolder = PromptForFolder(defaultFolder);
+        string? outputFolder = PromptForFolder(defaultFolder);
         if (outputFolder == null)
             return Result.Cancelled;
 
@@ -48,7 +48,7 @@ public sealed class BatchExportCommand : IExternalCommand
     /// Show a TaskDialog asking user to confirm/change the output folder.
     /// Returns null if cancelled.
     /// </summary>
-    private static string PromptForFolder(string defaultFolder)
+    private static string? PromptForFolder(string defaultFolder)
     {
         var dialog = new TaskDialog("DHCB Tools - Xuất file hàng loạt")
         {

@@ -146,7 +146,7 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
         var result = new List<Element>();
         bool filterCat = config.Categories != null && config.Categories.Count > 0;
 
-        var categories = filterCat ? FilterCategories(config.Categories) : DefaultCategories;
+        var categories = filterCat && config.Categories != null ? FilterCategories(config.Categories) : DefaultCategories;
 
         foreach (var bic in categories)
         {
@@ -157,7 +157,8 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
 
             foreach (var e in elems)
             {
-                if (!string.IsNullOrEmpty(config.LevelName) && !BelongsToLevel(doc, e, config.LevelName))
+                var ln = config.LevelName ?? string.Empty;
+                if (!string.IsNullOrEmpty(ln) && !BelongsToLevel(doc, e, ln))
                     continue;
                 if (e.Location is LocationCurve)
                     result.Add(e);
