@@ -159,4 +159,4 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
 1. **Vòng kiểm thử 1** trên máy có Revit 2024 + AutoCAD 2024 theo hướng dẫn; ghi kết quả vào mục "Kết quả kiểm thử trên máy thật".
 2. Sửa lỗi theo kết quả; mỗi lỗi có phần thuần tách được thì kèm test tái hiện.
 3. Chạy một đêm batch thật (job 2 file × 5 step) để chốt Giai đoạn 1.
-4. Sau khi vòng 1 xanh: cân nhắc P3 trong [`roadmap.md`](roadmap.md).
+4. Sau khi vòng 1 xanh: **không mở P3** — đi theo giai đoạn 8→11 trong [`roadmap.md`](roadmap.md) (đổi hướng 2026-09-03: chiều sâu thay bề rộng).
