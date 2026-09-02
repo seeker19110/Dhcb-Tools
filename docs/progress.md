@@ -33,7 +33,7 @@
 | Giai đoạn 7 P1 — khoảng trống so với tool thị trường ([`nghien-cuu-tool-thi-truong-va-ke-hoach.md`](nghien-cuu-tool-thi-truong-va-ke-hoach.md)) | ✅ Mã nguồn (PR #11): SheetRename, RevisionOnSheets, StylePurge, ColorByParameter, FamilyAudit, WarningsExport, checkset ngưỡng; batch autodetect phiên bản Revit + PlotPdf; AI structured outputs + ≤ 8 ứng viên; MCP read-only/nhóm. ⬜ Phần AutoCAD (LayerTranslate, DrawingCompare, BlockQuantity, AttributeIncrement, purge text/dim/regapp) **chưa có mã nguồn** |
 | Giai đoạn 7 P2 | ✅ Mã nguồn (PR #12): SlopePipes, PipeKick, SystemBom, AutoRoute, ScheduleExport, ViewportCopy; vỏ `DhcbTools.AutoCAD.Core` (chỉ AcDbMgd/AcCoreMgd) cho accoreconsole; map năm AutoCAD → package (2026.1+ là .NET 10) |
 | Hướng dẫn cài đặt & kiểm thử thủ công | ✅ (PR #13) [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md) — checklist R1–R48, C1–C17, B1–B12, M1–M4 |
-| Kiểm thử tự động | ✅ 340 test xUnit (`Shared.Logic`); ⬜ chưa có test nào cho Core Revit/AutoCAD |
+| Kiểm thử tự động | ✅ 345 test xUnit (`Shared.Logic`), gồm `RibbonCoverageTests` đối chiếu vỏ Revit với bảng lệnh; ⬜ chưa có test chạy thật cho Core Revit/AutoCAD (cần API thật, không chạy headless được) |
 | CI | ✅ có `tests.yml` (test + check-build bằng API package, ubuntu) — đỏ từ 02/09 vì thiếu mã nguồn, đang sửa |
 | CD | ✅ đóng gói Release thật (Revit 2023/2024/2025, AutoCAD 2024/2025) + GitHub Release khi đẩy tag (`release.yml`, windows-latest) |
 
@@ -50,7 +50,7 @@ nhưng file không có trong repo — CI bắt được vì bảng lệnh và ca
 
 | Nhóm | Tài liệu nói | Thực tế trong repo |
 |---|---|---|
-| Vỏ Revit (Ribbon) | 6 panel, 16 nút MEPF, AI chat WPF, đăng ký `ElevationUpdater`, hook batch `pending-job.json` | `App.cs` có **4 panel / 10 nút**; không có AI chat, không đăng ký updater, không có hook batch |
+| Vỏ Revit (Ribbon) | 6 panel, đủ lệnh MEPF, đăng ký `ElevationUpdater`, hook batch `pending-job.json` | ✅ `App.cs` có **6 panel**, phủ đủ **42/42** lệnh (nút phẳng + nút xổ xuống), có `BatchStartupHook` và đăng ký `ElevationUpdater` (mặc định tắt). ⬜ AI chat WPF vẫn chưa có — lớp AI dùng qua Bridge `/chat` và `dhcb_agent.py` |
 
 ### Lệnh AutoCAD — nay đã đủ 15 lệnh có mã nguồn
 
@@ -104,7 +104,8 @@ Xem [Lệnh AutoCAD — nay đã đủ 15 lệnh có mã nguồn](#lệnh-autoca
 giản hoá so với đặc tả gốc.
 
 ### Ribbon Revit
-4 panel: Nền tảng · Xuất & Báo cáo · Khởi tạo dự án · MEPF (10 nút). `CommandRunner` đọc config JSON ở
+6 panel: Nền tảng · Xuất & Báo cáo · Khởi tạo dự án · MEPF · Hồ sơ & Style · Kiểm tra & AI, phủ đủ 42 lệnh.
+`CommandRunner` đọc config JSON ở
 `%APPDATA%\DHCB\configs\revit\<Lệnh>.json` → chạy xem trước (`dryRun`) → hỏi xác nhận → chạy thật; hiện mới dùng cho
 bản build không WPF. Hai panel còn thiếu (Hồ sơ & Style, AI offline & Batch) và phần lớn lệnh giai đoạn 7 chưa có nút —
 xem [Phần chưa có mã nguồn](#phần-chưa-có-mã-nguồn).

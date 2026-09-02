@@ -76,6 +76,27 @@ Bridge có Bearer authentication. AI Chat dùng provider/model hiện hành củ
 Các thao tác ghi/xóa không được AI Chat chạy trực tiếp — người dùng thực hiện
 trong tab AutoNumber hoặc Cleanup, mặc định DryRun để an toàn.
 
+## Dữ liệu đi đâu
+
+⚠️ **Panel AI Chat KHÔNG offline.** Khác với lớp AI trong add-in Revit/AutoCAD
+(heuristic + Ollama local, không có gì rời máy), tab AI Chat của panel gọi
+`hermes -z`, nên **prompt — kèm nội dung đọc từ bản vẽ đang mở — được gửi tới
+provider inference mà Hermes đang cấu hình**. Nếu provider đó là dịch vụ đám mây
+thì dữ liệu bản vẽ rời khỏi máy.
+
+Những gì đã siết để giảm rủi ro:
+
+| Biện pháp | Chi tiết |
+|---|---|
+| Không toolset | Gọi với `-t ""` (`HERMES_TOOLSETS`) — model không duyệt web, không chạy lệnh, không đọc file. Nó chỉ trả lời từ prompt. |
+| Không nạp ngữ cảnh riêng tư | `--ignore-rules` chặn AGENTS.md/SOUL.md/memory của người dùng lọt vào prompt chứa dữ liệu bản vẽ. |
+| Chống prompt injection | Nội dung DWG được bọc trong khối `<du_lieu>` kèm chỉ thị coi đó là dữ liệu, không phải mệnh lệnh — text/attribute trong bản vẽ nhận từ bên ngoài không điều khiển được model. |
+| Chỉ đọc | AI Chat không chạy được lệnh ghi/xóa; whitelist `ALLOWED_QUERIES` chặn ở gateway, không tin vào model. |
+| Cắt khối lượng | Tối đa 24.000 ký tự kết quả truy vấn vào prompt. |
+
+**Muốn hoàn toàn offline:** trỏ Hermes vào model local (`hermes model` → Ollama).
+Với bản vẽ thuộc diện bảo mật, dùng `DHCB_AI` trong AutoCAD thay cho tab AI Chat.
+
 ## Bridge endpoints (port 8766)
 
 | Endpoint | Mô tả |

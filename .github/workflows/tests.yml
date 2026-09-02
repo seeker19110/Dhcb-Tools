@@ -35,6 +35,12 @@ jobs:
 
   check-build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 2025 = net8.0-windows, 2024 = net48. Trước đây CI chỉ build nhánh 2025, nên lỗi chỉ
+        # xảy ra trên net48 (ví dụ Dictionary.GetValueOrDefault) lọt qua tới tận máy người dùng.
+        version: ['2025', '2024']
     steps:
       - uses: actions/checkout@v4
 
@@ -45,20 +51,24 @@ jobs:
       - name: Build BatchRunner
         run: dotnet build src/DhcbTools.BatchRunner/DhcbTools.BatchRunner.csproj -c Release
 
-      - name: Check-build Core + vỏ (Revit/AutoCAD 2025 API từ NuGet)
+      - name: Check-build Core + vỏ (Revit/AutoCAD ${{ matrix.version }} API từ NuGet)
         run: |
           for proj in src/DhcbTools.Core/DhcbTools.Core.csproj src/DhcbTools.Core.AutoCAD/DhcbTools.Core.AutoCAD.csproj \
                       src/DhcbTools.Revit/DhcbTools.Revit.csproj src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj \
                       src/DhcbTools.AutoCAD.Core/DhcbTools.AutoCAD.Core.csproj; do
-            dotnet build "$proj" -p:EnableWindowsTargeting=true -p:RevitVersion=2025 -p:AcadVersion=2025 -p:UseWPF=false -c Release
+            dotnet build "$proj" -p:EnableWindowsTargeting=true \
+              -p:RevitVersion=${{ matrix.version }} -p:AcadVersion=${{ matrix.version }} \
+              -p:UseWPF=false -c Release
           done
 
       - name: Kiểm tra script Python
+        if: matrix.version == '2025'   # không phụ thuộc TFM, chạy một lần là đủ
         run: |
           python3 -m py_compile scripts/dhcb_agent.py scripts/dhcb_mcp_server.py scripts/dhcb_ai.py \
             tools/autocad-mcp-server/server.py tools/autocad-mcp-server/panel_api.py
           python3 -m unittest discover -s tools/autocad-mcp-server -p 'test_*.py'
 
       - name: Kiểm tra JavaScript panel AutoCAD
+        if: matrix.version == '2025'   # không phụ thuộc TFM, chạy một lần là đủ
         run: |
           node -e "const fs=require('fs');const s=fs.readFileSync('tools/autocad-mcp-server/panel.html','utf8');const m=s.match(/<script>([\\s\\S]*?)<\\/script>/);if(!m)throw Error('script missing');new Function(m[1]);if(!s.includes('runCleanup(false)'))throw Error('real cleanup path missing');"

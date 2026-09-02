@@ -22,7 +22,7 @@ namespace DhcbTools.Shared.Logic
         public static bool TryParseAcadVersion(string? version, out string enumName)
         {
             enumName = DefaultAcadVersion;
-            if (string.IsNullOrWhiteSpace(version))
+            if (StringGuard.IsBlank(version))
             {
                 return false;
             }
@@ -49,7 +49,7 @@ namespace DhcbTools.Shared.Logic
         public static bool TryParseIfcVersion(string? version, out string enumName)
         {
             enumName = DefaultIfcVersion;
-            if (string.IsNullOrWhiteSpace(version))
+            if (StringGuard.IsBlank(version))
             {
                 return false;
             }

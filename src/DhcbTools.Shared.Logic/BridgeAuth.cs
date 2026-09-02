@@ -33,7 +33,7 @@ namespace DhcbTools.Shared.Logic
         /// <summary>Lấy phần token từ giá trị header Authorization; trả về null nếu header sai định dạng.</summary>
         public static string? ExtractBearerToken(string? authorizationHeader)
         {
-            if (string.IsNullOrWhiteSpace(authorizationHeader))
+            if (StringGuard.IsBlank(authorizationHeader))
             {
                 return null;
             }
@@ -93,7 +93,7 @@ namespace DhcbTools.Shared.Logic
                 return false;
             }
 
-            if (string.IsNullOrWhiteSpace(contentTypeHeader))
+            if (StringGuard.IsBlank(contentTypeHeader))
             {
                 return false;
             }

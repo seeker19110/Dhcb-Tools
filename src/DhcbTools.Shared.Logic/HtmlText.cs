@@ -11,7 +11,7 @@ namespace DhcbTools.Shared.Logic
         /// <summary>Escape cho nội dung nằm giữa hai thẻ.</summary>
         public static string Escape(string? value)
         {
-            if (string.IsNullOrEmpty(value))
+            if (StringGuard.IsEmpty(value))
             {
                 return string.Empty;
             }

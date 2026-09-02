@@ -36,7 +36,7 @@ namespace DhcbTools.Shared.Logic
         public static bool TryParseDouble(string? text, out double value)
         {
             value = 0;
-            if (string.IsNullOrWhiteSpace(text))
+            if (StringGuard.IsBlank(text))
             {
                 return false;
             }
@@ -66,7 +66,7 @@ namespace DhcbTools.Shared.Logic
         public static bool TryParseInt(string? text, out int value)
         {
             value = 0;
-            if (string.IsNullOrWhiteSpace(text))
+            if (StringGuard.IsBlank(text))
             {
                 return false;
             }

@@ -37,8 +37,9 @@ public sealed class DrawingCompareCommand : ICoreCommand<DrawingCompareConfig>
 
         foreach (var layer in allLayers)
         {
-            var currentCount = currentCounts.GetValueOrDefault(layer, 0);
-            var otherCount = otherCounts.GetValueOrDefault(layer, 0);
+            // TryGetValue chứ không GetValueOrDefault: net48 (AutoCAD ≤ 2024) không có extension đó.
+            currentCounts.TryGetValue(layer, out var currentCount);
+            otherCounts.TryGetValue(layer, out var otherCount);
 
             string status;
             if (currentCount > 0 && otherCount == 0)

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using DhcbTools.Shared.Logic;
 using Newtonsoft.Json;
 
 namespace DhcbTools.Shared.Logic.Batch
@@ -54,7 +55,7 @@ namespace DhcbTools.Shared.Logic.Batch
 
         public static RunLogEntry? Deserialize(string? line)
         {
-            if (string.IsNullOrWhiteSpace(line))
+            if (StringGuard.IsBlank(line))
             {
                 return null;
             }

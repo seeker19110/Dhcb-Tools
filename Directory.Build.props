@@ -58,4 +58,13 @@
     <AcadNetVersion Condition="'$(AcadNetVersion)'==''">25.1.*</AcadNetVersion>
   </PropertyGroup>
 
+
+  <!--
+    Reference assemblies cho net48: cho phép build nhánh Revit/AutoCAD ≤ 2024 trên máy
+    không cài .NET Framework (CI Linux). Trên Windows có sẵn SDK thì package này vô hại.
+  -->
+  <ItemGroup Condition="'$(TargetFramework)'=='net48'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
 </Project>

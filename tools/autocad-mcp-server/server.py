@@ -27,7 +27,7 @@ def _ensure_panel_api() -> None:
 
     def _probe() -> bool:
         try:
-            with urllib.request.urlopen(PANEL_API_URL + "/health", timeout=2) as resp:
+            with urllib.request.urlopen(PANEL_API_URL + "/alive", timeout=2) as resp:
                 data = json.loads(resp.read())
                 return data.get("panelApi") == "ok"
         except Exception:

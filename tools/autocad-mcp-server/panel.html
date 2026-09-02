@@ -474,6 +474,19 @@
   select.field { cursor: pointer; }
   .timing { font-size: 11px; color: var(--muted); font-family: var(--mono); }
 
+  .privacy-note {
+    border: 1px solid var(--yellow);
+    border-left-width: 3px;
+    border-radius: 6px;
+    padding: 9px 12px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--text);
+    background: rgba(210, 153, 34, 0.08);
+  }
+  .privacy-note code { font-size: 11px; }
+
   /* ── AI Chat ───────────────────────────────── */
   .chat-messages {
     flex: 1;
@@ -886,6 +899,14 @@
     <div class="panel-page" id="tab-ai">
       <div class="page-title">🤖 AI Chat <small>Giao tiếp với trợ lý AutoCAD</small></div>
 
+      <div class="privacy-note" id="aiPrivacyNote">
+        <strong>⚠️ Tab này không chạy offline.</strong>
+        Câu hỏi của bạn <em>kèm nội dung đọc từ bản vẽ đang mở</em> được gửi tới provider
+        inference mà Hermes đang cấu hình. Nếu đó là dịch vụ đám mây, dữ liệu bản vẽ rời khỏi máy.
+        Với bản vẽ bảo mật, dùng lệnh <code>DHCB_AI</code> trong AutoCAD (offline) hoặc trỏ Hermes
+        vào model local.
+      </div>
+
       <div class="card" style="flex:1;display:flex;flex-direction:column;min-height:0;">
         <div class="card-header">
           Trợ lý AutoCAD AI
@@ -982,7 +1003,7 @@ let allLayers = [];
 async function apiFetch(path, body) {
   const opts = body
     ? { method:'POST', headers:{'Content-Type':'application/json', 'X-Panel-Token':PANEL_TOKEN}, body: JSON.stringify(body) }
-    : { method:'GET' };
+    : { method:'GET', headers:{'X-Panel-Token':PANEL_TOKEN} };
   const r = await fetch(BASE + path, opts);
   return r.json();
 }
