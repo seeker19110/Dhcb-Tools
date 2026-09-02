@@ -113,6 +113,18 @@ Packages: Revit `Nice3point.Revit.Api.RevitAPI/RevitAPIUI`, AutoCAD `AutoCAD.NET
 (Core + vỏ core-only). Revit 2021–2024 và AutoCAD ≤2024 dùng net48, 2025 dùng net8.0-windows; AutoCAD 2026.1+ (package
 25.1.x) đã sang .NET 10 — `Directory.Build.props` map `-p:AcadVersion` → phiên bản package.
 
+## CI/CD
+
+- **CI** (`.github/workflows/tests.yml`, ubuntu-latest, mọi push/PR): test `Shared.Logic` + `dotnet build` toàn bộ
+  Core/vỏ (kể cả vỏ core-only) bằng API package NuGet, `UseWPF=false` — bắt lỗi biên dịch không cần Windows.
+- **CD** (`.github/workflows/release.yml`, windows-latest, khi đẩy tag `vX.Y.Z` hoặc chạy tay): build **Release thật**
+  (đủ WPF) cho Revit 2023/2024/2025 và AutoCAD 2024/2025 + vỏ core-only, đóng gói zip kèm hướng dẫn cài đặt, và tạo
+  GitHub Release đính kèm toàn bộ gói.
+
+```powershell
+git tag v1.0.0 && git push origin v1.0.0   # kích hoạt release.yml
+```
+
 ## Cài đặt và kiểm thử trên máy thật
 
 Quy trình đầy đủ (build → cài → file mẫu → checklist Revit/AutoCAD/batch/MCP → ghi kết quả):

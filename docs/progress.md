@@ -30,7 +30,8 @@
 | Giai đoạn 7 P2 | ✅ Mã nguồn (PR #12): SlopePipes, PipeKick, SystemBom, AutoRoute, ScheduleExport, ViewportCopy; vỏ `DhcbTools.AutoCAD.Core` (chỉ AcDbMgd/AcCoreMgd) cho accoreconsole; map năm AutoCAD → package (2026.1+ là .NET 10) |
 | Hướng dẫn cài đặt & kiểm thử thủ công | ✅ (PR #13) [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md) — checklist R1–R48, C1–C17, B1–B12, M1–M4 |
 | Kiểm thử tự động | ✅ 340 test xUnit, chạy trên CI Linux |
-| CI | ✅ test + check-build toàn bộ Core/vỏ bằng API package (RevitVersion=2025) |
+| CI | ✅ test + check-build toàn bộ Core/vỏ (kể cả vỏ core-only) bằng API package (`tests.yml`, ubuntu) |
+| CD | ✅ đóng gói Release thật (Revit 2023/2024/2025, AutoCAD 2024/2025) + GitHub Release khi đẩy tag (`release.yml`, windows-latest) |
 
 Ước tính: **~95 %** phạm vi (tài liệu nghiên cứu + khảo sát tool thị trường) đã có mã nguồn; 0 % đã kiểm trên phần mềm thật.
 Việc có giá trị nhất lúc này không phải thêm lệnh mà là **chạy vòng kiểm thử 1** theo hướng dẫn và sửa theo kết quả.
