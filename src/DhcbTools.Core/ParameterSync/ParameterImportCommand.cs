@@ -29,6 +29,7 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
         var parameterColumns = header.Skip(3).ToList();
 
         var updated = 0;
+        var unchanged = 0;
         var result = CommandResult.Ok(string.Empty);
 
         using var transaction = new Transaction(document, "DHCB - Nhập tham số từ CSV");
@@ -92,6 +93,14 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
                     continue;
                 }
 
+                if (IsUnchanged(parameter, cells[cellIndex]))
+                {
+                    // Không ghi lại giá trị đã giống hệt: tránh mở transaction đụng vào 100% phần tử
+                    // (và tham số Type dùng chung) khi kỹ sư chỉ sửa vài ô trong CSV xuất ra.
+                    unchanged++;
+                    continue;
+                }
+
                 if (TrySetParameter(parameter, cells[cellIndex]))
                 {
                     updated++;
@@ -118,8 +127,36 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
 
         // Giữ nguyên object `result` để không đánh rơi toàn bộ cảnh báo đã gom ở trên (cùng dạng lỗi #2).
         var final = CommandResult.Ok(summary, updated);
+        if (unchanged > 0)
+        {
+            final.Messages.Add($"{unchanged} ô giữ nguyên vì giá trị trong CSV trùng với mô hình.");
+        }
         final.Messages.AddRange(result.Messages);
         return final;
+    }
+
+    /// <summary>Ô CSV trùng giá trị hiện tại của tham số (so sánh theo StorageType, số thực theo dung sai).</summary>
+    private static bool IsUnchanged(Parameter parameter, string rawValue)
+    {
+        try
+        {
+            switch (parameter.StorageType)
+            {
+                case StorageType.String:
+                    return string.Equals(parameter.AsString() ?? string.Empty, rawValue, StringComparison.Ordinal);
+                case StorageType.Integer:
+                    return NumericText.TryParseInt(rawValue, out var intValue) && parameter.AsInteger() == intValue;
+                case StorageType.Double:
+                    return NumericText.TryParseDouble(rawValue, out var doubleValue)
+                           && Math.Abs(parameter.AsDouble() - doubleValue) < 1e-9;
+                default:
+                    return false;
+            }
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     private static bool TrySetParameter(Parameter parameter, string rawValue)

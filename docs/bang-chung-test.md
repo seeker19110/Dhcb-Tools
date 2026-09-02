@@ -154,4 +154,14 @@ Kịch bản theo `huong-dan-cai-dat-va-kiem-thu-thu-cong.md` §5.1.
 | — | HealthReport qua Bridge (`exec HealthReport`) | ❌ → ✅ sau sửa: config JSON không có `outputPath` → `required` không chặn được null qua Newtonsoft → `ArgumentNullException: path`. Core nay tự đặt `Documents\DHCB_Health_<title>_<time>.html` |
 | R12 | RemoveUnusedViews xem trước qua Bridge | ✅ liệt kê 90 view/sheet, không ghi (dry-run mặc định) |
 
-Chưa chạy: R9–R11, R13, R15+ (cần config/CSV riêng).
+### 6.1 Lệnh nền tảng R9–R13 (cùng máy, cùng model, qua Bridge `dhcb_agent.py`)
+
+| # | Lệnh | Kết quả |
+|---|---|---|
+| R9 | ParameterExport Doors · Mark/Level/Width | ✅ 142 phần tử, CSV UTF-8 BOM, số dấu chấm. Ghi nhận: Width xuất theo đơn vị nội bộ (feet) kiểu `3.0000000000000004` — chưa quy đổi mm |
+| R10 | ParameterImport sửa 3 ô Mark | ❌ → ✅ sau sửa: bản cũ xem trước báo "cập nhật 277 giá trị" dù CSV chỉ đổi 3 ô (ghi đè lại mọi ô, kể cả tham số Type dùng chung). Core nay bỏ qua ô trùng giá trị; sau sửa xem trước = 3, ghi thật = 3, xuất lại đối chiếu đúng 3 phần tử đổi; cột Level chỉ đọc được báo trong Messages |
+| R11 | AutoNumbering Doors · Mark · D- · pad 3 | ✅ 141/142 đánh D-001…D-141 trái→phải; 1 cửa (id 1447958) bị bỏ qua — cần xem lý do (không có Location/Level?) |
+| R12 | RemoveUnusedViews xem trước → thật → Ctrl+Z | ✅ xem trước 90, xoá 90, Ctrl+Z trong Revit trả lại đủ 90. Ghi nhận: sau khi xoá, xem trước lần 2 còn 1 ứng viên phát sinh (sheet vừa rỗng) |
+| R13 | BatchExport PDF+DWG mẫu `{SheetNumber}-{SheetName}` | ❌ → ✅ sau sửa: bản cũ gọi Export cả lô nên Revit tự đặt `Sheet-Cover.pdf` và `<Dự án>-Sheet - G000 - Cover.dwg`, bỏ qua mẫu tên, hai sheet trùng tên ghi đè nhau, DWG tách mỗi view thành xref riêng. Core nay xuất từng sheet (`Combine=true`+`FileName`, `MergedViews=true`, `MakeUnique`) → `S000-Cover Sheet.pdf` / `.dwg` |
+
+Chưa chạy: R15+ (giai đoạn 7 P1) và MEPF.
