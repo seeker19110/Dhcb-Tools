@@ -120,6 +120,9 @@ báo), `WarningAnalyzer`, `CommandIntentParser` (chỉ trả lệnh trong whitel
 
 ## 4. Kịch bản thủ công (phần cần Revit/AutoCAD thật)
 
+Quy trình cài đặt + checklist đi từ đầu đến cuối (kèm mẫu ghi kết quả) ở
+[`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md); mục này giữ kỳ vọng chi tiết từng lệnh.
+
 Chuẩn bị: một file mẫu `test-model.rvt` có ít nhất 2 tầng, 20 cửa (trong đó vài cửa cùng hàng lệch
 vài mm), 10 đoạn ống dài ngắn khác nhau, 1 tường bị ống xuyên qua, vài view thừa và vài warning; một
 file `test-drawing.dwg` có layer trùng tên, layer rỗng, linetype chỉ dùng bởi layer.

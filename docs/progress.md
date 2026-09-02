@@ -73,6 +73,10 @@ WarningAnalyzer, CommandIntentParser, CommandCatalog↔mã nguồn**. `scripts/c
 
 ---
 
+## Kết quả kiểm thử trên máy thật
+
+Chưa có vòng nào. Quy trình và checklist: [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md) §10.
+
 ## Lỗi đã biết
 
 Các lỗi #1–#11 trong bản trước **đã sửa**:
