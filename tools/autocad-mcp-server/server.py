@@ -15,7 +15,52 @@ from typing import Any
 from fastmcp import FastMCP
 
 BRIDGE_URL = "http://localhost:8766"
+PANEL_API_URL = "http://127.0.0.1:8767"
 PANEL_HTML = str(Path(__file__).parent / "panel.html")
+PANEL_API_SCRIPT = str(Path(__file__).parent / "panel_api.py")
+
+
+def _ensure_panel_api() -> None:
+    """Start the CORS/AI gateway once; validate identity before accepting existing instance."""
+    import time
+    import urllib.request
+
+    def _probe() -> bool:
+        try:
+            with urllib.request.urlopen(PANEL_API_URL + "/health", timeout=2) as resp:
+                data = json.loads(resp.read())
+                return data.get("panelApi") == "ok"
+        except Exception:
+            return False
+
+    if _probe():
+        return  # Verified our own gateway is already running
+
+    creationflags = 0
+    if sys.platform == "win32":
+        creationflags = (
+            getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+            | getattr(subprocess, "DETACHED_PROCESS", 0)
+            | getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        )
+    subprocess.Popen(
+        [sys.executable, PANEL_API_SCRIPT],
+        cwd=str(Path(__file__).parent),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        creationflags=creationflags,
+        close_fds=True,
+    )
+
+    # Poll for readiness (up to 5 s) before returning so first tool call doesn't race.
+    for _ in range(25):
+        time.sleep(0.2)
+        if _probe():
+            return
+
+
+_ensure_panel_api()
 
 mcp = FastMCP(
     name="autocad-tools",
@@ -27,6 +72,22 @@ mcp = FastMCP(
 )
 
 
+def _bridge_headers(has_body: bool) -> dict[str, str]:
+    headers = {"Content-Type": "application/json"} if has_body else {}
+    token = os.environ.get("DHCB_BRIDGE_TOKEN", "").strip()
+    if not token:
+        appdata = os.environ.get("APPDATA")
+        base = Path(appdata) if appdata else Path.home() / "AppData" / "Roaming"
+        token_path = base / "DHCB" / "bridge-token.txt"
+        try:
+            token = token_path.read_text(encoding="utf-8").strip()
+        except OSError:
+            token = ""
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
 def _fetch(path: str, body: dict | None = None) -> dict:
     """Gọi HTTP bridge."""
     try:
@@ -34,13 +95,13 @@ def _fetch(path: str, body: dict | None = None) -> dict:
         import urllib.error
 
         if body is None:
-            req = urllib.request.Request(BRIDGE_URL + path)
+            req = urllib.request.Request(BRIDGE_URL + path, headers=_bridge_headers(False))
         else:
             data = json.dumps(body).encode()
             req = urllib.request.Request(
                 BRIDGE_URL + path,
                 data=data,
-                headers={"Content-Type": "application/json"},
+                headers=_bridge_headers(True),
                 method="POST",
             )
         with urllib.request.urlopen(req, timeout=10) as resp:
