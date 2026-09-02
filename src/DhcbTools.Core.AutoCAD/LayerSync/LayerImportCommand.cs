@@ -1,6 +1,5 @@
 using Autodesk.AutoCAD.Colors;
 using Autodesk.AutoCAD.DatabaseServices;
-using DhcbTools.Shared.Logic;
 
 namespace DhcbTools.Core.AutoCAD.LayerSync;
 
@@ -42,7 +41,7 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
                 continue;
             }
 
-            var cells = CsvText.SplitLine(lines[i]);
+            var cells = SplitCsvLine(lines[i]);
             if (cells.Count < 1)
             {
                 continue;
@@ -91,7 +90,7 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
             // Ghi color
             if (cells.Count > 1 && !string.IsNullOrEmpty(cells[1]))
             {
-                if (short.TryParse(cells[1], System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var aci))
+                if (short.TryParse(cells[1], out var aci))
                 {
                     layer.Color = Color.FromColorIndex(ColorMethod.ByAci, aci);
                 }
@@ -117,21 +116,61 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
             }
         }
 
-        string summary;
         if (config.DryRun)
         {
             transaction.Abort();
-            summary = $"[Xem trước] Sẽ cập nhật {updated} layer, tạo mới {created} layer (chưa ghi vào drawing).";
-        }
-        else
-        {
-            transaction.Commit();
-            summary = $"Đã nhập {updated + created} layer từ \"{config.InputPath}\" ({updated} cập nhật, {created} tạo mới).";
+            return CommandResult.Ok(
+                $"[Xem trước] Sẽ cập nhật {updated} layer, tạo mới {created} layer (chưa ghi vào drawing).",
+                updated + created);
         }
 
-        // Giữ nguyên các dòng cảnh báo đã gom trong `result` — trả về object mới sẽ đánh rơi hết.
-        var final = CommandResult.Ok(summary, updated + created);
-        final.Messages.AddRange(result.Messages);
-        return final;
+        transaction.Commit();
+        result.Messages.Add($"Đã cập nhật {updated} layer, tạo mới {created} layer.");
+        return CommandResult.Ok(
+            $"Đã nhập {updated + created} layer từ \"{config.InputPath}\".",
+            updated + created);
+    }
+
+    private static List<string> SplitCsvLine(string line)
+    {
+        var cells = new List<string>();
+        var current = new System.Text.StringBuilder();
+        var inQuotes = false;
+
+        for (var i = 0; i < line.Length; i++)
+        {
+            var c = line[i];
+            if (inQuotes)
+            {
+                if (c == '"' && i + 1 < line.Length && line[i + 1] == '"')
+                {
+                    current.Append('"');
+                    i++;
+                }
+                else if (c == '"')
+                {
+                    inQuotes = false;
+                }
+                else
+                {
+                    current.Append(c);
+                }
+            }
+            else if (c == '"')
+            {
+                inQuotes = true;
+            }
+            else if (c == ',')
+            {
+                cells.Add(current.ToString());
+                current.Clear();
+            }
+            else
+            {
+                current.Append(c);
+            }
+        }
+        cells.Add(current.ToString());
+        return cells;
     }
 }

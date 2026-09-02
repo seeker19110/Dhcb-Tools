@@ -164,7 +164,8 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
 
             foreach (var e in elems)
             {
-                if (!string.IsNullOrEmpty(config.LevelName) && !BelongsToLevel(doc, e, config.LevelName))
+                var pln = config.LevelName ?? string.Empty;
+                if (!string.IsNullOrEmpty(pln) && !BelongsToLevel(doc, e, pln))
                     continue;
                 if (e.Location is LocationCurve)
                     result.Add((e, kvp.Key));

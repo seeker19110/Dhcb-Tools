@@ -17,7 +17,7 @@ namespace DhcbTools.Core.ProjectInit
             foreach (Level lvl in new FilteredElementCollector(doc).OfClass(typeof(Level)).ToElements())
                 existingNames.Add(lvl.Name);
 
-            ViewFamilyType floorPlanVft = null;
+            ViewFamilyType? floorPlanVft = null;
             foreach (ViewFamilyType vft in new FilteredElementCollector(doc)
                          .OfClass(typeof(ViewFamilyType)).ToElements().Cast<ViewFamilyType>())
             {

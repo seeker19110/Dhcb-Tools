@@ -55,7 +55,7 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
 #if NET8_0_WINDOWS
             var elementId = new ElementId(idValue);
 #else
-            var elementId = new ElementId((int)idValue);
+            var elementId = new ElementId((long)idValue);
 #endif
             var element = document.GetElement(elementId);
             if (element is null)

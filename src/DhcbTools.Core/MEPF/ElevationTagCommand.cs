@@ -92,7 +92,7 @@ public sealed class ElevationTagCommand : ICoreCommand<ElevationTagConfig>
                     .Replace("OST_", string.Empty)
                     .Replace("Curves", string.Empty);
                 bool include = false;
-                foreach (var cat in config.Categories)
+                foreach (var cat in config.Categories ?? new System.Collections.Generic.List<string>())
                 {
                     if (catKey.IndexOf(cat, StringComparison.OrdinalIgnoreCase) >= 0 ||
                         cat.IndexOf(catKey, StringComparison.OrdinalIgnoreCase) >= 0)
@@ -111,7 +111,8 @@ public sealed class ElevationTagCommand : ICoreCommand<ElevationTagConfig>
 
             foreach (var e in elems)
             {
-                if (!string.IsNullOrEmpty(config.LevelName) && !BelongsToLevel(doc, e, config.LevelName))
+                var eln = config.LevelName ?? string.Empty;
+                if (!string.IsNullOrEmpty(eln) && !BelongsToLevel(doc, e, eln))
                     continue;
                 result.Add(e);
             }

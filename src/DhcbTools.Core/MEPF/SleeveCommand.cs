@@ -41,7 +41,7 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         var existingSleeveLocations = CollectExistingSleeveLocations(document, config.SleeveFamilyName);
 
         // 4. Collect planned placements
-        var placements = new List<(XYZ Point, Face Face, Wall HostWall, Floor HostFloor, double WidthFt, double HeightFt, Element MepElement)>();
+        var placements = new List<(XYZ Point, Face? Face, Wall? HostWall, Floor? HostFloor, double WidthFt, double HeightFt, Element MepElement)>();
 
         foreach (var mepElem in mepElements)
         {
@@ -130,7 +130,7 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
                 }
                 if (alreadyPlanned) continue;
 
-                placements.Add((intersectionPt, null, host as Wall, host as Floor, widthFt, heightFt, mepElem));
+                placements.Add((intersectionPt, null!, host as Wall, host as Floor, widthFt, heightFt, mepElem));
             }
         }
 
@@ -163,7 +163,7 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         {
             try
             {
-                FamilyInstance inst = null;
+                FamilyInstance? inst = null;
 
                 if (hostWall != null)
                 {
@@ -291,13 +291,13 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         return false;
     }
 
-    private static Solid GetFirstSolid(Element elem)
+    private static Solid? GetFirstSolid(Element elem)
     {
         try
         {
             var opts = new Options { ComputeReferences = false, DetailLevel = ViewDetailLevel.Coarse };
             var geom = elem.get_Geometry(opts);
-            if (geom == null) return null;
+            if (geom == null) return null!;
             foreach (GeometryObject obj in geom)
             {
                 if (obj is Solid s && s.Volume > 1e-9) return s;
@@ -360,25 +360,25 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
             heightFt = heightParam.AsDouble() + clearFt;
     }
 
-    private static Face GetNearestFace(Element host, XYZ point)
+    private static Face? GetNearestFace(Element host, XYZ point)
     {
         try
         {
             var opts = new Options { ComputeReferences = true, DetailLevel = ViewDetailLevel.Fine };
             var geom = host.get_Geometry(opts);
-            if (geom == null) return null;
+            if (geom == null) return null!;
 
-            Face nearest = null;
+            Face? nearest = null;
             double minDist = double.MaxValue;
 
             foreach (GeometryObject obj in geom)
             {
-                Solid solid = obj as Solid;
+                Solid? solid = obj as Solid;
                 if (solid == null && obj is GeometryInstance gi)
                 {
                     foreach (GeometryObject o2 in gi.GetInstanceGeometry())
                     {
-                        if (o2 is Solid s2) { solid = s2; break; }
+                        if (o2 is Solid s2) { solid = s2!; break; }
                     }
                 }
                 if (solid == null || solid.Faces.Size == 0) continue;
@@ -395,11 +395,11 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
                     }
                 }
             }
-            return nearest;
+            return nearest!;
         }
         catch (System.Exception)
         {
-            return null;
+            return null!;
         }
     }
 
