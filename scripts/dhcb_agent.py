@@ -26,6 +26,11 @@ import sys
 import urllib.error
 import urllib.request
 
+# Console Windows mặc định cp1252 → in ký tự ○/✎ và tiếng Việt sẽ vỡ (UnicodeEncodeError)
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 PORTS = {"revit": 8765, "autocad": 8766}
 
 
