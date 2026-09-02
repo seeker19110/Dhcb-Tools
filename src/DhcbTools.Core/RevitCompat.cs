@@ -47,6 +47,9 @@ public static class RevitCompat
 
     public static double FtToMm(double ft) => MepLayout.FeetToMillimetres(ft);
 
+    /// <summary>Đổi foot² (Room.Area) sang m² — điểm duy nhất, tránh hai hệ số làm tròn khác nhau.</summary>
+    public static double SqFtToSqm(double squareFeet) => MepLayout.SquareFeetToSquareMetres(squareFeet);
+
     /// <summary>Tìm Level theo tên (không phân biệt hoa thường).</summary>
     public static Level? FindLevel(Document doc, string? name)
     {
@@ -113,13 +116,28 @@ public static class RevitCompat
 #endif
     }
 
-    /// <summary>Mở transaction với SilentFailuresPreprocessor — khuôn chung cho mọi lệnh Core.</summary>
+    /// <summary>Mở transaction theo chính sách cảnh báo của vỏ — khuôn chung cho mọi lệnh Core.</summary>
     public static Transaction StartTransaction(Document doc, string name)
     {
         var tx = new Transaction(doc, name);
         tx.Start();
-        tx.SetFailureHandlingOptions(tx.GetFailureHandlingOptions().SetFailuresPreprocessor(new SilentFailuresPreprocessor()));
+        ApplyFailurePolicy(tx);
         return tx;
+    }
+
+    /// <summary>
+    /// Gắn <see cref="SilentFailuresPreprocessor"/> theo <see cref="CoreContext.FailurePolicy"/>. Ribbon (Interactive)
+    /// không gắn gì để Revit hiện hộp thoại cho kỹ sư; Bridge/batch mới tự xử lý. Gọi được trước hoặc sau <c>Start()</c>.
+    /// </summary>
+    public static void ApplyFailurePolicy(Transaction tx)
+    {
+        var policy = CoreContext.FailurePolicy;
+        if (policy == FailurePolicy.Interactive)
+        {
+            return;
+        }
+
+        tx.SetFailureHandlingOptions(tx.GetFailureHandlingOptions().SetFailuresPreprocessor(new SilentFailuresPreprocessor(policy)));
     }
 
     /// <summary>Ghi tham số chuỗi nếu tồn tại và ghi được; trả lý do khi không ghi được.</summary>

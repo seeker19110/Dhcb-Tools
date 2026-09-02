@@ -92,7 +92,7 @@ internal sealed class BridgeEventHandler : IExternalEventHandler
                     continue;
                 }
 
-                item.Completion.TrySetResult(RevitCommandTable.Dispatch(doc, item.Request.Command, item.Request.ConfigJson));
+                item.Completion.TrySetResult(DispatchWithFailurePolicy(doc, item.Request.Command, item.Request.ConfigJson));
             }
             catch (Exception ex)
             {
@@ -128,5 +128,22 @@ internal sealed class BridgeEventHandler : IExternalEventHandler
                 item.Completion.TrySetResult(new { error = ex.Message });
             }
         }
+    }
+
+    /// <summary>
+    /// Không có kỹ sư ngồi máy để bấm hộp thoại cảnh báo qua Bridge, nên bỏ Warning (giữ lại mô tả) và để
+    /// Error rollback như bình thường — xem <see cref="FailurePolicy.SuppressWarnings"/>.
+    /// </summary>
+    private static CommandResult DispatchWithFailurePolicy(Autodesk.Revit.DB.Document doc, string command, string configJson)
+    {
+        using var _ = CoreContext.Use(FailurePolicy.SuppressWarnings);
+        CoreContext.SuppressedWarnings.Clear();
+        var result = RevitCommandTable.Dispatch(doc, command, configJson);
+        foreach (var warning in CoreContext.SuppressedWarnings)
+        {
+            result.Messages.Add("[Cảnh báo Revit bỏ qua] " + warning);
+        }
+
+        return result;
     }
 }

@@ -15,7 +15,6 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
 {
     public string CommandName => "ConnectorChecker";
 
-    private const double FtToMm = 304.8;
 
     public CommandResult Execute(Document document, ConnectorCheckerConfig config)
     {
@@ -28,9 +27,9 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
 
         foreach (var info in openConnectors)
         {
-            var xMm = info.Origin.X * FtToMm;
-            var yMm = info.Origin.Y * FtToMm;
-            var zMm = info.Origin.Z * FtToMm;
+            var xMm = RevitCompat.FtToMm(info.Origin.X);
+            var yMm = RevitCompat.FtToMm(info.Origin.Y);
+            var zMm = RevitCompat.FtToMm(info.Origin.Z);
             reportLines.Add(
                 $"Element {RevitCompat.IdValue(info.ElementId)} at ({xMm:F1},{yMm:F1},{zMm:F1}) mm - {info.Domain}");
             elementIds.Add(info.ElementId);
@@ -48,8 +47,7 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
             {
                 using var tx = new Transaction(document, "DHCB - View connector hở");
                 tx.Start();
-                tx.SetFailureHandlingOptions(
-                    tx.GetFailureHandlingOptions().SetFailuresPreprocessor(new SilentFailuresPreprocessor()));
+                RevitCompat.ApplyFailurePolicy(tx);
 
                 var view = FindOrCreate3dView(document, config.ViewName);
                 if (view != null)

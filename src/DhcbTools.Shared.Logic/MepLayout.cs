@@ -19,6 +19,14 @@ namespace DhcbTools.Shared.Logic
         /// <summary>Đổi feet sang mm.</summary>
         public static double FeetToMillimetres(double feet) => feet * FeetToMm;
 
+        /// <summary>Hệ số đổi foot² ↔ m² dùng chung cho cả solution (0.3048²) — trước đây RevitQueryHandler
+        /// dùng 0.0929 (làm tròn) còn DevicePlacementCommand dùng 0.09290304, cho hai kết quả m² khác nhau
+        /// trên cùng một Room.Area.</summary>
+        public const double SqFtToSqm = 0.09290304;
+
+        /// <summary>Đổi foot² (Room.Area, Revit trả về feet vuông) sang m².</summary>
+        public static double SquareFeetToSquareMetres(double squareFeet) => squareFeet * SqFtToSqm;
+
         /// <summary>
         /// Vị trí đặt hanger dọc một đoạn ống: đặt tại spacing/2, 3·spacing/2, … và LUÔN có ít nhất
         /// một hanger cho đoạn ngắn.

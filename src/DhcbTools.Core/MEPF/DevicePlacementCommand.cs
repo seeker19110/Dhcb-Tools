@@ -70,7 +70,7 @@ public sealed class DevicePlacementCommand : ICoreCommand<DevicePlacementConfig>
             .Where(r => r.Area > 0 && r.Location != null)
             .Where(r => string.IsNullOrEmpty(config.RoomFilter.LevelName) || string.Equals(r.Level?.Name, config.RoomFilter.LevelName, StringComparison.OrdinalIgnoreCase))
             .Where(r => string.IsNullOrEmpty(config.RoomFilter.NameContains) || (r.Name ?? string.Empty).IndexOf(config.RoomFilter.NameContains!, StringComparison.OrdinalIgnoreCase) >= 0)
-            .Where(r => config.RoomFilter.MinAreaM2 <= 0 || r.Area * 0.09290304 >= config.RoomFilter.MinAreaM2)
+            .Where(r => config.RoomFilter.MinAreaM2 <= 0 || RevitCompat.SqFtToSqm(r.Area) >= config.RoomFilter.MinAreaM2)
             .ToList();
 
         if (rooms.Count == 0)

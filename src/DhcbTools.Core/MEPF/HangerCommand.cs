@@ -14,7 +14,6 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
 {
     public string CommandName => "HangerAuto";
 
-    private const double FtToMm = 304.8;
 
     private static readonly BuiltInCategory[] DefaultCategories =
     {
@@ -83,7 +82,7 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
             foreach (var (pt, dir) in plan)
             {
                 preview.Messages.Add(
-                    $"  → ({pt.X * FtToMm:F0}, {pt.Y * FtToMm:F0}, {pt.Z * FtToMm:F0}) mm" +
+                    $"  → ({RevitCompat.FtToMm(pt.X):F0}, {RevitCompat.FtToMm(pt.Y):F0}, {RevitCompat.FtToMm(pt.Z):F0}) mm" +
                     $"  dir=({dir.X:F2},{dir.Y:F2},{dir.Z:F2})");
             }
             return preview;
@@ -93,8 +92,7 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
         int placed = 0;
         using var tx = new Transaction(document, "DHCB - Đặt hanger");
         tx.Start();
-        tx.SetFailureHandlingOptions(
-            tx.GetFailureHandlingOptions().SetFailuresPreprocessor(new SilentFailuresPreprocessor()));
+        RevitCompat.ApplyFailurePolicy(tx);
 
         if (!symbol.IsActive)
             symbol.Activate();

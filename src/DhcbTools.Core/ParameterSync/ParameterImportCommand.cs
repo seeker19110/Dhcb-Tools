@@ -34,8 +34,7 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
 
         using var transaction = new Transaction(document, "DHCB - Nhập tham số từ CSV");
         transaction.Start();
-        transaction.SetFailureHandlingOptions(
-            transaction.GetFailureHandlingOptions().SetFailuresPreprocessor(new SilentFailuresPreprocessor()));
+        RevitCompat.ApplyFailurePolicy(transaction);
 
         for (var i = 1; i < lines.Length; i++)
         {
@@ -93,12 +92,18 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
                     continue;
                 }
 
-                if (IsUnchanged(parameter, cells[cellIndex]))
+                if (IsUnchanged(parameter, cells[cellIndex], out var readError))
                 {
                     // Không ghi lại giá trị đã giống hệt: tránh mở transaction đụng vào 100% phần tử
                     // (và tham số Type dùng chung) khi kỹ sư chỉ sửa vài ô trong CSV xuất ra.
                     unchanged++;
                     continue;
+                }
+                if (readError != null)
+                {
+                    // Trước đây lỗi đọc tham số bị catch rỗng và coi là "đã đổi" rồi ghi đè im lặng —
+                    // nay báo rõ và vẫn thử ghi (TrySetParameter có catch/báo lỗi riêng của nó).
+                    result.Messages.Add($"Dòng {i + 1}, cột \"{name}\": không đọc được giá trị hiện tại ({readError}), vẫn thử ghi.");
                 }
 
                 if (TrySetParameter(parameter, cells[cellIndex]))
@@ -135,9 +140,14 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
         return final;
     }
 
-    /// <summary>Ô CSV trùng giá trị hiện tại của tham số (so sánh theo StorageType, số thực theo dung sai).</summary>
-    private static bool IsUnchanged(Parameter parameter, string rawValue)
+    /// <summary>
+    /// Ô CSV trùng giá trị hiện tại của tham số (so sánh theo StorageType, số thực theo dung sai).
+    /// <paramref name="readError"/> khác null khi đọc tham số ném lỗi — trước đây bị nuốt im lặng và
+    /// coi như "đã đổi", nên một tham số đọc lỗi luôn bị ghi đè mà không ai biết vì sao.
+    /// </summary>
+    private static bool IsUnchanged(Parameter parameter, string rawValue, out string? readError)
     {
+        readError = null;
         try
         {
             switch (parameter.StorageType)
@@ -153,8 +163,9 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
                     return false;
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            readError = ex.Message;
             return false;
         }
     }

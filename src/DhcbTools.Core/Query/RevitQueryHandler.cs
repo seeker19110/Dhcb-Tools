@@ -122,7 +122,7 @@ public static class RevitQueryHandler
                 id        = RevitCompat.IdValue(l.Id),
                 name      = l.Name,
                 elevation = l.Elevation,            // internal unit (feet)
-                elevationMm = l.Elevation * 304.8,  // mm
+                elevationMm = RevitCompat.FtToMm(l.Elevation),  // mm
             })
             .ToList();
 
@@ -227,7 +227,7 @@ public static class RevitQueryHandler
             name         = r.Name,
             number       = r.Number,
             levelName    = r.Level?.Name,
-            areaSqm      = Math.Round(r.Area * 0.0929, 3),         // ft² → m²
+            areaSqm      = Math.Round(RevitCompat.SqFtToSqm(r.Area), 3),  // ft² → m²
             perimeterM   = Math.Round(r.Perimeter * 0.3048, 3),    // ft → m
             department   = SafeGet(() => r.LookupParameter("Department")?.AsString()),
             occupancy    = SafeGet(() => r.LookupParameter("Occupancy")?.AsString()),

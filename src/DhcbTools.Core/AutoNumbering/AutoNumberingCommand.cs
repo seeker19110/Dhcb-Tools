@@ -71,8 +71,7 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
         var updated = 0;
         using var transaction = new Transaction(document, $"DHCB - Đánh số {config.Category}");
         transaction.Start();
-        transaction.SetFailureHandlingOptions(
-            transaction.GetFailureHandlingOptions().SetFailuresPreprocessor(new SilentFailuresPreprocessor()));
+        RevitCompat.ApplyFailurePolicy(transaction);
 
         var result = CommandResult.Ok(string.Empty);
         foreach (var (element, value) in plan)
