@@ -43,6 +43,19 @@ namespace DhcbTools.Shared.Logic.Ai
             return this;
         }
 
+        /// <summary>
+        /// Lệnh công cụ nội bộ (ví dụ <c>RunTests</c>): có trong bảng dispatch để batch runner gọi được,
+        /// nhưng KHÔNG lên Ribbon và KHÔNG chào ra <c>GET /tools</c>/MCP — agent không có việc gì gọi
+        /// bộ chạy test, và kỹ sư không cần một nút như thế.
+        /// </summary>
+        public bool Internal { get; private set; }
+
+        public CommandDescriptor Tooling()
+        {
+            Internal = true;
+            return this;
+        }
+
         /// <summary>Tên trường config → mô tả ngắn (dùng cho MCP inputSchema và cho intent parser).</summary>
         public Dictionary<string, string> ConfigFields { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -233,6 +246,12 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("inputPath", "file .txt/.md thuyết minh").Field("outputPath", "JSON config")
                 .Words("đọc thuyết minh", "spec sang config", "trích cao độ"),
 
+            // ── Revit — công cụ nội bộ (không lên Ribbon, không chào ra /tools) ──
+            new CommandDescriptor("RunTests", Revit, "Chạy bộ kiểm thử bên trong Revit trên model mẫu, ghi TRX + Markdown", false)
+                .Field("suitePath", "file JSON mô tả bộ ca kiểm").Field("outputFolder", "nơi ghi báo cáo")
+                .Field("onlyCommands", "chỉ chạy các lệnh này").Field("allowWrites", "cho phép ca allowWrite ghi thật")
+                .Tooling(),
+
             // ── AutoCAD ─────────────────────────────────────────────────────
             new CommandDescriptor("LayerExport", AutoCad, "Xuất layer ra CSV", false)
                 .Field("outputPath", "file CSV").Field("filterNameContains", "lọc tên")
@@ -283,7 +302,7 @@ namespace DhcbTools.Shared.Logic.Ai
 
         /// <summary>Lệnh dùng được của một nền tảng — chỉ những lệnh đã có mã nguồn trong Core.</summary>
         public static IEnumerable<CommandDescriptor> For(string app) =>
-            AllFor(app).Where(c => c.Implemented);
+            AllFor(app).Where(c => c.Implemented && !c.Internal);
 
         /// <summary>Cả lệnh đã có lẫn lệnh mới chỉ có đặc tả (<see cref="CommandDescriptor.Implemented"/> = false).</summary>
         public static IEnumerable<CommandDescriptor> AllFor(string app) =>

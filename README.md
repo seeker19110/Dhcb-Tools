@@ -112,6 +112,15 @@ dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.cspr
 ./scripts/check-build.sh
 ```
 
+**Kiểm thử chạy bên trong Revit** (phần chạm Revit API, không test được trên CI):
+
+```powershell
+DhcbTools.BatchRunner.exe --job jobs\in-revit-tests.json --log-dir D:\DHCB\logs
+```
+
+Bộ ca kiểm JSON ở [`tests/suites/`](tests/suites/), báo cáo ra TRX + Markdown, mã thoát khác 0 khi có ca trượt.
+Chi tiết: [`docs/kiem-thu-trong-revit.md`](docs/kiem-thu-trong-revit.md).
+
 Packages: Revit `Nice3point.Revit.Api.RevitAPI/RevitAPIUI`, AutoCAD `AutoCAD.NET` (vỏ đầy đủ) và `AutoCAD.NET.Core/.Model`
 (Core + vỏ core-only). Revit 2021–2024 và AutoCAD ≤2024 dùng net48, 2025 dùng net8.0-windows; AutoCAD 2026.1+ (package
 25.1.x) đã sang .NET 10 — `Directory.Build.props` map `-p:AcadVersion` → phiên bản package.
@@ -133,13 +142,28 @@ git tag v1.0.0 && git push origin v1.0.0   # kích hoạt release.yml
 Quy trình đầy đủ (build → cài → file mẫu → checklist Revit/AutoCAD/batch/MCP → ghi kết quả):
 [`docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md).
 
-## Triển khai (dev)
+## Cài đặt
+
+**Cách thường dùng — installer.** Tải `DhcbTools-Setup-<phiên bản>.exe` ở
+[Releases](https://github.com/seeker19110/Dhcb-Tools/releases), chọn phiên bản Revit/AutoCAD cần cài. Installer chạy
+theo người dùng (không cần quyền admin): add-in Revit vào `%APPDATA%\Autodesk\Revit\Addins\<năm>\`, plugin AutoCAD
+vào bundle `%APPDATA%\Autodesk\ApplicationPlugins\DhcbTools.bundle\` nên **tự nạp khi khởi động, không cần
+`NETLOAD`**. Nguồn: [`installer/dhcb-tools.iss`](installer/dhcb-tools.iss).
+
+**Chép tay (dev).**
 
 - **Revit:** copy `DhcbTools.Revit.addin` + `DhcbTools.Revit.dll`, `DhcbTools.Core.dll`, `DhcbTools.Shared.*.dll`,
-  `Newtonsoft.Json.dll` vào `%ProgramData%\Autodesk\Revit\Addins\<version>\`.
+  `Newtonsoft.Json.dll` vào `%APPDATA%\Autodesk\Revit\Addins\<năm>\`.
 - **AutoCAD:** `NETLOAD DhcbTools.AutoCAD.dll` (kèm `DhcbTools.Core.AutoCAD.dll`, `DhcbTools.Shared.*.dll`), hoặc đặt vào
   `%AppData%\Autodesk\ApplicationPlugins\`.
 - **Tuỳ chọn:** `%APPDATA%\DHCB\settings.json` (bật `ElevationUpdater`), `%APPDATA%\DHCB\ai.json` (model local) — mẫu trong `configs/`.
+
+## Phiên bản và log
+
+- **Phiên bản** đi từ tag git vào DLL (`release.yml` truyền `-p:Version=`), nên `GET /health` trả đúng bản đang chạy.
+  Build tại chỗ không truyền gì thì là `0.9.0-dev`.
+- **Log**: `%APPDATA%\DHCB\logs\<Revit|AutoCAD>-<ngày>.log` — khởi động add-in, trạng thái Bridge, và stack trace đầy
+  đủ của mọi lệnh lỗi (hộp thoại chỉ hiện một dòng tóm tắt). Giữ 30 ngày, tự dọn lúc khởi động.
 
 ## Trạng thái
 

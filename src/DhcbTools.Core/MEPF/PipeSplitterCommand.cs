@@ -16,7 +16,6 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
 {
     public string CommandName => "PipeSplitter";
 
-    private const double FtToMm = 304.8;
 
     public CommandResult Execute(Document document, PipeSplitterConfig config)
     {
@@ -64,7 +63,7 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
             {
                 preview.Messages.Add(
                     $"  {cat} {elem.Id}: {pts.Count} điểm cắt tại " +
-                    string.Join(", ", pts.Select(p => $"({p.X * FtToMm:F0},{p.Y * FtToMm:F0},{p.Z * FtToMm:F0})mm")));
+                    string.Join(", ", pts.Select(p => $"({RevitCompat.FtToMm(p.X):F0},{RevitCompat.FtToMm(p.Y):F0},{RevitCompat.FtToMm(p.Z):F0})mm")));
             }
             return preview;
         }
@@ -74,8 +73,7 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
 
         using var tx = new Transaction(document, "DHCB - Cắt đoạn MEP dài");
         tx.Start();
-        tx.SetFailureHandlingOptions(
-            tx.GetFailureHandlingOptions().SetFailuresPreprocessor(new SilentFailuresPreprocessor()));
+        RevitCompat.ApplyFailurePolicy(tx);
 
         foreach (var (elem, category, splitPoints) in plan)
         {

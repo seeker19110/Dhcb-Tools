@@ -11,7 +11,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <!--
+      Trước đây GenerateAssemblyInfo=false mà không có AssemblyInfo.cs nào trong repo, nên mọi DLL phát hành
+      đều mang phiên bản 0.0.0.0 — GET /health không cho biết đang chạy bản build nào (lỗi phát hiện ở R4).
+      Nay sinh attribute phiên bản từ property Version; release.yml truyền -p:Version=<tag> vào mọi dotnet build.
+    -->
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <Version Condition="'$(Version)'==''">0.9.0-dev</Version>
     <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
     <Company>DHCB</Company>
     <Product>DHCB Revit Tools</Product>

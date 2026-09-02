@@ -45,8 +45,7 @@ public sealed class RemoveUnusedViewsCommand : ICoreCommand<CleanupConfig>
 
         using var transaction = new Transaction(document, "DHCB - Dọn dẹp view/sheet thừa");
         transaction.Start();
-        transaction.SetFailureHandlingOptions(
-            transaction.GetFailureHandlingOptions().SetFailuresPreprocessor(new SilentFailuresPreprocessor()));
+        RevitCompat.ApplyFailurePolicy(transaction);
 
         document.Delete(toDelete);
 

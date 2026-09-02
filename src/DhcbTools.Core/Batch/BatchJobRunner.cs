@@ -92,7 +92,13 @@ public sealed class BatchJobRunner
                     CommandResult result;
                     try
                     {
+                        using var _ = CoreContext.Use(FailurePolicy.Silent);
+                        CoreContext.SuppressedWarnings.Clear();
                         result = RevitCommandTable.Dispatch(doc, step.Command, configJson);
+                        foreach (var warning in CoreContext.SuppressedWarnings)
+                        {
+                            result.Messages.Add("[Cảnh báo Revit bỏ qua] " + warning);
+                        }
                     }
                     catch (Exception ex)
                     {

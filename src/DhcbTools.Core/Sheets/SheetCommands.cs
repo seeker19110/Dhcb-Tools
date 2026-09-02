@@ -110,10 +110,22 @@ public sealed class SheetRenameCommand : ICoreCommand<SheetRenameConfig>
         var done = 0;
         using var tx = RevitCompat.StartTransaction(document, "DHCB - Đổi tên sheet/view");
         // Đổi số sheet có thể va nhau tạm thời (A→B, B→A): đi hai vòng qua tên tạm.
+        // Nhớ số gốc để khôi phục nếu vòng đổi tên thật thất bại — trước đây sheet lỗi bị bỏ lại vĩnh viễn
+        // với số tạm "~DHCB~<id>" vì transaction vẫn Commit dù có Errors.
         var temp = plan.Where(p => p.Number != null).ToList();
+        var originalNumbers = new Dictionary<ElementId, string>();
         foreach (var (view, _, _) in temp)
         {
-            try { ((ViewSheet)view).SheetNumber = "~DHCB~" + RevitCompat.IdValue(view.Id); } catch (Exception ex) { result.Errors.Add($"{Key(view)}: {ex.Message}"); }
+            try
+            {
+                var sheet = (ViewSheet)view;
+                originalNumbers[view.Id] = sheet.SheetNumber;
+                sheet.SheetNumber = "~DHCB~" + RevitCompat.IdValue(view.Id);
+            }
+            catch (Exception ex)
+            {
+                result.Errors.Add($"{Key(view)}: {ex.Message}");
+            }
         }
 
         foreach (var (view, number, name) in plan)
@@ -127,6 +139,11 @@ public sealed class SheetRenameCommand : ICoreCommand<SheetRenameConfig>
             catch (Exception ex)
             {
                 result.Errors.Add($"{Key(view)}: {ex.Message}");
+                if (number != null && originalNumbers.TryGetValue(view.Id, out var original))
+                {
+                    try { ((ViewSheet)view).SheetNumber = original; }
+                    catch (Exception restoreEx) { result.Errors.Add($"{Key(view)}: không khôi phục được số gốc \"{original}\": {restoreEx.Message}"); }
+                }
             }
         }
 

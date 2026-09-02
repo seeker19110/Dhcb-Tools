@@ -43,7 +43,7 @@ namespace DhcbTools.Core.ProjectInit
 
                 using (var tx = new Transaction(doc, "DHCB - Load family: " + famName))
                 {
-                    tx.GetFailureHandlingOptions().SetFailuresPreprocessor(new SilentFailuresPreprocessor());
+                    RevitCompat.ApplyFailurePolicy(tx);
                     tx.Start();
                     try
                     {

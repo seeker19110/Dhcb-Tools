@@ -11,9 +11,7 @@ namespace DhcbTools.Core.ProjectInit
             int count = 0;
             using (var tx = new Transaction(doc, "DHCB - Gan thong tin du an"))
             {
-                var opts = tx.GetFailureHandlingOptions()
-                    .SetFailuresPreprocessor(new SilentFailuresPreprocessor());
-                tx.SetFailureHandlingOptions(opts);
+                RevitCompat.ApplyFailurePolicy(tx);
                 tx.Start();
                 try
                 {

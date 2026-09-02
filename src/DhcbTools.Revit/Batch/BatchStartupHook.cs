@@ -59,11 +59,40 @@ internal static class BatchStartupHook
         }
         finally
         {
-            TryDelete(PendingPath);
+            // Lỗi vận hành nghiêm trọng đã sửa: TryDelete cũ chỉ bắt IOException — nếu pending-job.json
+            // không xoá được (khoá bởi AV, sync OneDrive…), lần mở Revit tương tác kế tiếp sẽ ÂM THẦM
+            // chạy lại batch job rồi tự đóng Revit, chiếm luôn phiên làm việc của kỹ sư. Đổi tên trước
+            // (ít khả năng bị khoá hơn là xoá) rồi mới thử xoá, và không giới hạn loại exception.
+            RetirePendingFile();
             TryWrite(DonePath, new JObject { ["exitCode"] = exitCode }.ToString());
         }
 
         return true;
+    }
+
+    /// <summary>Đổi tên <c>pending-job.json</c> thành <c>.done</c> rồi xoá — không để nó sống sót sang phiên sau.</summary>
+    private static void RetirePendingFile()
+    {
+        var retired = PendingPath + "." + DateTime.Now.Ticks + ".done";
+        try
+        {
+            File.Move(PendingPath, retired);
+        }
+        catch (Exception)
+        {
+            // Không đổi tên được (đã bị xoá, hoặc khoá cứng) — vẫn thử xoá thẳng file gốc bên dưới.
+            retired = PendingPath;
+        }
+
+        try
+        {
+            File.Delete(retired);
+        }
+        catch (Exception)
+        {
+            // Xoá không được thì thôi — quan trọng nhất đã đổi tên xong nên hook lần sau không nhận
+            // nhầm là còn job đang chờ (RunIfRequested chỉ nhìn đúng tên PendingPath).
+        }
     }
 
     private static void TryWrite(string path, string content)
@@ -76,18 +105,6 @@ internal static class BatchStartupHook
         catch (IOException)
         {
             // Hết cách báo ra ngoài; runner sẽ coi như add-in không hoàn thành.
-        }
-    }
-
-    private static void TryDelete(string path)
-    {
-        try
-        {
-            File.Delete(path);
-        }
-        catch (IOException)
-        {
-            // Không xoá được thì lần sau hook chạy lại — vẫn tốt hơn là ném ra lúc khởi động.
         }
     }
 }

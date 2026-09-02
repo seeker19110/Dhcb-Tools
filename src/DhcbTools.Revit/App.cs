@@ -4,6 +4,7 @@ using Autodesk.Revit.UI;
 using DhcbTools.Core.Updaters;
 using DhcbTools.Revit.Batch;
 using DhcbTools.Revit.Bridge;
+using DhcbTools.Shared.Hosting;
 
 namespace DhcbTools.Revit;
 
@@ -22,6 +23,10 @@ public sealed class App : IExternalApplication
 
     public Result OnStartup(UIControlledApplication application)
     {
+        DhcbLog.Prune("Revit");
+        DhcbLog.Write("Revit", $"Add-in khởi động — phiên bản {DhcbVersion.Of(Assembly.GetExecutingAssembly())}, "
+                             + $"Revit {application.ControlledApplication.VersionNumber}.");
+
         application.CreateRibbonTab(TabName);
         var path = Assembly.GetExecutingAssembly().Location;
 
@@ -152,6 +157,7 @@ public sealed class App : IExternalApplication
             {
                 _bridge = new DhcbHttpBridge();
                 _bridge.Start();
+                DhcbLog.Write("Revit", $"HTTP Bridge nghe ở 127.0.0.1:{DhcbHttpBridge.Port}.");
             }
             catch (Exception ex)
             {
@@ -159,6 +165,7 @@ public sealed class App : IExternalApplication
                 // handler (Revit nuốt hoặc crash) — báo rõ để người dùng biết Bridge đang trỏ instance nào.
                 _bridge?.Dispose();
                 _bridge = null;
+                DhcbLog.Error("Revit", "khởi động HTTP Bridge", ex);
                 TaskDialog.Show("DHCB Tools — HTTP Bridge", ex.Message);
             }
 

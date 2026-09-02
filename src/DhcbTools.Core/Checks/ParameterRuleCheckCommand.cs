@@ -54,7 +54,7 @@ public sealed class ParameterRuleCheckCommand : ICoreCommand<ParameterRuleCheckC
         if (thresholds.Count > 0)
         {
             var notes = new List<string>();
-            var metrics = CollectMetrics(document);
+            var metrics = CollectMetrics(document, notes);
             violations.AddRange(ThresholdRule.Evaluate(thresholds, metrics, notes));
             result.Messages.AddRange(notes);
             result.Messages.Add("Số đo mô hình: " + string.Join(", ", metrics.Select(m => m.Key + "=" + Shared.Logic.NumericText.Format(m.Value, 1))));
@@ -122,45 +122,59 @@ public sealed class ParameterRuleCheckCommand : ICoreCommand<ParameterRuleCheckC
     }
 
     /// <summary>Số đo mô hình cho checkset (Autodesk Model Checker style).</summary>
-    internal static Dictionary<string, double> CollectMetrics(Document doc)
+    /// <summary>
+    /// Số đo mô hình cho checkset. Trước đây mỗi nhóm có <c>catch { }</c> rỗng riêng — một model hỏng
+    /// (link lỗi, family corrupt…) cho ra báo cáo "sạch" vì thiếu số liệu mà không ai biết. Nay mỗi lỗi
+    /// được ghi vào <paramref name="notes"/> để hiện trong <c>CommandResult.Messages</c>.
+    /// </summary>
+    internal static Dictionary<string, double> CollectMetrics(Document doc, List<string>? notes = null)
     {
         var m = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
-        try { m["warnings"] = doc.GetWarnings().Count; } catch { }
-        try
+        void Try(string label, Action run)
+        {
+            try
+            {
+                run();
+            }
+            catch (Exception ex)
+            {
+                notes?.Add($"Không tính được số đo \"{label}\": {ex.Message}");
+            }
+        }
+
+        Try("warnings", () => m["warnings"] = doc.GetWarnings().Count);
+        Try("views/sheets", () =>
         {
             var placed = new HashSet<ElementId>(new FilteredElementCollector(doc).OfClass(typeof(Viewport)).Cast<Viewport>().Select(v => v.ViewId));
             var views = new FilteredElementCollector(doc).OfClass(typeof(View)).Cast<View>().Where(v => !v.IsTemplate && v is not ViewSheet && v.CanBePrinted).ToList();
             m["views"] = views.Count;
             m["unplacedViews"] = views.Count(v => !placed.Contains(v.Id));
             m["sheets"] = new FilteredElementCollector(doc).OfClass(typeof(ViewSheet)).GetElementCount();
-        }
-        catch { }
-        try { m["elements"] = new FilteredElementCollector(doc).WhereElementIsNotElementType().GetElementCount(); } catch { }
-        try
+        });
+        Try("elements", () => m["elements"] = new FilteredElementCollector(doc).WhereElementIsNotElementType().GetElementCount());
+        Try("families", () =>
         {
             var families = new FilteredElementCollector(doc).OfClass(typeof(Family)).Cast<Family>().ToList();
             m["families"] = families.Count;
             m["inPlaceFamilies"] = families.Count(f => f.IsInPlace);
             var usedFamilies = new HashSet<ElementId>(new FilteredElementCollector(doc).OfClass(typeof(FamilyInstance)).Cast<FamilyInstance>().Select(i => i.Symbol.Family.Id));
             m["unusedFamilies"] = families.Count(f => !usedFamilies.Contains(f.Id));
-        }
-        catch { }
-        try
+        });
+        Try("links", () =>
         {
             var links = new FilteredElementCollector(doc).OfClass(typeof(RevitLinkType)).Cast<RevitLinkType>().ToList();
             m["links"] = links.Count;
             m["missingLinks"] = links.Count(l => l.GetLinkedFileStatus() != LinkedFileStatus.Loaded);
-        }
-        catch { }
-        try { m["cadImports"] = new FilteredElementCollector(doc).OfClass(typeof(ImportInstance)).GetElementCount(); } catch { }
-        try
+        });
+        Try("cadImports", () => m["cadImports"] = new FilteredElementCollector(doc).OfClass(typeof(ImportInstance)).GetElementCount());
+        Try("fileSizeMb", () =>
         {
             if (!string.IsNullOrEmpty(doc.PathName) && File.Exists(doc.PathName))
             {
                 m["fileSizeMb"] = new FileInfo(doc.PathName).Length / (1024.0 * 1024.0);
             }
-        }
-        catch { }
+        });
+
         return m;
     }
 }

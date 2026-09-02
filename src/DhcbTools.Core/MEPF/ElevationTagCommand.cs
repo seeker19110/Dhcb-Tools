@@ -13,7 +13,6 @@ public sealed class ElevationTagCommand : ICoreCommand<ElevationTagConfig>
 {
     public string CommandName => "ElevationTag";
 
-    private const double FtToMm = 304.8;
 
     private static readonly BuiltInCategory[] DefaultCategories =
     {
@@ -60,8 +59,7 @@ public sealed class ElevationTagCommand : ICoreCommand<ElevationTagConfig>
         int updated = 0;
         using var tx = new Transaction(document, "DHCB - Gán cao độ MEP");
         tx.Start();
-        tx.SetFailureHandlingOptions(
-            tx.GetFailureHandlingOptions().SetFailuresPreprocessor(new SilentFailuresPreprocessor()));
+        RevitCompat.ApplyFailurePolicy(tx);
 
         var result = CommandResult.Ok(string.Empty);
         foreach (var (elem, bottom, top, centre) in plan)
@@ -144,7 +142,7 @@ public sealed class ElevationTagCommand : ICoreCommand<ElevationTagConfig>
         try
         {
             if (param.StorageType == StorageType.Double)
-                param.Set(valueMm / FtToMm); // internal units = feet
+                param.Set(RevitCompat.MmToFt(valueMm)); // internal units = feet
             else if (param.StorageType == StorageType.String)
                 param.Set(NumericText.Format(valueMm, 1)); // Invariant: máy tiếng Việt không được ghi "3200,0"
             else

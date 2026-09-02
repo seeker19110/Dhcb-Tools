@@ -333,7 +333,9 @@ public class CommandCatalogTests
     {
         var root = RepoRoot();
         var inCode = CommandNamesIn(Path.Combine(root, coreFolder));
-        var inCatalog = new HashSet<string>(CommandCatalog.Names(app), StringComparer.Ordinal);
+        // AllFor chứ không phải Names: Names() lọc bỏ lệnh nội bộ (RunTests) khỏi /tools và MCP,
+        // nhưng lệnh nội bộ vẫn phải khai báo trong catalog để không trôi khỏi bảng dispatch.
+        var inCatalog = new HashSet<string>(CommandCatalog.AllFor(app).Select(c => c.Name), StringComparer.Ordinal);
 
         Assert.True(inCode.Count > 0, "Không đọc được CommandName nào từ " + coreFolder);
         Assert.True(inCode.SetEquals(inCatalog),

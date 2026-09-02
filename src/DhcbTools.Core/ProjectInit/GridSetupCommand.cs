@@ -7,7 +7,6 @@ namespace DhcbTools.Core.ProjectInit
 {
     public sealed class GridSetupCommand : ICoreCommand<GridSetupConfig>
     {
-        private const double MmToFeet = 1.0 / 304.8;
         public string CommandName => "GridSetup";
 
         public CommandResult Execute(Document doc, GridSetupConfig config)
@@ -21,7 +20,7 @@ namespace DhcbTools.Core.ProjectInit
 
             using (var tx = new Transaction(doc, "DHCB - Tao luoi truc"))
             {
-                tx.GetFailureHandlingOptions().SetFailuresPreprocessor(new SilentFailuresPreprocessor());
+                RevitCompat.ApplyFailurePolicy(tx);
                 tx.Start();
                 try
                 {
@@ -30,9 +29,9 @@ namespace DhcbTools.Core.ProjectInit
                         if (config.SkipExisting && existingNames.Contains(def.Name))
                         { messages.AppendLine("[Skip] " + def.Name); continue; }
 
-                        double pos   = def.PositionMm * MmToFeet;
-                        double start = def.StartMm    * MmToFeet;
-                        double end   = def.EndMm      * MmToFeet;
+                        double pos   = RevitCompat.MmToFt(def.PositionMm);
+                        double start = RevitCompat.MmToFt(def.StartMm);
+                        double end   = RevitCompat.MmToFt(def.EndMm);
 
                         Line line = def.Orientation == GridOrientation.Vertical
                             ? Line.CreateBound(new XYZ(pos, start, 0), new XYZ(pos, end, 0))

@@ -17,8 +17,7 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
 {
     public string CommandName => "SleeveAuto";
 
-    private const double FtToMm = 304.8;
-    private const double ToleranceFt = 100.0 / FtToMm; // 100 mm
+    private static readonly double ToleranceFt = RevitCompat.MmToFt(100.0); // 100 mm
 
     public CommandResult Execute(Document document, SleeveConfig config)
     {
@@ -43,6 +42,16 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         // 4. Collect planned placements
         var placements = new List<(XYZ Point, Face? Face, Wall? HostWall, Floor? HostFloor, double WidthFt, double HeightFt, Element MepElement)>();
 
+        // Lỗi hiệu năng đã sửa: trước đây FilteredElementCollector toàn model (Walls+Floors) được dựng lại
+        // BÊN TRONG vòng lặp cho từng phần tử MEP — O(n·m) trên model lớn, vượt timeout Bridge 30 s.
+        // Thu thập một lần ở đây, lọc bbox trong bộ nhớ cho từng phần tử MEP.
+        var hostCandidatesAll = new FilteredElementCollector(document)
+            .WhereElementIsNotElementType()
+            .WherePasses(new LogicalOrFilter(
+                new ElementCategoryFilter(BuiltInCategory.OST_Walls),
+                new ElementCategoryFilter(BuiltInCategory.OST_Floors)))
+            .ToList();
+
         foreach (var mepElem in mepElements)
         {
             if (!(mepElem.Location is LocationCurve locCurve))
@@ -56,20 +65,12 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
             // Get element's solid for precise intersection
             var solid = GetFirstSolid(mepElem);
 
-            // Find candidate host elements using bounding box first
+            // Find candidate host elements using bounding box first — lọc trong danh sách đã thu thập một lần
+            // ở ngoài vòng lặp (hostCandidatesAll), không dựng FilteredElementCollector mới cho mỗi phần tử MEP.
             var outline = new Outline(bb.Min - new XYZ(0.1, 0.1, 0.1), bb.Max + new XYZ(0.1, 0.1, 0.1));
             var bbFilter = new BoundingBoxIntersectsFilter(outline);
 
-            var candidateFilter = new LogicalAndFilter(
-                bbFilter,
-                new LogicalOrFilter(
-                    new ElementCategoryFilter(BuiltInCategory.OST_Walls),
-                    new ElementCategoryFilter(BuiltInCategory.OST_Floors)));
-
-            var candidates = new FilteredElementCollector(document)
-                .WhereElementIsNotElementType()
-                .WherePasses(candidateFilter)
-                .ToElements();
+            var candidates = hostCandidatesAll.Where(c => bbFilter.PassesFilter(c)).ToList();
 
             // Refine with solid intersection if available
             IEnumerable<Element> hosts;
@@ -143,8 +144,8 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
             {
                 var hostDesc = p.HostWall != null ? $"Tường {p.HostWall.Id}" : $"Sàn {p.HostFloor?.Id}";
                 preview.Messages.Add(
-                    $"  → {hostDesc} tại ({p.Point.X * FtToMm:F0}, {p.Point.Y * FtToMm:F0}, {p.Point.Z * FtToMm:F0}) mm" +
-                    $"  W={p.WidthFt * FtToMm:F0}mm H={p.HeightFt * FtToMm:F0}mm");
+                    $"  → {hostDesc} tại ({RevitCompat.FtToMm(p.Point.X):F0}, {RevitCompat.FtToMm(p.Point.Y):F0}, {RevitCompat.FtToMm(p.Point.Z):F0}) mm" +
+                    $"  W={RevitCompat.FtToMm(p.WidthFt):F0}mm H={RevitCompat.FtToMm(p.HeightFt):F0}mm");
             }
             return preview;
         }
@@ -153,8 +154,7 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         int placed = 0;
         using var tx = new Transaction(document, "DHCB - Sleeve tự động");
         tx.Start();
-        tx.SetFailureHandlingOptions(
-            tx.GetFailureHandlingOptions().SetFailuresPreprocessor(new SilentFailuresPreprocessor()));
+        RevitCompat.ApplyFailurePolicy(tx);
 
         if (!symbol.IsActive)
             symbol.Activate();
@@ -195,8 +195,8 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
 
                 if (inst != null)
                 {
-                    SetParameterDouble(inst, config.WidthParamName, widthFt * FtToMm);
-                    SetParameterDouble(inst, config.HeightParamName, heightFt * FtToMm);
+                    SetParameterDouble(inst, config.WidthParamName, RevitCompat.FtToMm(widthFt));
+                    SetParameterDouble(inst, config.HeightParamName, RevitCompat.FtToMm(heightFt));
                     placed++;
                 }
             }
@@ -338,7 +338,7 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
     private static void GetMepSize(Element elem, SleeveConfig config,
         out double widthFt, out double heightFt)
     {
-        double clearFt = config.ClearanceMm / FtToMm * 2; // both sides
+        double clearFt = RevitCompat.MmToFt(config.ClearanceMm) * 2; // both sides
         widthFt = 0.5; // default 6 inches
         heightFt = 0.5;
 
@@ -416,7 +416,7 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         var param = inst.LookupParameter(paramName);
         if (param == null || param.IsReadOnly) return;
         if (param.StorageType == StorageType.Double)
-            param.Set(valueMm / FtToMm);
+            param.Set(RevitCompat.MmToFt(valueMm));
         else if (param.StorageType == StorageType.String)
             param.Set(NumericText.Format(valueMm, 1)); // Invariant, không phụ thuộc culture máy
     }

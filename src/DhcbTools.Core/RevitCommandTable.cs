@@ -10,6 +10,7 @@ using DhcbTools.Core.ParameterSync;
 using DhcbTools.Core.ProjectInit;
 using DhcbTools.Core.Sheets;
 using DhcbTools.Core.Styles;
+using DhcbTools.Core.Testing;
 using DhcbTools.Shared.Logic.Ai;
 using Newtonsoft.Json;
 
@@ -77,6 +78,7 @@ public static class RevitCommandTable
 
             "CADLAYERMAP" => new CadLayerMapCommand().Execute(doc, Deserialize<CadLayerMapConfig>(configJson)),
             "SPECTOCONFIG" => new SpecToConfigCommand().Execute(doc, Deserialize<SpecToConfigConfig>(configJson)),
+            "RUNTESTS" => new RunTestsCommand().Execute(doc, Deserialize<RunTestsConfig>(configJson)),
 
             _ => CommandResult.Fail($"Lệnh không xác định: \"{command}\". Hợp lệ: {string.Join(", ", CommandCatalog.Names(CommandCatalog.Revit))}."),
         };

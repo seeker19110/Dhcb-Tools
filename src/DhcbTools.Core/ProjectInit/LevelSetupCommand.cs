@@ -8,7 +8,6 @@ namespace DhcbTools.Core.ProjectInit
 {
     public sealed class LevelSetupCommand : ICoreCommand<LevelSetupConfig>
     {
-        private const double MmToFeet = 1.0 / 304.8;
         public string CommandName => "LevelSetup";
 
         public CommandResult Execute(Document doc, LevelSetupConfig config)
@@ -29,7 +28,7 @@ namespace DhcbTools.Core.ProjectInit
 
             using (var tx = new Transaction(doc, "DHCB - Tao tang va view plan"))
             {
-                tx.GetFailureHandlingOptions().SetFailuresPreprocessor(new SilentFailuresPreprocessor());
+                RevitCompat.ApplyFailurePolicy(tx);
                 tx.Start();
                 try
                 {
@@ -38,7 +37,7 @@ namespace DhcbTools.Core.ProjectInit
                         if (config.SkipExisting && existingNames.Contains(def.Name))
                         { messages.AppendLine("[Skip] " + def.Name); continue; }
 
-                        double elevFeet = def.ElevationMm * MmToFeet;
+                        double elevFeet = RevitCompat.MmToFt(def.ElevationMm);
                         Level level = Level.Create(doc, elevFeet);
                         level.Name = def.Name;
                         created++;
