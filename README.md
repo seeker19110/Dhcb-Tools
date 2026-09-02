@@ -33,11 +33,12 @@ src/
 ├── DhcbTools.Core.AutoCAD/        # Core AutoCAD: AcadCommandTable, LayerSync, DrawingCleanup, AutoNumbering, Attributes,
 │                                  #   Text (TextReplace), Standards (LayerStandardCheck, GridExtract, XrefAudit, CadLayerMap), Query
 ├── DhcbTools.AutoCAD/             # Vỏ AutoCAD: CommandMethod DHCB_*, Bridge 8766, DHCB_RUN cho batch, DHCB_AI
+├── DhcbTools.AutoCAD.Core/        # Vỏ core-only (AcDbMgd/AcCoreMgd, không AcMgd): DHCB_RUN cho accoreconsole
 └── DhcbTools.BatchRunner/         # Console chạy đêm (Revit qua add-in, AutoCAD qua accoreconsole), báo cáo, mã thoát
 scripts/  dhcb_agent.py · dhcb_mcp_server.py · dhcb_ai.py · install-nightly-task.ps1 · check-build.sh
 jobs/     nightly.sample.json · autocad-nightly.sample.json
 configs/  parameter-rules · layer-rules · ai · settings (mẫu)
-tests/    DhcbTools.Shared.Logic.Tests (322 test, chạy trên CI Linux)
+tests/    DhcbTools.Shared.Logic.Tests (340 test, chạy trên CI Linux)
 ```
 
 ## Lệnh
@@ -54,7 +55,8 @@ Ribbon/dòng lệnh, HTTP Bridge, batch runner, lớp AI. Danh mục đầy đ�
 | Kiểm tra | `ParameterRuleCheck`, `ClashDetection` (+ `clash-accepted.json`), `ConnectorChecker` | `LayerStandardCheck`, `TextReplace` |
 | Dự án & hồ sơ | `ProjectFromTemplate`, `TransferStandards`, `LevelSetup`, `GridSetup`, `GridFromCsv`, `FamilyLoader`, `ProjectInfo`, `SheetBatchCreate` | `GridExtract` (layer AXIS → CSV cho `GridFromCsv`) |
 | MEPF | `SleeveAuto`, `ElevationTag`, `HangerAuto`, `PipeSplitter`, `RouteFromLines`, `DevicePlacement`, `SizingProposal` / `ApplySizing`, `SystemColor`, `SystemName` | — |
-| Hồ sơ & style (giai đoạn 7) | `SheetRename`, `RevisionOnSheets`, `StylePurge`, `ColorByParameter`, `FamilyAudit`, `WarningsExport` | `LayerTranslate`, `DrawingCompare`, `BlockQuantity`, `AttributeIncrement` |
+| Hồ sơ & style (giai đoạn 7) | `SheetRename`, `RevisionOnSheets`, `StylePurge`, `ColorByParameter`, `FamilyAudit`, `WarningsExport`, `ScheduleExport`, `ViewportCopy` | `LayerTranslate`, `DrawingCompare`, `BlockQuantity`, `AttributeIncrement` |
+| MEPF nâng cao (P2) | `SlopePipes`, `PipeKick`, `SystemBom`, `AutoRoute` (mức C → mức A) | — |
 | AI offline | `CadLayerMap`, `SpecToConfig`, nút *Ra lệnh tiếng Việt* | `CadLayerMap`, `DHCB_AI` |
 
 Lệnh AutoCAD trên dòng lệnh: `DHCB` (trợ giúp), `DHCB_LAYER_EXPORT/IMPORT`, `DHCB_CLEANUP`, `DHCB_AUTONUMBER`,
@@ -107,8 +109,9 @@ dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.cspr
 ./scripts/check-build.sh
 ```
 
-Packages: Revit `Nice3point.Revit.Api.RevitAPI/RevitAPIUI`, AutoCAD `AutoCAD.NET`. Revit 2021–2024 và AutoCAD ≤2024 dùng
-net48, 2025+ dùng net8.0-windows (chọn bằng `-p:RevitVersion`).
+Packages: Revit `Nice3point.Revit.Api.RevitAPI/RevitAPIUI`, AutoCAD `AutoCAD.NET` (vỏ đầy đủ) và `AutoCAD.NET.Core/.Model`
+(Core + vỏ core-only). Revit 2021–2024 và AutoCAD ≤2024 dùng net48, 2025 dùng net8.0-windows; AutoCAD 2026.1+ (package
+25.1.x) đã sang .NET 10 — `Directory.Build.props` map `-p:AcadVersion` → phiên bản package.
 
 ## Triển khai (dev)
 
@@ -123,6 +126,7 @@ net48, 2025+ dùng net8.0-windows (chọn bằng `-p:RevitVersion`).
 Toàn bộ giai đoạn 0–5, 6.1/6.2 của [`docs/dac-ta-tinh-nang.md`](docs/dac-ta-tinh-nang.md) và P1 giai đoạn 7
 ([`docs/nghien-cuu-tool-thi-truong-va-ke-hoach.md`](docs/nghien-cuu-tool-thi-truong-va-ke-hoach.md) — khoảng trống so với
 pyRevit, DiRoots, Ideate, Colour Splasher, LAYTRANS, Drawing Compare, RevitBatchProcessor) đã có mã nguồn, biên dịch xanh
-với API Revit 2023/2024/2025 và AutoCAD 2024/2025, 322 test thuần xanh. **Chưa kiểm thử trên Revit/AutoCAD thật** cho
+với API Revit 2023/2024/2025 và AutoCAD 2024/2025, 340 test thuần xanh. P2 giai đoạn 7 (ống dốc, kick, BOM spool, AutoRoute,
+ScheduleExport, ViewportCopy, vỏ AutoCAD core-only) cũng đã có mã nguồn. **Chưa kiểm thử trên Revit/AutoCAD thật** cho
 các lệnh mới — kịch bản ở [`docs/dac-ta-kiem-thu.md`](docs/dac-ta-kiem-thu.md) §4. Chi tiết và lỗi còn mở:
 [`docs/progress.md`](docs/progress.md) · lộ trình: [`docs/roadmap.md`](docs/roadmap.md).

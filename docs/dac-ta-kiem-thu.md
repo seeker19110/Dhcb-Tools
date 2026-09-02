@@ -99,6 +99,12 @@ ParameterRule, max/min, số đo thiếu), `LayerMapTable` (khớp chính xác/w
 chuỗi build cũ, không nhận ra → null), `AcadScriptGen.PlotPdf` (thứ tự prompt -PLOT, chèn trước SAVEAS),
 `CommandIntentParser.Candidates` (≤ 8, lệnh khớp đứng đầu).
 
+### 2.11 Giai đoạn 7 P2 (đã có — `Phase7P2Tests`)
+
+`SlopeMath` (bảng dốc tối thiểu theo DN, độ hạ, kiểm dốc đạt/không đạt/ngược, kick 45°/90°, chiều dài tối thiểu cho kick,
+cao độ dọc tuyến), `BomAggregator` (gom theo spool/hệ/type/size, tổng chiều dài, số cây có hao hụt, CSV, tổng theo hệ),
+`PolylineSimplifier` (bỏ điểm thẳng hàng/trùng, không gộp đoạn quay đầu, chiều dài).
+
 ### 2.9 Kiểm tra và AI (đã có)
 
 `RuleChecker`, `ClashAcceptance` (khoá ổn định theo cặp id + vị trí làm tròn), `LayerMappingSuggester` (tường 200 đúng
@@ -182,6 +188,13 @@ file `test-drawing.dwg` có layer trùng tên, layer rỗng, linetype chỉ dùn
 | `BlockQuantity` | Block DOOR có SIZE | BOM nhóm theo SIZE đúng số |
 | `AttributeIncrement` | Mẫu `P-{n:000}` | Thứ tự trái→phải trên→dưới, `P-001…` |
 | BatchRunner autodetect | Job lẫn file 2023 và 2024 | Mở Revit 2024, cảnh báo file 2023 |
+| `SlopePipes` | 5 ống Sanitary DN100 nằm ngang, `checkOnly` rồi chạy thật | Báo 5 chưa đạt; sau khi chạy: dốc 1 %, đầu cuối hạ 60 mm/6 m; ống đã nối hai đầu báo lỗi rõ |
+| `PipeKick` | Ống thẳng 3 m, offset 300 Up, cút 45° | 3 đoạn + 2 cút nối kín; thiếu cút 45° trong routing preference → báo, không rollback đoạn |
+| `SystemBom` | Model có 2 hệ, tham số spool | CSV đúng tổng mét, số cây = ceil(m×1,05/6) |
+| `AutoRoute` | 2 điểm cách 12 m, dầm chắn giữa | Tuyến né dầm, ≤ 4 lần rẽ, `buildRoute` dựng duct liền mạch |
+| `ScheduleExport` | Door Schedule có header 2 dòng | CSV đủ header + body, tiếng Việt đúng trong Excel |
+| `ViewportCopy` | Sheet nguồn có 1 legend + 1 schedule + 1 plan | Legend/schedule sang mọi sheet đích cùng toạ độ, plan báo bỏ qua |
+| `DHCB_RUN` core-only | accoreconsole NETLOAD DhcbTools.AutoCAD.Core.dll | Không lỗi "assembly references AcMgd", run.jsonl có dòng |
 | `PlotPdf` accoreconsole | Layout A3 | PDF sinh ra đúng thư mục |
 
 ### 4.3 Kiểm thử hồi quy trước mỗi lần phát hành

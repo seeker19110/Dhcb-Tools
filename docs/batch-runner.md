@@ -64,6 +64,10 @@ Cũng có nút **AI offline & Batch → Chạy job batch** trên Ribbon để ch
 - **Step `PlotPdf` cho AutoCAD:** không phải lệnh Core; runner sinh chuỗi `-PLOT` không hộp thoại vào script accoreconsole
   (`outputPath`, `layout`, `paperSize`, `orientation`, `plotArea`, `plotStyle`). Xem `jobs/autocad-nightly.sample.json`.
 
+- **Vỏ core-only cho accoreconsole (P2):** `DhcbTools.AutoCAD.Core.dll` chỉ tham chiếu AcDbMgd/AcCoreMgd nên NETLOAD được
+  trong Core Console mọi phiên bản (vỏ đầy đủ tham chiếu AcMgd có thể bị từ chối). Runner tự ưu tiên DLL này nếu nằm cạnh
+  `DhcbTools.BatchRunner.exe`; hoặc chỉ định bằng `--plugin-dll`.
+
 ## Hẹn giờ
 
 ```powershell
