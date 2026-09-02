@@ -2,10 +2,14 @@
 
 Ảnh chụp tại thời điểm cập nhật gần nhất. Kế hoạch phía trước xem [`roadmap.md`](roadmap.md).
 
-> Cập nhật lần cuối: 2026-09-02 · Nhánh `main` sau khi merge PR #11 (giai đoạn 0–7 P1), #12 (giai đoạn 7 P2) và #13
-> (hướng dẫn cài đặt/kiểm thử). Toàn bộ giai đoạn 0–7 theo [`dac-ta-tinh-nang.md`](dac-ta-tinh-nang.md) và
-> [`nghien-cuu-tool-thi-truong-va-ke-hoach.md`](nghien-cuu-tool-thi-truong-va-ke-hoach.md) đã có mã nguồn, biên dịch bằng
-> API package NuGet và có test phần thuần; **chưa có vòng kiểm thử nào trên Revit/AutoCAD thật** — quy trình ở
+> Cập nhật lần cuối: 2026-09-02 · Nhánh `main` sau khi rà soát lại toàn bộ repo đối chiếu với CI.
+>
+> ⚠️ **Đính chính.** Bản ghi trước đó ("~95 % đã có mã nguồn, biên dịch 0 error, 340 test xanh") **không đúng**.
+> CI trên `main` đang đỏ ở cả hai job, và nguyên nhân là một mảng lớn công việc mà PR #11/#12 mô tả trong commit
+> message **chưa bao giờ được commit vào repo** — xem [Phần chưa có mã nguồn](#phần-chưa-có-mã-nguồn) bên dưới.
+> Những gì viết dưới đây đã được đối chiếu với cây mã nguồn thật, không lấy lại từ commit message.
+>
+> **Chưa có vòng kiểm thử nào trên Revit/AutoCAD thật** — quy trình ở
 > [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md).
 
 ## Tóm tắt
@@ -17,7 +21,7 @@
 | HTTP Bridge cho agent AI | ✅ Token, khoá khi dò token, bind 127.0.0.1, timeout huỷ lệnh, `/tools`, `/chat` |
 | Batch export + Health report | ✅ |
 | Khởi tạo dự án | ✅ Grid/Level/Family/Project info + **file từ template, transfer standards, trục/level từ CSV (CAD/Excel), sheet hàng loạt** |
-| MEPF nền tảng (sleeve, cao độ, hanger, chia ống, connector) | ✅ Đã gắn đủ Ribbon + Bridge + batch |
+| MEPF nền tảng (sleeve, cao độ, hanger, chia ống, connector) | ✅ Core + Bridge + batch; ⚠️ Ribbon mới có 3 nút (Sleeve, ElevationTag, ConnectorChecker) |
 | MEPF routing A (theo line), B (rải thiết bị theo phòng) | ✅ Core + Ribbon + Bridge; chờ kiểm thử trên model mẫu |
 | MEPF sizing (đề xuất → CSV → áp), màu/tên hệ, đánh số theo dòng chảy | ✅ |
 | Batch runner chạy đêm (Revit + AutoCAD accoreconsole) | ✅ [`batch-runner.md`](batch-runner.md) |
@@ -26,15 +30,41 @@
 | Lớp AI (offline) | ✅ [`ai-offline.md`](ai-offline.md) — heuristic mặc định, Ollama local tuỳ chọn |
 | Routing C (A* 3D) | ✅ `PathFinder3D` (thuần) + lệnh Core `AutoRoute`: 2 điểm → né chướng ngại → model line → tuỳ chọn `RouteFromLines` dựng luôn |
 | MCP server | ✅ `scripts/dhcb_mcp_server.py` |
-| Giai đoạn 7 P1 — khoảng trống so với tool thị trường ([`nghien-cuu-tool-thi-truong-va-ke-hoach.md`](nghien-cuu-tool-thi-truong-va-ke-hoach.md)) | ✅ Mã nguồn (PR #11): SheetRename, RevisionOnSheets, StylePurge, ColorByParameter, FamilyAudit, WarningsExport, checkset ngưỡng; AutoCAD LayerTranslate, DrawingCompare, BlockQuantity, AttributeIncrement, purge text/dim/regapp; batch autodetect phiên bản Revit + PlotPdf; AI structured outputs + ≤ 8 ứng viên; MCP read-only/nhóm |
+| Giai đoạn 7 P1 — khoảng trống so với tool thị trường ([`nghien-cuu-tool-thi-truong-va-ke-hoach.md`](nghien-cuu-tool-thi-truong-va-ke-hoach.md)) | ✅ Mã nguồn (PR #11): SheetRename, RevisionOnSheets, StylePurge, ColorByParameter, FamilyAudit, WarningsExport, checkset ngưỡng; batch autodetect phiên bản Revit + PlotPdf; AI structured outputs + ≤ 8 ứng viên; MCP read-only/nhóm. ⬜ Phần AutoCAD (LayerTranslate, DrawingCompare, BlockQuantity, AttributeIncrement, purge text/dim/regapp) **chưa có mã nguồn** |
 | Giai đoạn 7 P2 | ✅ Mã nguồn (PR #12): SlopePipes, PipeKick, SystemBom, AutoRoute, ScheduleExport, ViewportCopy; vỏ `DhcbTools.AutoCAD.Core` (chỉ AcDbMgd/AcCoreMgd) cho accoreconsole; map năm AutoCAD → package (2026.1+ là .NET 10) |
 | Hướng dẫn cài đặt & kiểm thử thủ công | ✅ (PR #13) [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md) — checklist R1–R48, C1–C17, B1–B12, M1–M4 |
-| Kiểm thử tự động | ✅ 340 test xUnit, chạy trên CI Linux |
-| CI | ✅ test + check-build toàn bộ Core/vỏ (kể cả vỏ core-only) bằng API package (`tests.yml`, ubuntu) |
+| Kiểm thử tự động | ✅ 340 test xUnit (`Shared.Logic`); ⬜ chưa có test nào cho Core Revit/AutoCAD |
+| CI | ✅ có `tests.yml` (test + check-build bằng API package, ubuntu) — đỏ từ 02/09 vì thiếu mã nguồn, đang sửa |
 | CD | ✅ đóng gói Release thật (Revit 2023/2024/2025, AutoCAD 2024/2025) + GitHub Release khi đẩy tag (`release.yml`, windows-latest) |
 
-Ước tính: **~95 %** phạm vi (tài liệu nghiên cứu + khảo sát tool thị trường) đã có mã nguồn; 0 % đã kiểm trên phần mềm thật.
-Việc có giá trị nhất lúc này không phải thêm lệnh mà là **chạy vòng kiểm thử 1** theo hướng dẫn và sửa theo kết quả.
+Ước tính đã có mã nguồn: **Core Revit gần đủ; vỏ Revit, Core AutoCAD và vỏ AutoCAD thì không** (chi tiết ngay dưới).
+0 % đã kiểm trên phần mềm thật. Việc có giá trị nhất lúc này là **viết nốt phần còn thiếu cho đủ khớp với tài liệu**,
+rồi mới **chạy vòng kiểm thử 1** theo hướng dẫn.
+
+---
+
+## Phần chưa có mã nguồn
+
+Đối chiếu cây mã nguồn `main` với những gì PR #11/#12 mô tả. Ba nhóm dưới đây được commit message nhắc tới
+nhưng file không có trong repo — CI bắt được vì bảng lệnh và catalog tham chiếu tới chúng.
+
+| Nhóm | Tài liệu nói | Thực tế trong repo |
+|---|---|---|
+| Vỏ Revit (Ribbon) | 6 panel, 16 nút MEPF, AI chat WPF, đăng ký `ElevationUpdater`, hook batch `pending-job.json` | `App.cs` có **4 panel / 10 nút**; không có AI chat, không đăng ký updater, không có hook batch |
+| Lệnh AutoCAD trong Core | 15 lệnh | **4 lệnh**: `LayerExport`, `LayerImport`, `DrawingCleanup`, `AutoNumbering` |
+| Lệnh dòng lệnh AutoCAD | `DHCB_EXEC`, `DHCB_CFG`, `DHCB_AI`, `DHCB_RUN`, `DHCB_LAYTRANS`, `DHCB_COMPARE`, `DHCB_BLOCKCOUNT`, `DHCB_ATTR_INC`… | **4 lệnh**: `DHCB_LAYER_EXPORT`, `DHCB_LAYER_IMPORT`, `DHCB_CLEANUP`, `DHCB_AUTONUMBER` (vỏ `DhcbTools.AutoCAD.Core` có thêm `DHCB_RUN`) |
+
+### Lệnh AutoCAD còn thiếu
+
+Mười một lệnh vẫn nằm trong `CommandCatalog` nhưng đánh dấu `.Pending()` — giữ nguyên đặc tả (mô tả, trường config,
+từ khoá tiếng Việt) để khi viết chỉ việc bỏ dấu, nhưng **không** được chào ra `GET /tools`, MCP hay lớp ra lệnh
+tiếng Việt, để agent không gọi một lệnh không tồn tại:
+
+`AttributeExport`, `AttributeImport`, `TextReplace`, `LayerStandardCheck`, `GridExtract`, `XrefAudit`,
+`LayerTranslate`, `DrawingCompare`, `BlockQuantity`, `AttributeIncrement`, `CadLayerMap`.
+
+Kéo theo: `jobs/autocad-nightly.sample.json` tham chiếu vài lệnh trong số này nên chưa chạy được nguyên vẹn, và các
+mục `C16`, `B12`, phần `DrawingCompare` trong hướng dẫn kiểm thử thủ công chưa kiểm được.
 
 ---
 
@@ -59,16 +89,15 @@ ProjectFromTemplate, TransferStandards, GridFromCsv, SheetBatchCreate, **SheetRe
 ColorByParameter, FamilyAudit, WarningsExport**, **SlopePipes, PipeKick, SystemBom, AutoRoute, ScheduleExport, ViewportCopy** (P2),
 ParameterRuleCheck (+ thresholds), ClashDetection, CadLayerMap, SpecToConfig.
 
-**AutoCAD (15):** LayerExport, LayerImport, DrawingCleanup (+ text/dim style, regapp), AutoNumbering, AttributeExport,
-AttributeImport, TextReplace, LayerStandardCheck, GridExtract, XrefAudit, **LayerTranslate, DrawingCompare, BlockQuantity,
-AttributeIncrement**, CadLayerMap. Lệnh dòng lệnh: `DHCB`, `DHCB_*` (kể cả `DHCB_LAYTRANS`, `DHCB_COMPARE`,
-`DHCB_BLOCKCOUNT`, `DHCB_ATTR_INC`), `DHCB_EXEC`, `DHCB_CFG`, `DHCB_AI`, `DHCB_RUN`. Vỏ `DhcbTools.AutoCAD.Core` chỉ có
-`DHCB_RUN` — dùng cho accoreconsole.
+**AutoCAD (4):** LayerExport, LayerImport, DrawingCleanup, AutoNumbering. Lệnh dòng lệnh: `DHCB_LAYER_EXPORT`,
+`DHCB_LAYER_IMPORT`, `DHCB_CLEANUP`, `DHCB_AUTONUMBER`. Vỏ `DhcbTools.AutoCAD.Core` chỉ có `DHCB_RUN` — dùng cho
+accoreconsole. Mười một lệnh còn lại: xem [Lệnh AutoCAD còn thiếu](#lệnh-autocad-còn-thiếu).
 
 ### Ribbon Revit
-6 panel: Nền tảng · Xuất & Kiểm tra · Dự án & Hồ sơ · Hồ sơ & Style (8 nút) · MEPF (16 nút) · AI offline & Batch. Nút mới đều theo khuôn
-`CommandRunner`: đọc config JSON ở `%APPDATA%\DHCB\configs\revit\<Lệnh>.json` (tự tạo mẫu lần đầu) → chạy xem trước →
-hỏi xác nhận → chạy thật.
+4 panel: Nền tảng · Xuất & Báo cáo · Khởi tạo dự án · MEPF (10 nút). `CommandRunner` đọc config JSON ở
+`%APPDATA%\DHCB\configs\revit\<Lệnh>.json` → chạy xem trước (`dryRun`) → hỏi xác nhận → chạy thật; hiện mới dùng cho
+bản build không WPF. Hai panel còn thiếu (Hồ sơ & Style, AI offline & Batch) và phần lớn lệnh giai đoạn 7 chưa có nút —
+xem [Phần chưa có mã nguồn](#phần-chưa-có-mã-nguồn).
 
 ### Kiểm thử
 `tests/DhcbTools.Shared.Logic.Tests`: CSV, số, đánh số, MEP layout, tên file, phiên bản xuất, HTML, token, **CleanupDecider,

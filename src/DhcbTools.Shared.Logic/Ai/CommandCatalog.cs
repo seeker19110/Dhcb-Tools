@@ -29,6 +29,20 @@ namespace DhcbTools.Shared.Logic.Ai
 
         public IReadOnlyList<string> Aliases { get; }
 
+        /// <summary>
+        /// Đã có mã nguồn trong Core chưa. Lệnh <c>false</c> là phần đặc tả đã chốt nhưng chưa viết:
+        /// nó không được chào ra <c>GET /tools</c>, MCP hay lớp ra lệnh tiếng Việt, để agent không
+        /// gọi một lệnh không tồn tại. Xem "Lệnh AutoCAD còn thiếu" trong docs/progress.md.
+        /// </summary>
+        public bool Implemented { get; private set; } = true;
+
+        /// <summary>Đánh dấu lệnh mới chỉ có đặc tả, chưa có mã nguồn.</summary>
+        public CommandDescriptor Pending()
+        {
+            Implemented = false;
+            return this;
+        }
+
         /// <summary>Tên trường config → mô tả ngắn (dùng cho MCP inputSchema và cho intent parser).</summary>
         public Dictionary<string, string> ConfigFields { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -234,42 +248,56 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Words("đánh số block", "numbering block"),
             new CommandDescriptor("AttributeExport", AutoCad, "Xuất attribute của block ra CSV", false)
                 .Field("blockName", "tên block (rỗng = mọi block có attribute)").Field("outputPath", "file CSV")
-                .Words("xuất attribute", "export attribute", "xuất thuộc tính block"),
+                .Words("xuất attribute", "export attribute", "xuất thuộc tính block").Pending(),
             new CommandDescriptor("AttributeImport", AutoCad, "Nhập CSV ghi ngược attribute vào block", true)
                 .Field("inputPath", "file CSV").Field("dryRun", "xem trước")
-                .Words("nhập attribute", "import attribute"),
+                .Words("nhập attribute", "import attribute").Pending(),
             new CommandDescriptor("TextReplace", AutoCad, "Tìm/thay văn bản trong Text, MText, Attribute (regex)", true, "FindReplace")
                 .Field("find", "chuỗi/regex").Field("replace", "thay bằng").Field("useRegex", "regex").Field("dryRun", "xem trước")
-                .Words("thay text", "find replace", "đổi chữ", "sửa text hàng loạt"),
+                .Words("thay text", "find replace", "đổi chữ", "sửa text hàng loạt").Pending(),
             new CommandDescriptor("LayerStandardCheck", AutoCad, "Kiểm tra layer theo bộ quy tắc đặt tên → HTML", false, "LayerCheck")
                 .Field("rulesPath", "file JSON quy tắc").Field("outputPath", "file HTML")
-                .Words("kiểm tra layer", "chuẩn layer", "layer standard"),
+                .Words("kiểm tra layer", "chuẩn layer", "layer standard").Pending(),
             new CommandDescriptor("GridExtract", AutoCad, "Trích trục từ layer AXIS ra CSV cho Revit GridFromCsv", false, "ExtractGrids")
                 .Field("gridLayer", "layer trục (mặc định AXIS)").Field("outputPath", "file CSV")
-                .Words("trích trục", "lấy trục từ cad", "extract grid"),
+                .Words("trích trục", "lấy trục từ cad", "extract grid").Pending(),
             new CommandDescriptor("XrefAudit", AutoCad, "Liệt kê xref, đường dẫn thiếu, xref chưa load", false)
                 .Field("outputPath", "file CSV (tuỳ chọn)")
-                .Words("xref", "kiểm tra xref", "xref thiếu"),
+                .Words("xref", "kiểm tra xref", "xref thiếu").Pending(),
             new CommandDescriptor("LayerTranslate", AutoCad, "Map layer cũ → layer chuẩn theo CSV (đổi entity, merge, đặt thuộc tính) — như LAYTRANS", true, "LayTrans")
                 .Field("mapCsvPath", "Source,Target,Color,Linetype,Lineweight,Plottable").Field("deleteEmptySource", "xoá layer nguồn rỗng").Field("dryRun", "xem trước")
-                .Words("layer translate", "laytrans", "đổi layer theo chuẩn", "map layer chuẩn"),
+                .Words("layer translate", "laytrans", "đổi layer theo chuẩn", "map layer chuẩn").Pending(),
             new CommandDescriptor("DrawingCompare", AutoCad, "So bản vẽ hiện tại với DWG khác theo handle (thêm/xoá/đổi layer/dời/đổi text) → CSV/HTML", false, "Compare")
                 .Field("otherPath", "DWG so sánh").Field("outputPath", "CSV hoặc HTML").Field("moveToleranceMm", "dung sai dời")
-                .Words("so sánh bản vẽ", "drawing compare", "khác nhau giữa hai bản"),
+                .Words("so sánh bản vẽ", "drawing compare", "khác nhau giữa hai bản").Pending(),
             new CommandDescriptor("BlockQuantity", AutoCad, "Đếm block theo tên (và nhóm theo attribute) → CSV BOM", false, "BlockCount", "Bom")
                 .Field("outputPath", "file CSV").Field("groupByAttribute", "tag attribute để nhóm").Field("blockNameContains", "lọc")
-                .Words("đếm block", "thống kê block", "bom block", "block quantity"),
+                .Words("đếm block", "thống kê block", "bom block", "block quantity").Pending(),
             new CommandDescriptor("AttributeIncrement", AutoCad, "Gán attribute tăng dần theo mẫu {n:000} theo thứ tự vị trí (Lee Mac BATTE)", true, "BatchAttribute")
                 .Field("blockName", "tên block").Field("attributeTag", "tag").Field("pattern", "mẫu, ví dụ P-{n:000}").Field("startNumber", "bắt đầu").Field("dryRun", "xem trước")
-                .Words("attribute tăng dần", "đánh số attribute", "batte", "increment attribute"),
+                .Words("attribute tăng dần", "đánh số attribute", "batte", "increment attribute").Pending(),
             new CommandDescriptor("CadLayerMap", AutoCad, "AI offline: gợi ý map layer → Revit type từ danh sách type", false, "LayerMap")
                 .Field("revitTypesPath", "file .txt danh sách type").Field("outputPath", "CSV mapping").Field("useOllama", "dùng model local nếu có")
-                .Words("map layer", "ánh xạ layer"),
+                .Words("map layer", "ánh xạ layer").Pending(),
         };
 
-        public static IEnumerable<CommandDescriptor> For(string app) => All.Where(c => string.Equals(c.App, app, StringComparison.OrdinalIgnoreCase));
+        /// <summary>Lệnh dùng được của một nền tảng — chỉ những lệnh đã có mã nguồn trong Core.</summary>
+        public static IEnumerable<CommandDescriptor> For(string app) =>
+            AllFor(app).Where(c => c.Implemented);
 
-        public static CommandDescriptor? Find(string app, string commandOrAlias) => For(app).FirstOrDefault(c => c.Matches(commandOrAlias));
+        /// <summary>Cả lệnh đã có lẫn lệnh mới chỉ có đặc tả (<see cref="CommandDescriptor.Implemented"/> = false).</summary>
+        public static IEnumerable<CommandDescriptor> AllFor(string app) =>
+            All.Where(c => string.Equals(c.App, app, StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>Lệnh đã chốt đặc tả nhưng chưa viết — dùng cho báo cáo hiện trạng.</summary>
+        public static IReadOnlyList<string> PendingNames(string app) =>
+            AllFor(app).Where(c => !c.Implemented).Select(c => c.Name).Distinct().ToList();
+
+        /// <summary>
+        /// Tra theo tên hoặc bí danh, kể cả lệnh chưa triển khai — để bảng dispatch trả về
+        /// "lệnh không xác định" kèm danh sách hợp lệ thay vì im lặng bỏ qua.
+        /// </summary>
+        public static CommandDescriptor? Find(string app, string commandOrAlias) => AllFor(app).FirstOrDefault(c => c.Matches(commandOrAlias));
 
         /// <summary>Danh sách tên chuẩn (phân biệt hoa thường theo Core) của một nền tảng.</summary>
         public static IReadOnlyList<string> Names(string app) => For(app).Select(c => c.Name).Distinct().ToList();
