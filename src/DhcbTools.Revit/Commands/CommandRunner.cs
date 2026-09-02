@@ -1,6 +1,7 @@
 using System.IO;
 using Autodesk.Revit.UI;
 using DhcbTools.Core;
+using DhcbTools.Shared.Hosting;
 using Newtonsoft.Json.Linq;
 
 namespace DhcbTools.Revit.Commands;
@@ -85,7 +86,10 @@ internal static class CommandRunner
         }
         catch (Exception ex)
         {
-            return CommandResult.Fail($"Lỗi khi chạy {commandName}: {ex.Message}");
+            // Hộp thoại chỉ hiện Message rồi kỹ sư bấm cho mất; stack trace đầy đủ vào log để còn gửi kèm khi báo lỗi.
+            DhcbLog.Error("Revit", $"lệnh {commandName} (dryRun={dryRun})", ex);
+            return CommandResult.Fail($"Lỗi khi chạy {commandName}: {ex.Message}"
+                                    + $"{Environment.NewLine}Chi tiết trong {DhcbLog.PathFor("Revit")}");
         }
     }
 }

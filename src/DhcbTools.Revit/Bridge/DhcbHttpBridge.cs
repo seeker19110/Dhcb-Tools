@@ -3,6 +3,7 @@ using System.Reflection;
 using Autodesk.Revit.UI;
 using DhcbTools.Core;
 using DhcbTools.Core.Query;
+using DhcbTools.Shared.Hosting;
 using DhcbTools.Shared.Logic.Ai;
 using Newtonsoft.Json;
 
@@ -29,7 +30,7 @@ public sealed class DhcbHttpBridge : IDisposable
     {
         _handler = new BridgeEventHandler();
         _externalEvent = ExternalEvent.Create(_handler);
-        _server = new HttpBridgeServer(Port, "Revit", Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0")
+        _server = new HttpBridgeServer(Port, "Revit", DhcbVersion.Of(Assembly.GetExecutingAssembly()))
         {
             ExecuteAsync = item =>
             {
@@ -45,7 +46,7 @@ public sealed class DhcbHttpBridge : IDisposable
             },
             Chat = text => CommandIntentParser.Parse(text, CommandCatalog.Revit).ToPayload(),
             ListTools = () => CommandCatalog.Describe(CommandCatalog.Revit),
-            Log = _ => { },
+            Log = line => DhcbLog.Write("Revit", line),
         };
     }
 

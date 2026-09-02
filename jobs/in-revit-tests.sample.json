@@ -1,0 +1,30 @@
+{
+  "name": "DHCB — kiểm thử trong Revit",
+  "app": "revit",
+  "revitVersion": 2024,
+  "stopOnError": false,
+
+  "//": [
+    "Giai đoạn 8.3: chạy bộ ca kiểm BÊN TRONG Revit, không người ngồi máy.",
+    "saveMode None — bộ test không bao giờ được lưu đè lên model mẫu.",
+    "Chạy: DhcbTools.BatchRunner.exe --job jobs/in-revit-tests.json --log-dir D:/DHCB/logs",
+    "Mã thoát khác 0 nếu có ca trượt, nên cắm thẳng vào Task Scheduler hoặc CI tự dựng được."
+  ],
+
+  "saveMode": "None",
+  "outputFolder": "D:/DHCB/test-results/{yyyy-MM-dd_HH-mm}",
+
+  "files": [
+    { "path": "C:/ProgramData/Autodesk/RVT 2024/Samples/Snowdon Towers Sample Architectural.rvt", "detachFromCentral": true }
+  ],
+
+  "steps": [
+    {
+      "command": "RunTests",
+      "config": {
+        "suitePath": "D:/DHCB/tests/suites/revit-smoke.json",
+        "outputFolder": "{outputFolder}"
+      }
+    }
+  ]
+}

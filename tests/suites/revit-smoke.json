@@ -1,0 +1,111 @@
+{
+  "name": "DHCB — kiểm thử trong Revit (smoke)",
+  "model": "Snowdon Towers Sample Architectural.rvt",
+
+  "//": [
+    "Bộ ca kiểm chạy BÊN TRONG Revit qua lệnh RunTests (giai đoạn 8.3).",
+    "Mọi ca mặc định bị ép dryRun=true nên chạy bao nhiêu lần trên model mẫu cũng không làm bẩn nó.",
+    "Chạy: DhcbTools.BatchRunner.exe --job jobs/in-revit-tests.json --log-dir D:/DHCB/logs",
+    "Kỳ vọng viết theo kiểu khai báo (đạt/ít nhất N/chứa chuỗi) thay vì so file vàng, để đổi model mẫu",
+    "không làm đỏ hàng loạt. Ngưỡng maxMs là lưới bắt hồi quy hiệu năng — SleeveAuto từng vượt 30 s."
+  ],
+
+  "cases": [
+    {
+      "name": "Đọc thông tin mô hình",
+      "command": "HealthReport",
+      "config": { "outputPath": "{outputFolder}/health.html" },
+      "expect": {
+        "success": true,
+        "maxMs": 60000,
+        "filesExist": ["{outputFolder}/health.html"]
+      }
+    },
+    {
+      "name": "Xuất tham số ra CSV",
+      "command": "ParameterExport",
+      "config": {
+        "categories": ["Doors"],
+        "parameterNames": ["Mark", "Comments"],
+        "outputPath": "{outputFolder}/doors.csv"
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxMs": 60000,
+        "filesExist": ["{outputFolder}/doors.csv"]
+      }
+    },
+    {
+      "name": "Xuất cảnh báo ra CSV",
+      "command": "WarningsExport",
+      "config": { "outputPath": "{outputFolder}/warnings.csv" },
+      "expect": { "success": true, "maxMs": 60000, "filesExist": ["{outputFolder}/warnings.csv"] }
+    },
+    {
+      "name": "Kiểm kê family",
+      "command": "FamilyAudit",
+      "config": { "outputPath": "{outputFolder}/families.csv" },
+      "expect": { "success": true, "minAffected": 1, "maxMs": 90000 }
+    },
+    {
+      "name": "Xem trước dọn view thừa",
+      "command": "RemoveUnusedViews",
+      "config": {},
+      "expect": {
+        "success": true,
+        "summaryContains": ["Xem trước"],
+        "maxMs": 60000
+      }
+    },
+    {
+      "name": "Xem trước đánh số cửa",
+      "command": "AutoNumbering",
+      "config": { "category": "Doors", "prefix": "D-", "digits": 3 },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "summaryContains": ["Xem trước"],
+        "maxMs": 60000
+      }
+    },
+    {
+      "name": "Xem trước đổi tên sheet",
+      "command": "SheetRename",
+      "config": { "target": "Sheets", "namePattern": "{Name}" },
+      "expect": { "success": true, "summaryContains": ["Xem trước"], "maxMs": 60000 }
+    },
+    {
+      "name": "Tô màu theo tham số",
+      "command": "ColorByParameter",
+      "config": { "category": "Doors", "parameterName": "Mark", "dryRun": true },
+      "expect": { "success": true, "maxMs": 60000 }
+    },
+    {
+      "name": "Xem trước purge style",
+      "command": "StylePurge",
+      "config": {},
+      "expect": { "success": true, "summaryContains": ["Xem trước"], "maxMs": 120000 }
+    },
+    {
+      "name": "Xuất schedule",
+      "command": "ScheduleExport",
+      "config": { "outputFolder": "{outputFolder}/schedules" },
+      "expect": { "success": true, "maxMs": 90000 }
+    },
+    {
+      "name": "Kiểm connector hở",
+      "command": "ConnectorChecker",
+      "config": { "create3dView": false },
+      "expect": { "success": true, "maxMs": 120000 }
+    },
+    {
+      "name": "Sleeve tự động — hiệu năng",
+      "command": "SleeveAuto",
+      "config": { "sleeveFamilyName": "M_Generic Model" },
+      "skip": true,
+      "skipReason": "Model kiến trúc mẫu không có hệ MEP — ca này nằm ở bộ revit-mep.json",
+      "expect": { "maxMs": 30000 }
+    }
+  ]
+}

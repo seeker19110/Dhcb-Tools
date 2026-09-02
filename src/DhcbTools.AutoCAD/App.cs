@@ -34,6 +34,9 @@ public sealed class App : IExtensionApplication
     public void Initialize()
     {
         var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
+        DhcbLog.Prune("AutoCAD");
+        DhcbLog.Write("AutoCAD", $"Plugin nạp — phiên bản "
+            + $"{DhcbVersion.Of(System.Reflection.Assembly.GetExecutingAssembly())}, PID {pid}.");
         Say("[DHCB Tools] Đã tải DHCB AutoCAD Tools (PID " + pid + "). Gõ DHCB_BRIDGE để xem trạng thái Bridge.");
 
         try
@@ -52,6 +55,7 @@ public sealed class App : IExtensionApplication
         {
             _bridge?.Dispose();
             _bridge = null;
+            DhcbLog.Error("AutoCAD", "khởi động HTTP Bridge", ex);
             Status($"[DHCB Tools] Lỗi khởi động Bridge (PID {pid}): {ex.Message}");
         }
 
@@ -84,6 +88,7 @@ public sealed class App : IExtensionApplication
     private void Status(string line)
     {
         s_status.Add(line);
+        DhcbLog.Write("AutoCAD", line);
         Say(line);
     }
 

@@ -48,7 +48,8 @@ public class RibbonCoverageTests
             "SleeveAuto", "ElevationTag", "ConnectorChecker",
         };
 
-        var missing = CommandCatalog.For(CommandCatalog.Revit)
+        var missing = CommandCatalog.AllFor(CommandCatalog.Revit)
+            .Where(c => !c.Internal)   // RunTests là công cụ chạy test, cố ý không có nút.
             .Select(c => c.Name)
             .Where(name => !handledByDedicatedShell.Contains(name))
             .Where(name => !shell.Contains("\"" + name + "\"", StringComparison.Ordinal))
