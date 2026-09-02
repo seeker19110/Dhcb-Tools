@@ -1,0 +1,95 @@
+{
+  "name": "DHCB — kiểm thử trong Revit (MEP)",
+  "model": "Snowdon Towers Sample HVAC.rvt",
+
+  "//": [
+    "Bộ ca kiểm cho nhóm MEPF — nhóm rủi ro cao nhất và chưa từng chạy thật.",
+    "Model: Snowdon Towers Sample HVAC/Plumbing kèm theo Revit 2024 (C:/Program Files/Autodesk/Revit 2024/Samples).",
+    "Mọi ca đều dryRun: mục tiêu ở đây là 'chạy được, không ném, không quá chậm, không no-op im lặng'.",
+    "maxMs là lưới bắt hồi quy hiệu năng — SleeveAuto từng dựng collector toàn model trong vòng lặp",
+    "và sẽ vượt timeout 30 s của Bridge trên model thật; ca dưới đây bắt đúng chuyện đó."
+  ],
+
+  "cases": [
+    {
+      "name": "Kiểm connector hở",
+      "command": "ConnectorChecker",
+      "config": { "create3dView": false },
+      "expect": { "success": true, "maxMs": 120000 }
+    },
+    {
+      "name": "Sleeve tự động — hiệu năng trên model MEP thật",
+      "command": "SleeveAuto",
+      "config": { "sleeveFamilyName": "M_Generic Model", "mepCategories": ["Ducts", "Pipes"] },
+      "expect": {
+        "maxMs": 30000,
+        "neverContains": ["Exception", "timed out"]
+      }
+    },
+    {
+      "name": "Tag cao độ — xem trước",
+      "command": "ElevationTag",
+      "config": { "categories": ["Ducts"] },
+      "expect": { "maxMs": 60000, "neverContains": ["Exception"] }
+    },
+    {
+      "name": "Hanger theo khoảng cách — xem trước",
+      "command": "HangerAuto",
+      "config": { "hangerFamilyName": "M_Generic Model", "spacingMm": 3000 },
+      "expect": { "maxMs": 60000, "neverContains": ["Exception"] }
+    },
+    {
+      "name": "Chia ống theo cây — xem trước",
+      "command": "PipeSplitter",
+      "config": { "maxSegmentMm": 6000 },
+      "expect": { "maxMs": 60000, "neverContains": ["Exception"] }
+    },
+    {
+      "name": "Đề xuất kích thước",
+      "command": "SizingProposal",
+      "config": { "outputPath": "{outputFolder}/sizing.csv" },
+      "expect": { "success": true, "maxMs": 90000 }
+    },
+    {
+      "name": "Đặt tên hệ thống — xem trước",
+      "command": "SystemName",
+      "config": {},
+      "expect": { "maxMs": 60000, "neverContains": ["Exception"] }
+    },
+    {
+      "name": "Màu theo hệ — xem trước",
+      "command": "SystemColor",
+      "config": {},
+      "expect": { "maxMs": 60000, "neverContains": ["Exception"] }
+    },
+    {
+      "name": "Đánh số theo dòng chảy — xem trước",
+      "command": "FlowNumbering",
+      "config": {},
+      "expect": { "maxMs": 90000, "neverContains": ["Exception"] }
+    },
+    {
+      "name": "BOM theo hệ",
+      "command": "SystemBom",
+      "config": { "outputPath": "{outputFolder}/bom.csv" },
+      "expect": { "success": true, "maxMs": 90000 }
+    },
+    {
+      "name": "Kiểm dốc ống thoát",
+      "command": "SlopePipes",
+      "config": { "checkOnly": true },
+      "expect": { "maxMs": 60000, "neverContains": ["Exception"] }
+    },
+    {
+      "name": "Dò va chạm nội bộ",
+      "command": "ClashDetection",
+      "config": {
+        "categoriesA": ["Ducts"],
+        "categoriesB": ["Structural Framing"],
+        "outputPath": "{outputFolder}/clash.html",
+        "create3dView": false
+      },
+      "expect": { "success": true, "maxMs": 180000 }
+    }
+  ]
+}

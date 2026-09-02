@@ -9,6 +9,17 @@ Revit không có chế độ headless chính thức, nhưng batch runner đã m�
 
 ## Chạy
 
+Cách nhanh nhất — một lệnh làm trọn vòng (build → cài add-in → dựng job → chạy → in báo cáo):
+
+```powershell
+.\scripts\run-in-revit-tests.ps1 -Suite mep
+```
+
+Script **dừng ngay nếu Revit đang mở**: Revit khoá DLL add-in khi chạy, và batch runner cần tự mở
+Revit của riêng nó. Đóng Revit rồi chạy lại.
+
+Hoặc gọi thẳng batch runner với file job tự viết:
+
 ```powershell
 DhcbTools.BatchRunner.exe --job jobs\in-revit-tests.json --log-dir D:\DHCB\logs
 ```
@@ -28,7 +39,14 @@ python scripts/dhcb_agent.py revit exec RunTests --config '{"suitePath":"D:/DHCB
 
 ## Viết một ca kiểm
 
-Bộ ca kiểm là JSON — mẫu ở [`tests/suites/revit-smoke.json`](../tests/suites/revit-smoke.json).
+Có sẵn hai bộ:
+
+| Bộ | Model mẫu | Phủ |
+|---|---|---|
+| [`revit-smoke.json`](../tests/suites/revit-smoke.json) | Snowdon Towers Sample Architectural | Health, tham số, cảnh báo, family, view/sheet, style, schedule |
+| [`revit-mep.json`](../tests/suites/revit-mep.json) | Snowdon Towers Sample HVAC | Connector, sleeve, cao độ, hanger, chia ống, sizing, BOM, dốc ống, clash |
+
+Cả hai model đều đi kèm Revit (`C:\Program Files\Autodesk\Revit 2024\Samples`), nên không cần chuẩn bị gì thêm.
 
 ```json
 {
@@ -90,6 +108,8 @@ Linux — nếu không thì "bộ test xanh" lại là một con số không ai 
 
 ## Còn thiếu
 
-- Model mẫu mới chỉ có bản kiến trúc (Snowdon Towers) nên các ca MEPF (`SleeveAuto`, `HangerAuto`, `RouteFromLines`,
-  `SlopePipes`, `PipeKick`) đang `skip`. Cần một model MEP mẫu — việc của giai đoạn 8.4.
-- Mới phủ các lệnh đọc và xem trước. Ca ghi thật (`allowWrite`) cần model dùng một lần rồi bỏ.
+- Mới phủ các lệnh đọc và xem trước. Ca ghi thật (`allowWrite`) cần một model dùng một lần rồi bỏ.
+- `RouteFromLines`, `DevicePlacement`, `AutoRoute`, `PipeKick` chưa có ca: cần model có sẵn model line/phòng
+  đúng dạng đầu vào, không có sẵn trong model mẫu của Autodesk.
+- Chưa chạy được vòng đầu trên máy thật vì Revit đang mở lúc dựng xong bộ test — chạy
+  `scripts/run-in-revit-tests.ps1` khi đóng Revit (giai đoạn 8.4).

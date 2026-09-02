@@ -104,7 +104,7 @@
       "command": "SleeveAuto",
       "config": { "sleeveFamilyName": "M_Generic Model" },
       "skip": true,
-      "skipReason": "Model kiến trúc mẫu không có hệ MEP; bật lại khi có model MEP mẫu (giai đoạn 8.4)",
+      "skipReason": "Model kiến trúc mẫu không có hệ MEP — ca này nằm ở bộ revit-mep.json",
       "expect": { "maxMs": 30000 }
     }
   ]
