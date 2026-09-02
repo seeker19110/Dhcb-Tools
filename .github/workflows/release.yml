@@ -167,7 +167,7 @@ jobs:
 
           # Bundle AutoCAD: AppVersion phải khớp phiên bản phát hành.
           $pc = Get-Content installer/PackageContents.xml -Raw
-          $pc = $pc -replace 'AppVersion="[^"]*"', "AppVersion=\"$v\""
+          $pc = $pc -replace 'AppVersion="[^"]*"', ('AppVersion="' + $v + '"')
           Set-Content "$stage/PackageContents.xml" $pc -Encoding UTF8
 
           Get-ChildItem $stage | Format-Table Name, Mode
