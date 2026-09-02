@@ -1,3 +1,4 @@
+using System.IO;
 using Autodesk.Revit.ApplicationServices;
 using DhcbTools.Core.Batch;
 using DhcbTools.Shared.Logic.Batch;

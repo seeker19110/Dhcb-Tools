@@ -4,3 +4,7 @@ obj/
 *.user
 *.suo
 __pycache__/
+
+# Rác do build target của package AutoCAD.NET sinh ra ở gốc repo.
+build_temp/
+build_v2/
