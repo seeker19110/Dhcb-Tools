@@ -112,6 +112,15 @@ dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.cspr
 ./scripts/check-build.sh
 ```
 
+**Kiểm thử chạy bên trong Revit** (phần chạm Revit API, không test được trên CI):
+
+```powershell
+DhcbTools.BatchRunner.exe --job jobs\in-revit-tests.json --log-dir D:\DHCB\logs
+```
+
+Bộ ca kiểm JSON ở [`tests/suites/`](tests/suites/), báo cáo ra TRX + Markdown, mã thoát khác 0 khi có ca trượt.
+Chi tiết: [`docs/kiem-thu-trong-revit.md`](docs/kiem-thu-trong-revit.md).
+
 Packages: Revit `Nice3point.Revit.Api.RevitAPI/RevitAPIUI`, AutoCAD `AutoCAD.NET` (vỏ đầy đủ) và `AutoCAD.NET.Core/.Model`
 (Core + vỏ core-only). Revit 2021–2024 và AutoCAD ≤2024 dùng net48, 2025 dùng net8.0-windows; AutoCAD 2026.1+ (package
 25.1.x) đã sang .NET 10 — `Directory.Build.props` map `-p:AcadVersion` → phiên bản package.
