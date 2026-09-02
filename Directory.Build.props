@@ -18,12 +18,27 @@
     <Copyright>Copyright (c) DHCB</Copyright>
   </PropertyGroup>
 
-  <!-- Revit 2021-2024 chạy trên .NET Framework 4.8; Revit 2025+ chạy trên .NET 8. -->
-  <PropertyGroup Condition="'$(RevitVersion)'=='' Or $(RevitVersion) &lt; 2025">
-    <TargetFramework>net48</TargetFramework>
+  <!--
+    Chọn TargetFramework theo ĐÚNG phần mềm chủ của từng project.
+    Trước đây TFM chỉ nhìn RevitVersion, nên vỏ AutoCAD luôn ra net48 kể cả khi build cho
+    AutoCAD 2025/2026 — mà AutoCAD 2025 chạy .NET 8 và AutoCAD 2026 chạy .NET 10, nên DLL net48
+    không NETLOAD được. Project AutoCAD nay theo AcadVersion, còn lại theo RevitVersion.
+  -->
+  <PropertyGroup>
+    <DhcbIsAcadProject Condition="$(MSBuildProjectName.Contains('AutoCAD'))">true</DhcbIsAcadProject>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(RevitVersion)' != '' And $(RevitVersion) &gt;= 2025">
-    <TargetFramework>net8.0-windows</TargetFramework>
+
+  <!-- Vỏ/Core AutoCAD: ≤2024 → net48 (.NET Framework), 2025 → .NET 8, 2026+ → .NET 10. -->
+  <PropertyGroup Condition="'$(DhcbIsAcadProject)'=='true'">
+    <TargetFramework Condition="'$(AcadVersion)'=='' Or $(AcadVersion) &lt;= 2024">net48</TargetFramework>
+    <TargetFramework Condition="'$(AcadVersion)' != '' And $(AcadVersion) == 2025">net8.0-windows</TargetFramework>
+    <TargetFramework Condition="'$(AcadVersion)' != '' And $(AcadVersion) &gt;= 2026">net10.0-windows</TargetFramework>
+  </PropertyGroup>
+
+  <!-- Revit 2021-2024 chạy trên .NET Framework 4.8; Revit 2025+ chạy trên .NET 8. -->
+  <PropertyGroup Condition="'$(DhcbIsAcadProject)' != 'true'">
+    <TargetFramework Condition="'$(RevitVersion)'=='' Or $(RevitVersion) &lt; 2025">net48</TargetFramework>
+    <TargetFramework Condition="'$(RevitVersion)' != '' And $(RevitVersion) &gt;= 2025">net8.0-windows</TargetFramework>
   </PropertyGroup>
 
   <!-- Hằng biên dịch theo phiên bản: CreateContainsRule bỏ tham số caseSensitive từ 2023. -->

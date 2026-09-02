@@ -24,7 +24,7 @@ public sealed class LayerStandardCheckCommand : ICoreCommand<LayerStandardCheckC
         List<LayerNamingRule>? rules;
         try
         {
-            rules = JsonConvert.DeserializeObject<List<LayerNamingRule>>(File.ReadAllText(config.RulesPath));
+            rules = ParseRules(File.ReadAllText(config.RulesPath));
         }
         catch (JsonException ex)
         {
@@ -36,17 +36,34 @@ public sealed class LayerStandardCheckCommand : ICoreCommand<LayerStandardCheckC
             return CommandResult.Fail("File quy tắc rỗng hoặc không đọc được.");
         }
 
+        // Một quy tắc thiếu "pattern" từng biến thành Regex("") — khớp MỌI tên layer. Vì layer chỉ
+        // cần khớp một quy tắc là hợp lệ, đúng một dòng thiếu pattern đủ để cả phép kiểm tra luôn
+        // báo "0 sai chuẩn". Với một công cụ kiểm tra thì im lặng bỏ sót còn tệ hơn là báo lỗi.
         var compiled = new List<(Regex Regex, string Description)>();
+        var skipped = new List<string>();
         foreach (var rule in rules)
         {
+            if (string.IsNullOrWhiteSpace(rule.Pattern))
+            {
+                skipped.Add(string.IsNullOrWhiteSpace(rule.Description) ? "(không mô tả)" : rule.Description);
+                continue;
+            }
+
             try
             {
                 compiled.Add((new Regex(rule.Pattern), rule.Description));
             }
             catch (ArgumentException)
             {
-                // Bỏ qua pattern không hợp lệ, không chặn cả lệnh.
+                skipped.Add(rule.Pattern);
             }
+        }
+
+        if (compiled.Count == 0)
+        {
+            return CommandResult.Fail(
+                "Không có quy tắc dùng được nào (thiếu \"pattern\" hoặc regex sai). "
+                + "Nếu vẫn chạy thì mọi layer đều được coi là hợp lệ — nên dừng ở đây.");
         }
 
         var allLayers = new List<string>();
@@ -73,9 +90,33 @@ public sealed class LayerStandardCheckCommand : ICoreCommand<LayerStandardCheckC
         var html = BuildHtml(allLayers, invalidLayers, rules);
         File.WriteAllText(config.OutputPath, html, Encoding.UTF8);
 
-        return CommandResult.Ok(
+        var result = CommandResult.Ok(
             $"Đã kiểm tra {allLayers.Count} layer, {invalidLayers.Count} layer không đúng chuẩn. Báo cáo: \"{config.OutputPath}\".",
             invalidLayers.Count);
+
+        foreach (var s in skipped)
+        {
+            result.Messages.Add($"Bỏ qua quy tắc không dùng được: {s}");
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Chấp nhận cả hai dạng: mảng thuần <c>[{...}]</c> và object bọc <c>{"rules":[{...}]}</c>.
+    /// File mẫu của repo (configs/layer-rules.sample.json) dùng dạng thứ hai, nên chỉ nhận dạng
+    /// mảng thuần khiến người dùng làm theo đúng mẫu vẫn gặp lỗi deserialize.
+    /// </summary>
+    internal static List<LayerNamingRule>? ParseRules(string json)
+    {
+        var trimmed = json.TrimStart();
+        if (trimmed.StartsWith("{", StringComparison.Ordinal))
+        {
+            var wrapper = JsonConvert.DeserializeObject<LayerRulesFile>(json);
+            return wrapper?.Rules;
+        }
+
+        return JsonConvert.DeserializeObject<List<LayerNamingRule>>(json);
     }
 
     private static string BuildHtml(List<string> allLayers, List<string> invalidLayers, List<LayerNamingRule> rules)

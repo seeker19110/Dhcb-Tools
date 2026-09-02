@@ -17,3 +17,9 @@ public sealed class LayerNamingRule
 
     public string Description { get; set; } = string.Empty;
 }
+
+/// <summary>Dạng file bọc <c>{"rules":[...]}</c> — chính là dạng của configs/layer-rules.sample.json.</summary>
+public sealed class LayerRulesFile
+{
+    public List<LayerNamingRule>? Rules { get; set; }
+}
