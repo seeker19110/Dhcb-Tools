@@ -229,8 +229,8 @@ public static class RevitQueryHandler
             levelName    = r.Level?.Name,
             areaSqm      = Math.Round(RevitCompat.SqFtToSqm(r.Area), 3),  // ft² → m²
             perimeterM   = Math.Round(r.Perimeter * 0.3048, 3),    // ft → m
-            department   = SafeGet(() => r.LookupParameter("Department")?.AsString()),
-            occupancy    = SafeGet(() => r.LookupParameter("Occupancy")?.AsString()),
+            department   = SafeGet(() => RevitCompat.Lookup(r, "department")?.AsString()),
+            occupancy    = SafeGet(() => RevitCompat.Lookup(r, "occupancy")?.AsString()),
             locationX    = (r.Location as LocationPoint)?.Point.X,
             locationY    = (r.Location as LocationPoint)?.Point.Y,
             locationZ    = (r.Location as LocationPoint)?.Point.Z,
@@ -355,7 +355,7 @@ public static class RevitQueryHandler
 
     private static long? GetLevelId(Element e)
     {
-        var levelParam = e.LookupParameter("Level")
+        var levelParam = RevitCompat.Lookup(e, "level")
             ?? e.get_Parameter(BuiltInParameter.FAMILY_LEVEL_PARAM)
             ?? e.get_Parameter(BuiltInParameter.LEVEL_PARAM);
         if (levelParam is null || levelParam.StorageType != StorageType.ElementId) return null;

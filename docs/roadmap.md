@@ -57,15 +57,15 @@ Bốn việc này phải xong **trước** mọi hướng mới; bỏ qua thì h
 
 ---
 
-## Giai đoạn 9 — Từ hình dáng agent sang hình dáng kỹ sư ⬜ (tuần 3–4)
+## Giai đoạn 9 — Từ hình dáng agent sang hình dáng kỹ sư 🟡 (tuần 3–4)
 
 32/42 nút Ribbon hiện là runner JSON chung không có form, và file config **không tự sinh** như README nói
 (`CommandRunner.LoadConfig` trả `JObject` rỗng). Không kỹ sư nào sửa JSON trong `%APPDATA%` để dùng tool.
 
 | # | Việc | Chi tiết |
 |---|---|---|
-| 9.1 | **Form động từ `CommandCatalog`** | Một cửa sổ WPF chung đọc `Field()` của lệnh → textbox/số/bật-tắt/combo; trường kiểu category/parameter/family/level/view chọn từ model thật; nút *Xem trước* chạy `dryRun` và hiện `Messages`; *Chạy* mới ghi. Lưu JSON đúng chỗ. Thay toàn bộ `CoreRibbonCommands` bằng đường này. Catalog cần thêm kiểu trường (`FieldKind`) — phần thuần, có test |
-| 9.2 | **Lớp từ điển tham số & family** | `%APPDATA%\DHCB\dictionary.json` (mẫu trong `configs/`): tên tham số theo ngôn ngữ UI (`Level`↔`Tầng`), family sleeve/hanger/tag mặc định, shared parameter cao độ. `RevitCompat.Lookup(doc, key)` là điểm duy nhất tra tham số; **thiếu → `CommandResult.Errors`**, không bao giờ no-op rồi báo thành công. Gỡ hết literal `M_Generic Model`, `Nominal Width`, `DHCB_Bottom_Elevation`, `Outer Diameter` khỏi Core |
+| 9.1 ✅ | **Form động từ `CommandCatalog`** | `FieldKind` + `FieldSpec` trong catalog, kiểu suy ra từ tên trường (`FieldKindGuess`, thuần, có test cho cả 107 trường thật). `CommandFormWindow` dựng ô nhập theo kiểu: checkbox, ô số theo culture, ô đường dẫn kèm nút chọn file/thư mục, combo lấy từ mô hình đang mở (`ModelChoices`: category, tham số, level, view template, family type). *Xem trước* chạy `dryRun` và hiện `Summary`+`Messages`; nút *Chạy thật* chỉ mở sau khi xem trước thành công. Config tự lưu lại. Ba vỏ MEPF viết tay (SleeveAuto/ElevationTag/ConnectorChecker) nay cũng đi qua form — gỡ luôn `SleeveFamilyName = "M_Generic Model"` gắn cứng. MCP `inputSchema` nhận kiểu JSON đúng (number/boolean/array) thay vì tất cả là string |
+| 9.2 ✅ | **Lớp từ điển tham số & family** | `ParameterDictionary` (thuần, có test) đọc `%APPDATA%\DHCB\dictionary.json` — mẫu ở [`configs/dictionary.sample.json`](../configs/dictionary.sample.json). Mỗi khoá logic (`level`, `diameter`, `bottomElevation`…) có danh sách tên đồng nghĩa Anh–Việt; tên trong file đứng **trước** tên dựng sẵn chứ không thay thế, nên dự án dùng thư viện chuẩn vẫn chạy mà không cần file. `RevitCompat.Lookup(element, key, preferred)` là điểm tra tham số duy nhất của Core (instance rồi type). Đã gỡ literal khỏi Core: `"Level"` (5 chỗ), `"Outer Diameter"`/`"Width"`/`"Height"`, `"Department"`/`"Occupancy"`, mặc định `DHCB_*_Elevation` và `M_Generic Model`. **Tra không ra là báo lỗi có mã `E-PARAM-MISSING` kèm danh sách tên đã thử** — `SleeveAuto` báo số phần tử không tra được kích thước, `ElevationTag` trả `Success=false` khi không ghi được phần tử nào (trước đây báo "Đã gán cao độ cho 0/N" như thể bình thường) |
 | 9.3 | **Tiếng Việt hoá thông báo** | Mọi `Messages`/`Errors` của Core có tiếng Việt kèm mã lỗi ổn định (ví dụ `E-PARAM-MISSING`) để tra tài liệu và để agent hiểu |
 | 9.4 | **Đưa cho một nhóm kỹ sư dùng thật** | Phát hành v1.1, thu phản hồi theo mẫu (lệnh nào dùng hằng tuần, lệnh nào bấm rồi bỏ). Số liệu này quyết định giai đoạn 10/11 đi sâu vào đâu |
 

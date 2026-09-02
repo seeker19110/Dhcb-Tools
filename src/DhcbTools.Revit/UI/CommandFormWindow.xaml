@@ -1,0 +1,42 @@
+<Window x:Class="DhcbTools.Revit.UI.CommandFormWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="DHCB Tools" Width="620" Height="640"
+        WindowStartupLocation="CenterScreen" ShowInTaskbar="False">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="160"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock x:Name="TitleText" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap"/>
+            <TextBlock x:Name="DescriptionText" Foreground="#555" TextWrapping="Wrap" Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="FieldsPanel"/>
+        </ScrollViewer>
+
+        <TextBlock Grid.Row="2" x:Name="ResultHeader" Margin="0,12,0,4" FontWeight="SemiBold" Text="Kết quả"/>
+
+        <Border Grid.Row="3" BorderBrush="#CCC" BorderThickness="1">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <TextBox x:Name="ResultBox" IsReadOnly="True" BorderThickness="0"
+                         TextWrapping="Wrap" Background="#FAFAFA" Padding="8"
+                         Text="Bấm &quot;Xem trước&quot; để chạy thử — không có gì được ghi vào mô hình."/>
+            </ScrollViewer>
+        </Border>
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button x:Name="PreviewButton" Content="Xem trước" Width="120" Height="30" Margin="0,0,8,0"
+                    Click="OnPreview"/>
+            <Button x:Name="RunButton" Content="Chạy thật" Width="120" Height="30" Margin="0,0,8,0"
+                    IsEnabled="False" Click="OnRun"/>
+            <Button Content="Đóng" Width="90" Height="30" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

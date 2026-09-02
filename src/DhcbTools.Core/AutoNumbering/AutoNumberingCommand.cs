@@ -105,7 +105,7 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
     {
         // Không phải mọi category đều có property Level thống nhất trong API (Room dùng SpatialElement.Level,
         // cửa/thiết bị dùng tham số instance "Level"...) nên tra theo tham số để dùng chung cho mọi category.
-        var levelParameter = element.LookupParameter("Level")
+        var levelParameter = RevitCompat.Lookup(element, "level")
             ?? element.get_Parameter(BuiltInParameter.FAMILY_LEVEL_PARAM)
             ?? element.get_Parameter(BuiltInParameter.LEVEL_PARAM);
 

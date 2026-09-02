@@ -140,6 +140,80 @@ public static class RevitCompat
         tx.SetFailureHandlingOptions(tx.GetFailureHandlingOptions().SetFailuresPreprocessor(new SilentFailuresPreprocessor(policy)));
     }
 
+    private static ParameterDictionary? _dictionary;
+
+    /// <summary>
+    /// Từ điển tên tham số/family của dự án (giai đoạn 9.2), nạp một lần từ
+    /// <c>%APPDATA%\DHCB\dictionary.json</c>. Đặt lại được để test hoặc để nạp lại sau khi sửa file.
+    /// </summary>
+    public static ParameterDictionary Dictionary
+    {
+        get => _dictionary ??= ParameterDictionary.Load();
+        set => _dictionary = value;
+    }
+
+    /// <summary>
+    /// Tra tham số theo <b>khoá logic</b> ("level", "diameter", "width"…) thay vì tên tiếng Anh cứng.
+    /// Thử lần lượt: tên người dùng đặt trong config → tên đồng nghĩa trong từ điển; tìm ở instance
+    /// trước rồi tới type.
+    /// <para>
+    /// Đây là điểm tra tham số DUY NHẤT của Core. Trước đây mỗi lệnh gọi thẳng
+    /// <c>LookupParameter("Level")</c>, nên trên Revit giao diện tiếng Việt hoặc thư viện family riêng,
+    /// lệnh không tìm thấy gì và <b>im lặng không làm gì mà vẫn báo thành công</b>.
+    /// </para>
+    /// </summary>
+    /// <returns>Parameter tìm được, hoặc null — người gọi PHẢI báo lỗi bằng <see cref="LookupFailed"/>.</returns>
+    public static Parameter? Lookup(Element element, string key, string? preferred = null)
+    {
+        if (element is null)
+        {
+            return null;
+        }
+
+        var names = Dictionary.NamesFor(key, preferred);
+
+        foreach (var name in names)
+        {
+            var parameter = element.LookupParameter(name);
+            if (parameter != null)
+            {
+                return parameter;
+            }
+        }
+
+        // Tham số có thể nằm ở type (ví dụ kích thước danh nghĩa của family sleeve).
+        Element? type = null;
+        try
+        {
+            type = element.Document?.GetElement(element.GetTypeId());
+        }
+        catch (Exception)
+        {
+        }
+
+        if (type != null)
+        {
+            foreach (var name in names)
+            {
+                var parameter = type.LookupParameter(name);
+                if (parameter != null)
+                {
+                    return parameter;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Thông báo lỗi chuẩn khi <see cref="Lookup"/> trả null — nêu rõ đã thử tên nào và sửa ở đâu.</summary>
+    public static string LookupFailed(string key, string? preferred = null) =>
+        Dictionary.NotFoundMessage(key, preferred);
+
+    /// <summary>Tên family mặc định theo khoá do từ điển khai báo; null nếu công ty chưa khai.</summary>
+    public static string? FamilyFor(string key) =>
+        Dictionary.Families.TryGetValue(key, out var name) ? name : null;
+
     /// <summary>Ghi tham số chuỗi nếu tồn tại và ghi được; trả lý do khi không ghi được.</summary>
     public static string? TrySetString(Element element, string parameterName, string value)
     {

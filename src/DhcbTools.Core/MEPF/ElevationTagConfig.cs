@@ -5,14 +5,18 @@ namespace DhcbTools.Core.MEPF;
 /// <summary>Cấu hình cho lệnh gán cao độ (elevation) vào tham số MEP.</summary>
 public sealed class ElevationTagConfig
 {
-    /// <summary>Parameter name to write bottom-of-element elevation (mm from ±0.000).</summary>
-    public string BottomElevParamName { get; init; } = "DHCB_Bottom_Elevation";
+    // Không đặt mặc định cứng "DHCB_*" nữa: shared parameter đó chỉ có trong template của DHCB, dự án
+    // khác không có nên lệnh ghi hụt mà vẫn báo thành công. Bỏ trống = tra theo từ điển
+    // (%APPDATA%\DHCB\dictionary.json, khoá bottomElevation/topElevation/centreElevation).
 
-    /// <summary>Parameter name for top elevation.</summary>
-    public string TopElevParamName { get; init; } = "DHCB_Top_Elevation";
+    /// <summary>Tên tham số ghi cao độ đáy (mm so với ±0.000). Bỏ trống = tra theo từ điển.</summary>
+    public string? BottomElevParamName { get; init; }
 
-    /// <summary>Parameter name for centerline elevation.</summary>
-    public string CenterElevParamName { get; init; } = "DHCB_Center_Elevation";
+    /// <summary>Tên tham số ghi cao độ đỉnh. Bỏ trống = tra theo từ điển.</summary>
+    public string? TopElevParamName { get; init; }
+
+    /// <summary>Tên tham số ghi cao độ tim. Bỏ trống = tra theo từ điển.</summary>
+    public string? CenterElevParamName { get; init; }
 
     /// <summary>Categories to process (empty = all MEP linear elements).</summary>
     public List<string> Categories { get; init; } = new List<string>();

@@ -65,14 +65,27 @@ public sealed class ElevationTagCommand : ICoreCommand<ElevationTagConfig>
         foreach (var (elem, bottom, top, centre) in plan)
         {
             bool anySet = false;
-            anySet |= TrySetDoubleParam(elem, config.BottomElevParamName, bottom, result);
-            anySet |= TrySetDoubleParam(elem, config.TopElevParamName, top, result);
-            anySet |= TrySetDoubleParam(elem, config.CenterElevParamName, centre, result);
+            anySet |= TrySetDoubleParam(elem, "bottomElevation", config.BottomElevParamName, bottom, result);
+            anySet |= TrySetDoubleParam(elem, "topElevation", config.TopElevParamName, top, result);
+            anySet |= TrySetDoubleParam(elem, "centreElevation", config.CenterElevParamName, centre, result);
             if (anySet) updated++;
         }
 
         tx.Commit();
-        return CommandResult.Ok($"Đã gán cao độ cho {updated}/{plan.Count} phần tử MEP.", updated);
+
+        var final = CommandResult.Ok($"Đã gán cao độ cho {updated}/{plan.Count} phần tử MEP.", updated);
+        final.Messages.AddRange(result.Messages);
+
+        // Không phần tử nào ghi được nghĩa là dự án không có tham số cao độ nào trong từ điển —
+        // trước đây lệnh vẫn báo "Đã gán cao độ cho 0/N" như thể mọi thứ bình thường.
+        if (updated == 0 && plan.Count > 0)
+        {
+            final.Success = false;
+            final.Summary = $"Không gán được cao độ cho phần tử nào trong {plan.Count} phần tử.";
+            final.Errors.Add(RevitCompat.LookupFailed("bottomElevation", config.BottomElevParamName));
+        }
+
+        return final;
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
@@ -121,7 +134,7 @@ public sealed class ElevationTagCommand : ICoreCommand<ElevationTagConfig>
 
     private static bool BelongsToLevel(Document doc, Element elem, string levelName)
     {
-        var levelParam = elem.LookupParameter("Level")
+        var levelParam = RevitCompat.Lookup(elem, "level")
             ?? elem.get_Parameter(BuiltInParameter.FAMILY_LEVEL_PARAM)
             ?? elem.get_Parameter(BuiltInParameter.LEVEL_PARAM)
             ?? elem.get_Parameter(BuiltInParameter.RBS_START_LEVEL_PARAM);
@@ -133,10 +146,14 @@ public sealed class ElevationTagCommand : ICoreCommand<ElevationTagConfig>
         return level != null && string.Equals(level.Name, levelName, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool TrySetDoubleParam(Element elem, string paramName, double valueMm, CommandResult log)
+    /// <summary>
+    /// Ghi một giá trị cao độ. <paramref name="key"/> là khoá từ điển (bottomElevation…),
+    /// <paramref name="paramName"/> là tên người dùng chỉ định trong config (ưu tiên hơn từ điển).
+    /// Trả false khi không có tham số nào ghi được — người gọi phải báo, không được im lặng.
+    /// </summary>
+    private static bool TrySetDoubleParam(Element elem, string key, string? paramName, double valueMm, CommandResult log)
     {
-        if (string.IsNullOrEmpty(paramName)) return false;
-        var param = elem.LookupParameter(paramName);
+        var param = RevitCompat.Lookup(elem, key, paramName);
         if (param == null || param.IsReadOnly) return false;
 
         try

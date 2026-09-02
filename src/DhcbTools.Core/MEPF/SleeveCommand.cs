@@ -42,6 +42,10 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         // 4. Collect planned placements
         var placements = new List<(XYZ Point, Face? Face, Wall? HostWall, Floor? HostFloor, double WidthFt, double HeightFt, Element MepElement)>();
 
+        // Phần tử không tra được kích thước: trước đây âm thầm dùng 6 inch mặc định nên sleeve ra sai cỡ
+        // mà không ai biết. Nay gom lại để báo trong CommandResult.
+        var unknownSize = new List<long>();
+
         // Lỗi hiệu năng đã sửa: trước đây FilteredElementCollector toàn model (Walls+Floors) được dựng lại
         // BÊN TRONG vòng lặp cho từng phần tử MEP — O(n·m) trên model lớn, vượt timeout Bridge 30 s.
         // Thu thập một lần ở đây, lọc bbox trong bộ nhớ cho từng phần tử MEP.
@@ -92,7 +96,10 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
             }
 
             // Get MEP size
-            GetMepSize(mepElem, config, out double widthFt, out double heightFt);
+            if (!GetMepSize(mepElem, config, out double widthFt, out double heightFt))
+            {
+                unknownSize.Add(RevitCompat.IdValue(mepElem.Id));
+            }
 
             foreach (var host in hosts)
             {
@@ -140,6 +147,7 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
             var preview = CommandResult.Ok(
                 $"[Xem trước] Sẽ đặt {placements.Count} sleeve tại giao cắt MEP × Tường/Sàn.",
                 placements.Count);
+            AddUnknownSizeWarning(preview, unknownSize, config);
             foreach (var p in placements)
             {
                 var hostDesc = p.HostWall != null ? $"Tường {p.HostWall.Id}" : $"Sàn {p.HostFloor?.Id}";
@@ -208,7 +216,9 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         }
 
         tx.Commit();
-        return CommandResult.Ok($"Đã đặt {placed} sleeve tại giao cắt MEP × Tường/Sàn.", placed);
+        var result = CommandResult.Ok($"Đã đặt {placed} sleeve tại giao cắt MEP × Tường/Sàn.", placed);
+        AddUnknownSizeWarning(result, unknownSize, config);
+        return result;
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
@@ -335,29 +345,62 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         }
     }
 
-    private static void GetMepSize(Element elem, SleeveConfig config,
-        out double widthFt, out double heightFt)
+    /// <summary>
+    /// Cảnh báo các phần tử không tra được kích thước — kèm tên tham số đã thử và chỗ khai báo thêm,
+    /// để kỹ sư sửa được chứ không chỉ biết là "có gì đó sai".
+    /// </summary>
+    private static void AddUnknownSizeWarning(CommandResult result, List<long> unknownSize, SleeveConfig config)
     {
-        double clearFt = RevitCompat.MmToFt(config.ClearanceMm) * 2; // both sides
-        widthFt = 0.5; // default 6 inches
-        heightFt = 0.5;
-
-        var outerDiam = elem.LookupParameter("Outer Diameter")
-            ?? elem.LookupParameter("Outside Diameter")
-            ?? elem.LookupParameter("Diameter");
-        if (outerDiam != null && outerDiam.StorageType == StorageType.Double)
+        if (unknownSize.Count == 0)
         {
-            widthFt = outerDiam.AsDouble() + clearFt;
-            heightFt = widthFt;
             return;
         }
 
-        var widthParam = elem.LookupParameter("Width");
-        var heightParam = elem.LookupParameter("Height");
-        if (widthParam != null && widthParam.StorageType == StorageType.Double)
+        result.Messages.Add(
+            $"{unknownSize.Count} phần tử MEP không tra được kích thước, dùng tạm 152 mm — sleeve có thể sai cỡ. "
+            + RevitCompat.LookupFailed("diameter")
+            + " Phần tử: " + string.Join(", ", unknownSize.Take(20))
+            + (unknownSize.Count > 20 ? ", …" : string.Empty));
+    }
+
+    /// <summary>
+    /// Kích thước phần tử MEP để tính lỗ mở. Tra qua từ điển tên tham số (giai đoạn 9.2) thay vì
+    /// tên tiếng Anh cứng — trên Revit tiếng Việt thì "Outer Diameter"/"Width" không tồn tại.
+    /// </summary>
+    /// <returns>false khi không tra được kích thước nào: người gọi phải báo, không được im lặng
+    /// dùng giá trị mặc định rồi đặt sleeve sai cỡ.</returns>
+    private static bool GetMepSize(Element elem, SleeveConfig config,
+        out double widthFt, out double heightFt)
+    {
+        double clearFt = RevitCompat.MmToFt(config.ClearanceMm) * 2; // both sides
+        widthFt = 0.5; // 6 inch — chỉ dùng khi đã báo cho người dùng biết là không tra được
+        heightFt = 0.5;
+
+        var outerDiam = RevitCompat.Lookup(elem, "diameter");
+        if (outerDiam != null && outerDiam.StorageType == StorageType.Double && outerDiam.AsDouble() > 0)
+        {
+            widthFt = outerDiam.AsDouble() + clearFt;
+            heightFt = widthFt;
+            return true;
+        }
+
+        var widthParam = RevitCompat.Lookup(elem, "width", config.WidthParamName);
+        var heightParam = RevitCompat.Lookup(elem, "height", config.HeightParamName);
+        var found = false;
+
+        if (widthParam != null && widthParam.StorageType == StorageType.Double && widthParam.AsDouble() > 0)
+        {
             widthFt = widthParam.AsDouble() + clearFt;
-        if (heightParam != null && heightParam.StorageType == StorageType.Double)
+            found = true;
+        }
+
+        if (heightParam != null && heightParam.StorageType == StorageType.Double && heightParam.AsDouble() > 0)
+        {
             heightFt = heightParam.AsDouble() + clearFt;
+            found = true;
+        }
+
+        return found;
     }
 
     private static Face? GetNearestFace(Element host, XYZ point)

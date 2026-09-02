@@ -1,0 +1,37 @@
+{
+  "//": [
+    "Từ điển tên tham số và family của dự án — chép vào %APPDATA%\\DHCB\\dictionary.json rồi sửa.",
+    "",
+    "Vì sao cần: Core từng gọi thẳng LookupParameter(\"Level\"), \"Outer Diameter\", \"Nominal Width\"",
+    "— toàn tên của thư viện mét bản tiếng Anh. Trên Revit giao diện tiếng Việt hoặc dự án dùng",
+    "thư viện family riêng, các tra cứu đó trả null và lệnh KHÔNG LÀM GÌ mà vẫn báo thành công.",
+    "",
+    "Cách hoạt động: mỗi khoá logic có một danh sách tên; tool thử lần lượt từ trên xuống.",
+    "Tên khai ở đây được đặt TRƯỚC tên dựng sẵn trong mã, không thay thế hẳn — dự án dùng",
+    "thư viện chuẩn vẫn chạy bình thường mà không cần file này."
+  ],
+
+  "parameters": {
+    "level": ["Tầng", "Cao độ tham chiếu"],
+    "mark": ["Ký hiệu"],
+    "comments": ["Ghi chú"],
+
+    "diameter": ["Đường kính ngoài", "DN"],
+    "width": ["Chiều rộng danh nghĩa"],
+    "height": ["Chiều cao danh nghĩa"],
+
+    "bottomElevation": ["Cao độ đáy"],
+    "topElevation": ["Cao độ đỉnh"],
+    "centreElevation": ["Cao độ tim"],
+
+    "department": ["Bộ phận"],
+    "occupancy": ["Công năng"]
+  },
+
+  "families": {
+    "//": "Tên family mặc định của công ty, dạng \"Family: Type\" hoặc chỉ tên family.",
+    "sleeve": "DHCB_Sleeve: Tròn",
+    "hanger": "DHCB_Hanger: Ty treo đơn",
+    "elevationTag": "DHCB_Tag_CaoDo"
+  }
+}

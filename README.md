@@ -67,8 +67,10 @@ Lệnh AutoCAD trên dòng lệnh: `DHCB` (trợ giúp), `DHCB_LAYER_EXPORT/IMPO
 `DHCB_LAYERMAP`, `DHCB_LAYTRANS`, `DHCB_COMPARE`, `DHCB_BLOCKCOUNT`, `DHCB_ATTR_INC`, `DHCB_EXEC <Lệnh>` (config JSON),
 `DHCB_CFG <Lệnh>` (tạo config mẫu), `DHCB_AI`, `DHCB_RUN` (batch).
 
-Nút Ribbon Revit mới dùng chung một khuôn: đọc config ở `%APPDATA%\DHCB\configs\revit\<Lệnh>.json` (tự tạo mẫu lần
-đầu) → chạy **xem trước** → hỏi xác nhận → chạy thật.
+Nút Ribbon Revit dùng chung **một form động** dựng từ `CommandCatalog`: mỗi trường config thành một ô nhập đúng kiểu
+(checkbox, ô số, nút chọn file/thư mục, combo category/tham số/level/view/family lấy từ mô hình đang mở). Bấm
+*Xem trước* chạy `dryRun` và hiện kết quả; nút *Chạy thật* chỉ mở sau khi xem trước thành công. Giá trị đã nhập được
+lưu ở `%APPDATA%\DHCB\configs\revit\<Lệnh>.json` cho lần sau.
 
 ## HTTP Bridge, agent và MCP
 
@@ -156,7 +158,16 @@ vào bundle `%APPDATA%\Autodesk\ApplicationPlugins\DhcbTools.bundle\` nên **t�
   `Newtonsoft.Json.dll` vào `%APPDATA%\Autodesk\Revit\Addins\<năm>\`.
 - **AutoCAD:** `NETLOAD DhcbTools.AutoCAD.dll` (kèm `DhcbTools.Core.AutoCAD.dll`, `DhcbTools.Shared.*.dll`), hoặc đặt vào
   `%AppData%\Autodesk\ApplicationPlugins\`.
-- **Tuỳ chọn:** `%APPDATA%\DHCB\settings.json` (bật `ElevationUpdater`), `%APPDATA%\DHCB\ai.json` (model local) — mẫu trong `configs/`.
+- **Tuỳ chọn:** `%APPDATA%\DHCB\settings.json` (bật `ElevationUpdater`), `%APPDATA%\DHCB\ai.json` (model local), `%APPDATA%\DHCB\dictionary.json` (tên tham số/family của dự án — xem *Từ điển tham số* bên dưới) — mẫu trong `configs/`.
+
+## Từ điển tham số
+
+Core không gọi thẳng `LookupParameter("Level")` nữa. Mỗi khoá logic (`level`, `diameter`, `bottomElevation`…) có một
+danh sách tên đồng nghĩa Anh–Việt; dự án khai thêm tên riêng trong `%APPDATA%\DHCB\dictionary.json`
+(mẫu: [`configs/dictionary.sample.json`](configs/dictionary.sample.json)). Tên khai trong file đứng trước tên dựng sẵn
+chứ không thay thế, nên dự án dùng thư viện chuẩn chạy được mà không cần file này.
+
+Tra không ra thì lệnh **báo lỗi `E-PARAM-MISSING` kèm danh sách tên đã thử**, không im lặng bỏ qua rồi báo thành công.
 
 ## Phiên bản và log
 

@@ -45,7 +45,6 @@ public class RibbonCoverageTests
         var handledByDedicatedShell = new HashSet<string>(StringComparer.Ordinal)
         {
             "RemoveUnusedViews", "BatchExport", "HealthReport", "ProjectInfo",
-            "SleeveAuto", "ElevationTag", "ConnectorChecker",
         };
 
         var missing = CommandCatalog.AllFor(CommandCatalog.Revit)

@@ -183,7 +183,7 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
 
     private static bool BelongsToLevel(Document doc, Element elem, string levelName)
     {
-        var levelParam = elem.LookupParameter("Level")
+        var levelParam = RevitCompat.Lookup(elem, "level")
             ?? elem.get_Parameter(BuiltInParameter.FAMILY_LEVEL_PARAM)
             ?? elem.get_Parameter(BuiltInParameter.LEVEL_PARAM)
             ?? elem.get_Parameter(BuiltInParameter.RBS_START_LEVEL_PARAM);
