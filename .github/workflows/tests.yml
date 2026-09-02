@@ -54,4 +54,11 @@ jobs:
           done
 
       - name: Kiểm tra script Python
-        run: python3 -m py_compile scripts/dhcb_agent.py scripts/dhcb_mcp_server.py scripts/dhcb_ai.py
+        run: |
+          python3 -m py_compile scripts/dhcb_agent.py scripts/dhcb_mcp_server.py scripts/dhcb_ai.py \
+            tools/autocad-mcp-server/server.py tools/autocad-mcp-server/panel_api.py
+          python3 -m unittest discover -s tools/autocad-mcp-server -p 'test_*.py'
+
+      - name: Kiểm tra JavaScript panel AutoCAD
+        run: |
+          node -e "const fs=require('fs');const s=fs.readFileSync('tools/autocad-mcp-server/panel.html','utf8');const m=s.match(/<script>([\\s\\S]*?)<\\/script>/);if(!m)throw Error('script missing');new Function(m[1]);if(!s.includes('runCleanup(false)'))throw Error('real cleanup path missing');"

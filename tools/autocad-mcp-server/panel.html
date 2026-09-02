@@ -2,435 +2,1002 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AutoCAD Control Panel</title>
+<script>
+  if (location.protocol === 'file:') location.replace('http://127.0.0.1:8767/panel');
+</script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+  :root {
+    --bg:       #0d1117;
+    --surface:  #161b22;
+    --surface2: #1c2128;
+    --border:   #30363d;
+    --border2:  #21262d;
+    --text:     #e6edf3;
+    --muted:    #7d8590;
+    --accent:   #2f81f7;
+    --accent-h: #388bfd;
+    --green:    #3fb950;
+    --red:      #f85149;
+    --yellow:   #d29922;
+    --purple:   #bc8cff;
+    --cyan:     #39c5cf;
+    --radius:   6px;
+    --font: -apple-system, 'Segoe UI', sans-serif;
+    --mono: 'Cascadia Code', 'Consolas', monospace;
+  }
+
+  html, body { height: 100%; }
+
   body {
-    font-family: inherit;
+    font-family: var(--font);
     font-size: 13px;
-    color: var(--foreground);
-    min-width: 640px;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
   }
 
-  .panel {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-
-  /* Header */
-  .header {
+  /* ── Top bar ───────────────────────────────── */
+  .topbar {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 10px 14px;
-    background: color-mix(in srgb, var(--accent) 10%, transparent);
+    padding: 0 16px;
+    height: 44px;
+    background: var(--surface);
     border-bottom: 1px solid var(--border);
-  }
-  .header-title { font-weight: 700; font-size: 14px; flex: 1; }
-  .status-dot {
-    width: 9px; height: 9px; border-radius: 50%;
-    background: #6b7280;
-    transition: background .3s;
     flex-shrink: 0;
   }
-  .status-dot.alive { background: #22c55e; animation: pulse 2s infinite; }
-  .status-dot.dead  { background: #ef4444; }
-  @keyframes pulse {
-    0%,100% { opacity:1 } 50% { opacity:.4 }
-  }
-  .status-text { font-size: 11px; color: var(--muted-foreground); }
-
-  /* Tabs */
-  .tabs {
-    display: flex;
-    border-bottom: 1px solid var(--border);
-    background: var(--card);
-  }
-  .tab {
-    padding: 7px 14px;
-    font-size: 12px;
-    cursor: pointer;
-    color: var(--muted-foreground);
-    border-bottom: 2px solid transparent;
-    transition: color .15s;
-    white-space: nowrap;
-  }
-  .tab:hover { color: var(--foreground); }
-  .tab.active {
-    color: var(--accent);
-    border-bottom-color: var(--accent);
-    font-weight: 600;
-  }
-
-  /* Content */
-  .tab-content { display: none; padding: 12px 14px; }
-  .tab-content.active { display: block; }
-
-  /* Query buttons grid */
-  .query-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
-    margin-bottom: 10px;
-  }
-  .btn {
-    padding: 6px 10px;
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    background: var(--card);
-    color: var(--foreground);
-    cursor: pointer;
-    font-size: 12px;
-    font-family: inherit;
-    text-align: center;
-    transition: background .15s, border-color .15s;
-  }
-  .btn:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: var(--accent); }
-  .btn:active { opacity: .7; }
-  .btn.primary {
-    background: var(--accent);
-    color: #fff;
-    border-color: var(--accent);
-    font-weight: 600;
-  }
-  .btn.primary:hover { opacity: .85; }
-  .btn.danger { border-color: #ef4444; color: #ef4444; }
-  .btn.danger:hover { background: rgba(239,68,68,.1); }
-
-  /* Form fields */
-  .form-row {
+  .topbar-logo {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 8px;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: -.2px;
+    color: var(--text);
+    text-decoration: none;
   }
-  .form-row label {
-    min-width: 110px;
-    font-size: 11px;
-    color: var(--muted-foreground);
-    text-transform: uppercase;
-    letter-spacing: .04em;
-  }
-  .form-row input, .form-row select {
-    flex: 1;
-    padding: 5px 8px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--card);
-    color: var(--foreground);
-    font-family: inherit;
-    font-size: 12px;
-  }
-  .form-row input:focus, .form-row select:focus {
-    outline: none;
-    border-color: var(--accent);
-  }
-  .checkbox-row {
+  .topbar-logo svg { flex-shrink: 0; }
+  .topbar-spacer { flex: 1; }
+  .status-pill {
     display: flex;
     align-items: center;
     gap: 6px;
-    margin-bottom: 8px;
-    font-size: 12px;
-    cursor: pointer;
-  }
-  .checkbox-row input { width: 14px; height: 14px; cursor: pointer; }
-
-  /* Raw command */
-  .raw-area {
-    width: 100%;
-    padding: 8px;
+    background: var(--surface2);
     border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--card);
-    color: var(--foreground);
-    font-family: 'Consolas', monospace;
+    border-radius: 20px;
+    padding: 4px 10px 4px 7px;
     font-size: 11px;
-    resize: vertical;
-    min-height: 80px;
+    color: var(--muted);
+    cursor: default;
+    transition: border-color .2s;
   }
-  .raw-area:focus { outline: none; border-color: var(--accent); }
+  .status-pill.alive { border-color: #3fb95044; color: var(--green); }
+  .status-pill.dead  { border-color: #f8514944; color: var(--red); }
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+    transition: background .3s;
+  }
+  .status-pill.alive .status-dot { background: var(--green); animation: pulse 2s infinite; }
+  .status-pill.dead  .status-dot { background: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
 
-  /* Result area */
-  .result-header {
+  .ping-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--muted);
+    font-size: 11px;
+    font-family: var(--font);
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: border-color .15s, color .15s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .ping-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .ping-btn .spin-ico { display:none; animation: spin .5s linear infinite; }
+  .ping-btn.loading .spin-ico { display:inline; }
+  .ping-btn.loading .ico { display:none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Layout ────────────────────────────────── */
+  .layout {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* ── Sidebar ───────────────────────────────── */
+  .sidebar {
+    width: 160px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 8px 0;
+    overflow-y: auto;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 14px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    transition: color .12s, background .12s, border-color .12s;
+    user-select: none;
+  }
+  .nav-item:hover { color: var(--text); background: var(--surface2); }
+  .nav-item.active {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    border-left-color: var(--accent);
+  }
+  .nav-icon { font-size: 15px; flex-shrink: 0; width: 18px; text-align: center; }
+  .nav-divider { height: 1px; background: var(--border2); margin: 6px 0; }
+  .sidebar-section-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--muted);
+    padding: 8px 14px 4px;
+    opacity: .7;
+  }
+
+  /* ── Content ───────────────────────────────── */
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .panel-page { display: none; flex-direction: column; flex: 1; padding: 16px; gap: 14px; }
+  .panel-page.active { display: flex; }
+
+  /* ── Page header ───────────────────────────── */
+  .page-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .page-title small {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--muted);
+    margin-left: 4px;
+  }
+
+  /* ── Cards ─────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border2);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--muted);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 6px;
+    background: var(--surface2);
   }
-  .result-label { font-size: 11px; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: .04em; }
-  .result-box {
-    background: color-mix(in srgb, var(--border) 30%, transparent);
+  .card-body { padding: 12px 14px; }
+
+  /* ── Query grid ────────────────────────────── */
+  .query-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .qbtn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    padding: 12px 8px;
+    background: var(--surface2);
     border: 1px solid var(--border);
-    border-radius: 5px;
-    padding: 10px;
-    font-family: 'Consolas', monospace;
+    border-radius: var(--radius);
+    color: var(--muted);
+    cursor: pointer;
+    font-family: var(--font);
+    font-size: 11.5px;
+    font-weight: 500;
+    text-align: center;
+    transition: all .15s;
+    line-height: 1.3;
+  }
+  .qbtn .qico { font-size: 20px; line-height: 1; }
+  .qbtn:hover {
+    background: color-mix(in srgb, var(--accent) 10%, var(--surface2));
+    border-color: var(--accent);
+    color: var(--text);
+    transform: translateY(-1px);
+  }
+  .qbtn:active { transform: translateY(0); opacity: .8; }
+
+  /* ── Stat cards ────────────────────────────── */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 8px;
+  }
+  .stat-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+  }
+  .stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing:.06em; margin-bottom: 4px; }
+  .stat-value { font-size: 22px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; line-height: 1; }
+  .stat-sub   { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  /* ── Result box ────────────────────────────── */
+  .result-wrap { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; }
+  .result-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .result-label-txt {
     font-size: 11px;
-    max-height: 260px;
+    color: var(--muted);
+    flex: 1;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-weight: 600;
+  }
+  .result-box {
+    flex: 1;
+    min-height: 120px;
+    max-height: 280px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    font-family: var(--mono);
+    font-size: 11.5px;
     overflow-y: auto;
     white-space: pre-wrap;
     word-break: break-all;
-    color: var(--foreground);
+    color: var(--text);
     scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
   }
   .result-box:empty::before {
     content: 'Kết quả sẽ hiển thị ở đây...';
-    color: var(--muted-foreground);
+    color: var(--muted);
     font-style: italic;
   }
-  .result-box .ok    { color: #22c55e; }
-  .result-box .err   { color: #ef4444; }
-  .result-box .warn  { color: #f59e0b; }
-  .result-box .num   { color: #60a5fa; }
-  .result-box .key   { color: #a78bfa; }
-  .result-box .str   { color: #34d399; }
+  .result-box .ok   { color: var(--green); }
+  .result-box .err  { color: var(--red); }
+  .result-box .warn { color: var(--yellow); }
+  .result-box .num  { color: var(--cyan); }
+  .result-box .key  { color: var(--purple); }
+  .result-box .str  { color: var(--green); }
 
-  /* Stats mini-cards */
-  .stat-cards {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-    margin-bottom: 10px;
-  }
-  .stat-card {
-    background: var(--card);
+  /* ── Buttons ───────────────────────────────── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    border-radius: var(--radius);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 8px 10px;
+    background: var(--surface2);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .12s;
+    white-space: nowrap;
   }
-  .stat-card-label { font-size: 10px; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: .05em; }
-  .stat-card-value { font-size: 18px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
-  .stat-card-sub   { font-size: 10px; color: var(--muted-foreground); }
+  .btn:hover { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface2)); }
+  .btn:active { opacity: .7; }
+  .btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+  .btn.primary:hover { background: var(--accent-h); border-color: var(--accent-h); color: #fff; }
+  .btn.danger { border-color: var(--red); color: var(--red); }
+  .btn.danger:hover { background: color-mix(in srgb, var(--red) 10%, transparent); }
+  .btn.danger-solid { background: var(--red); border-color: var(--red); color: #fff; font-weight: 700; }
+  .btn.danger-solid:hover { background: #da3633; border-color: #da3633; color: #fff; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; pointer-events: none; }
+  .btn.sm { padding: 3px 9px; font-size: 11px; }
+  .btn.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+  .btn.ghost:hover { background: var(--surface2); border-color: var(--border); color: var(--text); }
 
-  /* Layer table */
-  .data-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  /* ── Form ──────────────────────────────────── */
+  .form-section { display: flex; flex-direction: column; gap: 8px; }
+  .form-row {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    align-items: center;
+    gap: 10px;
+  }
+  .form-label {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: right;
+    font-weight: 500;
+  }
+  .field {
+    padding: 5px 9px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 12.5px;
+    transition: border-color .12s;
+    width: 100%;
+  }
+  .field:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent); }
+  .field[type=number] { font-family: var(--mono); }
+  textarea.field { resize: vertical; min-height: 80px; font-family: var(--mono); font-size: 12px; }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12.5px;
+    cursor: pointer;
+    color: var(--text);
+    user-select: none;
+  }
+  .toggle-row input[type=checkbox] {
+    width: 15px; height: 15px; cursor: pointer;
+    accent-color: var(--accent);
+  }
+  .toggle-desc { font-size: 11px; color: var(--muted); margin-left: 25px; margin-top: 2px; }
+
+  .action-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  /* ── Badges ────────────────────────────────── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .04em;
+  }
+  .badge-dry  { background: color-mix(in srgb, var(--yellow) 15%, transparent); color: var(--yellow); border: 1px solid color-mix(in srgb, var(--yellow) 30%, transparent); }
+  .badge-done { background: color-mix(in srgb, var(--green)  15%, transparent); color: var(--green);  border: 1px solid color-mix(in srgb, var(--green)  30%, transparent); }
+  .badge-err  { background: color-mix(in srgb, var(--red)    15%, transparent); color: var(--red);    border: 1px solid color-mix(in srgb, var(--red)    30%, transparent); }
+
+  /* ── Spinner ───────────────────────────────── */
+  .spinner { display: inline-block; width: 11px; height: 11px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; margin-right: 5px; }
+  .loading-txt { color: var(--muted); font-size: 12px; }
+
+  /* ── Layer table ───────────────────────────── */
+  .tbl-wrap { max-height: 260px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; border: 1px solid var(--border); border-radius: var(--radius); }
+  .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
   .data-table th {
     text-align: left;
-    padding: 4px 8px;
-    background: color-mix(in srgb, var(--border) 40%, transparent);
-    font-weight: 600;
+    padding: 6px 10px;
+    background: var(--surface2);
     font-size: 10px;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: .04em;
-    color: var(--muted-foreground);
+    letter-spacing: .06em;
+    color: var(--muted);
     position: sticky; top: 0;
+    z-index: 1;
+    border-bottom: 1px solid var(--border);
   }
-  .data-table td { padding: 3px 8px; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); }
-  .data-table tr:last-child td { border-bottom: none; }
-  .data-table tr:hover td { background: color-mix(in srgb, var(--accent) 6%, transparent); }
-  .table-wrap { max-height: 220px; overflow-y: auto; scrollbar-width: thin; }
-  .dot-off { color: var(--muted-foreground); }
-  .dot-on  { color: #22c55e; }
-
-  /* Divider */
-  .divider { height: 1px; background: var(--border); margin: 10px 0; }
-
-  /* Spinner */
-  .spinner {
-    display: inline-block;
-    width: 12px; height: 12px;
-    border: 2px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin .6s linear infinite;
+  .data-table td {
+    padding: 5px 10px;
+    border-bottom: 1px solid var(--border2);
     vertical-align: middle;
-    margin-right: 5px;
   }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+  .dot-off { color: var(--muted); }
+  .dot-on  { color: var(--green); }
 
-  .loading { color: var(--muted-foreground); font-size: 12px; }
-  .action-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .dry-badge {
-    font-size: 10px; padding: 2px 7px; border-radius: 10px;
-    background: #f59e0b22; color: #f59e0b; border: 1px solid #f59e0b44;
-    font-weight: 600;
+  /* ── Layers toolbar ────────────────────────── */
+  .layers-toolbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
   }
-  .ok-badge {
-    font-size: 10px; padding: 2px 7px; border-radius: 10px;
-    background: #22c55e22; color: #22c55e; border: 1px solid #22c55e44;
-    font-weight: 600;
+  .search-field {
+    flex: 1;
+    padding: 5px 9px 5px 30px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 12.5px;
+    font-family: var(--font);
+    position: relative;
   }
+  .search-field:focus { outline: none; border-color: var(--accent); }
+  .search-wrap { position: relative; flex: 1; }
+  .search-ico {
+    position: absolute;
+    left: 9px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    pointer-events: none;
+    font-size: 13px;
+  }
+
+  /* ── Raw tab ───────────────────────────────── */
+  .endpoint-row { display: flex; gap: 6px; align-items: center; }
+  .endpoint-badge {
+    font-size: 10px;
+    font-family: var(--mono);
+    padding: 2px 7px;
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+    color: var(--accent);
+    border-radius: 4px;
+    font-weight: 700;
+  }
+  select.field { cursor: pointer; }
+  .timing { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+  /* ── AI Chat ───────────────────────────────── */
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+    min-height: 200px;
+    max-height: 400px;
+  }
+  .chat-msg {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .chat-msg.user { flex-direction: row-reverse; }
+  .chat-avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .chat-msg.user .chat-avatar {
+    background: color-mix(in srgb, var(--accent) 20%, var(--surface2));
+    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+  .chat-bubble {
+    max-width: 75%;
+    padding: 9px 13px;
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.55;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .chat-msg.user .chat-bubble {
+    background: color-mix(in srgb, var(--accent) 12%, var(--surface2));
+    border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+    text-align: right;
+  }
+  .chat-bubble.thinking {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+    font-style: italic;
+  }
+  .dots { display: flex; gap: 3px; }
+  .dots span {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--muted);
+    animation: dotbounce 1.2s ease-in-out infinite;
+  }
+  .dots span:nth-child(2) { animation-delay: .2s; }
+  .dots span:nth-child(3) { animation-delay: .4s; }
+  @keyframes dotbounce { 0%,80%,100%{transform:scale(1);opacity:.5} 40%{transform:scale(1.3);opacity:1} }
+
+  .chat-bubble .cmd-block {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 6px 10px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    margin: 7px 0 3px;
+    color: var(--cyan);
+  }
+  .chat-bubble .run-btn {
+    margin-top: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: var(--radius);
+    border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+    color: var(--accent);
+    font-size: 11.5px;
+    font-family: var(--font);
+    cursor: pointer;
+    font-weight: 600;
+    transition: all .12s;
+  }
+  .chat-bubble .run-btn:hover { background: var(--accent); color: #fff; }
+
+  .chat-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border2);
+    background: var(--surface2);
+  }
+  .suggestion-chip {
+    padding: 4px 11px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 11.5px;
+    font-family: var(--font);
+    cursor: pointer;
+    transition: all .12s;
+    white-space: nowrap;
+  }
+  .suggestion-chip:hover { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+
+  .chat-input-wrap {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .chat-input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 13px;
+    resize: none;
+    line-height: 1.5;
+    max-height: 120px;
+    overflow-y: auto;
+    transition: border-color .12s;
+    scrollbar-width: thin;
+  }
+  .chat-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent); }
+  .chat-send-btn {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: background .12s, transform .1s;
+  }
+  .chat-send-btn:hover { background: var(--accent-h); transform: scale(1.05); }
+  .chat-send-btn:active { transform: scale(.95); }
+  .chat-send-btn:disabled { background: var(--border); cursor: not-allowed; transform: none; }
+
+  /* ── Divider ───────────────────────────────── */
+  .divider { height: 1px; background: var(--border2); margin: 2px 0; }
+
+  /* ── Empty state ───────────────────────────── */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 32px;
+    color: var(--muted);
+    font-size: 13px;
+    text-align: center;
+  }
+  .empty-state .empty-ico { font-size: 32px; opacity: .5; }
 </style>
 </head>
 <body>
-<div class="panel">
 
-  <!-- Header -->
-  <div class="header">
-    <div class="status-dot" id="dot"></div>
-    <div class="header-title">🔧 AutoCAD Control Panel</div>
-    <div class="status-text" id="statusText">Đang kiểm tra...</div>
-    <button class="btn" onclick="healthCheck()" style="font-size:11px;padding:4px 10px;">↻ Ping</button>
+<!-- ── Top bar ──────────────────────────────────── -->
+<div class="topbar">
+  <div class="topbar-logo">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
+    </svg>
+    AutoCAD Control Panel
   </div>
-
-  <!-- Tabs -->
-  <div class="tabs">
-    <div class="tab active" onclick="switchTab('query',this)">📊 Query</div>
-    <div class="tab" onclick="switchTab('layers',this)">🗂 Layers</div>
-    <div class="tab" onclick="switchTab('numbering',this)">🔢 AutoNumbering</div>
-    <div class="tab" onclick="switchTab('cleanup',this)">🧹 Cleanup</div>
-    <div class="tab" onclick="switchTab('raw',this)">⚡ Raw</div>
+  <div class="topbar-spacer"></div>
+  <div class="status-pill" id="statusPill">
+    <div class="status-dot"></div>
+    <span id="statusText">Đang kiểm tra...</span>
   </div>
+  <button class="ping-btn" id="pingBtn" onclick="healthCheck()">
+    <span class="ico">↻</span>
+    <span class="spin-ico">◌</span>
+    Ping
+  </button>
+</div>
 
-  <!-- TAB: Query -->
-  <div class="tab-content active" id="tab-query">
-    <div class="stat-cards" id="statCards" style="display:none"></div>
-    <div class="query-grid">
-      <button class="btn" onclick="runQuery('drawing_info')">📄 Drawing Info</button>
-      <button class="btn" onclick="runQuery('stats')">📈 Stats</button>
-      <button class="btn" onclick="runQuery('layouts')">📋 Layouts</button>
-      <button class="btn" onclick="runQuery('xrefs')">🔗 XRefs</button>
-      <button class="btn" onclick="runQuery('text',{limit:20})">🔤 Text (20)</button>
-      <button class="btn" onclick="runQuery('inserts',{limit:20})">📦 Inserts (20)</button>
-      <button class="btn" onclick="runQuery('entities',{limit:10})">🔵 Entities (10)</button>
-      <button class="btn" onclick="runQuery('blocks')">⬛ Blocks</button>
+<!-- ── Layout ───────────────────────────────────── -->
+<div class="layout">
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-section-label">Truy vấn</div>
+    <div class="nav-item active" onclick="switchTab('query',this)" data-tab="query">
+      <span class="nav-icon">📊</span> Query
     </div>
-    <div class="result-header">
-      <span class="result-label" id="queryLabel">Kết quả</span>
-      <button class="btn" onclick="clearResult('queryResult')" style="font-size:10px;padding:3px 8px;">Xoá</button>
+    <div class="nav-item" onclick="switchTab('layers',this)" data-tab="layers">
+      <span class="nav-icon">🗂</span> Layers
     </div>
-    <div class="result-box" id="queryResult"></div>
-  </div>
+    <div class="nav-divider"></div>
+    <div class="sidebar-section-label">Lệnh</div>
+    <div class="nav-item" onclick="switchTab('numbering',this)" data-tab="numbering">
+      <span class="nav-icon">🔢</span> AutoNumber
+    </div>
+    <div class="nav-item" onclick="switchTab('cleanup',this)" data-tab="cleanup">
+      <span class="nav-icon">🧹</span> Cleanup
+    </div>
+    <div class="nav-divider"></div>
+    <div class="sidebar-section-label">Trợ lý</div>
+    <div class="nav-item" onclick="switchTab('ai',this)" data-tab="ai">
+      <span class="nav-icon">🤖</span> AI Chat
+    </div>
+    <div class="nav-divider"></div>
+    <div class="sidebar-section-label">Nâng cao</div>
+    <div class="nav-item" onclick="switchTab('raw',this)" data-tab="raw">
+      <span class="nav-icon">⚡</span> Raw
+    </div>
+  </nav>
 
-  <!-- TAB: Layers -->
-  <div class="tab-content" id="tab-layers">
-    <div class="action-row" style="margin-bottom:10px;">
-      <button class="btn primary" onclick="loadLayers()">↻ Tải danh sách layers</button>
-      <div class="form-row" style="flex:1;margin:0;">
-        <input id="layerFilter" placeholder="Lọc theo tên..." oninput="filterLayers()" style="width:100%">
+  <!-- Content -->
+  <main class="content">
+
+    <!-- ── Query ──────────────────────────────── -->
+    <div class="panel-page active" id="tab-query">
+      <div class="page-title">📊 Query <small>Truy vấn bản vẽ hiện tại</small></div>
+
+      <div id="statCards" class="stat-grid" style="display:none"></div>
+
+      <div class="card">
+        <div class="card-header">Thông tin nhanh</div>
+        <div class="card-body">
+          <div class="query-grid">
+            <button class="qbtn" onclick="runQuery('drawing_info')">
+              <span class="qico">📄</span>Drawing Info
+            </button>
+            <button class="qbtn" onclick="runQuery('stats')">
+              <span class="qico">📈</span>Stats
+            </button>
+            <button class="qbtn" onclick="runQuery('layouts')">
+              <span class="qico">📋</span>Layouts
+            </button>
+            <button class="qbtn" onclick="runQuery('xrefs')">
+              <span class="qico">🔗</span>XRefs
+            </button>
+            <button class="qbtn" onclick="runQuery('text',{limit:20})">
+              <span class="qico">🔤</span>Text (20)
+            </button>
+            <button class="qbtn" onclick="runQuery('inserts',{limit:20})">
+              <span class="qico">📦</span>Inserts (20)
+            </button>
+            <button class="qbtn" onclick="runQuery('entities',{limit:10})">
+              <span class="qico">🔵</span>Entities (10)
+            </button>
+            <button class="qbtn" onclick="runQuery('blocks')">
+              <span class="qico">⬛</span>Blocks
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="result-wrap">
+        <div class="result-toolbar">
+          <span class="result-label-txt" id="queryLabel">Kết quả</span>
+          <button class="btn sm ghost" onclick="clearResult('queryResult')">✕ Xoá</button>
+        </div>
+        <div class="result-box" id="queryResult"></div>
       </div>
     </div>
-    <div id="layerCount" style="font-size:11px;color:var(--muted-foreground);margin-bottom:6px;"></div>
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead><tr>
-          <th>Tên</th><th>Màu</th><th>Linetype</th><th>On</th><th>Frozen</th><th>Locked</th><th>Plot</th>
-        </tr></thead>
-        <tbody id="layerBody"></tbody>
-      </table>
-    </div>
-    <div class="divider"></div>
-    <div class="action-row">
-      <button class="btn" onclick="exportLayers()">💾 Xuất CSV</button>
-      <span id="exportMsg" style="font-size:11px;color:var(--muted-foreground);"></span>
-    </div>
-  </div>
 
-  <!-- TAB: AutoNumbering -->
-  <div class="tab-content" id="tab-numbering">
-    <div class="form-row">
-      <label>Block Name</label>
-      <input id="n_block" placeholder="vd: Dau Cat" value="Dau Cat">
-    </div>
-    <div class="form-row">
-      <label>Attribute Tag</label>
-      <input id="n_tag" placeholder="để trống = attribute đầu tiên" value="A">
-    </div>
-    <div class="form-row">
-      <label>Prefix</label>
-      <input id="n_prefix" placeholder="vd: DC" value="DC">
-    </div>
-    <div class="form-row">
-      <label>Bắt đầu từ</label>
-      <input id="n_start" type="number" value="1" min="1">
-    </div>
-    <div class="form-row">
-      <label>Bước nhảy</label>
-      <input id="n_step" type="number" value="1" min="1">
-    </div>
-    <div class="form-row">
-      <label>Pad width</label>
-      <input id="n_pad" type="number" value="0" min="0" placeholder="0 = không pad">
-    </div>
-    <label class="checkbox-row">
-      <input type="checkbox" id="n_dry" checked>
-      Xem trước (DryRun) — không ghi thật
-    </label>
-    <div class="action-row">
-      <button class="btn primary" onclick="runNumbering()">▶ Chạy AutoNumbering</button>
-      <span id="numBadge"></span>
-    </div>
-    <div class="divider"></div>
-    <div class="result-header">
-      <span class="result-label" id="numLabel">Kết quả</span>
-      <button class="btn" onclick="clearResult('numResult')" style="font-size:10px;padding:3px 8px;">Xoá</button>
-    </div>
-    <div class="result-box" id="numResult"></div>
-  </div>
+    <!-- ── Layers ─────────────────────────────── -->
+    <div class="panel-page" id="tab-layers">
+      <div class="page-title">🗂 Layers <small>Quản lý các lớp bản vẽ</small></div>
 
-  <!-- TAB: Cleanup -->
-  <div class="tab-content" id="tab-cleanup">
-    <label class="checkbox-row"><input type="checkbox" id="cl_purge" checked> Xoá layer/block/linetype không dùng</label>
-    <label class="checkbox-row"><input type="checkbox" id="cl_audit" checked> Audit & sửa lỗi database</label>
-    <label class="checkbox-row"><input type="checkbox" id="cl_dry" checked> Xem trước (DryRun) — không xoá thật</label>
-    <div class="action-row" style="margin-top:8px;">
-      <button class="btn primary" onclick="runCleanup()">▶ Chạy DrawingCleanup</button>
-      <span id="cleanBadge"></span>
-    </div>
-    <div class="divider"></div>
-    <div class="result-header">
-      <span class="result-label" id="cleanLabel">Kết quả</span>
-      <button class="btn" onclick="clearResult('cleanResult')" style="font-size:10px;padding:3px 8px;">Xoá</button>
-    </div>
-    <div class="result-box" id="cleanResult"></div>
-  </div>
+      <div class="card">
+        <div class="card-body" style="display:flex; flex-direction:column; gap:10px;">
+          <div class="layers-toolbar">
+            <button class="btn primary" onclick="loadLayers()">↻ Tải layers</button>
+            <div class="search-wrap">
+              <span class="search-ico">🔍</span>
+              <input class="search-field field" id="layerFilter" placeholder="Lọc tên layer..." oninput="filterLayers()">
+            </div>
+            <button class="btn" onclick="exportLayers()">💾 Xuất CSV</button>
+          </div>
+          <div id="layerCount" style="font-size:11px;color:var(--muted);"></div>
 
-  <!-- TAB: Raw -->
-  <div class="tab-content" id="tab-raw">
-    <div style="font-size:11px;color:var(--muted-foreground);margin-bottom:6px;">
-      Gửi JSON thẳng tới bridge. Endpoint:
-      <code style="background:var(--card);padding:1px 5px;border-radius:3px;">localhost:8766</code>
+          <div class="tbl-wrap">
+            <table class="data-table">
+              <thead><tr>
+                <th>Tên</th><th>Màu</th><th>Linetype</th><th>On</th><th>Frozen</th><th>Locked</th><th>Plot</th>
+              </tr></thead>
+              <tbody id="layerBody">
+                <tr><td colspan="7"><div class="empty-state"><span class="empty-ico">🗂</span>Chưa tải dữ liệu — nhấn "Tải layers"</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="exportMsg" style="font-size:11px;color:var(--muted);"></div>
+        </div>
+      </div>
     </div>
-    <div class="form-row">
-      <label>Endpoint</label>
-      <select id="rawEndpoint">
-        <option value="/health">GET /health</option>
-        <option value="/query" selected>POST /query</option>
-        <option value="/execute">POST /execute</option>
-      </select>
-    </div>
-    <div style="font-size:11px;color:var(--muted-foreground);margin-bottom:4px;">Body JSON:</div>
-    <textarea class="raw-area" id="rawBody">{"query": "stats"}</textarea>
-    <div class="action-row" style="margin-top:8px;">
-      <button class="btn primary" onclick="runRaw()">▶ Gửi</button>
-      <button class="btn" onclick="formatRaw()">{ } Format</button>
-      <div style="flex:1"></div>
-      <span style="font-size:10px;color:var(--muted-foreground)" id="rawTime"></span>
-    </div>
-    <div class="divider"></div>
-    <div class="result-header">
-      <span class="result-label" id="rawLabel">Kết quả</span>
-      <button class="btn" onclick="clearResult('rawResult')" style="font-size:10px;padding:3px 8px;">Xoá</button>
-    </div>
-    <div class="result-box" id="rawResult"></div>
-  </div>
 
+    <!-- ── AutoNumbering ──────────────────────── -->
+    <div class="panel-page" id="tab-numbering">
+      <div class="page-title">🔢 AutoNumbering <small>Đánh số block attribute</small></div>
+
+      <div class="card">
+        <div class="card-header">Cấu hình</div>
+        <div class="card-body">
+          <div class="form-section">
+            <div class="form-row">
+              <label class="form-label">Block Name</label>
+              <input class="field" id="n_block" placeholder="vd: Dau Cat" value="Dau Cat">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Attribute Tag</label>
+              <input class="field" id="n_tag" placeholder="để trống = attribute đầu tiên" value="A">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Prefix</label>
+              <input class="field" id="n_prefix" placeholder="vd: DC" value="DC">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Bắt đầu từ</label>
+              <input class="field" id="n_start" type="number" value="1" min="1">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Bước nhảy</label>
+              <input class="field" id="n_step" type="number" value="1" min="1">
+            </div>
+            <div class="form-row">
+              <label class="form-label">Pad width</label>
+              <input class="field" id="n_pad" type="number" value="0" min="0" placeholder="0 = không pad">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">Chế độ chạy</div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:8px;">
+          <label class="toggle-row">
+            <input type="checkbox" id="n_dry" checked>
+            Xem trước (DryRun) — không ghi thật
+          </label>
+          <div class="toggle-desc">Bật DryRun để xem kết quả trước khi ghi thực sự vào bản vẽ.</div>
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button class="btn primary" onclick="runNumbering()">▶ Chạy AutoNumbering</button>
+        <span id="numBadge"></span>
+      </div>
+
+      <div class="result-wrap">
+        <div class="result-toolbar">
+          <span class="result-label-txt" id="numLabel">Kết quả</span>
+          <button class="btn sm ghost" onclick="clearResult('numResult')">✕ Xoá</button>
+        </div>
+        <div class="result-box" id="numResult"></div>
+      </div>
+    </div>
+
+    <!-- ── Cleanup ────────────────────────────── -->
+    <div class="panel-page" id="tab-cleanup">
+      <div class="page-title">🧹 Drawing Cleanup <small>Dọn dẹp bản vẽ</small></div>
+
+      <div class="card">
+        <div class="card-header">Tùy chọn</div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
+          <label class="toggle-row">
+            <input type="checkbox" id="cl_purge" checked>
+            Xoá layer / block / linetype không dùng
+          </label>
+          <label class="toggle-row">
+            <input type="checkbox" id="cl_audit" checked>
+            Audit &amp; sửa lỗi database bản vẽ
+          </label>
+          <div class="divider"></div>
+          <div style="display:flex;gap:10px;align-items:flex-start;color:var(--yellow);font-size:12px;line-height:1.5;">
+            <span style="font-size:16px">⚠</span>
+            <span><strong>Xoá thật sẽ thay đổi bản vẽ.</strong><br><span style="color:var(--muted)">Nên chạy Xem trước trước, sau đó dùng nút đỏ để xác nhận xoá.</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button class="btn primary" id="cleanupPreviewBtn" onclick="runCleanup(true)">👁 Xem trước — không xoá</button>
+        <button class="btn danger-solid" id="cleanupDeleteBtn" onclick="confirmRealCleanup()">🗑 XOÁ THẬT</button>
+        <span id="cleanBadge"></span>
+      </div>
+
+      <div class="result-wrap">
+        <div class="result-toolbar">
+          <span class="result-label-txt" id="cleanLabel">Kết quả</span>
+          <button class="btn sm ghost" onclick="clearResult('cleanResult')">✕ Xoá</button>
+        </div>
+        <div class="result-box" id="cleanResult"></div>
+      </div>
+    </div>
+
+    <!-- ── AI Chat ───────────────────────────── -->
+    <div class="panel-page" id="tab-ai">
+      <div class="page-title">🤖 AI Chat <small>Giao tiếp với trợ lý AutoCAD</small></div>
+
+      <div class="card" style="flex:1;display:flex;flex-direction:column;min-height:0;">
+        <div class="card-header">
+          Trợ lý AutoCAD AI
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="badge badge-done" id="aiModelBadge">Hermes</span>
+            <button class="btn sm ghost" onclick="clearChat()" title="Xoá lịch sử">🗑 Xoá</button>
+          </div>
+        </div>
+
+        <!-- Messages -->
+        <div class="chat-messages" id="chatMessages">
+          <div class="chat-msg ai">
+            <div class="chat-avatar">🤖</div>
+            <div class="chat-bubble">
+              Xin chào! Tôi là trợ lý AutoCAD. Tôi có thể giúp bạn:<br><br>
+              • Truy vấn thông tin bản vẽ (layers, blocks, entities...)<br>
+              • Thực thi lệnh AutoCAD qua bridge<br>
+              • Giải thích kết quả và gợi ý thao tác<br><br>
+              Hãy mô tả điều bạn muốn làm bằng tiếng Việt hoặc tiếng Anh!
+            </div>
+          </div>
+        </div>
+
+        <!-- Suggestions -->
+        <div class="chat-suggestions" id="chatSuggestions">
+          <button class="suggestion-chip" onclick="sendSuggestion(this)">📄 Xem thông tin bản vẽ</button>
+          <button class="suggestion-chip" onclick="sendSuggestion(this)">🗂 Liệt kê tất cả layers</button>
+          <button class="suggestion-chip" onclick="sendSuggestion(this)">📊 Thống kê entities</button>
+          <button class="suggestion-chip" onclick="sendSuggestion(this)">🧹 Dọn dẹp bản vẽ</button>
+          <button class="suggestion-chip" onclick="sendSuggestion(this)">🔢 AutoNumbering block</button>
+        </div>
+
+        <!-- Input -->
+        <div class="chat-input-wrap">
+          <textarea class="chat-input" id="chatInput" placeholder="Nhập câu hỏi hoặc lệnh... (Enter gửi, Shift+Enter xuống dòng)" rows="1"
+            onkeydown="handleChatKey(event)" oninput="autoResize(this)"></textarea>
+          <button class="chat-send-btn" id="chatSendBtn" onclick="sendChat()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Raw ────────────────────────────────── -->
+    <div class="panel-page" id="tab-raw">
+      <div class="page-title">⚡ Raw <small>Gửi JSON trực tiếp tới bridge</small></div>
+
+      <div class="card">
+        <div class="card-header">
+          Endpoint
+          <span class="endpoint-badge">localhost:8766</span>
+        </div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
+          <div class="form-row">
+            <label class="form-label">Method / Path</label>
+            <select class="field" id="rawEndpoint">
+              <option value="/health">GET /health</option>
+              <option value="/query" selected>POST /query</option>
+              <option value="/execute">POST /execute</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Request Body (JSON)</div>
+            <textarea class="field" id="rawBody">{"query": "stats"}</textarea>
+          </div>
+          <div class="action-row">
+            <button class="btn primary" onclick="runRaw()">▶ Gửi</button>
+            <button class="btn" onclick="formatRaw()">{ } Format</button>
+            <span class="timing" id="rawTime"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="result-wrap">
+        <div class="result-toolbar">
+          <span class="result-label-txt" id="rawLabel">Kết quả</span>
+          <button class="btn sm ghost" onclick="clearResult('rawResult')">✕ Xoá</button>
+        </div>
+        <div class="result-box" id="rawResult"></div>
+      </div>
+    </div>
+
+  </main>
 </div>
 
 <script>
-const BASE = 'http://localhost:8766';
+const BASE = 'http://127.0.0.1:8767';
+const PANEL_TOKEN = '__PANEL_TOKEN__';
 let allLayers = [];
 
-// ── Helpers ─────────────────────────────────────
+// ── Helpers ──────────────────────────────────────
 async function apiFetch(path, body) {
   const opts = body
-    ? { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }
+    ? { method:'POST', headers:{'Content-Type':'application/json', 'X-Panel-Token':PANEL_TOKEN}, body: JSON.stringify(body) }
     : { method:'GET' };
   const r = await fetch(BASE + path, opts);
   return r.json();
 }
 
 function setLoading(el, msg = 'Đang tải...') {
-  el.innerHTML = `<span class="spinner"></span><span class="loading">${msg}</span>`;
+  el.innerHTML = `<span class="spinner"></span><span class="loading-txt">${msg}</span>`;
 }
 
 function clearResult(id) { document.getElementById(id).innerHTML = ''; }
 
 function syntaxHL(json) {
-  return JSON.stringify(json, null, 2)
-    .replace(/("[\w\s\u00C0-\u024F\u1E00-\u1EFF]+")(\s*:)/g,
+  return escHtml(JSON.stringify(json, null, 2))
+    .replace(/(\"[\w\s\u00C0-\u024F\u1E00-\u1EFF]+\")(\s*:)/g,
       '<span class="key">$1</span>$2')
-    .replace(/:\s*("([^"]*)")/g,
+    .replace(/:\s*(\"([^\"]*)\")/g,
       ': <span class="str">"$2"</span>')
     .replace(/:\s*(\d+\.?\d*)/g,
       ': <span class="num">$1</span>')
@@ -450,36 +1017,40 @@ function showResult(elId, data, labelId, labelText) {
 
 // ── Health ───────────────────────────────────────
 async function healthCheck() {
-  const dot = document.getElementById('dot');
-  const txt = document.getElementById('statusText');
-  dot.className = 'status-dot';
-  txt.textContent = 'Kiểm tra...';
+  const pill = document.getElementById('statusPill');
+  const txt  = document.getElementById('statusText');
+  const btn  = document.getElementById('pingBtn');
+  pill.className = 'status-pill';
+  txt.textContent = 'Đang kiểm tra...';
+  btn.classList.add('loading');
   try {
     const d = await apiFetch('/health');
+    btn.classList.remove('loading');
     if (d.status === 'ok') {
-      dot.className = 'status-dot alive';
-      txt.textContent = `✓ ${d.app} — port ${d.port}`;
+      pill.className = 'status-pill alive';
+      txt.textContent = `${d.app || 'Bridge'} :${d.port || 8766}`;
     } else {
-      dot.className = 'status-dot dead';
+      pill.className = 'status-pill dead';
       txt.textContent = 'Phản hồi lạ';
     }
   } catch(e) {
-    dot.className = 'status-dot dead';
+    btn.classList.remove('loading');
+    pill.className = 'status-pill dead';
     txt.textContent = 'Không kết nối được';
   }
 }
 
 // ── Tabs ─────────────────────────────────────────
 function switchTab(name, el) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel-page').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('tab-' + name).classList.add('active');
 }
 
 // ── Query Tab ────────────────────────────────────
 async function runQuery(type, config) {
-  const el = document.getElementById('queryResult');
+  const el  = document.getElementById('queryResult');
   const lbl = document.getElementById('queryLabel');
   setLoading(el);
   lbl.textContent = type + '…';
@@ -487,7 +1058,6 @@ async function runQuery(type, config) {
     const body = config ? { query: type, config } : { query: type };
     const d = await apiFetch('/query', body);
 
-    // Render stat-cards for 'stats'
     if (type === 'stats' && d.byType) {
       const cards = document.getElementById('statCards');
       cards.style.display = 'grid';
@@ -496,9 +1066,9 @@ async function runQuery(type, config) {
         ...d.byType.slice(0,5).map(t => [t.type, t.count, ''])
       ].map(([l,v,s]) => `
         <div class="stat-card">
-          <div class="stat-card-label">${l}</div>
-          <div class="stat-card-value">${v?.toLocaleString?.() ?? v}</div>
-          <div class="stat-card-sub">${s}</div>
+          <div class="stat-label">${escHtml(l)}</div>
+          <div class="stat-value">${escHtml(v?.toLocaleString?.() ?? v)}</div>
+          <div class="stat-sub">${escHtml(s)}</div>
         </div>`).join('');
     } else {
       document.getElementById('statCards').style.display = 'none';
@@ -506,37 +1076,46 @@ async function runQuery(type, config) {
 
     showResult('queryResult', d, 'queryLabel', `${type} — ${new Date().toLocaleTimeString('vi')}`);
   } catch(e) {
-    el.innerHTML = `<span class="err">Lỗi: ${e.message}</span>`;
+    el.innerHTML = `<span class="err">Lỗi: ${escHtml(e.message)}</span>`;
   }
 }
 
 // ── Layers Tab ───────────────────────────────────
 async function loadLayers() {
   const tbody = document.getElementById('layerBody');
-  tbody.innerHTML = '<tr><td colspan="7" style="padding:12px;color:var(--muted-foreground)"><span class="spinner"></span> Đang tải...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="7" style="padding:16px"><span class="spinner"></span><span class="loading-txt">Đang tải layers...</span></td></tr>';
   try {
     const d = await apiFetch('/query', { query: 'layers' });
     allLayers = d.layers || [];
     document.getElementById('layerCount').textContent =
-      `${allLayers.length} layers — lọc bằng ô tìm kiếm bên trên`;
+      `${allLayers.length} layer${allLayers.length !== 1 ? 's' : ''} — dùng ô tìm kiếm để lọc`;
     renderLayerTable(allLayers);
   } catch(e) {
-    tbody.innerHTML = `<tr><td colspan="7" style="color:#ef4444;padding:8px">${e.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="padding:12px;color:var(--red)">${escHtml(e.message)}</td></tr>`;
   }
 }
 
-function colorSwatch(idx) {
+function colorSwatch(value) {
+  const parsed = Number(value);
+  const idx = Number.isFinite(parsed) ? Math.max(0, Math.min(255, Math.trunc(parsed))) : 7;
   const acad = {1:'#ff0000',2:'#ffff00',3:'#00ff00',4:'#00ffff',5:'#0000ff',6:'#ff00ff',7:'#ffffff'};
   const c = acad[idx] || `hsl(${(idx*37)%360},70%,55%)`;
-  return `<span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:${c};border:1px solid #0003;vertical-align:middle;margin-right:4px"></span>${idx}`;
+  return `<span style="display:inline-flex;align-items:center;gap:5px;">
+    <span style="display:inline-block;width:11px;height:11px;border-radius:2px;background:${c};border:1px solid rgba(255,255,255,.15);flex-shrink:0"></span>
+    <span style="color:var(--muted);font-size:11px">${idx}</span>
+  </span>`;
 }
 
 function renderLayerTable(layers) {
+  if (!layers.length) {
+    document.getElementById('layerBody').innerHTML = '<tr><td colspan="7"><div class="empty-state"><span class="empty-ico">🔍</span>Không tìm thấy layer phù hợp</div></td></tr>';
+    return;
+  }
   document.getElementById('layerBody').innerHTML = layers.map(l => `
     <tr>
-      <td style="font-weight:${l.name==='0'?700:400}">${l.name}</td>
+      <td style="font-weight:${l.name==='0'?700:500};font-family:var(--mono);font-size:12px">${escHtml(l.name ?? '')}</td>
       <td>${colorSwatch(l.colorIndex)}</td>
-      <td style="color:var(--muted-foreground)">${l.linetype}</td>
+      <td style="color:var(--muted);font-family:var(--mono);font-size:11px">${escHtml(l.linetype ?? '')}</td>
       <td class="${l.isOff?'dot-off':'dot-on'}">${l.isOff ? '○' : '●'}</td>
       <td class="${l.isFrozen?'dot-off':'dot-on'}">${l.isFrozen ? '❄' : '—'}</td>
       <td class="${l.isLocked?'dot-off':'dot-on'}">${l.isLocked ? '🔒' : '—'}</td>
@@ -551,12 +1130,22 @@ function filterLayers() {
 
 async function exportLayers() {
   const msg = document.getElementById('exportMsg');
-  msg.textContent = 'Đang xuất...';
-  const out = 'C:/Users/liend/AppData/Local/Temp/dhcb_layers_export.csv';
+  msg.textContent = '↻ Đang xuất...';
+  msg.style.color = 'var(--muted)';
+  const out = 'dhcb_layers_export.csv';
   try {
     const d = await apiFetch('/execute', { command:'LayerExport', config:{ outputPath: out } });
-    msg.textContent = d.success ? `✓ ${d.summary}` : `✗ ${d.errors?.[0] || 'Lỗi'}`;
-  } catch(e) { msg.textContent = `✗ ${e.message}`; }
+    if (d.success) {
+      msg.textContent = `✓ ${d.summary}`;
+      msg.style.color = 'var(--green)';
+    } else {
+      msg.textContent = `✗ ${d.errors?.[0] || 'Lỗi không xác định'}`;
+      msg.style.color = 'var(--red)';
+    }
+  } catch(e) {
+    msg.textContent = `✗ ${e.message}`;
+    msg.style.color = 'var(--red)';
+  }
 }
 
 // ── AutoNumbering Tab ─────────────────────────────
@@ -574,42 +1163,77 @@ async function runNumbering() {
     dryRun:       isDry
   };
 
+  if (!isDry && !confirm('XÁC NHẬN GHI THẬT\n\nAutoNumbering sẽ thay đổi attribute trong bản vẽ. Bạn có chắc muốn tiếp tục?')) {
+    return;
+  }
+
   badge.innerHTML = '';
   setLoading(el);
   try {
-    const d = await apiFetch('/execute', { command: 'AutoNumbering', config });
+    const request = { command: 'AutoNumbering', config };
+    if (!isDry) request.confirmation = 'WRITE_AUTONUMBER';
+    const d = await apiFetch('/execute', request);
     badge.innerHTML = isDry
-      ? '<span class="dry-badge">DRY RUN</span>'
-      : (d.success ? '<span class="ok-badge">ĐÃ GHI</span>' : '');
+      ? '<span class="badge badge-dry">⚠ DRY RUN</span>'
+      : (d.success ? '<span class="badge badge-done">✓ ĐÃ GHI</span>' : '<span class="badge badge-err">✗ THẤT BẠI</span>');
     showResult('numResult', d, 'numLabel',
       `AutoNumbering — ${d.affectedCount} blocks — ${new Date().toLocaleTimeString('vi')}`);
   } catch(e) {
-    el.innerHTML = `<span class="err">${e.message}</span>`;
+    el.innerHTML = `<span class="err">${escHtml(e.message)}</span>`;
   }
 }
 
 // ── Cleanup Tab ──────────────────────────────────
-async function runCleanup() {
+function confirmRealCleanup() {
+  const purge = document.getElementById('cl_purge').checked;
+  const audit = document.getElementById('cl_audit').checked;
+  if (!purge && !audit) {
+    alert('Hãy chọn ít nhất một tác vụ Cleanup.');
+    return;
+  }
+  const tasks = [
+    purge ? '• Xoá layer / block / linetype không dùng' : '',
+    audit ? '• Audit và sửa lỗi database bản vẽ' : ''
+  ].filter(Boolean).join('\n');
+  const accepted = confirm(
+    'XÁC NHẬN XOÁ THẬT\n\n' + tasks +
+    '\n\nThao tác này sẽ ghi trực tiếp vào bản vẽ AutoCAD. Bạn có chắc muốn tiếp tục?'
+  );
+  if (accepted) runCleanup(false);
+}
+
+async function runCleanup(isDry = true) {
   const el = document.getElementById('cleanResult');
   const badge = document.getElementById('cleanBadge');
-  const isDry = document.getElementById('cl_dry').checked;
+  const previewBtn = document.getElementById('cleanupPreviewBtn');
+  const deleteBtn = document.getElementById('cleanupDeleteBtn');
   const config = {
     purgeUnused: document.getElementById('cl_purge').checked,
     auditErrors: document.getElementById('cl_audit').checked,
     dryRun: isDry
   };
 
-  badge.innerHTML = '';
-  setLoading(el);
+  badge.innerHTML = isDry
+    ? '<span class="badge badge-dry">⚠ ĐANG XEM TRƯỚC</span>'
+    : '<span class="badge badge-err">⏳ ĐANG XOÁ THẬT</span>';
+  previewBtn.disabled = true;
+  deleteBtn.disabled = true;
+  setLoading(el, isDry ? 'Đang xem trước...' : 'Đang xoá thật trong AutoCAD...');
   try {
-    const d = await apiFetch('/execute', { command: 'DrawingCleanup', config });
+    const request = { command: 'DrawingCleanup', config };
+    if (!isDry) request.confirmation = 'DELETE_UNUSED';
+    const d = await apiFetch('/execute', request);
     badge.innerHTML = isDry
-      ? '<span class="dry-badge">DRY RUN</span>'
-      : (d.success ? '<span class="ok-badge">ĐÃ XOÁ</span>' : '');
+      ? '<span class="badge badge-dry">⚠ DRY RUN — CHƯA XOÁ</span>'
+      : (d.success ? '<span class="badge badge-done">✓ ĐÃ XOÁ THẬT</span>' : '<span class="badge badge-err">✗ XOÁ THẤT BẠI</span>');
     showResult('cleanResult', d, 'cleanLabel',
-      `Cleanup — ${d.affectedCount} objects — ${new Date().toLocaleTimeString('vi')}`);
+      `${isDry ? 'Xem trước' : 'ĐÃ XOÁ THẬT'} — ${d.affectedCount || 0} objects — ${new Date().toLocaleTimeString('vi')}`);
   } catch(e) {
-    el.innerHTML = `<span class="err">${e.message}</span>`;
+    badge.innerHTML = '<span class="badge badge-err">✗ THẤT BẠI</span>';
+    el.innerHTML = `<span class="err">${escHtml(e.message)}</span>`;
+  } finally {
+    previewBtn.disabled = false;
+    deleteBtn.disabled = false;
   }
 }
 
@@ -627,7 +1251,7 @@ async function runRaw() {
     document.getElementById('rawTime').textContent = `${ms}ms`;
     showResult('rawResult', d, 'rawLabel', `${ep} — ${ms}ms`);
   } catch(e) {
-    el.innerHTML = `<span class="err">${e.message}</span>`;
+    el.innerHTML = `<span class="err">${escHtml(e.message)}</span>`;
   }
 }
 
@@ -636,6 +1260,119 @@ function formatRaw() {
     const txt = document.getElementById('rawBody');
     txt.value = JSON.stringify(JSON.parse(txt.value), null, 2);
   } catch(_) {}
+}
+
+// ── AI Chat ──────────────────────────────────────
+const chatHistory = [];
+
+function addMsg(role, text) {
+  const wrap = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = `chat-msg ${role}`;
+  const avatar = role === 'ai' ? '🤖' : '👤';
+  div.innerHTML = `
+    <div class="chat-avatar">${avatar}</div>
+    <div class="chat-bubble"></div>`;
+  div.querySelector('.chat-bubble').textContent = String(text);
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+  return div.querySelector('.chat-bubble');
+}
+
+function addThinking() {
+  const wrap = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = 'chat-msg ai';
+  div.id = 'thinkingMsg';
+  div.innerHTML = `
+    <div class="chat-avatar">🤖</div>
+    <div class="chat-bubble thinking">
+      <div class="dots"><span></span><span></span><span></span></div>
+      Đang xử lý...
+    </div>`;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+function removeThinking() {
+  const el = document.getElementById('thinkingMsg');
+  if (el) el.remove();
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function processUserMessage(text) {
+  chatHistory.push({ role: 'user', content: text });
+  addMsg('user', text);
+  document.getElementById('chatSuggestions').style.display = 'none';
+
+  addThinking();
+  const sendButton = document.getElementById('chatSendBtn');
+  sendButton.disabled = true;
+
+  try {
+    const response = await apiFetch('/ai/chat', {
+      message: text,
+      history: chatHistory.slice(-8)
+    });
+    removeThinking();
+    if (!response.ok) throw new Error(response.error || 'AI không phản hồi');
+
+    chatHistory.push({ role: 'assistant', content: response.reply });
+    addMsg('ai', response.reply);
+
+    if (typeof response.autocadConnected === 'boolean') {
+      const pill = document.getElementById('statusPill');
+      const status = document.getElementById('statusText');
+      pill.className = response.autocadConnected ? 'status-pill alive' : 'status-pill dead';
+      status.textContent = response.autocadConnected ? 'AutoCAD đã kết nối' : 'Không kết nối được';
+    }
+  } catch (error) {
+    removeThinking();
+    addMsg('ai', `❌ Không gọi được Hermes AI: ${error.message}`);
+  } finally {
+    sendButton.disabled = false;
+  }
+}
+
+async function sendChat() {
+  const inp = document.getElementById('chatInput');
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = '';
+  inp.style.height = 'auto';
+  await processUserMessage(text);
+}
+
+function sendSuggestion(btn) {
+  const text = btn.textContent.replace(/^[^\s]+\s/, '').trim(); // strip emoji
+  document.getElementById('chatInput').value = btn.textContent;
+  sendChat();
+}
+
+function handleChatKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendChat();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function clearChat() {
+  chatHistory.length = 0;
+  const wrap = document.getElementById('chatMessages');
+  wrap.innerHTML = `
+    <div class="chat-msg ai">
+      <div class="chat-avatar">🤖</div>
+      <div class="chat-bubble">Lịch sử đã xoá. Tôi có thể giúp gì cho bạn?</div>
+    </div>`;
+  document.getElementById('chatSuggestions').style.display = 'flex';
 }
 
 // ── Init ─────────────────────────────────────────

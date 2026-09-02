@@ -54,10 +54,27 @@ Sau khi mở session mới, agent có thêm 5 tools:
 
 ```
 mcp-servers/autocad-tools/
-├── server.py      # MCP server (FastMCP)
+├── server.py      # MCP server (FastMCP), tự khởi động panel gateway
+├── panel_api.py   # CORS proxy + Hermes AI thật tại localhost:8767
 ├── panel.html     # Bảng điều khiển HTML (widget chat)
 └── README.md      # File này
 ```
+
+## Luồng kết nối panel
+
+```text
+panel.html (file:// → tự chuyển hướng sang gateway)
+    ↓ http://127.0.0.1:8767/panel (same-origin + token phiên)
+panel_api.py
+    ├── /health, /query, /execute → AutoCAD Bridge localhost:8766
+    └── /ai/chat → Hermes CLI/model đang cấu hình → truy vấn AutoCAD có kiểm soát
+```
+
+`server.py` tự khởi động `panel_api.py` nếu port 8767 chưa chạy. Gateway
+đọc `DHCB_BRIDGE_TOKEN` hoặc `%APPDATA%\DHCB\bridge-token.txt` để tương thích
+Bridge có Bearer authentication. AI Chat dùng provider/model hiện hành của Hermes.
+Các thao tác ghi/xóa không được AI Chat chạy trực tiếp — người dùng thực hiện
+trong tab AutoNumber hoặc Cleanup, mặc định DryRun để an toàn.
 
 ## Bridge endpoints (port 8766)
 
