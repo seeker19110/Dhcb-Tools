@@ -280,8 +280,19 @@ public class IntentCandidatesTests
     public void LenhMoi_NhanDangDuoc()
     {
         Assert.Equal("ColorByParameter", CommandIntentParser.Parse("tô màu theo tham số Fire Rating", CommandCatalog.Revit).Command);
-        Assert.Equal("LayerTranslate", CommandIntentParser.Parse("laytrans đổi layer theo chuẩn", CommandCatalog.AutoCad).Command);
         Assert.Equal("StylePurge", CommandIntentParser.Parse("xoá view template thừa", CommandCatalog.Revit).Command);
+    }
+
+    /// <summary>
+    /// Lệnh mới chỉ có đặc tả (<c>Pending</c>) không được lớp AI đề xuất — nếu không agent sẽ gọi
+    /// một lệnh không có trong Core. Khi LayerTranslate được viết, bỏ <c>.Pending()</c> trong
+    /// CommandCatalog và chuyển dòng này lên <see cref="LenhMoi_NhanDangDuoc"/>.
+    /// </summary>
+    [Fact]
+    public void LenhChuaTrienKhai_KhongDuocDeXuat()
+    {
+        Assert.Contains("LayerTranslate", CommandCatalog.PendingNames(CommandCatalog.AutoCad));
+        Assert.NotEqual("LayerTranslate", CommandIntentParser.Parse("laytrans đổi layer theo chuẩn", CommandCatalog.AutoCad).Command);
     }
 
     [Fact]

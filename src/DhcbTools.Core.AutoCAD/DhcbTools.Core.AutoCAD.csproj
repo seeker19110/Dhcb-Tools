@@ -12,6 +12,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- CommandCatalog (whitelist lệnh cho AI/MCP) dùng chung với Revit. -->
+    <ProjectReference Include="..\DhcbTools.Shared.Logic\DhcbTools.Shared.Logic.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!--
       Package chính thức của Autodesk trên NuGet — đóng gói AcMgd/AcCoreMgd/AcDbMgd
       theo từng năm phát hành, không cần cài AutoCAD trên máy build.
