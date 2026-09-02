@@ -18,7 +18,7 @@ public sealed class ElevationTagConfig
     public List<string> Categories { get; init; } = new List<string>();
 
     /// <summary>Level name to filter (empty = all levels).</summary>
-    public string LevelName { get; init; } = null;
+    public string? LevelName { get; init; } = null;
 
     /// <summary>If true, report changes without writing to the model.</summary>
     public bool DryRun { get; init; } = true;

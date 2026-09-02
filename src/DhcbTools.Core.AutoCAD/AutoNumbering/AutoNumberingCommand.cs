@@ -94,7 +94,12 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
             {
                 var attRef = (AttributeReference)transaction.GetObject(attId, OpenMode.ForRead);
 
-                if (!string.Equals(attRef.Tag, config.AttributeTag, StringComparison.OrdinalIgnoreCase))
+                // Khi AttributeTag rỗng → ghi vào attribute đầu tiên tìm thấy
+                var matchByTag = !string.IsNullOrEmpty(config.AttributeTag)
+                    && string.Equals(attRef.Tag, config.AttributeTag, StringComparison.OrdinalIgnoreCase);
+                var matchFirst = string.IsNullOrEmpty(config.AttributeTag);
+
+                if (!matchByTag && !matchFirst)
                 {
                     continue;
                 }

@@ -1,0 +1,19 @@
+{
+  "rules": [
+    { "category": "Doors",   "parameter": "Mark",        "required": true,  "pattern": "^D-\\d{3}$",           "description": "Mã cửa D-001…" },
+    { "category": "Windows", "parameter": "Mark",        "required": true,  "pattern": "^W-\\d{3}$" },
+    { "category": "Rooms",   "parameter": "Name",        "required": true },
+    { "category": "Rooms",   "parameter": "Number",      "required": true,  "pattern": "^\\d{2}\\.\\d{2}$",   "description": "Số phòng dạng Tầng.Phòng, ví dụ 03.12" },
+    { "category": "Walls",   "parameter": "Fire Rating", "required": false, "allowedValues": ["EI60", "EI90", "EI120"], "severity": "warning" },
+    { "category": "Ducts",   "parameter": "System Name", "required": true,  "pattern": "^MEC-[A-Z]{2,4}-.+" },
+    { "category": "Pipes",   "parameter": "System Name", "required": true }
+  ],
+  "thresholds": [
+    { "metric": "warnings",        "max": 200,  "description": "Checkset kiểu Autodesk Model Checker — số warning cho phép" },
+    { "metric": "unplacedViews",   "max": 50 },
+    { "metric": "fileSizeMb",      "max": 300,  "severity": "warning" },
+    { "metric": "inPlaceFamilies", "max": 0 },
+    { "metric": "missingLinks",    "max": 0 },
+    { "metric": "cadImports",      "max": 0,    "severity": "warning" }
+  ]
+}

@@ -1,0 +1,158 @@
+# CD: đóng gói bản Release thật cho từng phiên bản Revit/AutoCAD và phát hành lên GitHub Releases.
+# Chạy trên windows-latest (khác với tests.yml/check-build trên ubuntu) vì đây là build UseWPF thật —
+# runner Linux không có WindowsDesktop SDK cho net48. Không cần cài Revit/AutoCAD: mọi tham chiếu API
+# đều qua package NuGet (Nice3point.Revit.Api.RevitAPI*, AutoCAD.NET*).
+#
+# Kích hoạt: đẩy tag "vX.Y.Z" (ví dụ v1.0.0), hoặc chạy tay (workflow_dispatch) với input version.
+name: release
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Nhãn phiên bản cho gói (không có tag → dùng giá trị này, ví dụ 1.0.0-dev)'
+        required: false
+        default: 'dev'
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - id: v
+        shell: bash
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-revit:
+    needs: version
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        revit: [2023, 2024, 2025]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build DhcbTools.Revit (Revit ${{ matrix.revit }})
+        run: dotnet build src/DhcbTools.Revit/DhcbTools.Revit.csproj -c Release -p:RevitVersion=${{ matrix.revit }}
+
+      - name: Đóng gói
+        shell: pwsh
+        run: |
+          $tfm = if (${{ matrix.revit }} -ge 2025) { "net8.0-windows" } else { "net48" }
+          $out = "src/DhcbTools.Revit/bin/Release/$tfm"
+          $pkg = "dist/DhcbTools.Revit-${{ matrix.revit }}-${{ needs.version.outputs.version }}"
+          New-Item -ItemType Directory -Force -Path $pkg | Out-Null
+          Copy-Item "$out/DhcbTools.Revit.addin" $pkg
+          Copy-Item "$out/DhcbTools.Revit.dll", "$out/DhcbTools.Core.dll", "$out/DhcbTools.Shared.Logic.dll", `
+                    "$out/DhcbTools.Shared.Hosting.dll", "$out/Newtonsoft.Json.dll" $pkg
+          Copy-Item docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md $pkg
+          Compress-Archive -Path "$pkg/*" -DestinationPath "dist/DhcbTools.Revit-${{ matrix.revit }}-${{ needs.version.outputs.version }}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DhcbTools.Revit-${{ matrix.revit }}
+          path: dist/*.zip
+          if-no-files-found: error
+
+  build-autocad:
+    needs: version
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        acad: [2024, 2025]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build vỏ đầy đủ (AutoCAD ${{ matrix.acad }})
+        run: dotnet build src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj -c Release -p:RevitVersion=${{ matrix.acad }} -p:AcadVersion=${{ matrix.acad }}
+
+      - name: Build vỏ core-only cho accoreconsole (AutoCAD ${{ matrix.acad }})
+        run: dotnet build src/DhcbTools.AutoCAD.Core/DhcbTools.AutoCAD.Core.csproj -c Release -p:RevitVersion=${{ matrix.acad }} -p:AcadVersion=${{ matrix.acad }}
+
+      - name: Đóng gói
+        shell: pwsh
+        run: |
+          $tfm = if (${{ matrix.acad }} -ge 2025) { "net8.0-windows" } else { "net48" }
+          $pkg = "dist/DhcbTools.AutoCAD-${{ matrix.acad }}-${{ needs.version.outputs.version }}"
+          New-Item -ItemType Directory -Force -Path $pkg | Out-Null
+          $full = "src/DhcbTools.AutoCAD/bin/Release/$tfm"
+          Copy-Item "$full/DhcbTools.AutoCAD.dll", "$full/DhcbTools.Core.AutoCAD.dll", "$full/DhcbTools.Shared.Logic.dll", `
+                    "$full/DhcbTools.Shared.Hosting.dll", "$full/Newtonsoft.Json.dll" $pkg
+          $core = "src/DhcbTools.AutoCAD.Core/bin/Release/$tfm"
+          Copy-Item "$core/DhcbTools.AutoCAD.Core.dll" $pkg
+          Copy-Item docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md $pkg
+          Compress-Archive -Path "$pkg/*" -DestinationPath "dist/DhcbTools.AutoCAD-${{ matrix.acad }}-${{ needs.version.outputs.version }}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DhcbTools.AutoCAD-${{ matrix.acad }}
+          path: dist/*.zip
+          if-no-files-found: error
+
+  build-batchrunner:
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build BatchRunner
+        run: dotnet build src/DhcbTools.BatchRunner/DhcbTools.BatchRunner.csproj -c Release
+
+      - name: Đóng gói kèm script và job mẫu
+        shell: pwsh
+        run: |
+          $pkg = "dist/DhcbTools.BatchRunner-${{ needs.version.outputs.version }}"
+          New-Item -ItemType Directory -Force -Path "$pkg/jobs", "$pkg/configs", "$pkg/scripts" | Out-Null
+          Copy-Item src/DhcbTools.BatchRunner/bin/Release/net8.0/* $pkg -Recurse
+          Copy-Item jobs/*.json "$pkg/jobs"
+          Copy-Item configs/* "$pkg/configs"
+          Copy-Item scripts/*.py, scripts/*.ps1 "$pkg/scripts"
+          Copy-Item docs/batch-runner.md, docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md $pkg
+          Compress-Archive -Path "$pkg/*" -DestinationPath "dist/DhcbTools.BatchRunner-${{ needs.version.outputs.version }}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DhcbTools.BatchRunner
+          path: dist/*.zip
+          if-no-files-found: error
+
+  publish:
+    if: github.ref_type == 'tag'
+    needs: [version, build-revit, build-autocad, build-batchrunner]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Danh sách gói
+        run: ls -la dist
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true
+          name: DHCB Tools ${{ needs.version.outputs.version }}

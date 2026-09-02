@@ -1,118 +1,149 @@
 # DHCB Tools — Revit & AutoCAD
 
-Add-in **2-trong-1** (C#) tự động hoá các tác vụ lặp lại cho kỹ sư xây dựng, chạy trực tiếp trên
-**Revit desktop** và **AutoCAD desktop**. Xem nghiên cứu đầy đủ và lộ trình tại
-[`docs/nghien-cuu-dhcb-revit-tools.md`](docs/nghien-cuu-dhcb-revit-tools.md).
+Add-in **2-trong-1** (C#) tự động hoá các tác vụ lặp lại cho kỹ sư xây dựng, chạy trực tiếp trên **Revit desktop**
+và **AutoCAD desktop**, có **batch chạy đêm**, **HTTP Bridge/MCP cho agent AI**, và **lớp AI offline** (không dữ liệu
+nào rời máy). Nghiên cứu và lộ trình ở [`docs/nghien-cuu-dhcb-revit-tools.md`](docs/nghien-cuu-dhcb-revit-tools.md),
+hiện trạng ở [`docs/progress.md`](docs/progress.md).
 
 ## Cấu trúc solution
 
 ```
 Dhcb-Tools.sln
-Directory.Build.props              # multi-target: net48 / net8.0-windows; AcadRoot/RevitVersion
+Directory.Build.props              # multi-target net48 (Revit/AutoCAD ≤2024) / net8.0-windows (2025+)
 src/
+├── DhcbTools.Shared.Logic/        # Logic thuần, KHÔNG Revit/AutoCAD — có test xUnit
+│   ├── CsvText, NumericText, NumberingPlanner, MepLayout, FileNaming, HtmlText, BridgeAuth, CleanupDecider
+│   ├── Batch/      JobTokens, BatchJob, RunLog (JSONL), BatchReport (HTML), AcadScriptGen (accoreconsole)
+│   ├── Geometry/   GridClustering, GridNaming (trục từ bản CAD/Excel)
+│   ├── Mep/        RouteGraph, DevicePattern, DuctSizing, PipeSizing, SystemNaming, FlowNumbering, PathFinder3D
+│   ├── Checks/     RuleChecker, ClashAcceptance
+│   └── Ai/         CommandCatalog, CommandIntentParser, LayerMappingSuggester, SpecTextExtractor, WarningAnalyzer, OllamaClient
+├── DhcbTools.Shared.Hosting/      # CommandResult, ICoreCommand<TConfig,TDocument>, HttpBridgeServer (token, khoá, timeout)
 ├── DhcbTools.Core/                # Core Revit — logic thuần, KHÔNG TaskDialog/WPF
-│   ├── ICoreCommand.cs            # Document + config → CommandResult
-│   ├── CommandResult.cs
-│   ├── SilentFailuresPreprocessor.cs
-│   ├── ParameterSync/             # #1: xuất/nhập tham số qua CSV
-│   ├── ModelCleanup/              # #2: dọn view/sheet thừa
-│   └── AutoNumbering/             # #3: đánh số hàng loạt theo vị trí hình học
-│
-├── DhcbTools.Revit/               # Vỏ Revit: Ribbon, TaskDialog, WPF
-│   ├── App.cs                     # IExternalApplication — khởi động cả Ribbon + HTTP Bridge
-│   ├── DhcbTools.Revit.addin
-│   ├── Bridge/DhcbHttpBridge.cs   # HttpListener port 8765 — agent AI gọi lệnh Core qua HTTP
-│   ├── Commands/                  # IExternalCommand — vỏ mỏng gọi Core (kể cả Export/Health/MEPF/ProjectInit)
-│   └── UI/                        # WPF config windows
-│
-├── DhcbTools.Core.AutoCAD/        # Core AutoCAD — logic thuần, KHÔNG Editor/WPF
-│   ├── ICoreCommand.cs            # Database + config → CommandResult
-│   ├── CommandResult.cs
-│   ├── LayerSync/                 # #1: xuất/nhập layer qua CSV (≈ ParameterSync)
-│   ├── DrawingCleanup/            # #2: dọn layer/block/linetype thừa (≈ ModelCleanup)
-│   ├── AutoNumbering/             # #3: đánh số Block Reference theo attribute tag
-│   └── Query/                     # đọc ngữ cảnh drawing qua Bridge (không transaction ghi)
-│
-└── DhcbTools.AutoCAD/             # Vỏ AutoCAD: IExtensionApplication, CommandMethod
-    ├── App.cs                     # IExtensionApplication — khởi tạo plugin + HTTP Bridge
-    ├── Bridge/DhcbHttpBridge.cs   # HttpListener port 8766 — agent AI gọi lệnh Core qua HTTP
-    └── Commands/DhcbCommands.cs   # 4 lệnh: DHCB_LAYER_EXPORT/IMPORT, DHCB_CLEANUP, DHCB_AUTONUMBER
+│   ├── RevitCommandTable.cs       # dispatch theo tên lệnh — dùng chung Bridge/batch/Ribbon/AI
+│   ├── ParameterSync, ModelCleanup, AutoNumbering, Export, Health, Query
+│   ├── ProjectInit/               # Level, Grid, Family, ProjectInfo, ProjectFromTemplate, TransferStandards, GridFromCsv, SheetBatchCreate
+│   ├── MEPF/                      # Sleeve, ElevationTag, Hanger, PipeSplitter, ConnectorChecker,
+│   │                              #   RouteFromLines (A), DevicePlacement (B), Sizing, SystemColor/Name, FlowNumbering
+│   ├── Checks/                    # ParameterRuleCheck, ClashDetection
+│   ├── Updaters/                  # ElevationUpdater (IUpdater, tắt mặc định)
+│   ├── Ai/                        # CadLayerMap, SpecToConfig
+│   └── Batch/                     # BatchJobRunner (mở → chạy step → lưu → đóng)
+├── DhcbTools.Revit/               # Vỏ Revit: Ribbon 5 panel, Bridge 8765, hook batch, WPF (AutoNumbering, AI chat)
+├── DhcbTools.Core.AutoCAD/        # Core AutoCAD: AcadCommandTable, LayerSync, DrawingCleanup, AutoNumbering, Attributes,
+│                                  #   Text (TextReplace), Standards (LayerStandardCheck, GridExtract, XrefAudit, CadLayerMap), Query
+├── DhcbTools.AutoCAD/             # Vỏ AutoCAD: CommandMethod DHCB_*, Bridge 8766, DHCB_RUN cho batch, DHCB_AI
+├── DhcbTools.AutoCAD.Core/        # Vỏ core-only (AcDbMgd/AcCoreMgd, không AcMgd): DHCB_RUN cho accoreconsole
+└── DhcbTools.BatchRunner/         # Console chạy đêm (Revit qua add-in, AutoCAD qua accoreconsole), báo cáo, mã thoát
+scripts/  dhcb_agent.py · dhcb_mcp_server.py · dhcb_ai.py · install-nightly-task.ps1 · check-build.sh
+jobs/     nightly.sample.json · autocad-nightly.sample.json
+configs/  parameter-rules · layer-rules · ai · settings (mẫu)
+tests/    DhcbTools.Shared.Logic.Tests (340 test, chạy trên CI Linux)
 ```
 
-`DhcbTools.Core/Export`, `Health`, `MEPF`, `ProjectInit`, `Query` (Revit) — nhóm lệnh mở rộng từ
-khung nền tảng: batch export PDF/DWG/IFC/NWC, health report HTML, sleeve/tag cao độ/hanger/chia
-ống/connector checker cho MEPF, khởi tạo dự án (grid/level/family/project info), và query đọc
-ngữ cảnh model qua Bridge.
+## Lệnh
 
-`scripts/dhcb_agent.py` — client Python (không cần dependency ngoài) gọi HTTP Bridge từ terminal,
-Hermes, hoặc bất kỳ agent AI nào:
+Mọi lệnh có cùng chữ ký `Document/Database + config → CommandResult`, `dryRun` mặc định bật, chạy được từ 4 chỗ:
+Ribbon/dòng lệnh, HTTP Bridge, batch runner, lớp AI. Danh mục đầy đủ: `python scripts/dhcb_agent.py revit tools`.
+
+| Nhóm | Revit | AutoCAD |
+|---|---|---|
+| Dữ liệu ↔ CSV | `ParameterExport` / `ParameterImport` | `LayerExport` / `LayerImport`, `AttributeExport` / `AttributeImport` |
+| Dọn dẹp | `RemoveUnusedViews` | `DrawingCleanup` (an toàn: CLAYER, linetype của layer, xref) |
+| Đánh số | `AutoNumbering` (theo vị trí), `FlowNumbering` (theo dòng chảy) | `AutoNumbering` (block attribute) |
+| Xuất & báo cáo | `BatchExport` (PDF/DWG/IFC/NWC), `HealthReport` | `XrefAudit` |
+| Kiểm tra | `ParameterRuleCheck`, `ClashDetection` (+ `clash-accepted.json`), `ConnectorChecker` | `LayerStandardCheck`, `TextReplace` |
+| Dự án & hồ sơ | `ProjectFromTemplate`, `TransferStandards`, `LevelSetup`, `GridSetup`, `GridFromCsv`, `FamilyLoader`, `ProjectInfo`, `SheetBatchCreate` | `GridExtract` (layer AXIS → CSV cho `GridFromCsv`) |
+| MEPF | `SleeveAuto`, `ElevationTag`, `HangerAuto`, `PipeSplitter`, `RouteFromLines`, `DevicePlacement`, `SizingProposal` / `ApplySizing`, `SystemColor`, `SystemName` | — |
+| Hồ sơ & style (giai đoạn 7) | `SheetRename`, `RevisionOnSheets`, `StylePurge`, `ColorByParameter`, `FamilyAudit`, `WarningsExport`, `ScheduleExport`, `ViewportCopy` | `LayerTranslate`, `DrawingCompare`, `BlockQuantity`, `AttributeIncrement` |
+| MEPF nâng cao (P2) | `SlopePipes`, `PipeKick`, `SystemBom`, `AutoRoute` (mức C → mức A) | — |
+| AI offline | `CadLayerMap`, `SpecToConfig`, nút *Ra lệnh tiếng Việt* | `CadLayerMap`, `DHCB_AI` |
+
+Lệnh AutoCAD trên dòng lệnh: `DHCB` (trợ giúp), `DHCB_LAYER_EXPORT/IMPORT`, `DHCB_CLEANUP`, `DHCB_AUTONUMBER`,
+`DHCB_ATTR_EXPORT/IMPORT`, `DHCB_TEXT_REPLACE`, `DHCB_XREF_AUDIT`, `DHCB_GRID_EXTRACT`, `DHCB_LAYER_CHECK`,
+`DHCB_LAYERMAP`, `DHCB_LAYTRANS`, `DHCB_COMPARE`, `DHCB_BLOCKCOUNT`, `DHCB_ATTR_INC`, `DHCB_EXEC <Lệnh>` (config JSON),
+`DHCB_CFG <Lệnh>` (tạo config mẫu), `DHCB_AI`, `DHCB_RUN` (batch).
+
+Nút Ribbon Revit mới dùng chung một khuôn: đọc config ở `%APPDATA%\DHCB\configs\revit\<Lệnh>.json` (tự tạo mẫu lần
+đầu) → chạy **xem trước** → hỏi xác nhận → chạy thật.
+
+## HTTP Bridge, agent và MCP
+
+Revit `http://127.0.0.1:8765`, AutoCAD `http://127.0.0.1:8766`. Token sinh lần đầu ở `%APPDATA%\DHCB\bridge-token.txt`
+(header `Authorization: Bearer …`, sai 5 lần/60 s → khoá 5 phút). Endpoint: `GET /health`, `GET /tools`,
+`POST /execute`, `POST /query`, `POST /chat` (đề xuất lệnh từ tiếng Việt, không chạy). Lệnh client bỏ đi vì timeout
+**không** được chạy.
 
 ```bash
-python scripts/dhcb_agent.py revit Cleanup --dry-run
-python scripts/dhcb_agent.py autocad LayerExport --output C:/tmp/layers.csv
+python scripts/dhcb_agent.py revit tools
+python scripts/dhcb_agent.py revit chat "đánh số cửa tầng 3 tiền tố D- 3 chữ số"
+python scripts/dhcb_agent.py revit exec HangerAuto --config '{"hangerFamilyName":"DHCB_Hanger","spacingMm":2500}'
+python scripts/dhcb_agent.py autocad exec GridExtract --config '{"gridLayer":"AXIS","outputPath":"C:/tmp/grids.csv"}'
+python scripts/dhcb_mcp_server.py revit        # MCP server stdio cho Claude Desktop / Claude Code
 ```
 
-### Tương đồng giữa hai nền tảng
+Chi tiết lớp AI offline (heuristic mặc định, Ollama local tuỳ chọn): [`docs/ai-offline.md`](docs/ai-offline.md).
 
-| Revit                  | AutoCAD                  | Chức năng                          |
-|------------------------|--------------------------|------------------------------------|
-| `ParameterExport`      | `LayerExport`            | Xuất dữ liệu → CSV                 |
-| `ParameterImport`      | `LayerImport`            | Nhập CSV → ghi vào model/drawing   |
-| `RemoveUnusedViews`    | `DrawingCleanup`         | Dọn object thừa                    |
-| `AutoNumbering`        | `AutoNumbering`          | Đánh số hàng loạt theo toạ độ      |
+## Batch chạy đêm
+
+```powershell
+DhcbTools.BatchRunner.exe --job jobs\nightly.json --log-dir D:\DHCB\logs --max-minutes 480 --analyze
+.\scripts\install-nightly-task.ps1 -Job D:\DHCB\jobs\nightly.json -RunnerExe D:\DHCB\bin\DhcbTools.BatchRunner.exe -Time 23:00
+```
+
+Ra `run.jsonl`, `report.html`, `warnings-summary.md`; mã thoát 0/1/2 cho Task Scheduler. Chi tiết:
+[`docs/batch-runner.md`](docs/batch-runner.md).
 
 ## Build
 
-Yêu cầu Visual Studio 2022 (hoặc `dotnet build`) trên **Windows**.
-
 ```powershell
-# Build Revit (2021-2024)
-dotnet build Dhcb-Tools.sln -p:RevitVersion=2024
-
-# Build AutoCAD 2024
-dotnet build Dhcb-Tools.sln -p:AcadVersion=2024
-
-# Build tất cả cùng lúc (mỗi app một lần)
+# Windows có Revit/AutoCAD (bản đầy đủ, kèm WPF)
 dotnet build src/DhcbTools.Revit/DhcbTools.Revit.csproj      -p:RevitVersion=2024
-dotnet build src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj  -p:AcadVersion=2024
+dotnet build src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj  -p:RevitVersion=2024 -p:AcadVersion=2024
+dotnet build src/DhcbTools.BatchRunner/DhcbTools.BatchRunner.csproj
 ```
 
-**Packages NuGet dùng thay cho DLL local:**
-- Revit: `Nice3point.Revit.Api.RevitAPI` — không cần cài Revit trên máy build
-- AutoCAD: `AutoCAD.NET` (Autodesk chính thức) — không cần cài AutoCAD trên máy build
+```bash
+# Mọi hệ điều hành (CI): test logic thuần + biên dịch toàn bộ Core/vỏ bằng API package NuGet, không cần cài phần mềm
+dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj
+./scripts/check-build.sh
+```
+
+Packages: Revit `Nice3point.Revit.Api.RevitAPI/RevitAPIUI`, AutoCAD `AutoCAD.NET` (vỏ đầy đủ) và `AutoCAD.NET.Core/.Model`
+(Core + vỏ core-only). Revit 2021–2024 và AutoCAD ≤2024 dùng net48, 2025 dùng net8.0-windows; AutoCAD 2026.1+ (package
+25.1.x) đã sang .NET 10 — `Directory.Build.props` map `-p:AcadVersion` → phiên bản package.
+
+## CI/CD
+
+- **CI** (`.github/workflows/tests.yml`, ubuntu-latest, mọi push/PR): test `Shared.Logic` + `dotnet build` toàn bộ
+  Core/vỏ (kể cả vỏ core-only) bằng API package NuGet, `UseWPF=false` — bắt lỗi biên dịch không cần Windows.
+- **CD** (`.github/workflows/release.yml`, windows-latest, khi đẩy tag `vX.Y.Z` hoặc chạy tay): build **Release thật**
+  (đủ WPF) cho Revit 2023/2024/2025 và AutoCAD 2024/2025 + vỏ core-only, đóng gói zip kèm hướng dẫn cài đặt, và tạo
+  GitHub Release đính kèm toàn bộ gói.
+
+```powershell
+git tag v1.0.0 && git push origin v1.0.0   # kích hoạt release.yml
+```
+
+## Cài đặt và kiểm thử trên máy thật
+
+Quy trình đầy đủ (build → cài → file mẫu → checklist Revit/AutoCAD/batch/MCP → ghi kết quả):
+[`docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md).
 
 ## Triển khai (dev)
 
-### Revit
-Copy vào `%ProgramData%\Autodesk\Revit\Addins\<version>\`:
-- `DhcbTools.Revit.addin`
-- `DhcbTools.Revit.dll` + `DhcbTools.Core.dll`
-
-### AutoCAD
-Trong AutoCAD, gõ lệnh `NETLOAD` và chọn `DhcbTools.AutoCAD.dll`.  
-Hoặc thêm vào `%AppData%\Autodesk\ApplicationPlugins\` để tự động load.
-
-Các lệnh AutoCAD sau khi load:
-| Lệnh | Chức năng |
-|------|-----------|
-| `DHCB_LAYER_EXPORT` | Xuất toàn bộ layer ra CSV |
-| `DHCB_LAYER_IMPORT` | Nhập layer từ CSV vào drawing |
-| `DHCB_CLEANUP`      | Dọn layer rỗng, block/linetype không dùng |
-| `DHCB_AUTONUMBER`   | Đánh số hàng loạt Block Reference |
+- **Revit:** copy `DhcbTools.Revit.addin` + `DhcbTools.Revit.dll`, `DhcbTools.Core.dll`, `DhcbTools.Shared.*.dll`,
+  `Newtonsoft.Json.dll` vào `%ProgramData%\Autodesk\Revit\Addins\<version>\`.
+- **AutoCAD:** `NETLOAD DhcbTools.AutoCAD.dll` (kèm `DhcbTools.Core.AutoCAD.dll`, `DhcbTools.Shared.*.dll`), hoặc đặt vào
+  `%AppData%\Autodesk\ApplicationPlugins\`.
+- **Tuỳ chọn:** `%APPDATA%\DHCB\settings.json` (bật `ElevationUpdater`), `%APPDATA%\DHCB\ai.json` (model local) — mẫu trong `configs/`.
 
 ## Trạng thái
 
-**Đã xong**
-- Khung solution 2-trong-1 (Revit + AutoCAD), tách Core (logic thuần) khỏi vỏ UI.
-- 3 nhóm lệnh nền tảng trên cả hai nền tảng: đồng bộ dữ liệu qua CSV, dọn dẹp, đánh số hàng loạt.
-- HTTP Bridge cho agent AI: Revit port 8765, AutoCAD port 8766, kèm client `scripts/dhcb_agent.py`.
-- Batch export (PDF/DWG/IFC/NWC), health report, khởi tạo dự án (grid/level/family/project info).
-- MEPF phần nền tảng: sleeve tại giao cắt, tag cao độ, hanger, chia ống, connector checker.
-
-**Đang tới** — routing MEPF (mức A/B/C), `IUpdater` chạy theo sự kiện, lớp AI, batch runner chạy
-đêm theo lịch.
-
-Chi tiết:
-- [`docs/progress.md`](docs/progress.md) — hiện trạng đầy đủ và danh sách lỗi đã biết.
-- [`docs/roadmap.md`](docs/roadmap.md) — lộ trình theo giai đoạn.
-- [`docs/nghien-cuu-dhcb-revit-tools.md`](docs/nghien-cuu-dhcb-revit-tools.md) — khảo sát kỹ thuật.
+Toàn bộ giai đoạn 0–5, 6.1/6.2 của [`docs/dac-ta-tinh-nang.md`](docs/dac-ta-tinh-nang.md) và P1 giai đoạn 7
+([`docs/nghien-cuu-tool-thi-truong-va-ke-hoach.md`](docs/nghien-cuu-tool-thi-truong-va-ke-hoach.md) — khoảng trống so với
+pyRevit, DiRoots, Ideate, Colour Splasher, LAYTRANS, Drawing Compare, RevitBatchProcessor) đã có mã nguồn, biên dịch xanh
+với API Revit 2023/2024/2025 và AutoCAD 2024/2025, 340 test thuần xanh. P2 giai đoạn 7 (ống dốc, kick, BOM spool, AutoRoute,
+ScheduleExport, ViewportCopy, vỏ AutoCAD core-only) cũng đã có mã nguồn. **Chưa kiểm thử trên Revit/AutoCAD thật** cho
+các lệnh mới — kịch bản ở [`docs/dac-ta-kiem-thu.md`](docs/dac-ta-kiem-thu.md) §4. Chi tiết và lỗi còn mở:
+[`docs/progress.md`](docs/progress.md) · lộ trình: [`docs/roadmap.md`](docs/roadmap.md).

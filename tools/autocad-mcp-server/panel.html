@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--foreground);
+    min-width: 640px;
+  }
+
+  .panel {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+    border-bottom: 1px solid var(--border);
+  }
+  .header-title { font-weight: 700; font-size: 14px; flex: 1; }
+  .status-dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #6b7280;
+    transition: background .3s;
+    flex-shrink: 0;
+  }
+  .status-dot.alive { background: #22c55e; animation: pulse 2s infinite; }
+  .status-dot.dead  { background: #ef4444; }
+  @keyframes pulse {
+    0%,100% { opacity:1 } 50% { opacity:.4 }
+  }
+  .status-text { font-size: 11px; color: var(--muted-foreground); }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--card);
+  }
+  .tab {
+    padding: 7px 14px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--muted-foreground);
+    border-bottom: 2px solid transparent;
+    transition: color .15s;
+    white-space: nowrap;
+  }
+  .tab:hover { color: var(--foreground); }
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* Content */
+  .tab-content { display: none; padding: 12px 14px; }
+  .tab-content.active { display: block; }
+
+  /* Query buttons grid */
+  .query-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .btn {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--card);
+    color: var(--foreground);
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    text-align: center;
+    transition: background .15s, border-color .15s;
+  }
+  .btn:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: var(--accent); }
+  .btn:active { opacity: .7; }
+  .btn.primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .btn.primary:hover { opacity: .85; }
+  .btn.danger { border-color: #ef4444; color: #ef4444; }
+  .btn.danger:hover { background: rgba(239,68,68,.1); }
+
+  /* Form fields */
+  .form-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .form-row label {
+    min-width: 110px;
+    font-size: 11px;
+    color: var(--muted-foreground);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .form-row input, .form-row select {
+    flex: 1;
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--card);
+    color: var(--foreground);
+    font-family: inherit;
+    font-size: 12px;
+  }
+  .form-row input:focus, .form-row select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .checkbox-row input { width: 14px; height: 14px; cursor: pointer; }
+
+  /* Raw command */
+  .raw-area {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--card);
+    color: var(--foreground);
+    font-family: 'Consolas', monospace;
+    font-size: 11px;
+    resize: vertical;
+    min-height: 80px;
+  }
+  .raw-area:focus { outline: none; border-color: var(--accent); }
+
+  /* Result area */
+  .result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .result-label { font-size: 11px; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: .04em; }
+  .result-box {
+    background: color-mix(in srgb, var(--border) 30%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 10px;
+    font-family: 'Consolas', monospace;
+    font-size: 11px;
+    max-height: 260px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: var(--foreground);
+    scrollbar-width: thin;
+  }
+  .result-box:empty::before {
+    content: 'Kết quả sẽ hiển thị ở đây...';
+    color: var(--muted-foreground);
+    font-style: italic;
+  }
+  .result-box .ok    { color: #22c55e; }
+  .result-box .err   { color: #ef4444; }
+  .result-box .warn  { color: #f59e0b; }
+  .result-box .num   { color: #60a5fa; }
+  .result-box .key   { color: #a78bfa; }
+  .result-box .str   { color: #34d399; }
+
+  /* Stats mini-cards */
+  .stat-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+  }
+  .stat-card-label { font-size: 10px; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: .05em; }
+  .stat-card-value { font-size: 18px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .stat-card-sub   { font-size: 10px; color: var(--muted-foreground); }
+
+  /* Layer table */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .data-table th {
+    text-align: left;
+    padding: 4px 8px;
+    background: color-mix(in srgb, var(--border) 40%, transparent);
+    font-weight: 600;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--muted-foreground);
+    position: sticky; top: 0;
+  }
+  .data-table td { padding: 3px 8px; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+  .table-wrap { max-height: 220px; overflow-y: auto; scrollbar-width: thin; }
+  .dot-off { color: var(--muted-foreground); }
+  .dot-on  { color: #22c55e; }
+
+  /* Divider */
+  .divider { height: 1px; background: var(--border); margin: 10px 0; }
+
+  /* Spinner */
+  .spinner {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+    vertical-align: middle;
+    margin-right: 5px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading { color: var(--muted-foreground); font-size: 12px; }
+  .action-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .dry-badge {
+    font-size: 10px; padding: 2px 7px; border-radius: 10px;
+    background: #f59e0b22; color: #f59e0b; border: 1px solid #f59e0b44;
+    font-weight: 600;
+  }
+  .ok-badge {
+    font-size: 10px; padding: 2px 7px; border-radius: 10px;
+    background: #22c55e22; color: #22c55e; border: 1px solid #22c55e44;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+<div class="panel">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="status-dot" id="dot"></div>
+    <div class="header-title">🔧 AutoCAD Control Panel</div>
+    <div class="status-text" id="statusText">Đang kiểm tra...</div>
+    <button class="btn" onclick="healthCheck()" style="font-size:11px;padding:4px 10px;">↻ Ping</button>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('query',this)">📊 Query</div>
+    <div class="tab" onclick="switchTab('layers',this)">🗂 Layers</div>
+    <div class="tab" onclick="switchTab('numbering',this)">🔢 AutoNumbering</div>
+    <div class="tab" onclick="switchTab('cleanup',this)">🧹 Cleanup</div>
+    <div class="tab" onclick="switchTab('raw',this)">⚡ Raw</div>
+  </div>
+
+  <!-- TAB: Query -->
+  <div class="tab-content active" id="tab-query">
+    <div class="stat-cards" id="statCards" style="display:none"></div>
+    <div class="query-grid">
+      <button class="btn" onclick="runQuery('drawing_info')">📄 Drawing Info</button>
+      <button class="btn" onclick="runQuery('stats')">📈 Stats</button>
+      <button class="btn" onclick="runQuery('layouts')">📋 Layouts</button>
+      <button class="btn" onclick="runQuery('xrefs')">🔗 XRefs</button>
+      <button class="btn" onclick="runQuery('text',{limit:20})">🔤 Text (20)</button>
+      <button class="btn" onclick="runQuery('inserts',{limit:20})">📦 Inserts (20)</button>
+      <button class="btn" onclick="runQuery('entities',{limit:10})">🔵 Entities (10)</button>
+      <button class="btn" onclick="runQuery('blocks')">⬛ Blocks</button>
+    </div>
+    <div class="result-header">
+      <span class="result-label" id="queryLabel">Kết quả</span>
+      <button class="btn" onclick="clearResult('queryResult')" style="font-size:10px;padding:3px 8px;">Xoá</button>
+    </div>
+    <div class="result-box" id="queryResult"></div>
+  </div>
+
+  <!-- TAB: Layers -->
+  <div class="tab-content" id="tab-layers">
+    <div class="action-row" style="margin-bottom:10px;">
+      <button class="btn primary" onclick="loadLayers()">↻ Tải danh sách layers</button>
+      <div class="form-row" style="flex:1;margin:0;">
+        <input id="layerFilter" placeholder="Lọc theo tên..." oninput="filterLayers()" style="width:100%">
+      </div>
+    </div>
+    <div id="layerCount" style="font-size:11px;color:var(--muted-foreground);margin-bottom:6px;"></div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr>
+          <th>Tên</th><th>Màu</th><th>Linetype</th><th>On</th><th>Frozen</th><th>Locked</th><th>Plot</th>
+        </tr></thead>
+        <tbody id="layerBody"></tbody>
+      </table>
+    </div>
+    <div class="divider"></div>
+    <div class="action-row">
+      <button class="btn" onclick="exportLayers()">💾 Xuất CSV</button>
+      <span id="exportMsg" style="font-size:11px;color:var(--muted-foreground);"></span>
+    </div>
+  </div>
+
+  <!-- TAB: AutoNumbering -->
+  <div class="tab-content" id="tab-numbering">
+    <div class="form-row">
+      <label>Block Name</label>
+      <input id="n_block" placeholder="vd: Dau Cat" value="Dau Cat">
+    </div>
+    <div class="form-row">
+      <label>Attribute Tag</label>
+      <input id="n_tag" placeholder="để trống = attribute đầu tiên" value="A">
+    </div>
+    <div class="form-row">
+      <label>Prefix</label>
+      <input id="n_prefix" placeholder="vd: DC" value="DC">
+    </div>
+    <div class="form-row">
+      <label>Bắt đầu từ</label>
+      <input id="n_start" type="number" value="1" min="1">
+    </div>
+    <div class="form-row">
+      <label>Bước nhảy</label>
+      <input id="n_step" type="number" value="1" min="1">
+    </div>
+    <div class="form-row">
+      <label>Pad width</label>
+      <input id="n_pad" type="number" value="0" min="0" placeholder="0 = không pad">
+    </div>
+    <label class="checkbox-row">
+      <input type="checkbox" id="n_dry" checked>
+      Xem trước (DryRun) — không ghi thật
+    </label>
+    <div class="action-row">
+      <button class="btn primary" onclick="runNumbering()">▶ Chạy AutoNumbering</button>
+      <span id="numBadge"></span>
+    </div>
+    <div class="divider"></div>
+    <div class="result-header">
+      <span class="result-label" id="numLabel">Kết quả</span>
+      <button class="btn" onclick="clearResult('numResult')" style="font-size:10px;padding:3px 8px;">Xoá</button>
+    </div>
+    <div class="result-box" id="numResult"></div>
+  </div>
+
+  <!-- TAB: Cleanup -->
+  <div class="tab-content" id="tab-cleanup">
+    <label class="checkbox-row"><input type="checkbox" id="cl_purge" checked> Xoá layer/block/linetype không dùng</label>
+    <label class="checkbox-row"><input type="checkbox" id="cl_audit" checked> Audit & sửa lỗi database</label>
+    <label class="checkbox-row"><input type="checkbox" id="cl_dry" checked> Xem trước (DryRun) — không xoá thật</label>
+    <div class="action-row" style="margin-top:8px;">
+      <button class="btn primary" onclick="runCleanup()">▶ Chạy DrawingCleanup</button>
+      <span id="cleanBadge"></span>
+    </div>
+    <div class="divider"></div>
+    <div class="result-header">
+      <span class="result-label" id="cleanLabel">Kết quả</span>
+      <button class="btn" onclick="clearResult('cleanResult')" style="font-size:10px;padding:3px 8px;">Xoá</button>
+    </div>
+    <div class="result-box" id="cleanResult"></div>
+  </div>
+
+  <!-- TAB: Raw -->
+  <div class="tab-content" id="tab-raw">
+    <div style="font-size:11px;color:var(--muted-foreground);margin-bottom:6px;">
+      Gửi JSON thẳng tới bridge. Endpoint:
+      <code style="background:var(--card);padding:1px 5px;border-radius:3px;">localhost:8766</code>
+    </div>
+    <div class="form-row">
+      <label>Endpoint</label>
+      <select id="rawEndpoint">
+        <option value="/health">GET /health</option>
+        <option value="/query" selected>POST /query</option>
+        <option value="/execute">POST /execute</option>
+      </select>
+    </div>
+    <div style="font-size:11px;color:var(--muted-foreground);margin-bottom:4px;">Body JSON:</div>
+    <textarea class="raw-area" id="rawBody">{"query": "stats"}</textarea>
+    <div class="action-row" style="margin-top:8px;">
+      <button class="btn primary" onclick="runRaw()">▶ Gửi</button>
+      <button class="btn" onclick="formatRaw()">{ } Format</button>
+      <div style="flex:1"></div>
+      <span style="font-size:10px;color:var(--muted-foreground)" id="rawTime"></span>
+    </div>
+    <div class="divider"></div>
+    <div class="result-header">
+      <span class="result-label" id="rawLabel">Kết quả</span>
+      <button class="btn" onclick="clearResult('rawResult')" style="font-size:10px;padding:3px 8px;">Xoá</button>
+    </div>
+    <div class="result-box" id="rawResult"></div>
+  </div>
+
+</div>
+
+<script>
+const BASE = 'http://localhost:8766';
+let allLayers = [];
+
+// ── Helpers ─────────────────────────────────────
+async function apiFetch(path, body) {
+  const opts = body
+    ? { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }
+    : { method:'GET' };
+  const r = await fetch(BASE + path, opts);
+  return r.json();
+}
+
+function setLoading(el, msg = 'Đang tải...') {
+  el.innerHTML = `<span class="spinner"></span><span class="loading">${msg}</span>`;
+}
+
+function clearResult(id) { document.getElementById(id).innerHTML = ''; }
+
+function syntaxHL(json) {
+  return JSON.stringify(json, null, 2)
+    .replace(/("[\w\s\u00C0-\u024F\u1E00-\u1EFF]+")(\s*:)/g,
+      '<span class="key">$1</span>$2')
+    .replace(/:\s*("([^"]*)")/g,
+      ': <span class="str">"$2"</span>')
+    .replace(/:\s*(\d+\.?\d*)/g,
+      ': <span class="num">$1</span>')
+    .replace(/:\s*(true|false|null)/g,
+      ': <span class="ok">$1</span>');
+}
+
+function showResult(elId, data, labelId, labelText) {
+  if (labelId) document.getElementById(labelId).textContent = labelText || 'Kết quả';
+  const el = document.getElementById(elId);
+  if (data && typeof data === 'object') {
+    el.innerHTML = syntaxHL(data);
+  } else {
+    el.textContent = String(data);
+  }
+}
+
+// ── Health ───────────────────────────────────────
+async function healthCheck() {
+  const dot = document.getElementById('dot');
+  const txt = document.getElementById('statusText');
+  dot.className = 'status-dot';
+  txt.textContent = 'Kiểm tra...';
+  try {
+    const d = await apiFetch('/health');
+    if (d.status === 'ok') {
+      dot.className = 'status-dot alive';
+      txt.textContent = `✓ ${d.app} — port ${d.port}`;
+    } else {
+      dot.className = 'status-dot dead';
+      txt.textContent = 'Phản hồi lạ';
+    }
+  } catch(e) {
+    dot.className = 'status-dot dead';
+    txt.textContent = 'Không kết nối được';
+  }
+}
+
+// ── Tabs ─────────────────────────────────────────
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ── Query Tab ────────────────────────────────────
+async function runQuery(type, config) {
+  const el = document.getElementById('queryResult');
+  const lbl = document.getElementById('queryLabel');
+  setLoading(el);
+  lbl.textContent = type + '…';
+  try {
+    const body = config ? { query: type, config } : { query: type };
+    const d = await apiFetch('/query', body);
+
+    // Render stat-cards for 'stats'
+    if (type === 'stats' && d.byType) {
+      const cards = document.getElementById('statCards');
+      cards.style.display = 'grid';
+      cards.innerHTML = [
+        ['Total', d.totalEntities, 'entities'],
+        ...d.byType.slice(0,5).map(t => [t.type, t.count, ''])
+      ].map(([l,v,s]) => `
+        <div class="stat-card">
+          <div class="stat-card-label">${l}</div>
+          <div class="stat-card-value">${v?.toLocaleString?.() ?? v}</div>
+          <div class="stat-card-sub">${s}</div>
+        </div>`).join('');
+    } else {
+      document.getElementById('statCards').style.display = 'none';
+    }
+
+    showResult('queryResult', d, 'queryLabel', `${type} — ${new Date().toLocaleTimeString('vi')}`);
+  } catch(e) {
+    el.innerHTML = `<span class="err">Lỗi: ${e.message}</span>`;
+  }
+}
+
+// ── Layers Tab ───────────────────────────────────
+async function loadLayers() {
+  const tbody = document.getElementById('layerBody');
+  tbody.innerHTML = '<tr><td colspan="7" style="padding:12px;color:var(--muted-foreground)"><span class="spinner"></span> Đang tải...</td></tr>';
+  try {
+    const d = await apiFetch('/query', { query: 'layers' });
+    allLayers = d.layers || [];
+    document.getElementById('layerCount').textContent =
+      `${allLayers.length} layers — lọc bằng ô tìm kiếm bên trên`;
+    renderLayerTable(allLayers);
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="7" style="color:#ef4444;padding:8px">${e.message}</td></tr>`;
+  }
+}
+
+function colorSwatch(idx) {
+  const acad = {1:'#ff0000',2:'#ffff00',3:'#00ff00',4:'#00ffff',5:'#0000ff',6:'#ff00ff',7:'#ffffff'};
+  const c = acad[idx] || `hsl(${(idx*37)%360},70%,55%)`;
+  return `<span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:${c};border:1px solid #0003;vertical-align:middle;margin-right:4px"></span>${idx}`;
+}
+
+function renderLayerTable(layers) {
+  document.getElementById('layerBody').innerHTML = layers.map(l => `
+    <tr>
+      <td style="font-weight:${l.name==='0'?700:400}">${l.name}</td>
+      <td>${colorSwatch(l.colorIndex)}</td>
+      <td style="color:var(--muted-foreground)">${l.linetype}</td>
+      <td class="${l.isOff?'dot-off':'dot-on'}">${l.isOff ? '○' : '●'}</td>
+      <td class="${l.isFrozen?'dot-off':'dot-on'}">${l.isFrozen ? '❄' : '—'}</td>
+      <td class="${l.isLocked?'dot-off':'dot-on'}">${l.isLocked ? '🔒' : '—'}</td>
+      <td class="${!l.isPlottable?'dot-off':'dot-on'}">${l.isPlottable ? '✓' : '✗'}</td>
+    </tr>`).join('');
+}
+
+function filterLayers() {
+  const q = document.getElementById('layerFilter').value.toLowerCase();
+  renderLayerTable(allLayers.filter(l => l.name.toLowerCase().includes(q)));
+}
+
+async function exportLayers() {
+  const msg = document.getElementById('exportMsg');
+  msg.textContent = 'Đang xuất...';
+  const out = 'C:/Users/liend/AppData/Local/Temp/dhcb_layers_export.csv';
+  try {
+    const d = await apiFetch('/execute', { command:'LayerExport', config:{ outputPath: out } });
+    msg.textContent = d.success ? `✓ ${d.summary}` : `✗ ${d.errors?.[0] || 'Lỗi'}`;
+  } catch(e) { msg.textContent = `✗ ${e.message}`; }
+}
+
+// ── AutoNumbering Tab ─────────────────────────────
+async function runNumbering() {
+  const el = document.getElementById('numResult');
+  const badge = document.getElementById('numBadge');
+  const isDry = document.getElementById('n_dry').checked;
+  const config = {
+    blockName:    document.getElementById('n_block').value.trim(),
+    attributeTag: document.getElementById('n_tag').value.trim(),
+    prefix:       document.getElementById('n_prefix').value.trim(),
+    startNumber:  parseInt(document.getElementById('n_start').value) || 1,
+    step:         parseInt(document.getElementById('n_step').value) || 1,
+    padWidth:     parseInt(document.getElementById('n_pad').value) || 0,
+    dryRun:       isDry
+  };
+
+  badge.innerHTML = '';
+  setLoading(el);
+  try {
+    const d = await apiFetch('/execute', { command: 'AutoNumbering', config });
+    badge.innerHTML = isDry
+      ? '<span class="dry-badge">DRY RUN</span>'
+      : (d.success ? '<span class="ok-badge">ĐÃ GHI</span>' : '');
+    showResult('numResult', d, 'numLabel',
+      `AutoNumbering — ${d.affectedCount} blocks — ${new Date().toLocaleTimeString('vi')}`);
+  } catch(e) {
+    el.innerHTML = `<span class="err">${e.message}</span>`;
+  }
+}
+
+// ── Cleanup Tab ──────────────────────────────────
+async function runCleanup() {
+  const el = document.getElementById('cleanResult');
+  const badge = document.getElementById('cleanBadge');
+  const isDry = document.getElementById('cl_dry').checked;
+  const config = {
+    purgeUnused: document.getElementById('cl_purge').checked,
+    auditErrors: document.getElementById('cl_audit').checked,
+    dryRun: isDry
+  };
+
+  badge.innerHTML = '';
+  setLoading(el);
+  try {
+    const d = await apiFetch('/execute', { command: 'DrawingCleanup', config });
+    badge.innerHTML = isDry
+      ? '<span class="dry-badge">DRY RUN</span>'
+      : (d.success ? '<span class="ok-badge">ĐÃ XOÁ</span>' : '');
+    showResult('cleanResult', d, 'cleanLabel',
+      `Cleanup — ${d.affectedCount} objects — ${new Date().toLocaleTimeString('vi')}`);
+  } catch(e) {
+    el.innerHTML = `<span class="err">${e.message}</span>`;
+  }
+}
+
+// ── Raw Tab ──────────────────────────────────────
+async function runRaw() {
+  const ep = document.getElementById('rawEndpoint').value;
+  const bodyStr = document.getElementById('rawBody').value.trim();
+  const el = document.getElementById('rawResult');
+  const t0 = Date.now();
+  setLoading(el);
+  try {
+    const body = ep === '/health' ? null : JSON.parse(bodyStr);
+    const d = await apiFetch(ep, body);
+    const ms = Date.now() - t0;
+    document.getElementById('rawTime').textContent = `${ms}ms`;
+    showResult('rawResult', d, 'rawLabel', `${ep} — ${ms}ms`);
+  } catch(e) {
+    el.innerHTML = `<span class="err">${e.message}</span>`;
+  }
+}
+
+function formatRaw() {
+  try {
+    const txt = document.getElementById('rawBody');
+    txt.value = JSON.stringify(JSON.parse(txt.value), null, 2);
+  } catch(_) {}
+}
+
+// ── Init ─────────────────────────────────────────
+healthCheck();
+setInterval(healthCheck, 15000);
+</script>
+</body>
+</html>

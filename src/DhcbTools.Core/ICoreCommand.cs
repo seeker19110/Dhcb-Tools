@@ -3,14 +3,9 @@ using Autodesk.Revit.DB;
 namespace DhcbTools.Core;
 
 /// <summary>
-/// Hợp đồng chung cho mọi lệnh Core: nhận Document + config JSON (kiểu TConfig), tự mở transaction,
-/// trả về CommandResult. Không có TaskDialog, không có Selection, không có WPF — để cùng một lệnh
-/// chạy được từ Ribbon (vỏ Revit) lẫn từ hàng đợi batch (vỏ Batch) mà không cần viết lại.
+/// Lệnh Core Revit: <see cref="Shared.Hosting.ICoreCommand{TConfig, TDocument}"/> với TDocument = <see cref="Document"/>.
+/// Giữ tên ngắn để mọi lệnh hiện có không phải đổi chữ ký.
 /// </summary>
-public interface ICoreCommand<in TConfig>
+public interface ICoreCommand<in TConfig> : Shared.Hosting.ICoreCommand<TConfig, Document>
 {
-    /// <summary>Tên duy nhất của lệnh, dùng để log và để hàng đợi batch tra cứu.</summary>
-    string CommandName { get; }
-
-    CommandResult Execute(Document document, TConfig config);
 }

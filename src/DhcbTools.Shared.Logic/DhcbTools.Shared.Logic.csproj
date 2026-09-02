@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Thư viện logic thuần: KHÔNG tham chiếu RevitAPI, KHÔNG tham chiếu AutoCAD.NET.
+    Đây là chỗ duy nhất chứa thuật toán test được (CSV, đánh số, số học hình học, đặt tên file),
+    để cả DhcbTools.Core (Revit) lẫn DhcbTools.Core.AutoCAD dùng chung và để
+    DhcbTools.Shared.Logic.Tests chạy được trên CI Linux không cần cài Revit/AutoCAD.
+
+    netstandard2.0 để nạp được cả trong net48 (Revit/AutoCAD 2024 trở về trước)
+    lẫn net8.0-windows (Revit/AutoCAD 2025+).
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <RootNamespace>DhcbTools.Shared.Logic</RootNamespace>
+    <AssemblyName>DhcbTools.Shared.Logic</AssemblyName>
+    <Platforms>AnyCPU;x64</Platforms>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Chỉ để đọc/ghi JSON (job batch, log JSONL, config AI). Không có API Autodesk nào ở đây. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+</Project>

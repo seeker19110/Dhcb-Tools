@@ -32,7 +32,7 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
             var yMm = info.Origin.Y * FtToMm;
             var zMm = info.Origin.Z * FtToMm;
             reportLines.Add(
-                $"Element {info.ElementId.IntegerValue} at ({xMm:F1},{yMm:F1},{zMm:F1}) mm - {info.Domain}");
+                $"Element {info.ElementId.Value} at ({xMm:F1},{yMm:F1},{zMm:F1}) mm - {info.Domain}");
             elementIds.Add(info.ElementId);
         }
 
@@ -75,10 +75,10 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
 
     private sealed class ConnectorInfo
     {
-        public ElementId ElementId { get; set; }
-        public XYZ Origin { get; set; }
-        public string Domain { get; set; }
-        public string Shape { get; set; }
+        public required ElementId ElementId { get; set; }
+        public required XYZ Origin { get; set; }
+        public required string Domain { get; set; }
+        public required string Shape { get; set; }
     }
 
     private List<ConnectorInfo> FindOpenConnectors(Document doc, ConnectorCheckerConfig config)
@@ -93,7 +93,7 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
 
         foreach (var elem in allElements)
         {
-            ConnectorManager cm = null;
+            ConnectorManager? cm = null;
 
             try
             {
@@ -136,7 +136,7 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
                     if (filterDomain)
                     {
                         bool domainMatch = false;
-                        foreach (var d in config.Domains)
+                        foreach (var d in config.Domains!)
                         {
                             if (domainStr.IndexOf(d, StringComparison.OrdinalIgnoreCase) >= 0)
                             {
@@ -183,7 +183,7 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
             .Cast<ViewFamilyType>()
             .FirstOrDefault(vft => vft.ViewFamily == ViewFamily.ThreeDimensional);
 
-        if (viewFamilyType == null) return null;
+        if (viewFamilyType == null) return null!;
 
         var view = View3D.CreateIsometric(doc, viewFamilyType.Id);
 

@@ -1,4 +1,5 @@
 using Autodesk.Revit.DB;
+using DhcbTools.Shared.Logic;
 
 namespace DhcbTools.Core.ParameterSync;
 
@@ -23,7 +24,7 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
             return CommandResult.Fail("File CSV không có dữ liệu (chỉ có dòng tiêu đề hoặc rỗng).");
         }
 
-        var header = SplitCsvLine(lines[0]);
+        var header = CsvText.SplitLine(lines[0]);
         // 3 cột đầu cố định: ElementId, Category, Name — phần còn lại là tên tham số.
         var parameterColumns = header.Skip(3).ToList();
 
@@ -42,7 +43,7 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
                 continue;
             }
 
-            var cells = SplitCsvLine(lines[i]);
+            var cells = CsvText.SplitLine(lines[i]);
             if (cells.Count < 3 || !long.TryParse(cells[0], out var idValue))
             {
                 result.Messages.Add($"Bỏ qua dòng {i + 1}: ElementId không hợp lệ.");
@@ -54,7 +55,7 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
 #if NET8_0_WINDOWS
             var elementId = new ElementId(idValue);
 #else
-            var elementId = new ElementId((int)idValue);
+            var elementId = new ElementId((long)idValue);
 #endif
             var element = document.GetElement(elementId);
             if (element is null)
@@ -71,9 +72,25 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
                     continue;
                 }
 
-                var parameter = element.LookupParameter(parameterColumns[col]);
-                if (parameter is null || parameter.IsReadOnly)
+                var name = parameterColumns[col];
+                var parameter = element.LookupParameter(name);
+
+                if (parameter is null)
                 {
+                    // Export có fallback đọc tham số ở Type; import phải đối xứng, nếu không thì tham số
+                    // Type xuất ra được mà sửa xong không nhập lại được và không có cảnh báo nào (lỗi #3).
+                    parameter = document.GetElement(element.GetTypeId())?.LookupParameter(name);
+                }
+
+                if (parameter is null)
+                {
+                    result.Messages.Add($"Bỏ qua dòng {i + 1}, cột \"{name}\": phần tử {idValue} không có tham số này.");
+                    continue;
+                }
+
+                if (parameter.IsReadOnly)
+                {
+                    result.Messages.Add($"Bỏ qua dòng {i + 1}, cột \"{name}\": tham số chỉ đọc.");
                     continue;
                 }
 
@@ -81,17 +98,30 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
                 {
                     updated++;
                 }
+                else
+                {
+                    result.Messages.Add(
+                        $"Bỏ qua dòng {i + 1}, cột \"{name}\": không ghi được giá trị \"{cells[cellIndex]}\" ({parameter.StorageType}).");
+                }
             }
         }
 
+        string summary;
         if (config.DryRun)
         {
             transaction.RollBack();
-            return CommandResult.Ok($"[Xem trước] Sẽ cập nhật {updated} giá trị tham số (chưa ghi vào mô hình).", updated);
+            summary = $"[Xem trước] Sẽ cập nhật {updated} giá trị tham số (chưa ghi vào mô hình).";
+        }
+        else
+        {
+            transaction.Commit();
+            summary = $"Đã cập nhật {updated} giá trị tham số từ \"{config.InputPath}\".";
         }
 
-        transaction.Commit();
-        return CommandResult.Ok($"Đã cập nhật {updated} giá trị tham số từ \"{config.InputPath}\".", updated);
+        // Giữ nguyên object `result` để không đánh rơi toàn bộ cảnh báo đã gom ở trên (cùng dạng lỗi #2).
+        var final = CommandResult.Ok(summary, updated);
+        final.Messages.AddRange(result.Messages);
+        return final;
     }
 
     private static bool TrySetParameter(Parameter parameter, string rawValue)
@@ -103,9 +133,11 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
                 case StorageType.String:
                     return parameter.Set(rawValue);
                 case StorageType.Integer:
-                    return int.TryParse(rawValue, out var intValue) && parameter.Set(intValue);
+                    return NumericText.TryParseInt(rawValue, out var intValue) && parameter.Set(intValue);
                 case StorageType.Double:
-                    return double.TryParse(rawValue, out var doubleValue) && parameter.Set(doubleValue);
+                    // Export ghi bằng InvariantCulture; đọc lại cũng phải Invariant, đồng thời chấp nhận
+                    // dấu phẩy thập phân do kỹ sư gõ tay trong Excel tiếng Việt (lỗi #1).
+                    return NumericText.TryParseDouble(rawValue, out var doubleValue) && parameter.Set(doubleValue);
                 default:
                     return false;
             }
@@ -116,46 +148,4 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
         }
     }
 
-    private static List<string> SplitCsvLine(string line)
-    {
-        var cells = new List<string>();
-        var current = new System.Text.StringBuilder();
-        var inQuotes = false;
-
-        for (var i = 0; i < line.Length; i++)
-        {
-            var c = line[i];
-            if (inQuotes)
-            {
-                if (c == '"' && i + 1 < line.Length && line[i + 1] == '"')
-                {
-                    current.Append('"');
-                    i++;
-                }
-                else if (c == '"')
-                {
-                    inQuotes = false;
-                }
-                else
-                {
-                    current.Append(c);
-                }
-            }
-            else if (c == '"')
-            {
-                inQuotes = true;
-            }
-            else if (c == ',')
-            {
-                cells.Add(current.ToString());
-                current.Clear();
-            }
-            else
-            {
-                current.Append(c);
-            }
-        }
-        cells.Add(current.ToString());
-        return cells;
-    }
 }

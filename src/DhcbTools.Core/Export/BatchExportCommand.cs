@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.IFC;
+using DhcbTools.Shared.Logic;
 
 namespace DhcbTools.Core.Export;
 
@@ -132,9 +133,11 @@ public sealed class BatchExportCommand : ICoreCommand<ExportConfig>
         var opts = new DWGExportOptions();
 
         // Map version string to ACADVersion enum
-        ACADVersion acadVer;
-        if (!TryParseAcadVersion(config.DwgVersion, out acadVer))
-            acadVer = ACADVersion.R2018;
+        if (!TryParseAcadVersion(config.DwgVersion, out var acadVer))
+        {
+            throw new NotSupportedException(
+                $"Không nhận ra phiên bản DWG \"{config.DwgVersion}\". Dùng dạng \"AcadRelease2018\" hoặc \"2013\".");
+        }
         opts.FileVersion = acadVer;
 
         var sheetIds = sheets.Select(s => s.Id).ToList();
@@ -149,9 +152,11 @@ public sealed class BatchExportCommand : ICoreCommand<ExportConfig>
     {
         var opts = new IFCExportOptions();
 
-        IFCVersion ifcVer;
-        if (!TryParseIfcVersion(config.IfcVersion, out ifcVer))
-            ifcVer = IFCVersion.IFC2x3;
+        if (!TryParseIfcVersion(config.IfcVersion, out var ifcVer))
+        {
+            throw new NotSupportedException(
+                $"Không nhận ra phiên bản IFC \"{config.IfcVersion}\". Dùng \"IFC2x3\" hoặc \"IFC4\".");
+        }
         opts.FileVersion = ifcVer;
         opts.ExportBaseQuantities = true;
 
@@ -175,43 +180,23 @@ public sealed class BatchExportCommand : ICoreCommand<ExportConfig>
 
     // ---- Helpers -------------------------------------------------------------
     private string ApplyPattern(string pattern, ViewSheet sheet, string projectNumber)
-    {
-        return pattern
-            .Replace("{SheetNumber}", SanitizeFileName(sheet.SheetNumber))
-            .Replace("{SheetName}", SanitizeFileName(sheet.Name))
-            .Replace("{ProjectNumber}", SanitizeFileName(projectNumber));
-    }
+        => FileNaming.ApplyPattern(pattern, sheet.SheetNumber, sheet.Name, projectNumber);
 
-    private static string SanitizeFileName(string name)
-    {
-        if (string.IsNullOrEmpty(name)) return "unnamed";
-        var invalid = Path.GetInvalidFileNameChars();
-        var chars = name.ToCharArray();
-        for (int i = 0; i < chars.Length; i++)
-        {
-            if (Array.IndexOf(invalid, chars[i]) >= 0)
-                chars[i] = '_';
-        }
-        return new string(chars).Trim();
-    }
+    private static string SanitizeFileName(string name) => FileNaming.Sanitize(name);
 
     private static bool TryParseAcadVersion(string version, out ACADVersion result)
     {
-        // ACADVersion enum values: R2013, R2018, etc.
-        if (version == null) { result = ACADVersion.R2018; return false; }
-        if (version.IndexOf("2013", StringComparison.Ordinal) >= 0) { result = ACADVersion.R2013; return true; }
-        if (version.IndexOf("2018", StringComparison.Ordinal) >= 0) { result = ACADVersion.R2018; return true; }
-        if (version.IndexOf("2010", StringComparison.Ordinal) >= 0) { result = ACADVersion.R2010; return true; }
-        if (version.IndexOf("2007", StringComparison.Ordinal) >= 0) { result = ACADVersion.R2007; return true; }
-        result = ACADVersion.R2018;
-        return false;
+        // Ánh xạ chuỗi → tên hằng nằm ở DhcbTools.Shared.Logic (test được không cần Revit);
+        // ở đây chỉ đổi tên hằng thành giá trị enum của Revit API.
+        var known = ExportVersionMap.TryParseAcadVersion(version, out var enumName);
+        result = Enum.TryParse(enumName, out ACADVersion parsed) ? parsed : ACADVersion.R2018;
+        return known;
     }
 
     private static bool TryParseIfcVersion(string version, out IFCVersion result)
     {
-        if (version == null) { result = IFCVersion.IFC2x3; return false; }
-        if (version.IndexOf("4", StringComparison.Ordinal) >= 0) { result = IFCVersion.IFC4; return true; }
-        result = IFCVersion.IFC2x3;
-        return true;
+        var known = ExportVersionMap.TryParseIfcVersion(version, out var enumName);
+        result = Enum.TryParse(enumName, out IFCVersion parsed) ? parsed : IFCVersion.IFC2x3;
+        return known;
     }
 }

@@ -2,7 +2,6 @@ using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using DhcbTools.Core.ParameterSync;
-using Microsoft.Win32;
 
 namespace DhcbTools.Revit.Commands;
 
@@ -16,6 +15,9 @@ public sealed class ParameterExportCommand : IExternalCommand
 {
     public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
     {
+#if DHCB_SKIP_WPF
+        return CommandRunner.Run(commandData, "ParameterExport");
+#else
         var document = commandData.Application.ActiveUIDocument.Document;
 
         var dialog = new Microsoft.Win32.SaveFileDialog
@@ -43,5 +45,6 @@ public sealed class ParameterExportCommand : IExternalCommand
 
         Feedback.Show("Xuất tham số ra CSV", result);
         return result.Success ? Result.Succeeded : Result.Failed;
+#endif
     }
 }

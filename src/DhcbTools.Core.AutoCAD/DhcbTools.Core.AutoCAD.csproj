@@ -4,12 +4,19 @@
     <OutputType>Library</OutputType>
     <RootNamespace>DhcbTools.Core.AutoCAD</RootNamespace>
     <AssemblyName>DhcbTools.Core.AutoCAD</AssemblyName>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
     <!--
       AutoCAD 2024 trở về trước dùng .NET Framework 4.8.
       AutoCAD 2025+ dùng .NET 8.0-windows (tương tự Revit).
       Cùng quy ước với Revit trong Directory.Build.props.
     -->
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- CommandCatalog (whitelist lệnh cho AI/MCP) dùng chung với Revit. -->
+    <ProjectReference Include="..\DhcbTools.Shared.Logic\DhcbTools.Shared.Logic.csproj" />
+  </ItemGroup>
 
   <ItemGroup>
     <!--

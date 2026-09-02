@@ -233,36 +233,13 @@ public sealed class DhcbHttpBridge : IDisposable
         WriteJson(res, 200, queryResult);
     }
 
-    private static CommandResult DispatchCommand(Database db, BridgeRequest req)
-    {
-        var configJson = req.Config?.ToString() ?? "{}";
-
-        return req.Command.ToUpperInvariant() switch
-        {
-            "LAYEREXPORT" => new LayerExportCommand().Execute(
-                db, Deserialize<LayerExportConfig>(configJson)),
-
-            "LAYERIMPORT" => new LayerImportCommand().Execute(
-                db, Deserialize<LayerImportConfig>(configJson)),
-
-            "CLEANUP" or "DRAWINGCLEANUP" => new DrawingCleanupCommand().Execute(
-                db, Deserialize<CleanupConfig>(configJson)),
-
-            "AUTONUMBERING" or "AUTONUMBER" => new AutoNumberingCommand().Execute(
-                db, Deserialize<AutoNumberingConfig>(configJson)),
-
-            _ => CommandResult.Fail($"Lệnh không xác định: \"{req.Command}\". " +
-                 "Các lệnh hợp lệ: LayerExport, LayerImport, Cleanup, AutoNumbering."),
-        };
-    }
-
-    private static T Deserialize<T>(string json)
-    {
-        var result = JsonConvert.DeserializeObject<T>(json);
-        if (result is null)
-            throw new InvalidOperationException($"Không thể deserialize config thành {typeof(T).Name}.");
-        return result;
-    }
+    /// <summary>
+    /// Dispatch qua <see cref="AcadCommandTable"/> — cùng một bảng lệnh mà Ribbon, batch runner và
+    /// lớp AI dùng, nên bí danh (<c>Cleanup</c>, <c>AutoNumber</c>…) và thông báo lệnh sai chỉ có
+    /// một chỗ định nghĩa: <c>CommandCatalog</c>.
+    /// </summary>
+    private static CommandResult DispatchCommand(Database db, BridgeRequest req) =>
+        AcadCommandTable.Dispatch(db, req.Command, req.Config?.ToString() ?? "{}");
 
     private static void WriteJson(HttpListenerResponse res, int statusCode, object payload)
     {

@@ -2,139 +2,150 @@
 
 Ảnh chụp tại thời điểm cập nhật gần nhất. Kế hoạch phía trước xem [`roadmap.md`](roadmap.md).
 
-> Cập nhật lần cuối: 2026-09-02 · Tương ứng nhánh `main` (sau khi merge Phase 1+2+3: Batch Export, Health Report, Project Init, MEPF)
+> Cập nhật lần cuối: 2026-09-02 · Nhánh `main` sau khi rà soát lại toàn bộ repo đối chiếu với CI.
+>
+> ⚠️ **Đính chính.** Bản ghi trước đó ("~95 % đã có mã nguồn, biên dịch 0 error, 340 test xanh") **không đúng**.
+> CI trên `main` đang đỏ ở cả hai job, và nguyên nhân là một mảng lớn công việc mà PR #11/#12 mô tả trong commit
+> message **chưa bao giờ được commit vào repo** — xem [Phần chưa có mã nguồn](#phần-chưa-có-mã-nguồn) bên dưới.
+> Những gì viết dưới đây đã được đối chiếu với cây mã nguồn thật, không lấy lại từ commit message.
+>
+> **Chưa có vòng kiểm thử nào trên Revit/AutoCAD thật** — quy trình ở
+> [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md).
 
 ## Tóm tắt
 
 | Hạng mục | Trạng thái |
 |---|---|
-| Kiến trúc Core / vỏ UI | ✅ Tốt — nền móng vững cho các giai đoạn sau |
-| Lệnh nền tảng (Revit + AutoCAD) | ✅ 3 nhóm lệnh, chạy được từ Ribbon và HTTP |
-| HTTP Bridge cho agent AI | ⚠️ Chạy được, có endpoint `/query`, chưa có xác thực |
-| Batch export (PDF/DWG/IFC/NWC) + Health report | ✅ Xong |
-| Khởi tạo dự án (grid/level/family/project info) | ✅ Xong |
-| MEPF — sleeve, tag cao độ, hanger, chia ống, connector checker | ✅ Xong phần nền tảng |
-| MEPF — routing mức A/B/C | ⬜ Chưa bắt đầu |
-| Batch runner chạy đêm theo lịch | ⬜ Chưa bắt đầu |
-| `IUpdater` theo sự kiện | ⬜ Chưa bắt đầu |
-| Lớp AI | ⬜ Chưa bắt đầu |
-| Kiểm thử tự động | ❌ Không có test nào |
-| CI | ❌ Không có workflow nào |
+| Kiến trúc Core / vỏ UI | ✅ `Shared.Logic` (thuần) + `Shared.Hosting` (CommandResult, ICoreCommand, HTTP server) dùng chung hai nền tảng |
+| Lệnh nền tảng (Revit + AutoCAD) | ✅ |
+| HTTP Bridge cho agent AI | ✅ Token, khoá khi dò token, bind 127.0.0.1, timeout huỷ lệnh, `/tools`, `/chat` |
+| Batch export + Health report | ✅ |
+| Khởi tạo dự án | ✅ Grid/Level/Family/Project info + **file từ template, transfer standards, trục/level từ CSV (CAD/Excel), sheet hàng loạt** |
+| MEPF nền tảng (sleeve, cao độ, hanger, chia ống, connector) | ✅ Core + Bridge + batch; ⚠️ Ribbon mới có 3 nút (Sleeve, ElevationTag, ConnectorChecker) |
+| MEPF routing A (theo line), B (rải thiết bị theo phòng) | ✅ Core + Ribbon + Bridge; chờ kiểm thử trên model mẫu |
+| MEPF sizing (đề xuất → CSV → áp), màu/tên hệ, đánh số theo dòng chảy | ✅ |
+| Batch runner chạy đêm (Revit + AutoCAD accoreconsole) | ✅ [`batch-runner.md`](batch-runner.md) |
+| `IUpdater` cao độ theo sự kiện | ✅ Mặc định tắt, tự tắt khi > 200 ms |
+| Checker tham số/đặt tên, clash nội bộ | ✅ HTML + 3D view, `clash-accepted.json` |
+| Lớp AI (offline) | ✅ [`ai-offline.md`](ai-offline.md) — heuristic mặc định, Ollama local tuỳ chọn |
+| Routing C (A* 3D) | ✅ `PathFinder3D` (thuần) + lệnh Core `AutoRoute`: 2 điểm → né chướng ngại → model line → tuỳ chọn `RouteFromLines` dựng luôn |
+| MCP server | ✅ `scripts/dhcb_mcp_server.py` |
+| Giai đoạn 7 P1 — khoảng trống so với tool thị trường ([`nghien-cuu-tool-thi-truong-va-ke-hoach.md`](nghien-cuu-tool-thi-truong-va-ke-hoach.md)) | ✅ Mã nguồn (PR #11): SheetRename, RevisionOnSheets, StylePurge, ColorByParameter, FamilyAudit, WarningsExport, checkset ngưỡng; batch autodetect phiên bản Revit + PlotPdf; AI structured outputs + ≤ 8 ứng viên; MCP read-only/nhóm. ⬜ Phần AutoCAD (LayerTranslate, DrawingCompare, BlockQuantity, AttributeIncrement, purge text/dim/regapp) **chưa có mã nguồn** |
+| Giai đoạn 7 P2 | ✅ Mã nguồn (PR #12): SlopePipes, PipeKick, SystemBom, AutoRoute, ScheduleExport, ViewportCopy; vỏ `DhcbTools.AutoCAD.Core` (chỉ AcDbMgd/AcCoreMgd) cho accoreconsole; map năm AutoCAD → package (2026.1+ là .NET 10) |
+| Hướng dẫn cài đặt & kiểm thử thủ công | ✅ (PR #13) [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md) — checklist R1–R48, C1–C17, B1–B12, M1–M4 |
+| Kiểm thử tự động | ✅ 340 test xUnit (`Shared.Logic`); ⬜ chưa có test nào cho Core Revit/AutoCAD |
+| CI | ✅ có `tests.yml` (test + check-build bằng API package, ubuntu) — đỏ từ 02/09 vì thiếu mã nguồn, đang sửa |
+| CD | ✅ đóng gói Release thật (Revit 2023/2024/2025, AutoCAD 2024/2025) + GitHub Release khi đẩy tag (`release.yml`, windows-latest) |
 
-Ước tính: hoàn thành khoảng **35%** phạm vi trong tài liệu nghiên cứu — nhảy nhanh hơn dự kiến
-vì phần lớn Giai đoạn 5+0 và nền tảng MEPF được làm cùng lúc với hạ tầng ban đầu. Phần còn thiếu
-lớn nhất là routing MEPF (khối lượng nhiều nhất) và batch runner (đích của dự án theo tài liệu
-nghiên cứu — vẫn chưa có, dù các lệnh nó cần đã có đủ).
+Ước tính đã có mã nguồn: **Core Revit gần đủ; vỏ Revit, Core AutoCAD và vỏ AutoCAD thì không** (chi tiết ngay dưới).
+0 % đã kiểm trên phần mềm thật. Việc có giá trị nhất lúc này là **viết nốt phần còn thiếu cho đủ khớp với tài liệu**,
+rồi mới **chạy vòng kiểm thử 1** theo hướng dẫn.
+
+---
+
+## Phần chưa có mã nguồn
+
+Đối chiếu cây mã nguồn `main` với những gì PR #11/#12 mô tả. Ba nhóm dưới đây được commit message nhắc tới
+nhưng file không có trong repo — CI bắt được vì bảng lệnh và catalog tham chiếu tới chúng.
+
+| Nhóm | Tài liệu nói | Thực tế trong repo |
+|---|---|---|
+| Vỏ Revit (Ribbon) | 6 panel, 16 nút MEPF, AI chat WPF, đăng ký `ElevationUpdater`, hook batch `pending-job.json` | `App.cs` có **4 panel / 10 nút**; không có AI chat, không đăng ký updater, không có hook batch |
+| Lệnh AutoCAD trong Core | 15 lệnh | **4 lệnh**: `LayerExport`, `LayerImport`, `DrawingCleanup`, `AutoNumbering` |
+| Lệnh dòng lệnh AutoCAD | `DHCB_EXEC`, `DHCB_CFG`, `DHCB_AI`, `DHCB_RUN`, `DHCB_LAYTRANS`, `DHCB_COMPARE`, `DHCB_BLOCKCOUNT`, `DHCB_ATTR_INC`… | **4 lệnh**: `DHCB_LAYER_EXPORT`, `DHCB_LAYER_IMPORT`, `DHCB_CLEANUP`, `DHCB_AUTONUMBER` (vỏ `DhcbTools.AutoCAD.Core` có thêm `DHCB_RUN`) |
+
+### Lệnh AutoCAD còn thiếu
+
+Mười một lệnh vẫn nằm trong `CommandCatalog` nhưng đánh dấu `.Pending()` — giữ nguyên đặc tả (mô tả, trường config,
+từ khoá tiếng Việt) để khi viết chỉ việc bỏ dấu, nhưng **không** được chào ra `GET /tools`, MCP hay lớp ra lệnh
+tiếng Việt, để agent không gọi một lệnh không tồn tại:
+
+`AttributeExport`, `AttributeImport`, `TextReplace`, `LayerStandardCheck`, `GridExtract`, `XrefAudit`,
+`LayerTranslate`, `DrawingCompare`, `BlockQuantity`, `AttributeIncrement`, `CadLayerMap`.
+
+Kéo theo: `jobs/autocad-nightly.sample.json` tham chiếu vài lệnh trong số này nên chưa chạy được nguyên vẹn, và các
+mục `C16`, `B12`, phần `DrawingCompare` trong hướng dẫn kiểm thử thủ công chưa kiểm được.
 
 ---
 
 ## Đã làm được
 
 ### Khung solution
-Tách `Core` (logic thuần) khỏi vỏ Revit/AutoCAD. Mọi lệnh nhận `Document`/`Database` + config
-và trả `CommandResult`, nhờ đó dùng lại được ở cả ba nơi: Ribbon, HTTP Bridge, và sau này là
-batch runner. Multi-target `net48` (Revit ≤2024) và `net8.0-windows` (Revit 2025+).
+`Shared.Logic` (netstandard2.0, thuần) ← `Shared.Hosting` (CommandResult, ICoreCommand<TConfig,TDocument>,
+HttpBridgeServer, BridgeTokenStore, AuthLockout, BridgeWorkItem) ← `Core` (Revit) / `Core.AutoCAD` ← vỏ Revit / AutoCAD.
+`BatchRunner` (net8.0 console) chỉ tham chiếu `Shared.Logic`. Không còn class trùng tên giữa hai Core
+(`git grep -c "class CommandResult"` = 1).
 
-### Ba nhóm lệnh nền tảng
+### Bảng lệnh và danh mục
+`RevitCommandTable` / `AcadCommandTable` là điểm dispatch duy nhất (Bridge, batch, Ribbon config-driven, AI đều gọi vào).
+`Shared.Logic/Ai/CommandCatalog` liệt kê mọi lệnh + bí danh + trường config; test đối chiếu với mã nguồn.
 
-| Chức năng | Revit | AutoCAD |
-|---|---|---|
-| Xuất dữ liệu ra CSV | `ParameterExport` | `LayerExport` |
-| Nhập CSV ghi ngược vào model | `ParameterImport` | `LayerImport` |
-| Dọn object thừa | `RemoveUnusedViews` | `DrawingCleanup` |
-| Đánh số hàng loạt | `AutoNumbering` | `AutoNumbering` |
+### Danh sách lệnh Core
 
-Cả bốn lệnh đều hỗ trợ `DryRun` (mặc định bật) và gói trong một transaction duy nhất.
+**Revit (42):** ParameterExport, ParameterImport, RemoveUnusedViews, AutoNumbering, BatchExport, HealthReport,
+ProjectInfo, LevelSetup, GridSetup, FamilyLoader, SleeveAuto, ElevationTag, HangerAuto, PipeSplitter, ConnectorChecker,
+RouteFromLines, DevicePlacement, SizingProposal, ApplySizing, SystemColor, SystemName, FlowNumbering,
+ProjectFromTemplate, TransferStandards, GridFromCsv, SheetBatchCreate, **SheetRename, RevisionOnSheets, StylePurge,
+ColorByParameter, FamilyAudit, WarningsExport**, **SlopePipes, PipeKick, SystemBom, AutoRoute, ScheduleExport, ViewportCopy** (P2),
+ParameterRuleCheck (+ thresholds), ClashDetection, CadLayerMap, SpecToConfig.
 
-### HTTP Bridge
-Revit cổng 8765 (`HttpListener` + `ExternalEvent` để marshal về main thread), AutoCAD cổng 8766
-(`ExecuteInCommandContextAsync`). Có thêm endpoint `GET /health` và `POST /query` (đọc ngữ cảnh
-model, không ghi transaction) bên cạnh `POST /execute`. Kèm client `scripts/dhcb_agent.py` không
-cần dependency ngoài.
+**AutoCAD (4):** LayerExport, LayerImport, DrawingCleanup, AutoNumbering. Lệnh dòng lệnh: `DHCB_LAYER_EXPORT`,
+`DHCB_LAYER_IMPORT`, `DHCB_CLEANUP`, `DHCB_AUTONUMBER`. Vỏ `DhcbTools.AutoCAD.Core` chỉ có `DHCB_RUN` — dùng cho
+accoreconsole. Mười một lệnh còn lại: xem [Lệnh AutoCAD còn thiếu](#lệnh-autocad-còn-thiếu).
 
-### Giai đoạn 5+0 — Xuất bản & khởi tạo dự án
-`Export/BatchExportCommand` xuất PDF/DWG/IFC/NWC hàng loạt; `Health/HealthReportCommand` xuất
-báo cáo HTML (warning, view thừa, open connector, in-place family). `ProjectInit/*` dựng
-Level, Grid, load family theo danh mục, gán project info — tất cả từ config JSON.
+### Ribbon Revit
+4 panel: Nền tảng · Xuất & Báo cáo · Khởi tạo dự án · MEPF (10 nút). `CommandRunner` đọc config JSON ở
+`%APPDATA%\DHCB\configs\revit\<Lệnh>.json` → chạy xem trước (`dryRun`) → hỏi xác nhận → chạy thật; hiện mới dùng cho
+bản build không WPF. Hai panel còn thiếu (Hồ sơ & Style, AI offline & Batch) và phần lớn lệnh giai đoạn 7 chưa có nút —
+xem [Phần chưa có mã nguồn](#phần-chưa-có-mã-nguồn).
 
-### MEPF — phần nền tảng
-`MEPF/SleeveCommand` (giao cắt MEP × Tường/Sàn, lọc 2 lớp BoundingBox → IntersectsSolid),
-`ElevationTagCommand` (cao độ đáy/đỉnh/tim), `HangerCommand` (đặt hanger theo khoảng cách đều
-dọc `LocationCurve`), `PipeSplitterCommand` (`BreakCurve` cho Pipe/Duct), `ConnectorCheckerCommand`
-(quét connector hở toàn mô hình, tuỳ chọn tạo 3D view khoanh vùng). Ribbon hiện có nút cho
-Sleeve, ElevationTag, ConnectorChecker; **Hanger và PipeSplitter đã có Core command nhưng chưa
-gắn nút Ribbon lẫn dispatch trong Bridge** — chỉ gọi được bằng cách sửa code, chưa dùng được
-từ UI hay HTTP.
-
-### Điều kiện cho tự động hoá cấp 2–3
-`SilentFailuresPreprocessor` đã có và được dùng đúng trong các lệnh Revit. Đây là điều kiện bắt
-buộc để chạy batch không người trực — nền cho batch runner đã sẵn sàng, nhưng **batch runner tự
-nó (mở → xử lý → lưu → đóng theo danh sách file, hẹn giờ Task Scheduler) chưa tồn tại.**
+### Kiểm thử
+`tests/DhcbTools.Shared.Logic.Tests`: CSV, số, đánh số, MEP layout, tên file, phiên bản xuất, HTML, token, **CleanupDecider,
+JobTokens/BatchJob/RunLog/BatchReport/AcadScriptGen, GridClustering/GridNaming, RouteGraph, DevicePattern, Duct/PipeSizing,
+SystemNaming, FlowNumbering, PathFinder3D, RuleChecker, ClashAcceptance, LayerMappingSuggester, SpecTextExtractor,
+WarningAnalyzer, CommandIntentParser, CommandCatalog↔mã nguồn, NamePattern, PaletteGenerator, ThresholdRule, LayerMapTable,
+DiffSummary, RvtFileInfo, PlotPdf, SlopeMath, BomAggregator, PolylineSimplifier**. `scripts/check-build.sh` biên dịch toàn bộ
+Core/vỏ (kể cả vỏ core-only) trên Linux với API Revit 2025 + AutoCAD 2025; Core Revit cũng xanh với API 2023.
 
 ---
+
+## Kết quả kiểm thử trên máy thật
+
+Chưa có vòng nào. Quy trình và checklist: [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md) §10.
 
 ## Lỗi đã biết
 
-Xếp theo mức độ. Nhóm "âm thầm" nguy hiểm nhất vì tool báo thành công trong khi kết quả sai.
+Các lỗi #1–#11 trong bản trước **đã sửa**:
 
-### Nghiêm trọng — sai âm thầm
+| # | Lỗi | Sửa ở |
+|---|---|---|
+| 1–5 | Round-trip số, nuốt cảnh báo, bất đối xứng export/import, CSV không BOM, đánh số không dung sai | `Shared.Logic` (bản trước) |
+| 6 | DrawingCleanup xoá nhầm / hỏng transaction | `CleanupDecider` + `DrawingCleanupCommand` (linetype của layer, CLAYER, xref, try/catch từng item) |
+| 7 | Request timeout vẫn thực thi | `BridgeWorkItem.TryClaim()` — vỏ kiểm tra trước khi mở transaction |
+| 8 | Bridge không xác thực | `BridgeTokenStore` + `BridgeAuth` + `AuthLockout`, bind 127.0.0.1 |
+| 9 | Trùng lặp giữa hai Core | `Shared.Hosting` |
+| 10 | Hiệu năng collector | `ElementMulticategoryFilter` / `ElementLevelFilter` trong ParameterExport, AutoNumbering (và mọi lệnh mới) |
+| 11 | Hanger/PipeSplitter chưa gắn UI/Bridge | `CatalogCommands` + `RevitCommandTable` |
+| 12 | Không có test MEPF/Export/ProjectInit | Phần thuần đã có test; phần Revit theo §4 kiểm thử thủ công |
 
-1. **Round-trip số thực hỏng trên máy locale Việt Nam.** Export ghi bằng `InvariantCulture`
-   (dấu chấm), import đọc theo culture hệ thống (dấu phẩy). Trên Windows tiếng Việt, mọi giá trị
-   Double xuất ra không import ngược được và bị bỏ qua không báo lỗi.
-   `ParameterExportCommand.cs` ↔ `ParameterImportCommand.cs`
-
-2. **Cảnh báo bị nuốt trong AutoNumbering.** Các message "Bỏ qua phần tử X" được gom vào một
-   `CommandResult` nhưng dòng `return` cuối tạo object mới, làm mất toàn bộ. Kỹ sư thấy
-   "Đã đánh số 40/120" mà không biết 80 phần tử kia hỏng vì lý do gì.
-   `Core/AutoNumbering/AutoNumberingCommand.cs`
-
-3. **Bất đối xứng Export/Import tham số.** Export có fallback đọc tham số ở Type, import chỉ tra
-   ở instance. Tham số Type xuất ra được, sửa xong không nhập lại được, không báo gì.
-
-4. **CSV không có BOM.** Excel trên Windows hiển thị sai tên tiếng Việt. Cần `new UTF8Encoding(true)`.
-
-### Nghiêm trọng — hành vi sai
-
-5. **Đánh số theo hàng không có dung sai.** Sắp `OrderByDescending(Y).ThenBy(X)`; hai cửa cùng hàng
-   lệch 1mm rơi vào hai "hàng" khác nhau nên `ThenBy(X)` gần như vô tác dụng — kết quả thực tế là
-   sắp thuần theo Y. Cần gom Y theo dung sai (ví dụ 300mm) rồi mới sắp X trong nhóm.
-
-6. **DrawingCleanup có thể xoá nhầm và làm hỏng transaction.** `CollectUsedLinetypeIds` chỉ duyệt
-   entity, bỏ sót linetype mà layer definition đang dùng. Layer hiện hành (`CLAYER`) không được
-   loại trừ; `Erase()` nó sẽ ném lỗi, và vì không có try/catch từng item nên hỏng cả transaction.
-   `Core.AutoCAD/DrawingCleanup/DrawingCleanupCommand.cs`
-
-7. **Request timeout vẫn thực thi.** Bridge báo timeout sau 30s nhưng item vẫn nằm trong queue;
-   khi Revit rảnh nó vẫn chạy dù client đã bỏ đi. Với `dryRun:false` là thay đổi mô hình ngoài ý muốn.
-
-### Bảo mật
-
-8. **HTTP Bridge không xác thực.** Không kiểm tra token, `Origin` hay `Content-Type`. Bất kỳ tiến
-   trình nào trên máy đều gửi được lệnh xoá view/sheet với `dryRun:false`. Cần token sinh ngẫu
-   nhiên lúc khởi động, lưu ở `%APPDATA%`, bắt buộc qua header `Authorization`.
-
-### Chất lượng
-
-9. **Trùng lặp ~40%** giữa `Core` và `Core.AutoCAD`: `ICoreCommand`, `CommandResult`, `Polyfills`,
-   và gần như toàn bộ phần HTTP của hai Bridge. Chi phí sẽ nhân lên theo mỗi tính năng mới.
-10. **Hiệu năng collector.** `ParameterExport` và `AutoNumbering` dùng `FilteredElementCollector`
-    rồi lọc bằng LINQ trong bộ nhớ. Nên dùng `ElementMulticategoryFilter` để Revit lọc ở tầng dưới.
-11. **Hanger và PipeSplitter chưa gắn UI/Bridge.** Core command đã viết xong nhưng không có nút
-    Ribbon, không có case trong `DispatchCommand` của Bridge — hiện chỉ chạy được nếu tự viết
-    code gọi. Cần bổ sung cả hai chỗ trước khi coi nhóm MEPF nền tảng là "dùng được".
-12. **Không còn test nào cho MEPF/Export/ProjectInit.** Cùng nợ kỹ thuật với các lệnh cũ, nhưng
-    khối lượng logic hình học (giao cắt, khoảng cách hanger) rủi ro sai cao hơn CSV/đánh số.
-
----
+### Còn mở
+- **Chưa kiểm thử trên Revit/AutoCAD thật** cho toàn bộ lệnh — chỉ mới biên dịch với API package. Rủi ro cao nhất theo thứ tự:
+  `RouteFromLines` và `PipeKick` (fitting/cút 45° phụ thuộc routing preference), `AutoRoute` (thời gian A* với bước 100 mm
+  trên hộp lớn), `TransferStandards` (LineStyles/ObjectStyles không copy được qua API — đã ghi rõ trong Messages),
+  `ProjectFromTemplate` (worksharing cần môi trường mạng), `StylePurge` (phân tích tham chiếu có thể thiếu trường hợp —
+  luôn xem trước), `SlopePipes` trên ống đã nối fitting hai đầu (Revit có thể từ chối dịch điểm cuối).
+- `RvtFileInfo` nhận phiên bản bằng cách quét chuỗi trong 2 MB đầu file thay vì parse OLE — đủ cho batch, nhưng file mã hoá/
+  bất thường sẽ rơi về `revitVersion` của job.
+- `AcadScriptGen.PlotPdf` theo thứ tự prompt `-PLOT` của AutoCAD 2018+ tiếng Anh; bản địa hoá hoặc phiên bản khác có thể lệch
+  prompt — kiểm B11 trước khi dùng thật.
+- AutoCAD 2026.1+ (package `AutoCAD.NET 25.1.x`) dùng .NET 10 — chưa build/kiểm; Revit 2027 cũng đang di trú .NET 10.
+- `ParameterImport` vẫn đọc CSV theo dòng nên chưa đọc ô có xuống dòng bên trong nháy (nợ cũ).
+- Batch Revit thoát bằng `Environment.Exit` sau khi ghi `batch-done.json` — đủ dùng cho Task Scheduler nhưng không "đẹp";
+  Revit không có API thoát cho add-in.
 
 ## Việc tiếp theo
 
-Theo [`roadmap.md`](roadmap.md) — Giai đoạn 0 (trả nợ kỹ thuật) rồi Giai đoạn 1 (batch runner):
-
-1. Thêm `DhcbTools.Core.Tests` — bắt luôn lỗi #1 và #5.
-2. Sửa nhóm lỗi âm thầm #1–#4.
-3. Gắn Hanger/PipeSplitter vào Ribbon + Bridge (#11).
-4. Thêm token cho Bridge (#8).
-5. Sửa #6, #7.
-6. Tách `DhcbTools.Shared` (#9) — làm **trước** khi thêm routing MEPF (khối lượng lớn nhất còn lại).
+1. **Vòng kiểm thử 1** trên máy có Revit 2024 + AutoCAD 2024 theo hướng dẫn; ghi kết quả vào mục "Kết quả kiểm thử trên máy thật".
+2. Sửa lỗi theo kết quả; mỗi lỗi có phần thuần tách được thì kèm test tái hiện.
+3. Chạy một đêm batch thật (job 2 file × 5 step) để chốt Giai đoạn 1.
+4. Sau khi vòng 1 xanh: cân nhắc P3 trong [`roadmap.md`](roadmap.md).

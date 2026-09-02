@@ -1,6 +1,6 @@
-using System.Globalization;
 using System.Text;
 using Autodesk.Revit.DB;
+using DhcbTools.Shared.Logic;
 
 namespace DhcbTools.Core.ParameterSync;
 
@@ -16,9 +16,16 @@ public sealed class ParameterExportCommand : ICoreCommand<ParameterExportConfig>
     {
         var categoryIds = ResolveCategoryIds(document, config.Categories, out var unknownCategories);
 
+        if (categoryIds.Count == 0)
+        {
+            return CommandResult.Fail("Không có category nào hợp lệ: " + string.Join(", ", unknownCategories));
+        }
+
+        // Lỗi #10: lọc bằng ElementMulticategoryFilter để Revit lọc ở tầng dưới thay vì LINQ trong bộ nhớ.
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var collector = new FilteredElementCollector(document)
             .WhereElementIsNotElementType()
-            .Where(e => e.Category is not null && categoryIds.Contains(e.Category.Id))
+            .WherePasses(new ElementMulticategoryFilter(categoryIds.ToList()))
             .ToList();
 
         var sb = new StringBuilder();
@@ -32,7 +39,7 @@ public sealed class ParameterExportCommand : ICoreCommand<ParameterExportConfig>
         foreach (var element in collector)
         {
             sb.Append(element.Id.ToString()).Append(',')
-              .Append(CsvEscape(element.Category!.Name)).Append(',')
+              .Append(CsvEscape(element.Category?.Name)).Append(',')
               .Append(CsvEscape(element.Name));
 
             foreach (var paramName in config.ParameterNames)
@@ -43,7 +50,8 @@ public sealed class ParameterExportCommand : ICoreCommand<ParameterExportConfig>
             sb.Append('\n');
         }
 
-        File.WriteAllText(config.OutputPath, sb.ToString(), Encoding.UTF8);
+        // UTF-8 CÓ BOM: thiếu BOM thì Excel trên Windows đọc theo code page hệ thống và hiện sai tiếng Việt.
+        File.WriteAllText(config.OutputPath, sb.ToString(), CsvText.Utf8WithBom);
 
         var result = CommandResult.Ok(
             $"Đã xuất {collector.Count} phần tử, {config.ParameterNames.Count} tham số ra \"{config.OutputPath}\".",
@@ -52,6 +60,11 @@ public sealed class ParameterExportCommand : ICoreCommand<ParameterExportConfig>
         foreach (var unknown in unknownCategories)
         {
             result.Messages.Add($"Bỏ qua category không tồn tại trong mô hình: \"{unknown}\".");
+        }
+
+        if (config.Verbose)
+        {
+            result.Messages.Add($"Thời gian: {stopwatch.ElapsedMilliseconds} ms.");
         }
 
         return result;
@@ -99,20 +112,12 @@ public sealed class ParameterExportCommand : ICoreCommand<ParameterExportConfig>
         return parameter.StorageType switch
         {
             StorageType.String => parameter.AsString() ?? string.Empty,
-            StorageType.Integer => parameter.AsInteger().ToString(CultureInfo.InvariantCulture),
-            StorageType.Double => parameter.AsDouble().ToString(CultureInfo.InvariantCulture),
+            StorageType.Integer => NumericText.Format(parameter.AsInteger()),
+            StorageType.Double => NumericText.Format(parameter.AsDouble()),
             StorageType.ElementId => parameter.AsValueString() ?? string.Empty,
             _ => parameter.AsValueString() ?? string.Empty,
         };
     }
 
-    private static string CsvEscape(string? value)
-    {
-        value ??= string.Empty;
-        if (value.Contains(',') || value.Contains('"') || value.Contains('\n'))
-        {
-            return "\"" + value.Replace("\"", "\"\"") + "\"";
-        }
-        return value;
-    }
+    private static string CsvEscape(string? value) => CsvText.Escape(value ?? string.Empty);
 }

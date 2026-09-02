@@ -1,4 +1,5 @@
 using Autodesk.Revit.DB;
+using DhcbTools.Shared.Logic;
 
 namespace DhcbTools.Core.AutoNumbering;
 
@@ -20,10 +21,18 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
             return CommandResult.Fail($"Không tìm thấy category \"{config.Category}\" trong mô hình.");
         }
 
-        var elements = new FilteredElementCollector(document)
+        // Lỗi #10: lọc category (và level nếu có) ở tầng Revit bằng ElementMulticategoryFilter/ElementLevelFilter.
+        var collector = new FilteredElementCollector(document)
             .WhereElementIsNotElementType()
-            .Where(e => e.Category is not null && categoryIds.Contains(e.Category.Id))
-            .Where(e => config.LevelName is null || BelongsToLevel(document, e, config.LevelName))
+            .WherePasses(new ElementMulticategoryFilter(categoryIds.ToList()));
+        var level = RevitCompat.FindLevel(document, config.LevelName);
+        if (level is not null)
+        {
+            collector = collector.WherePasses(new ElementLevelFilter(level.Id));
+        }
+
+        var elements = collector
+            .Where(e => config.LevelName is null || level is not null || BelongsToLevel(document, e, config.LevelName))
             .Select(e => (Element: e, Location: GetLocationPoint(e)))
             .Where(t => t.Location is not null)
             .ToList();
@@ -33,22 +42,22 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
             return CommandResult.Fail($"Không có phần tử nào của category \"{config.Category}\" có vị trí để đánh số.");
         }
 
-        var ordered = config.Direction == NumberingDirection.LeftToRightThenTopToBottom
-            ? elements.OrderByDescending(t => t.Location!.Y).ThenBy(t => t.Location!.X)
-            : elements.OrderBy(t => t.Location!.X).ThenByDescending(t => t.Location!.Y);
+        // Sắp xếp có gom dải theo dung sai (mặc định 300 mm): hai cửa cùng hàng lệch vài mm phải nằm
+        // cùng một "hàng" thì thứ tự trái→phải mới có nghĩa (lỗi #5 trong docs/progress.md).
+        var items = elements
+            .Select(t => new NumberingItem<Element>(t.Element, t.Location!.X, t.Location!.Y))
+            .ToList();
 
-        var plan = new List<(Element Element, string Value)>();
-        var number = config.StartNumber;
-        foreach (var (element, _) in ordered)
-        {
-            var digits = number.ToString();
-            if (config.PadWidth > 0)
-            {
-                digits = digits.PadLeft(config.PadWidth, '0');
-            }
-            plan.Add((element, config.Prefix + digits));
-            number += config.Step;
-        }
+        var direction = config.Direction == NumberingDirection.LeftToRightThenTopToBottom
+            ? ScanDirection.LeftToRightThenTopToBottom
+            : ScanDirection.TopToBottomThenLeftToRight;
+
+        var ordered = NumberingPlanner.Order(items, direction, config.RowToleranceMm / MepLayout.FeetToMm);
+
+        var plan = NumberingPlanner
+            .Assign(ordered, config.Prefix, config.StartNumber, config.Step, config.PadWidth)
+            .Select(a => (Element: a.Key, Value: a.Value))
+            .ToList();
 
         if (config.DryRun)
         {
@@ -86,7 +95,11 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
 
         transaction.Commit();
 
-        return CommandResult.Ok($"Đã đánh số {updated}/{plan.Count} phần tử \"{config.Category}\".", updated);
+        // Lỗi #2: bản cũ `return CommandResult.Ok(...)` tạo object mới nên toàn bộ dòng "Bỏ qua phần tử X"
+        // gom trong `result` bị mất — kỹ sư thấy "40/120" mà không biết 80 phần tử kia hỏng vì lý do gì.
+        var final = CommandResult.Ok($"Đã đánh số {updated}/{plan.Count} phần tử \"{config.Category}\".", updated);
+        final.Messages.AddRange(result.Messages);
+        return final;
     }
 
     private static bool BelongsToLevel(Document document, Element element, string levelName)

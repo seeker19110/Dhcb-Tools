@@ -18,7 +18,7 @@ public sealed class HangerConfig
     public List<string> Categories { get; init; } = new List<string>();
 
     /// <summary>Level name filter (empty = all levels).</summary>
-    public string LevelName { get; init; } = null;
+    public string? LevelName { get; init; } = null;
 
     /// <summary>If true, report placements without writing to the model.</summary>
     public bool DryRun { get; init; } = true;

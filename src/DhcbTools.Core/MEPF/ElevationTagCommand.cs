@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
+using DhcbTools.Shared.Logic;
 
 namespace DhcbTools.Core.MEPF;
 
@@ -38,11 +39,9 @@ public sealed class ElevationTagCommand : ICoreCommand<ElevationTagConfig>
             var bb = elem.get_BoundingBox(null);
             if (bb == null) continue;
 
-            var bottomMm = bb.Min.Z * FtToMm;
-            var topMm = bb.Max.Z * FtToMm;
-            var centreMm = (bb.Min.Z + bb.Max.Z) / 2.0 * FtToMm;
+            var elevations = MepLayout.Elevations(bb.Min.Z, bb.Max.Z);
 
-            plan.Add((elem, bottomMm, topMm, centreMm));
+            plan.Add((elem, elevations.BottomMm, elevations.TopMm, elevations.CentreMm));
         }
 
         if (config.DryRun)
@@ -93,7 +92,7 @@ public sealed class ElevationTagCommand : ICoreCommand<ElevationTagConfig>
                     .Replace("OST_", string.Empty)
                     .Replace("Curves", string.Empty);
                 bool include = false;
-                foreach (var cat in config.Categories)
+                foreach (var cat in config.Categories ?? new System.Collections.Generic.List<string>())
                 {
                     if (catKey.IndexOf(cat, StringComparison.OrdinalIgnoreCase) >= 0 ||
                         cat.IndexOf(catKey, StringComparison.OrdinalIgnoreCase) >= 0)
@@ -112,7 +111,8 @@ public sealed class ElevationTagCommand : ICoreCommand<ElevationTagConfig>
 
             foreach (var e in elems)
             {
-                if (!string.IsNullOrEmpty(config.LevelName) && !BelongsToLevel(doc, e, config.LevelName))
+                var eln = config.LevelName ?? string.Empty;
+                if (!string.IsNullOrEmpty(eln) && !BelongsToLevel(doc, e, eln))
                     continue;
                 result.Add(e);
             }
@@ -146,7 +146,7 @@ public sealed class ElevationTagCommand : ICoreCommand<ElevationTagConfig>
             if (param.StorageType == StorageType.Double)
                 param.Set(valueMm / FtToMm); // internal units = feet
             else if (param.StorageType == StorageType.String)
-                param.Set(valueMm.ToString("F1"));
+                param.Set(NumericText.Format(valueMm, 1)); // Invariant: máy tiếng Việt không được ghi "3200,0"
             else
                 return false;
             return true;

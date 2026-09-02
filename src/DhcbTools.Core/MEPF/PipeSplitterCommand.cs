@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
+using DhcbTools.Shared.Logic;
 using Autodesk.Revit.DB.Mechanical;
 using Autodesk.Revit.DB.Plumbing;
 
@@ -19,7 +20,12 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
 
     public CommandResult Execute(Document document, PipeSplitterConfig config)
     {
-        double maxSegmentFt = config.MaxSegmentMm / FtToMm;
+        if (config.MaxSegmentMm <= 0)
+        {
+            return CommandResult.Fail("MaxSegmentMm phải lớn hơn 0.");
+        }
+
+        double maxSegmentFt = MepLayout.MmToFeet(config.MaxSegmentMm);
 
         // 1. Collect MEP elements
         var elements = CollectElements(document, config);
@@ -37,16 +43,11 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
             var curve = locCurve.Curve;
             double lengthFt = curve.Length;
 
-            if (lengthFt <= maxSegmentFt + 0.01) continue; // already short enough
-
             var splitPoints = new List<XYZ>();
-            double pos = maxSegmentFt;
-            while (pos < lengthFt - 0.01)
+            foreach (var pos in MepLayout.SplitPositions(lengthFt, maxSegmentFt))
             {
                 double normalized = pos / lengthFt;
-                var pt = curve.Evaluate(normalized, true);
-                splitPoints.Add(pt);
-                pos += maxSegmentFt;
+                splitPoints.Add(curve.Evaluate(normalized, true));
             }
 
             if (splitPoints.Count > 0)
@@ -163,7 +164,8 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
 
             foreach (var e in elems)
             {
-                if (!string.IsNullOrEmpty(config.LevelName) && !BelongsToLevel(doc, e, config.LevelName))
+                var pln = config.LevelName ?? string.Empty;
+                if (!string.IsNullOrEmpty(pln) && !BelongsToLevel(doc, e, pln))
                     continue;
                 if (e.Location is LocationCurve)
                     result.Add((e, kvp.Key));
