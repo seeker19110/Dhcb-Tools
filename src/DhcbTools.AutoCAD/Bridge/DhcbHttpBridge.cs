@@ -1,275 +1,132 @@
-using System.Net;
-using System.Text;
+using System.Reflection;
 using Autodesk.AutoCAD.ApplicationServices;
-using Autodesk.AutoCAD.DatabaseServices;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using DhcbTools.Core.AutoCAD;
-using DhcbTools.Core.AutoCAD.AutoNumbering;
-using DhcbTools.Core.AutoCAD.DrawingCleanup;
-using DhcbTools.Core.AutoCAD.LayerSync;
 using DhcbTools.Core.AutoCAD.Query;
+using DhcbTools.Shared.Hosting;
+using DhcbTools.Shared.Logic.Ai;
+using Newtonsoft.Json;
+using AcadResult = DhcbTools.Core.AutoCAD.CommandResult;
+using HostResult = DhcbTools.Shared.Hosting.CommandResult;
 
 namespace DhcbTools.AutoCAD.Bridge;
 
 /// <summary>
-/// HTTP Bridge cho AutoCAD — cùng giao thức với Revit Bridge (port 8766).
+/// HTTP Bridge AutoCAD (port 8766) — phần HTTP/xác thực/timeout nằm trong <see cref="HttpBridgeServer"/>
+/// dùng chung với Revit (mục 0.2). Trước đây vỏ AutoCAD tự viết HTTP server riêng, và vì thế **không có
+/// xác thực nào**: mọi tiến trình local đều POST /execute sửa được bản vẽ đang mở. Nay dùng chung server
+/// nên có token, khoá khi dò token, bind 127.0.0.1, cùng với /tools và /chat vốn chỉ Revit mới có.
 ///
-/// AutoCAD marshal sang main thread qua
-/// Application.DocumentManager.ExecuteInCommandContextAsync()
-/// — cách chính thức của Autodesk từ AutoCAD 2014+ (AcMgd managed).
+/// Phần riêng của AutoCAD ở đây chỉ còn: marshal về main thread qua
+/// <c>Application.DocumentManager.ExecuteInCommandContextAsync()</c> và dispatch qua
+/// <see cref="AcadCommandTable"/>.
 ///
-/// Endpoints:
-///   GET  http://localhost:8766/health  → { "status": "ok", "port": 8766, "app": "AutoCAD" }
-///   POST http://localhost:8766/execute { "command": "LayerExport", "config": {...} }
-///   POST http://localhost:8766/query   { "query": "drawing_info" }
+///   GET /health · GET /tools · POST /execute · POST /query · POST /chat (đề xuất lệnh, KHÔNG chạy)
+/// Token: %APPDATA%\DHCB\bridge-token.txt — cùng file với Bridge Revit.
 /// </summary>
 public sealed class DhcbHttpBridge : IDisposable
 {
     public const int Port = 8766;
 
-    private readonly HttpListener _listener = new();
-    private CancellationTokenSource? _cts;
-    private Task? _listenTask;
+    private readonly HttpBridgeServer _server;
     private bool _disposed;
 
-    public void Start()
+    public DhcbHttpBridge()
     {
-        _listener.Prefixes.Add($"http://localhost:{Port}/");
-        _listener.Start();
+        _server = new HttpBridgeServer(Port, "AutoCAD", Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0")
+        {
+            ExecuteAsync = item => RunOnAutoCadThread(
+                item,
+                database => ToHostResult(AcadCommandTable.Dispatch(database, item.Request.Command, item.Request.ConfigJson)),
+                message => HostResult.Fail(message)),
 
-        _cts = new CancellationTokenSource();
-        _listenTask = Task.Run(() => ListenLoop(_cts.Token));
+            QueryAsync = item => RunOnAutoCadThread(
+                item,
+                database => AcadQueryHandler.Handle(database, ToQueryRequest(item.Request)),
+                message => (object)new { error = message }),
+
+            Chat = text => CommandIntentParser.Parse(text, CommandCatalog.AutoCad).ToPayload(),
+            ListTools = () => CommandCatalog.Describe(CommandCatalog.AutoCad),
+            Log = _ => { },
+        };
     }
 
-    public void Stop()
-    {
-        _cts?.Cancel();
-        try { _listener.Stop(); } catch { }
-        try { _listenTask?.Wait(2000); } catch { }
-    }
+    public string? TokenPath => BridgeTokenStore.DefaultPath;
 
-    private async Task ListenLoop(CancellationToken ct)
-    {
-        while (!ct.IsCancellationRequested)
-        {
-            HttpListenerContext ctx;
-            try
-            {
-                ctx = await _listener.GetContextAsync();
-            }
-            catch
-            {
-                break;
-            }
+    public void Start() => _server.Start();
 
-            _ = Task.Run(() => HandleRequest(ctx), ct);
-        }
-    }
-
-    private void HandleRequest(HttpListenerContext ctx)
-    {
-        var req = ctx.Request;
-        var res = ctx.Response;
-
-        // ── Health check ──────────────────────────────────────────
-        if (req.HttpMethod == "GET" && req.Url?.AbsolutePath == "/health")
-        {
-            WriteJson(res, 200, new { status = "ok", port = Port, app = "AutoCAD" });
-            return;
-        }
-
-        if (req.HttpMethod != "POST")
-        {
-            WriteJson(res, 405, new { error = "Chỉ hỗ trợ GET /health, POST /execute, POST /query" });
-            return;
-        }
-
-        string body;
-        using (var reader = new System.IO.StreamReader(req.InputStream, req.ContentEncoding))
-        {
-            body = reader.ReadToEnd();
-        }
-
-        var path = req.Url?.AbsolutePath ?? string.Empty;
-
-        if (path == "/execute")
-        {
-            HandleExecute(res, body);
-            return;
-        }
-
-        if (path == "/query")
-        {
-            HandleQuery(res, body);
-            return;
-        }
-
-        WriteJson(res, 404, new { error = $"Endpoint không tồn tại: {path}. Dùng /execute hoặc /query." });
-    }
-
-    // ──────────────────────────────────────────────────────────────
-    // /execute
-    // ──────────────────────────────────────────────────────────────
-    private void HandleExecute(HttpListenerResponse res, string body)
-    {
-        BridgeRequest? bridgeReq;
-        try
-        {
-            bridgeReq = JsonConvert.DeserializeObject<BridgeRequest>(body);
-        }
-        catch (System.Exception ex)
-        {
-            WriteJson(res, 400, new { error = $"JSON không hợp lệ: {ex.Message}" });
-            return;
-        }
-
-        if (bridgeReq is null || string.IsNullOrWhiteSpace(bridgeReq.Command))
-        {
-            WriteJson(res, 400, new { error = "Thiếu trường 'command'." });
-            return;
-        }
-
-        var tcs = new TaskCompletionSource<CommandResult>();
-
-        Application.DocumentManager.ExecuteInCommandContextAsync(async _ =>
-        {
-            var doc = Application.DocumentManager.MdiActiveDocument;
-            if (doc is null)
-            {
-                tcs.SetResult(CommandResult.Fail("Không có drawing nào đang mở trong AutoCAD."));
-                return;
-            }
-
-            try
-            {
-                tcs.SetResult(DispatchCommand(doc.Database, bridgeReq));
-            }
-            catch (System.Exception ex)
-            {
-                tcs.SetException(ex);
-            }
-
-            await Task.CompletedTask;
-        }, null);
-
-        CommandResult cmdResult;
-        try
-        {
-            cmdResult = tcs.Task.Wait(30_000) ? tcs.Task.Result
-                : CommandResult.Fail("Timeout: AutoCAD không xử lý trong 30 giây.");
-        }
-        catch (System.Exception ex)
-        {
-            cmdResult = CommandResult.Fail($"Lỗi thực thi: {ex.Message}");
-        }
-
-        WriteJson(res, cmdResult.Success ? 200 : 500, new
-        {
-            success      = cmdResult.Success,
-            summary      = cmdResult.Summary,
-            affectedCount = cmdResult.AffectedCount,
-            messages     = cmdResult.Messages,
-            errors       = cmdResult.Errors,
-        });
-    }
-
-    // ──────────────────────────────────────────────────────────────
-    // /query
-    // ──────────────────────────────────────────────────────────────
-    private void HandleQuery(HttpListenerResponse res, string body)
-    {
-        QueryRequest? queryReq;
-        try
-        {
-            queryReq = JsonConvert.DeserializeObject<QueryRequest>(body);
-        }
-        catch (System.Exception ex)
-        {
-            WriteJson(res, 400, new { error = $"JSON không hợp lệ: {ex.Message}" });
-            return;
-        }
-
-        if (queryReq is null || string.IsNullOrWhiteSpace(queryReq.Query))
-        {
-            WriteJson(res, 400, new { error = "Thiếu trường 'query'." });
-            return;
-        }
-
-        var tcs = new TaskCompletionSource<object>();
-
-        Application.DocumentManager.ExecuteInCommandContextAsync(async _ =>
-        {
-            var doc = Application.DocumentManager.MdiActiveDocument;
-            if (doc is null)
-            {
-                tcs.SetResult(new { error = "Không có drawing nào đang mở trong AutoCAD." });
-                return;
-            }
-
-            try
-            {
-                tcs.SetResult(AcadQueryHandler.Handle(doc.Database, queryReq));
-            }
-            catch (System.Exception ex)
-            {
-                tcs.SetResult(new { error = ex.Message });
-            }
-
-            await Task.CompletedTask;
-        }, null);
-
-        object queryResult;
-        try
-        {
-            queryResult = tcs.Task.Wait(30_000) ? tcs.Task.Result
-                : new { error = "Timeout: AutoCAD không xử lý trong 30 giây." };
-        }
-        catch (System.Exception ex)
-        {
-            queryResult = new { error = $"Lỗi truy vấn: {ex.Message}" };
-        }
-
-        WriteJson(res, 200, queryResult);
-    }
-
-    /// <summary>
-    /// Dispatch qua <see cref="AcadCommandTable"/> — cùng một bảng lệnh mà Ribbon, batch runner và
-    /// lớp AI dùng, nên bí danh (<c>Cleanup</c>, <c>AutoNumber</c>…) và thông báo lệnh sai chỉ có
-    /// một chỗ định nghĩa: <c>CommandCatalog</c>.
-    /// </summary>
-    private static CommandResult DispatchCommand(Database db, BridgeRequest req) =>
-        AcadCommandTable.Dispatch(db, req.Command, req.Config?.ToString() ?? "{}");
-
-    private static void WriteJson(HttpListenerResponse res, int statusCode, object payload)
-    {
-        var json = JsonConvert.SerializeObject(payload, Formatting.Indented);
-        var bytes = Encoding.UTF8.GetBytes(json);
-        res.StatusCode = statusCode;
-        res.ContentType = "application/json; charset=utf-8";
-        res.ContentLength64 = bytes.Length;
-        try
-        {
-            res.OutputStream.Write(bytes, 0, bytes.Length);
-            res.OutputStream.Close();
-        }
-        catch { }
-    }
+    public void Stop() => _server.Stop();
 
     public void Dispose()
     {
-        if (_disposed) return;
+        if (_disposed)
+        {
+            return;
+        }
+
         _disposed = true;
-        Stop();
-        _listener.Close();
+        _server.Dispose();
     }
-}
 
-public sealed class BridgeRequest
-{
-    [JsonProperty("command")]
-    public string Command { get; set; } = string.Empty;
+    /// <summary>
+    /// Đưa việc vào command context của AutoCAD — bắt buộc, vì Database chỉ được đụng tới trên luồng
+    /// chính. Kiểm tra <c>TryClaim()</c> trước khi chạy để không mở transaction cho request mà client
+    /// đã bỏ vì timeout (mục 0.5).
+    /// </summary>
+    private static Task RunOnAutoCadThread<TRequest, TResult>(
+        BridgeWorkItem<TRequest, TResult> item,
+        Func<Autodesk.AutoCAD.DatabaseServices.Database, TResult> work,
+        Func<string, TResult> onError)
+    {
+        Application.DocumentManager.ExecuteInCommandContextAsync(
+            _ =>
+            {
+                if (!item.TryClaim())
+                {
+                    return Task.CompletedTask;
+                }
 
-    [JsonProperty("config")]
-    public JObject? Config { get; set; }
+                try
+                {
+                    var document = Application.DocumentManager.MdiActiveDocument;
+                    item.Completion.TrySetResult(document is null
+                        ? onError("Không có drawing nào đang mở trong AutoCAD.")
+                        : work(document.Database));
+                }
+                catch (Exception ex)
+                {
+                    item.Completion.TrySetResult(onError($"Lỗi khi chạy trong AutoCAD: {ex.Message}"));
+                }
+
+                return Task.CompletedTask;
+            },
+            null);
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Core.AutoCAD và Shared.Hosting hiện có hai lớp <c>CommandResult</c> riêng, hình dạng giống
+    /// nhau. Gộp lại là refactor lớn (đụng toàn bộ lệnh AutoCAD) nên tách khỏi PR bảo mật này;
+    /// tạm thời chuyển đổi ở đúng một chỗ — ranh giới HTTP.
+    /// </summary>
+    private static HostResult ToHostResult(AcadResult result)
+    {
+        var mapped = result.Success
+            ? HostResult.Ok(result.Summary, result.AffectedCount)
+            : HostResult.Fail(result.Summary, result.Errors);
+
+        foreach (var message in result.Messages)
+        {
+            mapped.Messages.Add(message);
+        }
+
+        return mapped;
+    }
+
+    /// <summary>Chuyển body dùng chung sang kiểu truy vấn của AutoCAD.</summary>
+    private static QueryRequest ToQueryRequest(BridgeQuery query) => new()
+    {
+        Query = query.Query,
+        Params = JsonConvert.DeserializeObject<AcadQueryParams>(query.ParamsJson) ?? new AcadQueryParams(),
+    };
 }

@@ -25,7 +25,15 @@ namespace DhcbTools.Shared.Hosting
         [JsonProperty("params")]
         public JObject? Params { get; set; }
 
-        public string ParamsJson => Params?.ToString(Formatting.None) ?? "{}";
+        /// <summary>
+        /// Bí danh của <see cref="Params"/>. Panel, MCP server và tài liệu đều gửi <c>"config"</c>,
+        /// nên nếu chỉ nhận <c>"params"</c> thì mọi tham số truy vấn bị bỏ qua trong im lặng —
+        /// đó chính là lý do <c>limit</c> không có tác dụng (xin 200 vẫn trả về đủ 2.273 bản ghi).
+        /// </summary>
+        [JsonProperty("config")]
+        public JObject? Config { get; set; }
+
+        public string ParamsJson => (Params ?? Config)?.ToString(Formatting.None) ?? "{}";
     }
 
     /// <summary>Body của <c>POST /chat</c>: câu lệnh tiếng Việt cần dịch sang lệnh Core (mục 5.4).</summary>

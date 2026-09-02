@@ -10,6 +10,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DhcbTools.Core.AutoCAD\DhcbTools.Core.AutoCAD.csproj" />
+    <!-- Cho phép vỏ AutoCAD dùng HttpBridgeServer chung (token, khoá dò token, /tools, /chat). -->
+    <ProjectReference Include="..\DhcbTools.Shared.Hosting\DhcbTools.Shared.Hosting.csproj" />
   </ItemGroup>
 
   <ItemGroup>

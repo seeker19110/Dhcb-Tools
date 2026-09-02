@@ -262,11 +262,47 @@ hợp lệ, nên đúng một dòng thiếu `pattern` làm mọi layer đều "�
 Nay quy tắc thiếu/hỏng bị bỏ qua **và báo ra**; nếu không còn quy tắc dùng được thì lệnh **dừng hẳn**
 thay vì báo "0 sai chuẩn".
 
-## Vấn đề còn mở (chưa sửa trong PR này)
+## Vấn đề còn mở → đã vá (vòng 3)
+
+Ba trong bốn vấn đề của vòng 2 có chung một gốc: vỏ AutoCAD **tự viết HTTP server riêng 275 dòng**
+thay vì dùng `Shared.Hosting.HttpBridgeServer` như vỏ Revit (nó thậm chí chưa từng tham chiếu
+`Shared.Hosting`). Nay đã chuyển sang server dùng chung.
+
+Đo trên AutoCAD 2026 đang chạy, bản vẽ thật:
+
+| Kiểm tra | Trước | Sau |
+|---|---|---|
+| `GET /health` không token | 200 | 200 (công khai, chỉ trạng thái) |
+| `GET /tools` không token | *không có endpoint* | **401** |
+| `POST /execute` không token | **200 — chạy thật** ❌ | **401** ✅ |
+| `POST /query` không token | **200** ❌ | **401** ✅ |
+| `POST /execute` token sai | *không kiểm tra* | **401** |
+| `POST /query` token đúng | — | 200 |
+| `GET /tools` token đúng | *không có* | 200 — **15 lệnh** |
+| `POST /chat` token đúng | *không có* | 200 — "purge dọn bản vẽ này" → `DrawingCleanup {dryRun:true}` |
+| 5 lần token sai liên tiếp | *không có* | lần 6 → **429**, khoá 5 phút (chặn cả token đúng) |
+| File token tự sinh | **không bao giờ tạo** | `%APPDATA%\DHCB\bridge-token.txt` (43 ký tự) |
+
+Yêu cầu nguy hiểm nhất — `{"command":"DrawingCleanup","config":{"dryRun":false,"purgeUnused":true}}`
+gửi **không kèm token** — trước đây chạy thật; nay trả 401.
+
+**Lỗi `limit` cũng cùng gốc.** `QueryRequest` đọc khoá `params`, còn panel/MCP/tài liệu đều gửi
+`config`, nên tham số bị bỏ qua trong im lặng. Nay `BridgeQuery` nhận cả hai khoá:
+
+| Yêu cầu | Trước | Sau |
+|---|---|---|
+| `{"query":"inserts","config":{"limit":5}}` | 2.273 bản ghi | **5** |
+| `{"query":"inserts","params":{"limit":5}}` | 2.273 bản ghi | **5** |
+
+Không hồi quy: chạy lại qua Bridge mới cho số liệu khớp hệt vòng 2 — `BlockQuantity` 2.273,
+`GridExtract` 1.911, `TextReplace` 344, `LayerStandardCheck` 64/87.
+
+Ba client Python (`panel_api.py`, `server.py`, `dhcb_agent.py`) vốn đã gửi
+`Authorization: Bearer` sẵn, nên việc bật xác thực không làm hỏng công cụ nào.
+
+### Còn lại
 
 | Vấn đề | Chi tiết |
 |---|---|
-| **Bridge AutoCAD không có xác thực** | Vỏ AutoCAD tự viết HTTP server riêng (275 dòng) thay vì dùng `Shared.Hosting.HttpBridgeServer` như vỏ Revit. Hệ quả: **không có token**, mọi tiến trình local đều POST `/execute` sửa được bản vẽ đang mở. README nói cả hai bridge đều có token + khoá khi dò sai. |
-| **Thiếu `/tools` và `/chat`** | Bridge AutoCAD chỉ có `/health`, `/execute`, `/query`. Cùng nguyên nhân với trên. |
-| **`limit` trong `/query` bị bỏ qua** | `{"query":"inserts","config":{"limit":200}}` vẫn trả về đủ 2.273 bản ghi. |
-| **Hai instance AutoCAD → xung đột cổng** | Instance thứ hai không chiếm được 8766 và không báo lỗi ra ngoài. |
+| Hai instance AutoCAD → xung đột cổng | Instance thứ hai không chiếm được 8766 và không báo lỗi ra ngoài. |
+| `CommandResult` trùng lặp | Tồn tại hai lớp (`Core.AutoCAD` và `Shared.Hosting`) hình dạng giống nhau. Gộp lại đụng toàn bộ lệnh AutoCAD nên tách riêng; hiện chuyển đổi tại đúng một chỗ — ranh giới HTTP. |
