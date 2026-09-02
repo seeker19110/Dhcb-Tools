@@ -99,6 +99,20 @@ public static class RevitCompat
         return types.FirstOrDefault(t => t.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0);
     }
 
+    /// <summary>
+    /// Luật "chứa chuỗi" cho ParameterFilter. Revit 2023 bỏ tham số <c>caseSensitive</c> và
+    /// đánh dấu overload cũ là obsolete; cả hai nhánh đều không phân biệt hoa thường,
+    /// nên hành vi giữ nguyên qua mọi phiên bản.
+    /// </summary>
+    public static FilterRule CreateContainsRule(ElementId parameterId, string value)
+    {
+#if REVIT2023_OR_GREATER
+        return ParameterFilterRuleFactory.CreateContainsRule(parameterId, value);
+#else
+        return ParameterFilterRuleFactory.CreateContainsRule(parameterId, value, false);
+#endif
+    }
+
     /// <summary>Mở transaction với SilentFailuresPreprocessor — khuôn chung cho mọi lệnh Core.</summary>
     public static Transaction StartTransaction(Document doc, string name)
     {

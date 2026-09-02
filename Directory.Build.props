@@ -26,6 +26,11 @@
     <TargetFramework>net8.0-windows</TargetFramework>
   </PropertyGroup>
 
+  <!-- Hằng biên dịch theo phiên bản: CreateContainsRule bỏ tham số caseSensitive từ 2023. -->
+  <PropertyGroup Condition="'$(RevitVersion)' != '' And $(RevitVersion) &gt;= 2023">
+    <DefineConstants>$(DefineConstants);REVIT2023_OR_GREATER</DefineConstants>
+  </PropertyGroup>
+
   <!-- Hằng biên dịch theo phiên bản: ElementId.Value (long) thay IntegerValue từ 2024. -->
   <PropertyGroup Condition="'$(RevitVersion)' != '' And $(RevitVersion) &gt;= 2024">
     <DefineConstants>$(DefineConstants);REVIT2024_OR_GREATER</DefineConstants>

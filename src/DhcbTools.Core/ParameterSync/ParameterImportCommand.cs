@@ -50,13 +50,11 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
                 continue;
             }
 
-            // ElementId chuyển sang dùng kiểu long kể từ Revit 2024 và bỏ hẳn constructor int từ Revit 2025;
-            // TargetFramework net8.0-windows chỉ dùng cho Revit 2025+ (xem Directory.Build.props) nên tách theo TFM.
-#if NET8_0_WINDOWS
-            var elementId = new ElementId(idValue);
-#else
-            var elementId = new ElementId((long)idValue);
-#endif
+            // ElementId dùng long từ Revit 2024, int trước đó — RevitCompat.MakeId tách theo
+            // REVIT2024_OR_GREATER. (Trước đây chỗ này tự tách bằng #if NET8_0_WINDOWS, một symbol
+            // không bao giờ được định nghĩa — TFM net8.0-windows sinh ra NET8_0_WINDOWS7_0 — nên
+            // nhánh long luôn thắng và Revit ≤ 2023 không biên dịch được.)
+            var elementId = RevitCompat.MakeId(idValue);
             var element = document.GetElement(elementId);
             if (element is null)
             {

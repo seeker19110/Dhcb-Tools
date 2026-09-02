@@ -1,145 +1,133 @@
 # DHCB Tools — Bằng chứng Build & Test
-**Ngày:** 2026-09-02 09:00 ICT (UTC+7)  
-**Repo:** https://github.com/seeker19110/Dhcb-Tools  
-**Commit:** `04f10c9` — test+fix: 28 unit tests + 0 warnings (28→0) (#15)
+
+**Ngày:** 2026-09-02 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
+**Nhánh:** `fix/toan-bo-danh-gia` ([PR #21](https://github.com/seeker19110/Dhcb-Tools/pull/21))
+
+> ⚠️ **Đính chính bản trước.** Bản ghi ngày 09:00 ICT báo *"28/28 unit test PASS"* dựa trên project
+> `src/DhcbTools.Tests`. Project đó **không hề tham chiếu `DhcbTools.Shared.Logic`** — nó khai báo lại
+> `UnitConverter`, `FileNameFormatter`… ngay trong file test rồi kiểm chính bản sao đó:
+>
+> ```csharp
+> // Các class dưới đây mirror đúng logic trong Core để test isolated.
+> static class UnitConverter { public static double MmToFeet(double mm) => mm / MmPerFoot; }
+> ```
+>
+> 28 test ấy xanh kể cả khi mã nguồn thật hỏng hoàn toàn, và CI cũng chưa bao giờ chạy tới chúng
+> (`tests.yml` chạy `tests/DhcbTools.Shared.Logic.Tests`, không nằm trong solution cũ). Project đã bị xoá;
+> phần logic tương ứng đã có test thật trong `Shared.Logic.Tests`. Con số dưới đây đo trên mã nguồn thật.
 
 ---
 
-## 1. Build toàn bộ solution
+## 1. Test tự động
 
-**Lệnh:**
-```
-cd "C:/Users/liend/Dhcb Tools"
-dotnet build Dhcb-Tools.sln -p:RevitVersion=2024 -p:AcadVersion=2024
-```
+| Bộ test | Số lượng | Kết quả |
+|---|---|---|
+| `tests/DhcbTools.Shared.Logic.Tests` (xUnit, .NET 8) | 345 | ✅ 345 passed / 0 failed |
+| `tools/autocad-mcp-server/test_panel_api.py` (unittest) | 29 | ✅ 29 passed / 0 failed |
 
-**Kết quả:**
 ```
-DhcbTools.Core.AutoCAD  → bin/Debug/net48/DhcbTools.Core.AutoCAD.dll
-DhcbTools.Shared.Logic  → bin/Debug/netstandard2.0/DhcbTools.Shared.Logic.dll
-DhcbTools.Tests         → bin/x64/Debug/net8.0/DhcbTools.Tests.dll
-DhcbTools.Shared.Hosting→ bin/Debug/netstandard2.0/DhcbTools.Shared.Hosting.dll
-DhcbTools.Core          → bin/Debug/net48/DhcbTools.Core.dll
-DhcbTools.AutoCAD       → bin/Debug/net48/DhcbTools.AutoCAD.dll
-DhcbTools.Revit         → bin/Debug/net48/DhcbTools.Revit.dll
+dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj -c Release
+Passed!  - Failed: 0, Passed: 345, Skipped: 0, Total: 345
 
-Build succeeded.
-    0 Warning(s)
-    0 Error(s)
-Time Elapsed 00:00:00.76
+python -m unittest discover -s tools/autocad-mcp-server -p 'test_*.py'
+Ran 29 tests — OK
 ```
 
-✅ **7 projects build thành công, 0 errors, 0 warnings**
+Trong đó `RibbonCoverageTests` (4 test) đối chiếu vỏ Revit với `RevitCommandTable`. Đã kiểm bằng
+**mutation**: đổi hỏng một tên lớp trong `App.cs` thì test đỏ ngay (`344 passed, 1 failed`), nên nó
+bắt thật chứ không xanh suông.
 
 ---
 
-## 2. Unit Tests (28/28 PASS)
+## 2. Build — đúng bộ phiên bản mà `release.yml` đóng gói
 
-**Lệnh:**
-```
-dotnet test src/DhcbTools.Tests/ -v:normal
-```
+Tất cả đều là build **sạch** (`--no-incremental`). Điều này quan trọng: build incremental bỏ qua
+project đã dựng nên **giấu mất warning** — chính vì thế lần đo trước báo nhầm "0 warning".
 
-**Kết quả chi tiết:**
+| Cấu hình | TFM | Kết quả |
+|---|---|---|
+| Solution, Revit+AutoCAD 2025 | net8.0-windows | ✅ 0 error, 0 warning |
+| Solution, Revit+AutoCAD 2024 | net48 | ✅ 0 error, 0 warning |
+| `DhcbTools.Revit`, Revit 2023 | net48 | ✅ 0 error, 0 warning |
+| `DhcbTools.Revit`, Revit 2024 | net48 | ✅ 0 error, 0 warning |
+| `DhcbTools.Revit`, Revit 2025 | net8.0-windows | ✅ 0 error, 0 warning |
+| `DhcbTools.AutoCAD`, AutoCAD 2024 | net48 | ✅ 0 error, 0 warning |
+| `DhcbTools.AutoCAD`, AutoCAD 2025 | net8.0-windows | ✅ 0 error, 0 warning |
 
-| Test | Class | Thời gian |
-|------|-------|-----------|
-| ✅ MmToFeet_Correct(0→0) | UnitConversionTests | <1ms |
-| ✅ MmToFeet_Correct(304.8→1.0) | UnitConversionTests | <1ms |
-| ✅ MmToFeet_Correct(3048→10.0) | UnitConversionTests | <1ms |
-| ✅ MmToFeet_Correct(-3500→-11.48) | UnitConversionTests | <1ms |
-| ✅ MmToFeet_Correct(3800→12.47) | UnitConversionTests | <1ms |
-| ✅ MmToFeet_Correct(11400→37.40) | UnitConversionTests | 2ms |
-| ✅ FeetToMm_Correct(1.0→304.8) | UnitConversionTests | <1ms |
-| ✅ FeetToMm_Correct(10.0→3048) | UnitConversionTests | <1ms |
-| ✅ FeetToMm_Correct(0.0→0.0) | UnitConversionTests | <1ms |
-| ✅ RoundTrip_Lossless | UnitConversionTests | <1ms |
-| ✅ DefaultPattern_AllTokens | FileNameFormatterTests | <1ms |
-| ✅ PatternWithProjectNumber | FileNameFormatterTests | <1ms |
-| ✅ EmptyPattern_ReturnsEmpty | FileNameFormatterTests | <1ms |
-| ✅ NoTokens_ReturnsLiteralPattern | FileNameFormatterTests | 2ms |
-| ✅ SkipExisting_CaseInsensitive | LevelSetupLogicTests | <1ms |
-| ✅ SkipExisting_False_NeverSkips | LevelSetupLogicTests | 2ms |
-| ✅ StandardLevels_AllConvertCorrectly | LevelSetupLogicTests | <1ms |
-| ✅ VerticalGrid_AtOrigin | GridSetupLogicTests | <1ms |
-| ✅ HorizontalGrid_HasConstantY | GridSetupLogicTests | 2ms |
-| ✅ ShortElement_OneHanger | HangerSpacingTests | 3ms |
-| ✅ ExactlyDoubleSpacing_TwoHangers | HangerSpacingTests | 1ms |
-| ✅ LongPipe_CorrectCount | HangerSpacingTests | <1ms |
-| ✅ ShortPipe_NoSplit | PipeSplitLogicTests | <1ms |
-| ✅ PipeExactly12m_OneSplit | PipeSplitLogicTests | 3ms |
-| ✅ PipeLong_CorrectSplitCount | PipeSplitLogicTests | 1ms |
-| ✅ FileSizeMb_Calculation | HealthReportLogicTests | <1ms |
-| ✅ FileSizeWarn_TriggersAboveThreshold | HealthReportLogicTests | 2ms |
-| ✅ FileSizeWarn_OkBelowThreshold | HealthReportLogicTests | <1ms |
+Solution nay gồm **9/9 project thật** (bản trước chỉ khai báo 5/10 và trỏ nhầm sang project test giả).
 
-**Tổng kết:**
-```
-Test Run Successful.
-Total tests: 28
-     Passed: 28
-     Failed: 0
- Total time: 0.3955 Seconds
-```
+### Ba lỗi chặn phát hành, chỉ lộ ra khi build đủ phiên bản
+
+CI cũ chỉ build nhánh 2025 (net8), nên ba lỗi dưới đây lọt qua — dù `release.yml` vẫn đóng gói 2023/2024:
+
+| Lỗi | Ảnh hưởng |
+|---|---|
+| `DrawingCompareCommand` dùng `Dictionary.GetValueOrDefault` — không có trên net48 | Toàn bộ nhánh **AutoCAD/Revit ≤ 2024 không build được** |
+| `ConnectorCheckerCommand` gọi thẳng `ElementId.Value` thay vì `RevitCompat.IdValue` | **Revit ≤ 2023 không build được** |
+| `ParameterImportCommand` tách nhánh bằng `#if NET8_0_WINDOWS` — symbol **không bao giờ được định nghĩa** (TFM `net8.0-windows` sinh ra `NET8_0_WINDOWS7_0`) | Nhánh `long` luôn thắng → **Revit ≤ 2023 không build được** |
+
+Đã sửa cả ba, và `tests.yml` nay chạy ma trận **2025 + 2024 + 2023** để không tái phát.
 
 ---
 
-## 3. Phạm vi test
+## 3. Gateway panel AutoCAD — kiểm chứng chạy thật
 
-### ✅ Đã test (unit tests độc lập — không cần Revit/AutoCAD)
+Chạy `panel_api.py` trên cổng riêng rồi gọi thật bằng `curl`:
 
-| Module | Logic được test |
-|--------|----------------|
-| **UnitConversion** | mm↔feet chính xác 6 chữ số thập phân, round-trip |
-| **FileNameFormatter** | `{SheetNumber}-{SheetName}`, `{ProjectNumber}`, literal pattern, empty |
-| **LevelSetup** | Skip duplicate case-insensitive, SkipExisting=false không bỏ qua, 5 tầng chuẩn |
-| **GridSetup** | Vertical grid (X cố định), Horizontal grid (Y cố định) đúng tọa độ |
-| **HangerSpacing** | Pipe ngắn=1 hanger, double spacing=2 hangers, pipe dài=3 hangers |
-| **PipeSplit** | Ống ngắn=không chia, 12m=1 điểm chia, 20m=3 điểm chia |
-| **HealthReport** | Tính file size MB, ngưỡng cảnh báo >200MB |
+| Yêu cầu | Mong đợi | Thực tế |
+|---|---|---|
+| `GET /alive` không token | 200, không mang dữ liệu | ✅ 200 `{"panelApi": "ok"}` |
+| `GET /health` không token | 403 | ✅ 403 |
+| `GET /health` có token | 200 | ✅ 200 |
+| `GET /panel` không token | 200 (nơi phát token) | ✅ 200 |
+| `POST /execute` lệnh ngoài whitelist | từ chối | ✅ `{"ok": false, "error": "command không hợp lệ"}` |
 
-### ⚫ Chưa test (cần Revit/AutoCAD đang chạy)
+Và kiểm chứng lớp AI:
 
-| Lệnh Bridge | Lý do chưa test |
-|-------------|----------------|
-| `BatchExport`, `HealthReport` | Cần Revit mở với document |
-| `ProjectInfo`, `LevelSetup`, `GridSetup`, `FamilyLoader` | Cần Revit + transaction |
-| `Sleeve`, `ElevationTag`, `Hanger`, `ConnectorCheck`, `PipeSplit` | Cần Revit + MEP elements |
-| `POST /query` (10 loại) | Cần add-in load vào Revit |
-| AutoCAD Bridge `localhost:8766` | Cần AutoCAD đang mở |
-
-**Test live khi Revit chạy:**
-```bash
-curl -s http://localhost:8765/health
-curl -s http://localhost:8765/query -d '{"type":"document_info"}'
-curl -s http://localhost:8765/execute -d '{"command":"HealthReport","config":{"OutputPath":"C:/tmp/health.html"}}'
+```
+hermes argv    : ['hermes', '--ignore-rules', '-t', '', '-z', ...]
+toolsets empty : True      ← model không duyệt web / không chạy lệnh / không đọc file
+no web toolset : True
+planner fenced : True      ← dữ liệu DWG nằm trong khối <du_lieu>
 ```
 
 ---
 
-## 4. Trạng thái codebase
+## 4. Phạm vi — cái gì đã kiểm, cái gì chưa
 
-| Hạng mục | Giá trị |
-|----------|---------|
-| Projects | 10 (7 build net48/netstandard2.0 + 1 test net8.0) |
-| .cs files | 133 |
-| Unit tests | 28 |
-| Build errors | 0 |
-| Build warnings | 0 |
-| Git commits | 15 PRs merged vào main |
-| GitHub | https://github.com/seeker19110/Dhcb-Tools |
+### ✅ Kiểm bằng test tự động (không cần Revit/AutoCAD)
+
+Toàn bộ `Shared.Logic`: đánh số, đặt tên file, CSV, HTML, xác thực Bridge, batch/RunLog, hình học
+lưới trục, MEP (route graph, device pattern, duct/pipe sizing, path finder 3D), rule checker,
+lớp AI offline; cộng phủ Ribbon và gateway panel.
+
+### ✅ Đã chạy thật trên AutoCAD
+
+Xem [`bang-chung-test-autocad-live.md`](bang-chung-test-autocad-live.md) — AutoCAD 2026, bản vẽ thật
+6.759 entity / 171 layer: `/health`, 6 loại `query`, `LayerExport`, `DrawingCleanup` (dryRun) và
+`AutoNumbering` **ghi thật 21/21 block**.
+
+### ⬜ Chưa chạy thật
+
+| Nhóm | Ghi chú |
+|---|---|
+| **Toàn bộ lệnh Revit (42 lệnh)** | Chưa có vòng kiểm thử nào trên Revit thật — rủi ro lớn nhất còn lại |
+| 11 lệnh AutoCAD thêm sau (`AttributeExport/Import`, `TextReplace`, `LayerStandardCheck`, `GridExtract`, `XrefAudit`, `LayerTranslate`, `DrawingCompare`, `BlockQuantity`, `AttributeIncrement`, `CadLayerMap`) | Có mã nguồn, biên dịch xanh, chưa chạy trên AutoCAD thật |
+| Batch chạy đêm đầu-cuối | `BatchStartupHook` mới viết, cần một đêm chạy thật trên máy có license |
+
+Quy trình kiểm thử tay: [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md).
 
 ---
 
-## 5. Git history (các PRs đã merge)
+## 5. Vì sao bản trước sai
 
-```
-04f10c9  test+fix: 28 unit tests + 0 warnings (28→0) (#15)
-65795a2  docs+ci: cập nhật progress/roadmap sau P2, thêm CI/CD (#14)
-676352c  docs: hướng dẫn cài đặt và kiểm thử thủ công (#13)
-7cd3675  feat: giai đoạn 7 P2 — ống dốc, BOM, AutoRoute, ScheduleExport (#12)
-942ea0a  feat: trọn bộ tính năng Revit + AutoCAD, offline AI (#11)
-...
-f894ed9  feat: Phase 1+2+3 — Batch Export, Health Report, Project Init, MEPF (#3)
-47c3b51  feat: DHCB Tools 2-trong-1 — Revit + AutoCAD với HTTP Bridge (#2)
-```
+Ba cơ chế khiến bằng chứng cũ đẹp hơn thực tế — ghi lại để không lặp lại:
+
+1. **Test trên bản sao.** `src/DhcbTools.Tests` kiểm logic chép tay trong chính file test, nên xanh
+   bất kể mã nguồn thật ra sao.
+2. **Build incremental giấu warning.** Project đã dựng bị bỏ qua, warning không hiện lại. Mọi con số
+   trong tài liệu này đều đo bằng `--no-incremental`.
+3. **CI chỉ phủ một phiên bản.** Chỉ build 2025 nên mọi lỗi riêng của net48 / Revit ≤ 2023 đều lọt.
+
+Nguyên tắc từ nay: **con số nào vào tài liệu này thì phải kèm lệnh tái lập được**, và test phải tham
+chiếu mã nguồn thật chứ không kiểm bản sao.

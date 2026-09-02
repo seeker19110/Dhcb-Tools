@@ -100,7 +100,7 @@ public sealed class SystemColorCommand : ICoreCommand<SystemColorConfig>
         {
             try
             {
-                var rule = ParameterFilterRuleFactory.CreateContainsRule(systemNameParamId, system, false);
+                var rule = RevitCompat.CreateContainsRule(systemNameParamId, system);
                 var elementFilter = new ElementParameterFilter(rule);
 
                 if (!existing.TryGetValue(filterName, out var filter))
