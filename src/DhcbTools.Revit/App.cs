@@ -148,8 +148,20 @@ public sealed class App : IExternalApplication
                 return;
             }
 
-            _bridge = new DhcbHttpBridge();
-            _bridge.Start();
+            try
+            {
+                _bridge = new DhcbHttpBridge();
+                _bridge.Start();
+            }
+            catch (Exception ex)
+            {
+                // Instance Revit thứ hai: cổng 8765 đã bị instance đầu giữ. Không ném ra khỏi event
+                // handler (Revit nuốt hoặc crash) — báo rõ để người dùng biết Bridge đang trỏ instance nào.
+                _bridge?.Dispose();
+                _bridge = null;
+                TaskDialog.Show("DHCB Tools — HTTP Bridge", ex.Message);
+            }
+
             RegisterElevationUpdater(application);
         };
 

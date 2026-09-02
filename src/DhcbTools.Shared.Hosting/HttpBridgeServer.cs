@@ -52,6 +52,9 @@ namespace DhcbTools.Shared.Hosting
         /// <summary>Token hiện hành (nạp từ <see cref="BridgeTokenStore"/> khi Start). Không bao giờ log.</summary>
         public string? Token { get; private set; }
 
+        /// <summary><c>true</c> khi listener đã mở cổng thành công và vòng lặp nhận request đang chạy.</summary>
+        public bool IsRunning => _listener.IsListening;
+
         /// <summary>Thực thi lệnh ghi. Nhận work item để kiểm tra <c>TryClaim()</c> trước khi mở transaction.</summary>
         public Func<BridgeWorkItem<BridgeRequest, CommandResult>, Task>? ExecuteAsync { get; set; }
 
@@ -74,7 +77,19 @@ namespace DhcbTools.Shared.Hosting
             // 127.0.0.1 thay cho "localhost": HttpListener coi "localhost" là host header, còn địa chỉ IP
             // ràng buộc đúng interface loopback — máy khác trong LAN không kết nối được (§4.1 kịch bản 6).
             _listener.Prefixes.Add("http://127.0.0.1:" + Port + "/");
-            _listener.Start();
+            try
+            {
+                _listener.Start();
+            }
+            catch (HttpListenerException ex)
+            {
+                // Windows: 32 = ERROR_SHARING_VIOLATION (net48), 183 = ERROR_ALREADY_EXISTS (.NET Core),
+                // 5 = ACCESS_DENIED khi prefix bị URL ACL khác giữ. Tất cả đều nghĩa là "không mở được cổng này".
+                // .NET Core tự Dispose listener khi Start() hỏng, nên chỉ dọn prefix được trên net48.
+                try { _listener.Prefixes.Clear(); } catch (ObjectDisposedException) { }
+                Log?.Invoke("[DHCB Bridge] " + AppName + " KHÔNG mở được cổng " + Port + " (mã " + ex.ErrorCode + ")");
+                throw new BridgePortInUseException(AppName, Port, ex);
+            }
 
             _cts = new CancellationTokenSource();
             _listenTask = Task.Run(() => ListenLoop(_cts.Token));

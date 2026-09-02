@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\DhcbTools.Shared.Logic\DhcbTools.Shared.Logic.csproj" />
+    <ProjectReference Include="..\..\src\DhcbTools.Shared.Hosting\DhcbTools.Shared.Hosting.csproj" />
   </ItemGroup>
 
 </Project>

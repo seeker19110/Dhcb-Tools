@@ -639,7 +639,7 @@ public sealed class DhcbCommands
     // ──────────────────────────────────────────────
     // Helper
     // ──────────────────────────────────────────────
-    private static void PrintResult(Editor ed, Core.AutoCAD.CommandResult result)
+    private static void PrintResult(Editor ed, DhcbTools.Shared.Hosting.CommandResult result)
     {
         ed.WriteMessage($"\n{(result.Success ? "✓" : "✗")} {result.Summary}\n");
         foreach (var msg in result.Messages)
