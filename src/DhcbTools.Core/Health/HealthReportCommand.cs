@@ -96,16 +96,21 @@ public sealed class HealthReportCommand : ICoreCommand<HealthReportConfig>
 
             // --- Generate HTML ----------------------------------------------
             string html = BuildHtml(document, config, metrics);
-            string? dir = Path.GetDirectoryName(config.OutputPath);
+            // Qua Bridge/batch config JSON có thể không có outputPath (required chỉ ràng buộc lúc biên dịch,
+            // Newtonsoft vẫn để null) → mặc định ghi vào Documents như nút Ribbon, thay vì ném ArgumentNullException.
+            string outputPath = string.IsNullOrWhiteSpace(config.OutputPath)
+                ? DefaultOutputPath(document)
+                : config.OutputPath!;
+            string? dir = Path.GetDirectoryName(outputPath);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
-            File.WriteAllText(config.OutputPath, html, Encoding.UTF8);
+            File.WriteAllText(outputPath, html, Encoding.UTF8);
 
             string summary = $"Health Report: {metrics.WarningCount} cảnh báo, " +
                              $"{metrics.UnplacedViewCount} view chưa đặt, " +
                              $"{metrics.OpenConnectorCount} connector hở, " +
                              $"{metrics.InPlaceFamilyCount} in-place family. " +
-                             $"File: {config.OutputPath}";
+                             $"File: {outputPath}";
             return CommandResult.Ok(summary, metrics.WarningCount);
         }
         catch (System.Exception ex)
@@ -155,6 +160,12 @@ public sealed class HealthReportCommand : ICoreCommand<HealthReportConfig>
     }
 
     // -------------------------------------------------------------------------
+    /// <summary>Đường dẫn mặc định khi config không có outputPath: Documents\DHCB_Health_&lt;title&gt;_&lt;thời điểm&gt;.html.</summary>
+    public static string DefaultOutputPath(Document document) =>
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            $"DHCB_Health_{DhcbTools.Shared.Logic.FileNaming.Sanitize(document.Title)}_{DateTime.Now:yyyyMMdd_HHmm}.html");
+
     private static string BuildHtml(Document doc, HealthReportConfig config, HealthMetrics m)
     {
         string projectName = doc.ProjectInformation?.Name ?? doc.Title ?? "Unknown Project";
