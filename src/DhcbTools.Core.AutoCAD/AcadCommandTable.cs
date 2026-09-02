@@ -1,6 +1,10 @@
+using DhcbTools.Core.AutoCAD.Attributes;
 using DhcbTools.Core.AutoCAD.AutoNumbering;
 using DhcbTools.Core.AutoCAD.DrawingCleanup;
 using DhcbTools.Core.AutoCAD.LayerSync;
+using DhcbTools.Core.AutoCAD.LayerTools;
+using DhcbTools.Core.AutoCAD.Reporting;
+using DhcbTools.Core.AutoCAD.TextTools;
 using DhcbTools.Shared.Logic.Ai;
 using Autodesk.AutoCAD.DatabaseServices;
 using Newtonsoft.Json;
@@ -26,6 +30,17 @@ public static class AcadCommandTable
             "LAYERIMPORT" => new LayerImportCommand().Execute(db, Deserialize<LayerImportConfig>(configJson)),
             "DRAWINGCLEANUP" => new DrawingCleanupCommand().Execute(db, Deserialize<CleanupConfig>(configJson)),
             "AUTONUMBERING" => new AutoNumberingCommand().Execute(db, Deserialize<AutoNumberingConfig>(configJson)),
+            "ATTRIBUTEEXPORT" => new AttributeExportCommand().Execute(db, Deserialize<AttributeExportConfig>(configJson)),
+            "ATTRIBUTEIMPORT" => new AttributeImportCommand().Execute(db, Deserialize<AttributeImportConfig>(configJson)),
+            "TEXTREPLACE" => new TextReplaceCommand().Execute(db, Deserialize<TextReplaceConfig>(configJson)),
+            "LAYERSTANDARDCHECK" => new LayerStandardCheckCommand().Execute(db, Deserialize<LayerStandardCheckConfig>(configJson)),
+            "GRIDEXTRACT" => new GridExtractCommand().Execute(db, Deserialize<GridExtractConfig>(configJson)),
+            "XREFAUDIT" => new XrefAuditCommand().Execute(db, Deserialize<XrefAuditConfig>(configJson)),
+            "LAYERTRANSLATE" => new LayerTranslateCommand().Execute(db, Deserialize<LayerTranslateConfig>(configJson)),
+            "DRAWINGCOMPARE" => new DrawingCompareCommand().Execute(db, Deserialize<DrawingCompareConfig>(configJson)),
+            "BLOCKQUANTITY" => new BlockQuantityCommand().Execute(db, Deserialize<BlockQuantityConfig>(configJson)),
+            "ATTRIBUTEINCREMENT" => new AttributeIncrementCommand().Execute(db, Deserialize<AttributeIncrementConfig>(configJson)),
+            "CADLAYERMAP" => new CadLayerMapCommand().Execute(db, Deserialize<CadLayerMapConfig>(configJson)),
 
             _ => CommandResult.Fail($"Lệnh không xác định: \"{command}\". Hợp lệ: {string.Join(", ", CommandCatalog.Names(CommandCatalog.AutoCad))}."),
         };

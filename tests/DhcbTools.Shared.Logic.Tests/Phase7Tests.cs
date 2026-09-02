@@ -281,18 +281,19 @@ public class IntentCandidatesTests
     {
         Assert.Equal("ColorByParameter", CommandIntentParser.Parse("tô màu theo tham số Fire Rating", CommandCatalog.Revit).Command);
         Assert.Equal("StylePurge", CommandIntentParser.Parse("xoá view template thừa", CommandCatalog.Revit).Command);
+        // LayerTranslate đã có mã nguồn (bỏ .Pending() trong CommandCatalog) nên giờ được nhận dạng bình thường.
+        Assert.Equal("LayerTranslate", CommandIntentParser.Parse("laytrans đổi layer theo chuẩn", CommandCatalog.AutoCad).Command);
     }
 
     /// <summary>
     /// Lệnh mới chỉ có đặc tả (<c>Pending</c>) không được lớp AI đề xuất — nếu không agent sẽ gọi
-    /// một lệnh không có trong Core. Khi LayerTranslate được viết, bỏ <c>.Pending()</c> trong
-    /// CommandCatalog và chuyển dòng này lên <see cref="LenhMoi_NhanDangDuoc"/>.
+    /// một lệnh không có trong Core. Toàn bộ 11 lệnh AutoCAD từng Pending nay đã có mã nguồn nên
+    /// danh sách Pending của AutoCAD hiện rỗng; test giữ lại để bắt hồi quy nếu có lệnh mới bị bỏ dở.
     /// </summary>
     [Fact]
     public void LenhChuaTrienKhai_KhongDuocDeXuat()
     {
-        Assert.Contains("LayerTranslate", CommandCatalog.PendingNames(CommandCatalog.AutoCad));
-        Assert.NotEqual("LayerTranslate", CommandIntentParser.Parse("laytrans đổi layer theo chuẩn", CommandCatalog.AutoCad).Command);
+        Assert.Empty(CommandCatalog.PendingNames(CommandCatalog.AutoCad));
     }
 
     [Fact]
