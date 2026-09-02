@@ -133,13 +133,28 @@ git tag v1.0.0 && git push origin v1.0.0   # kích hoạt release.yml
 Quy trình đầy đủ (build → cài → file mẫu → checklist Revit/AutoCAD/batch/MCP → ghi kết quả):
 [`docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md).
 
-## Triển khai (dev)
+## Cài đặt
+
+**Cách thường dùng — installer.** Tải `DhcbTools-Setup-<phiên bản>.exe` ở
+[Releases](https://github.com/seeker19110/Dhcb-Tools/releases), chọn phiên bản Revit/AutoCAD cần cài. Installer chạy
+theo người dùng (không cần quyền admin): add-in Revit vào `%APPDATA%\Autodesk\Revit\Addins\<năm>\`, plugin AutoCAD
+vào bundle `%APPDATA%\Autodesk\ApplicationPlugins\DhcbTools.bundle\` nên **tự nạp khi khởi động, không cần
+`NETLOAD`**. Nguồn: [`installer/dhcb-tools.iss`](installer/dhcb-tools.iss).
+
+**Chép tay (dev).**
 
 - **Revit:** copy `DhcbTools.Revit.addin` + `DhcbTools.Revit.dll`, `DhcbTools.Core.dll`, `DhcbTools.Shared.*.dll`,
-  `Newtonsoft.Json.dll` vào `%ProgramData%\Autodesk\Revit\Addins\<version>\`.
+  `Newtonsoft.Json.dll` vào `%APPDATA%\Autodesk\Revit\Addins\<năm>\`.
 - **AutoCAD:** `NETLOAD DhcbTools.AutoCAD.dll` (kèm `DhcbTools.Core.AutoCAD.dll`, `DhcbTools.Shared.*.dll`), hoặc đặt vào
   `%AppData%\Autodesk\ApplicationPlugins\`.
 - **Tuỳ chọn:** `%APPDATA%\DHCB\settings.json` (bật `ElevationUpdater`), `%APPDATA%\DHCB\ai.json` (model local) — mẫu trong `configs/`.
+
+## Phiên bản và log
+
+- **Phiên bản** đi từ tag git vào DLL (`release.yml` truyền `-p:Version=`), nên `GET /health` trả đúng bản đang chạy.
+  Build tại chỗ không truyền gì thì là `0.9.0-dev`.
+- **Log**: `%APPDATA%\DHCB\logs\<Revit|AutoCAD>-<ngày>.log` — khởi động add-in, trạng thái Bridge, và stack trace đầy
+  đủ của mọi lệnh lỗi (hộp thoại chỉ hiện một dòng tóm tắt). Giữ 30 ngày, tự dọn lúc khởi động.
 
 ## Trạng thái
 

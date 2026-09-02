@@ -14,7 +14,7 @@ on:
       version:
         description: 'Nhãn phiên bản cho gói (không có tag → dùng giá trị này, ví dụ 1.0.0-dev)'
         required: false
-        default: 'dev'
+        default: '0.0.0-dev'
 
 permissions:
   contents: write
@@ -48,7 +48,7 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Build DhcbTools.Revit (Revit ${{ matrix.revit }})
-        run: dotnet build src/DhcbTools.Revit/DhcbTools.Revit.csproj -c Release -p:RevitVersion=${{ matrix.revit }}
+        run: dotnet build src/DhcbTools.Revit/DhcbTools.Revit.csproj -c Release -p:RevitVersion=${{ matrix.revit }} -p:Version=${{ needs.version.outputs.version }}
 
       - name: Đóng gói
         shell: pwsh
@@ -83,10 +83,10 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Build vỏ đầy đủ (AutoCAD ${{ matrix.acad }})
-        run: dotnet build src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj -c Release -p:RevitVersion=${{ matrix.acad }} -p:AcadVersion=${{ matrix.acad }}
+        run: dotnet build src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj -c Release -p:RevitVersion=${{ matrix.acad }} -p:AcadVersion=${{ matrix.acad }} -p:Version=${{ needs.version.outputs.version }}
 
       - name: Build vỏ core-only cho accoreconsole (AutoCAD ${{ matrix.acad }})
-        run: dotnet build src/DhcbTools.AutoCAD.Core/DhcbTools.AutoCAD.Core.csproj -c Release -p:RevitVersion=${{ matrix.acad }} -p:AcadVersion=${{ matrix.acad }}
+        run: dotnet build src/DhcbTools.AutoCAD.Core/DhcbTools.AutoCAD.Core.csproj -c Release -p:RevitVersion=${{ matrix.acad }} -p:AcadVersion=${{ matrix.acad }} -p:Version=${{ needs.version.outputs.version }}
 
       - name: Đóng gói
         shell: pwsh
@@ -118,7 +118,7 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Build BatchRunner
-        run: dotnet build src/DhcbTools.BatchRunner/DhcbTools.BatchRunner.csproj -c Release
+        run: dotnet build src/DhcbTools.BatchRunner/DhcbTools.BatchRunner.csproj -c Release -p:Version=${{ needs.version.outputs.version }}
 
       - name: Đóng gói kèm script và job mẫu
         shell: pwsh
@@ -138,9 +138,61 @@ jobs:
           path: dist/*.zip
           if-no-files-found: error
 
+  installer:
+    needs: [version, build-revit, build-autocad, build-batchrunner]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tải mọi gói zip đã build
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Dựng thư mục stage cho Inno Setup
+        shell: pwsh
+        run: |
+          $v = "${{ needs.version.outputs.version }}"
+          $stage = "dist/stage"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+
+          foreach ($r in 2023, 2024, 2025) {
+            Expand-Archive "artifacts/DhcbTools.Revit-$r-$v.zip" -DestinationPath "$stage/revit-$r" -Force
+          }
+          foreach ($a in 2024, 2025) {
+            Expand-Archive "artifacts/DhcbTools.AutoCAD-$a-$v.zip" -DestinationPath "$stage/autocad-$a" -Force
+          }
+          Expand-Archive "artifacts/DhcbTools.BatchRunner-$v.zip" -DestinationPath "$stage/batchrunner" -Force
+
+          # Bundle AutoCAD: AppVersion phải khớp phiên bản phát hành.
+          $pc = Get-Content installer/PackageContents.xml -Raw
+          $pc = $pc -replace 'AppVersion="[^"]*"', "AppVersion=\"$v\""
+          Set-Content "$stage/PackageContents.xml" $pc -Encoding UTF8
+
+          Get-ChildItem $stage | Format-Table Name, Mode
+
+      - name: Cài Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Đóng gói installer
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
+            "/DVersion=${{ needs.version.outputs.version }}" `
+            "/DStageDir=..\dist\stage" `
+            installer/dhcb-tools.iss
+          Get-ChildItem dist/*.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DhcbTools-Setup
+          path: dist/*.exe
+          if-no-files-found: error
+
   publish:
     if: github.ref_type == 'tag'
-    needs: [version, build-revit, build-autocad, build-batchrunner]
+    needs: [version, build-revit, build-autocad, build-batchrunner, installer]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -153,6 +205,8 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.zip
+          files: |
+            dist/*.zip
+            dist/*.exe
           generate_release_notes: true
           name: DHCB Tools ${{ needs.version.outputs.version }}

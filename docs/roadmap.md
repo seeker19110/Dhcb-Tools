@@ -42,14 +42,14 @@ phản hồi người dùng thật yêu cầu.
 
 ---
 
-## Giai đoạn 8 — Nền móng: biến mã đã biên dịch thành tính năng đã chứng minh ⬜ (tuần 1–2)
+## Giai đoạn 8 — Nền móng: biến mã đã biên dịch thành tính năng đã chứng minh 🟡 (tuần 1–2)
 
 Bốn việc này phải xong **trước** mọi hướng mới; bỏ qua thì hướng nào cũng sụp ở lần cài thứ hai.
 
 | # | Việc | Chi tiết | Cỡ |
 |---|---|---|---|
-| 8.1 | **Sửa nhóm lỗi im lặng** đã chỉ ra khi rà mã | `SilentFailuresPreprocessor` chỉ gắn ở batch (`BatchJobRunner`), không gắn ở Ribbon/Bridge · bỏ `catch {}` rỗng trong `ParameterRuleCheckCommand` (thu thập chỉ số) và `ParameterImportCommand.IsUnchanged` · `SleeveCommand`: dựng collector Walls/Floors **một lần** ngoài vòng lặp, và báo rõ khi rơi về bbox thay vì solid · gộp 7 hằng số `304.8`/`0.0929` về `RevitCompat` · `SheetRename` hai pha có rollback tên tạm `~DHCB~` khi lỗi · `BatchStartupHook`: xoá `pending-job.json` bằng mọi giá (đổi tên trước, xoá sau) để không chiếm phiên Revit kế tiếp | 3–4 ngày |
-| 8.2 | **Version, installer, log** | `Directory.Build.props` nhận `-p:Version` từ tag (release.yml truyền vào); `GET /health` trả đúng version · installer Inno Setup đặt `.addin` + DLL theo năm Revit và AutoCAD `ApplicationPlugins`, có gỡ cài · log file `%APPDATA%\DHCB\logs\<app>-<ngày>.log` (thay `Log = _ => { }`), ghi mọi exception ở Bridge/Ribbon | 2–3 ngày |
+| 8.1 ✅ | **Sửa nhóm lỗi im lặng** đã chỉ ra khi rà mã | `SilentFailuresPreprocessor` chỉ gắn ở batch (`BatchJobRunner`), không gắn ở Ribbon/Bridge · bỏ `catch {}` rỗng trong `ParameterRuleCheckCommand` (thu thập chỉ số) và `ParameterImportCommand.IsUnchanged` · `SleeveCommand`: dựng collector Walls/Floors **một lần** ngoài vòng lặp, và báo rõ khi rơi về bbox thay vì solid · gộp 7 hằng số `304.8`/`0.0929` về `RevitCompat` · `SheetRename` hai pha có rollback tên tạm `~DHCB~` khi lỗi · `BatchStartupHook`: xoá `pending-job.json` bằng mọi giá (đổi tên trước, xoá sau) để không chiếm phiên Revit kế tiếp | 3–4 ngày |
+| 8.2 ✅ | **Version, installer, log** | `GenerateAssemblyInfo=true` + property `Version` (mặc định `0.9.0-dev`), release.yml truyền `-p:Version=<tag>` vào mọi build; `DhcbVersion` đọc `AssemblyInformationalVersion` nên `GET /health` trả đúng bản · installer Inno Setup ([`installer/dhcb-tools.iss`](../installer/dhcb-tools.iss)) cài theo người dùng, chọn theo phiên bản, AutoCAD thành bundle tự nạp (hết cần `NETLOAD`), có gỡ cài · `DhcbLog` ghi `%APPDATA%\DHCB\logs\<app>-<ngày>.log` (thay `Log = _ => { }`), giữ 30 ngày, có stack trace của mọi lệnh lỗi | ✅ |
 | 8.3 | **Test runner chạy bên trong Revit** | Lệnh Core `RunTests` (không lên Ribbon): mở model mẫu trong `tests/models/`, chạy từng lệnh Core với config mẫu, so `CommandResult` với file vàng JSON, ghi `test-results.trx`. Kích bằng `BatchRunner --job jobs/tests.json`. Mục tiêu: **mỗi lệnh Revit có ít nhất 1 test chạy thật**; `CommandCatalogTests` đỏ nếu lệnh không có test và không gắn nhãn *thử nghiệm* | 1–2 tuần |
 | 8.4 | **Vòng kiểm thử thật số 1 trọn 42 lệnh** trên Revit 2024.3 + AutoCAD 2026 | Theo [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md) R1–R48, C1–C17, B1–B12. Ghi vào [`bang-chung-test.md`](bang-chung-test.md) §6; mỗi lỗi có phần thuần tách được thì kèm test tái hiện | 1 tuần |
 

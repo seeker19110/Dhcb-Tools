@@ -30,7 +30,7 @@ public sealed class DhcbHttpBridge : IDisposable
 
     public DhcbHttpBridge()
     {
-        _server = new HttpBridgeServer(Port, "AutoCAD", Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0")
+        _server = new HttpBridgeServer(Port, "AutoCAD", DhcbVersion.Of(Assembly.GetExecutingAssembly()))
         {
             ExecuteAsync = item => RunOnAutoCadThread(
                 item,
@@ -44,7 +44,7 @@ public sealed class DhcbHttpBridge : IDisposable
 
             Chat = text => CommandIntentParser.Parse(text, CommandCatalog.AutoCad).ToPayload(),
             ListTools = () => CommandCatalog.Describe(CommandCatalog.AutoCad),
-            Log = _ => { },
+            Log = line => DhcbLog.Write("AutoCAD", line),
         };
     }
 
