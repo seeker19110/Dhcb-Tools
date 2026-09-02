@@ -5,8 +5,6 @@ using DhcbTools.Core.AutoCAD.Query;
 using DhcbTools.Shared.Hosting;
 using DhcbTools.Shared.Logic.Ai;
 using Newtonsoft.Json;
-using AcadResult = DhcbTools.Core.AutoCAD.CommandResult;
-using HostResult = DhcbTools.Shared.Hosting.CommandResult;
 
 namespace DhcbTools.AutoCAD.Bridge;
 
@@ -36,8 +34,8 @@ public sealed class DhcbHttpBridge : IDisposable
         {
             ExecuteAsync = item => RunOnAutoCadThread(
                 item,
-                database => ToHostResult(AcadCommandTable.Dispatch(database, item.Request.Command, item.Request.ConfigJson)),
-                message => HostResult.Fail(message)),
+                database => AcadCommandTable.Dispatch(database, item.Request.Command, item.Request.ConfigJson),
+                message => CommandResult.Fail(message)),
 
             QueryAsync = item => RunOnAutoCadThread(
                 item,
@@ -102,25 +100,6 @@ public sealed class DhcbHttpBridge : IDisposable
             null);
 
         return Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// Core.AutoCAD và Shared.Hosting hiện có hai lớp <c>CommandResult</c> riêng, hình dạng giống
-    /// nhau. Gộp lại là refactor lớn (đụng toàn bộ lệnh AutoCAD) nên tách khỏi PR bảo mật này;
-    /// tạm thời chuyển đổi ở đúng một chỗ — ranh giới HTTP.
-    /// </summary>
-    private static HostResult ToHostResult(AcadResult result)
-    {
-        var mapped = result.Success
-            ? HostResult.Ok(result.Summary, result.AffectedCount)
-            : HostResult.Fail(result.Summary, result.Errors);
-
-        foreach (var message in result.Messages)
-        {
-            mapped.Messages.Add(message);
-        }
-
-        return mapped;
     }
 
     /// <summary>Chuyển body dùng chung sang kiểu truy vấn của AutoCAD.</summary>

@@ -16,6 +16,13 @@
   <ItemGroup>
     <!-- CommandCatalog (whitelist lệnh cho AI/MCP) dùng chung với Revit. -->
     <ProjectReference Include="..\DhcbTools.Shared.Logic\DhcbTools.Shared.Logic.csproj" />
+    <!-- CommandResult dùng chung nằm ở Shared.Hosting (lỗi #9) — Core.AutoCAD không còn bản riêng. -->
+    <ProjectReference Include="..\DhcbTools.Shared.Hosting\DhcbTools.Shared.Hosting.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Global using để 20+ lệnh hiện có không phải đổi từng file. -->
+    <Using Include="DhcbTools.Shared.Hosting" />
   </ItemGroup>
 
   <ItemGroup>

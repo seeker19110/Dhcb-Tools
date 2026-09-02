@@ -300,9 +300,9 @@ Không hồi quy: chạy lại qua Bridge mới cho số liệu khớp hệt vò
 Ba client Python (`panel_api.py`, `server.py`, `dhcb_agent.py`) vốn đã gửi
 `Authorization: Bearer` sẵn, nên việc bật xác thực không làm hỏng công cụ nào.
 
-### Còn lại
+### Còn lại — đã đóng (2026-09-02)
 
-| Vấn đề | Chi tiết |
+| Vấn đề | Cách đóng |
 |---|---|
-| Hai instance AutoCAD → xung đột cổng | Instance thứ hai không chiếm được 8766 và không báo lỗi ra ngoài. |
-| `CommandResult` trùng lặp | Tồn tại hai lớp (`Core.AutoCAD` và `Shared.Hosting`) hình dạng giống nhau. Gộp lại đụng toàn bộ lệnh AutoCAD nên tách riêng; hiện chuyển đổi tại đúng một chỗ — ranh giới HTTP. |
+| Hai instance AutoCAD → xung đột cổng | `HttpBridgeServer.Start()` bắt `HttpListenerException` và ném `BridgePortInUseException` nêu rõ cổng + tên app. Vỏ AutoCAD xếp hàng thông báo và in ra Editor ở sự kiện `Idle` đầu tiên (lúc `Initialize()` chưa có document nên trước đây `WriteMessage` rơi vào khoảng không). Vỏ Revit hiện `TaskDialog`. Test xUnit: `HttpBridgeServerTests.Second_server_on_same_port_throws_BridgePortInUseException`. |
+| `CommandResult` trùng lặp | Xoá `Core.AutoCAD/CommandResult.cs`; Core.AutoCAD tham chiếu `Shared.Hosting` với global using nên toàn bộ lệnh dùng chung một lớp với Revit. Bỏ hàm chuyển đổi `ToHostResult` ở ranh giới HTTP. Build lại net48 / net8 / net10 đều qua. |
