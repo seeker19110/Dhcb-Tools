@@ -15,33 +15,44 @@ namespace DhcbTools.AutoCAD;
 /// nên <c>MdiActiveDocument</c> là null và mọi <c>WriteMessage</c> đều rơi vào khoảng không. Vì thế
 /// thông báo khởi động/lỗi được xếp hàng và in ở sự kiện <c>Idle</c> đầu tiên có Editor — đây là
 /// lý do trước đây instance AutoCAD thứ hai không chiếm được cổng 8766 mà không ai thấy gì.
+///
+/// Kiểm chứng thật trên AutoCAD 2026 cho thấy AutoCAD còn mở một Drawing1 tạm lúc khởi động rồi
+/// đóng để về tab Start, nên dòng in ở Idle có thể rơi vào document tạm đó. Vì vậy trạng thái Bridge
+/// được giữ lại trong <see cref="StatusLines"/> và xem lại được bất cứ lúc nào bằng lệnh
+/// <c>DHCB_BRIDGE</c> (<see cref="Commands.BridgeCommands"/>).
 /// </summary>
 public sealed class App : IExtensionApplication
 {
+    private static readonly List<string> s_status = new();
+
     private DhcbHttpBridge? _bridge;
     private readonly List<string> _pending = new();
 
+    /// <summary>Trạng thái Bridge của instance này (PID, cổng hoặc lý do không mở được) — nguồn cho lệnh DHCB_BRIDGE.</summary>
+    public static IReadOnlyList<string> StatusLines => s_status;
+
     public void Initialize()
     {
-        Say("[DHCB Tools] Đã tải DHCB AutoCAD Tools. Gõ DHCB để xem lệnh.");
+        var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
+        Say("[DHCB Tools] Đã tải DHCB AutoCAD Tools (PID " + pid + "). Gõ DHCB_BRIDGE để xem trạng thái Bridge.");
 
         try
         {
             _bridge = new DhcbHttpBridge();
             _bridge.Start();
-            Say($"[DHCB Tools] HTTP Bridge đang lắng nghe tại http://127.0.0.1:{DhcbHttpBridge.Port}/ (token: {_bridge.TokenPath})");
+            Status($"[DHCB Tools] HTTP Bridge (PID {pid}) đang lắng nghe tại http://127.0.0.1:{DhcbHttpBridge.Port}/ (token: {_bridge.TokenPath})");
         }
         catch (BridgePortInUseException ex)
         {
             _bridge?.Dispose();
             _bridge = null;
-            Say("[DHCB Tools] CẢNH BÁO — " + ex.Message);
+            Status($"[DHCB Tools] CẢNH BÁO (PID {pid}) — " + ex.Message);
         }
         catch (System.Exception ex)
         {
             _bridge?.Dispose();
             _bridge = null;
-            Say($"[DHCB Tools] Lỗi khởi động Bridge: {ex.Message}");
+            Status($"[DHCB Tools] Lỗi khởi động Bridge (PID {pid}): {ex.Message}");
         }
 
         Flush();
@@ -68,6 +79,13 @@ public sealed class App : IExtensionApplication
     }
 
     private void Say(string line) => _pending.Add(line);
+
+    /// <summary>Vừa in lúc khởi động, vừa giữ lại cho DHCB_BRIDGE.</summary>
+    private void Status(string line)
+    {
+        s_status.Add(line);
+        Say(line);
+    }
 
     /// <summary>In các dòng đang chờ nếu đã có Editor; không có thì giữ lại cho lần Idle sau.</summary>
     private void Flush()
