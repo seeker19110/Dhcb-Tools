@@ -53,6 +53,9 @@ public sealed class App : IExternalApplication
         Add(docs, asm, "DhcbColorBy", "Tô màu\ntheo tham số", typeof(Commands.ColorByParameterCommand), "Tô màu phần tử trong view theo giá trị tham số + chú giải CSV (Colour Splasher).");
         Add(docs, asm, "DhcbFamilyAudit", "Kiểm kê\nfamily", typeof(Commands.FamilyAuditCommand), "Family/type: instance, in-place, không dùng → CSV; đổi tên theo mẫu (FamilyReviser).");
         Add(docs, asm, "DhcbWarnings", "Warning\n→ CSV", typeof(Commands.WarningsExportCommand), "Xuất warning kèm ElementId/category để lọc trong Excel (Ideate Explorer).");
+        docs.AddSeparator();
+        Add(docs, asm, "DhcbScheduleExport", "Schedule\n→ CSV", typeof(Commands.ScheduleExportCommand), "Xuất schedule ra CSV đúng cột/hàng đang hiển thị (SheetLink).");
+        Add(docs, asm, "DhcbViewportCopy", "Copy\nlegend/schedule", typeof(Commands.ViewportCopyCommand), "Copy legend/schedule từ một sheet sang nhiều sheet, cùng vị trí (pyRevit).");
 
         var mepf = application.CreateRibbonPanel(TabName, "MEPF");
         Add(mepf, asm, "DhcbSleeve", "Sleeve\ntự động", typeof(Commands.SleeveAutoCommand), "Sleeve/opening tại giao cắt MEP × tường/sàn.");
@@ -68,6 +71,11 @@ public sealed class App : IExternalApplication
         Add(mepf, asm, "DhcbSysColor", "Màu\ntheo hệ", typeof(Commands.SystemColorCommand), "Filter + màu theo hệ trong view template.");
         Add(mepf, asm, "DhcbSysName", "Tên\nhệ", typeof(Commands.SystemNameCommand), "System Name theo quy tắc {Discipline}-{Abbr}-{Zone}-{N}.");
         Add(mepf, asm, "DhcbFlowNum", "Đánh số\ntheo tuyến", typeof(Commands.FlowNumberingCommand), "Đánh số theo thứ tự dòng chảy từ phần tử đang chọn.");
+        mepf.AddSeparator();
+        Add(mepf, asm, "DhcbSlope", "Ống\ndốc", typeof(Commands.SlopePipesCommand), "Đặt/kiểm tra dốc ống thoát nước theo % hoặc bảng tối thiểu theo DN (Naviate).");
+        Add(mepf, asm, "DhcbKick", "Kick\nống", typeof(Commands.PipeKickCommand), "Kick/jog ống đang chọn bằng hai cút 45°/90°.");
+        Add(mepf, asm, "DhcbBom", "BOM\ntheo hệ", typeof(Commands.SystemBomCommand), "Khối lượng ống/fitting theo hệ và spool → CSV (Victaulic).");
+        Add(mepf, asm, "DhcbRouteC", "Tìm tuyến\ntự động", typeof(Commands.AutoRouteCommand), "Mức C: A* né chướng ngại giữa hai điểm → model line → dựng duct/pipe (eVolve).");
 
         var ai = application.CreateRibbonPanel(TabName, "AI offline & Batch");
 #if !DHCB_SKIP_WPF

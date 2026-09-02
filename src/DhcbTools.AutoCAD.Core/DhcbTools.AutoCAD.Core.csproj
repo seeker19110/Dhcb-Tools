@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Vỏ AutoCAD "core-only" (P2 giai đoạn 7): chỉ tham chiếu AcDbMgd + AcCoreMgd (package AutoCAD.NET.Core/.Model),
+    KHÔNG AcMgd/AcWindows/WPF — điều kiện để NETLOAD được trong accoreconsole.exe (headless) ở mọi phiên bản.
+    Chỉ có một lệnh DHCB_RUN cho batch; lệnh tương tác vẫn ở DhcbTools.AutoCAD.
+  -->
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>DhcbTools.AutoCAD.Core</RootNamespace>
+    <AssemblyName>DhcbTools.AutoCAD.Core</AssemblyName>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <UseWPF>false</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DhcbTools.Core.AutoCAD\DhcbTools.Core.AutoCAD.csproj" />
+    <ProjectReference Include="..\DhcbTools.Shared.Hosting\DhcbTools.Shared.Hosting.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AutoCAD.NET.Core" Version="$(AcadNetVersion)" />
+    <PackageReference Include="AutoCAD.NET.Model" Version="$(AcadNetVersion)" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+</Project>

@@ -18,7 +18,8 @@ echo "== build BatchRunner"
 dotnet build src/DhcbTools.BatchRunner/DhcbTools.BatchRunner.csproj -nologo -v:q -clp:ErrorsOnly
 
 for proj in src/DhcbTools.Core/DhcbTools.Core.csproj src/DhcbTools.Core.AutoCAD/DhcbTools.Core.AutoCAD.csproj \
-            src/DhcbTools.Revit/DhcbTools.Revit.csproj src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj; do
+            src/DhcbTools.Revit/DhcbTools.Revit.csproj src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj \
+            src/DhcbTools.AutoCAD.Core/DhcbTools.AutoCAD.Core.csproj; do
   echo "== check-build $proj (Revit $REVIT / AutoCAD $ACAD)"
   dotnet build "$proj" "${COMMON[@]}"
 done
