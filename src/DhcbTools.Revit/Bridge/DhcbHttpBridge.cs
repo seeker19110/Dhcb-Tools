@@ -110,8 +110,8 @@ internal sealed class BridgeEventHandler : IExternalEventHandler
 
             try
             {
-                var doc = app.ActiveUIDocument?.Document;
-                if (doc is null)
+                var uiDoc = app.ActiveUIDocument;
+                if (uiDoc?.Document is null)
                 {
                     item.Completion.TrySetResult(new { error = "Không có document nào đang mở trong Revit." });
                     continue;
@@ -122,7 +122,10 @@ internal sealed class BridgeEventHandler : IExternalEventHandler
                     Query = item.Request.Query,
                     Params = JsonConvert.DeserializeObject<QueryParams>(item.Request.ParamsJson) ?? new QueryParams(),
                 };
-                item.Completion.TrySetResult(RevitQueryHandler.Handle(doc, request));
+
+                // Qua UiQueryHandler: nó xử lý selection/show_elements/active_view (cần UIDocument)
+                // rồi chuyển phần còn lại xuống RevitQueryHandler.
+                item.Completion.TrySetResult(UiQueryHandler.Handle(uiDoc, request));
             }
             catch (Exception ex)
             {

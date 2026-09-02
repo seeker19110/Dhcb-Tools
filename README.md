@@ -87,6 +87,13 @@ python scripts/dhcb_agent.py autocad exec GridExtract --config '{"gridLayer":"AX
 python scripts/dhcb_mcp_server.py revit        # MCP server stdio cho Claude Desktop / Claude Code
 ```
 
+Ngoài truy vấn đọc cơ bản, `POST /query` còn có phần đủ để agent **nhìn, chỉ và kiểm** được kết quả:
+`parameters_of` (tham số của category, để dựng config không phải đoán), `element_geometry` (hộp bao, đường tâm,
+connector kèm tình trạng nối — toạ độ mm), `schedule_rows`, `snapshot` (ảnh PNG base64 của view), `selection`
+(đọc và **đặt** lựa chọn), `show_elements` (zoom cho kỹ sư nhìn), `active_view`. Mọi `CommandResult` mang theo
+`changedIds` nên agent kiểm lại được đúng phần tử vừa đổi. Chi tiết:
+[`docs/agent-khep-vong.md`](docs/agent-khep-vong.md).
+
 Chi tiết lớp AI offline (heuristic mặc định, Ollama local tuỳ chọn): [`docs/ai-offline.md`](docs/ai-offline.md).
 
 ## Batch chạy đêm

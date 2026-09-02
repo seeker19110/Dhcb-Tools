@@ -68,12 +68,17 @@ public sealed class ElevationTagCommand : ICoreCommand<ElevationTagConfig>
             anySet |= TrySetDoubleParam(elem, "bottomElevation", config.BottomElevParamName, bottom, result);
             anySet |= TrySetDoubleParam(elem, "topElevation", config.TopElevParamName, top, result);
             anySet |= TrySetDoubleParam(elem, "centreElevation", config.CenterElevParamName, centre, result);
-            if (anySet) updated++;
+            if (anySet)
+            {
+                updated++;
+                result.WithChanged(RevitCompat.IdValue(elem.Id));
+            }
         }
 
         tx.Commit();
 
-        var final = CommandResult.Ok($"Đã gán cao độ cho {updated}/{plan.Count} phần tử MEP.", updated);
+        var final = CommandResult.Ok($"Đã gán cao độ cho {updated}/{plan.Count} phần tử MEP.", updated)
+            .WithChanged(result.ChangedIds);
         final.Messages.AddRange(result.Messages);
 
         // Không phần tử nào ghi được nghĩa là dự án không có tham số cao độ nào trong từ điển —

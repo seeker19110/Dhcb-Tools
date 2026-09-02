@@ -71,7 +71,7 @@ Bốn việc này phải xong **trước** mọi hướng mới; bỏ qua thì h
 
 ---
 
-## Giai đoạn 10 — Agent khép vòng cho Revit 2021–2026 ⬜ (tuần 5–8) — **hướng khác biệt lớn nhất**
+## Giai đoạn 10 — Agent khép vòng cho Revit 2021–2026 🟡 (tuần 5–8) — **hướng khác biệt lớn nhất**
 
 Autodesk Revit 2027 MCP Server chỉ **đọc** và chỉ chạy trên **2027**; các dự án revit-mcp mã mở có 100+ tool nhưng
 không có `dryRun`, token, batch, AutoCAD song hành hay tiếng Việt. DHCB đã có Bridge, token, `ExternalEvent`,
@@ -79,8 +79,8 @@ catalog, MCP — thiếu đúng phần làm agent *nhìn, chỉ, kiểm* đượ
 
 | # | Việc | Chi tiết |
 |---|---|---|
-| 10.1 | **Mở rộng phía đọc** `RevitQueryHandler` (hiện 10 loại) | `selection` (đọc + đặt qua `UIDocument`), `show_elements`/zoom, `active_view`, `element_geometry` (bounding box, đường tâm, connector, host/level), `schedule_rows` (bảng dạng hàng, không ghi file), `parameters_of` (category/type → tên, kiểu, đơn vị, read-only), `snapshot` (`ExportImage` view hiện tại → PNG base64). AutoCAD tương ứng: `selection`, `zoom`, `entity_geometry`, `snapshot` |
-| 10.2 | **Khép vòng ghi** | Mọi `/execute` trả `changedIds` (thêm/sửa/xoá) và tuỳ chọn `snapshotBefore/After`; agent và kỹ sư thấy được kết quả, không chỉ đọc số đếm |
+| 10.1 ✅ | **Mở rộng phía đọc** `RevitQueryHandler` (10 → 17 loại) | Đã có cho Revit: `element_geometry` (hộp bao, đường tâm, **connector kèm tình trạng nối**, host, level — toạ độ trả ra mm), `parameters_of` (tham số của category: tên, `storageType`, chỉ đọc, giá trị mẫu), `schedule_rows` (bảng dạng hàng, không ghi file), `snapshot` (`Document.ExportImage` → PNG base64, nên vẫn ở Core không cần RevitAPIUI); và ở vỏ Revit (`UiQueryHandler`, cần `UIDocument`): `selection` (đọc + **đặt**), `show_elements` (zoom + chọn), `active_view`. Xem [`agent-khep-vong.md`](agent-khep-vong.md). ⬜ Phần AutoCAD tương ứng |
+| 10.2 ✅ | **Khép vòng ghi** | `CommandResult.ChangedIds` — ElementId của phần tử vừa tạo/sửa, giới hạn 500 id một lượt để không phình response (`AffectedCount` vẫn là số đầy đủ). Đã gắn cho `SleeveAuto`, `HangerAuto`, `AutoNumbering`, `ElevationTag`, `SheetRename`. Agent nay chạy được vòng: xem trước → chạy → `element_geometry`/`show_elements` trên đúng id vừa đổi → `snapshot` để nhìn |
 | 10.3 | **Playbook nghiệp vụ** cho Claude (thư mục `skills/`) | 5 kịch bản đầu: *kiểm model trước sync*, *đánh số cửa/thiết bị theo tầng*, *tìm và xử lý một nhóm warning*, *dựng grid/level từ CAD*, *xuất bộ PDF theo revision*. Mỗi playbook = trình tự query → xem trước → xác nhận → kiểm lại, có model mẫu để chạy thử trong 8.3 |
 | 10.4 | **Đóng gói `.mcpb`** cho Claude Desktop | Một cú cài; tự tìm cổng 8765/8766 và token; MCP server chịu được khi Revit chưa mở (trả tool list từ cache thay vì lỗi) |
 | 10.5 | **Bridge chịu tải** | Nâng timeout theo lệnh (Sleeve/AutoRoute cần > 30 s) với tiến độ `/progress/<id>`; chỉ một lệnh ghi tại một thời điểm, query đọc xếp hàng sau |

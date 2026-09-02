@@ -65,7 +65,14 @@ def tool_list() -> list:
         })
     tools.append({
         "name": "query",
-        "description": f"Đọc ngữ cảnh {APP} (không ghi): document_info/levels/views/sheets/rooms/elements… hoặc drawing_info/layers/blocks/inserts…",
+        "description": (
+            f"Đọc ngữ cảnh {APP} (không ghi). Revit: document_info, levels, views, sheets, rooms, elements, "
+            "families, warnings, links, stats; element_geometry (hộp bao/đường tâm/connector, params: elementIds "
+            "hoặc categories), parameters_of (tham số của category — dùng trước khi dựng config), schedule_rows "
+            "(bảng thống kê dạng hàng), snapshot (ảnh PNG base64 của view — để NHÌN kết quả), selection (đang chọn "
+            "gì; truyền elementIds để ĐẶT lựa chọn), show_elements (zoom tới phần tử cho kỹ sư nhìn), active_view. "
+            "AutoCAD: drawing_info, layers, blocks, inserts…"
+        ),
         "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}, "params": {"type": "object"}}, "required": ["query"]},
     })
     if allowed is not None and "chat" not in allowed:

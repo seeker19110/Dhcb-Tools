@@ -160,6 +160,7 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
 
         // 5. Execute placements in a single transaction
         int placed = 0;
+        var placedIds = new List<long>();   // giai đoạn 10.2: agent zoom/kiểm được đúng sleeve vừa đặt
         using var tx = new Transaction(document, "DHCB - Sleeve tự động");
         tx.Start();
         RevitCompat.ApplyFailurePolicy(tx);
@@ -206,6 +207,7 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
                     SetParameterDouble(inst, config.WidthParamName, RevitCompat.FtToMm(widthFt));
                     SetParameterDouble(inst, config.HeightParamName, RevitCompat.FtToMm(heightFt));
                     placed++;
+                    placedIds.Add(RevitCompat.IdValue(inst.Id));
                 }
             }
             catch (System.Exception ex)
@@ -216,7 +218,8 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         }
 
         tx.Commit();
-        var result = CommandResult.Ok($"Đã đặt {placed} sleeve tại giao cắt MEP × Tường/Sàn.", placed);
+        var result = CommandResult.Ok($"Đã đặt {placed} sleeve tại giao cắt MEP × Tường/Sàn.", placed)
+            .WithChanged(placedIds);
         AddUnknownSizeWarning(result, unknownSize, config);
         return result;
     }

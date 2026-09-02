@@ -135,6 +135,7 @@ public sealed class SheetRenameCommand : ICoreCommand<SheetRenameConfig>
                 if (number != null) ((ViewSheet)view).SheetNumber = number;
                 if (name != null) view.Name = name;
                 done++;
+                result.WithChanged(RevitCompat.IdValue(view.Id));
             }
             catch (Exception ex)
             {

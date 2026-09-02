@@ -24,8 +24,16 @@ public static class RevitQueryHandler
             "WARNINGS"      => GetWarnings(doc, req.Params),
             "LINKS"         => GetLinks(doc),
             "STATS"         => GetStats(doc),
+
+            // Giai đoạn 10.1 — phần đọc sâu để agent nhìn, chỉ và kiểm được kết quả.
+            "ELEMENT_GEOMETRY" => GeometryQueries.ElementGeometry(doc, req.Params),
+            "PARAMETERS_OF"    => GeometryQueries.ParametersOf(doc, req.Params),
+            "SCHEDULE_ROWS"    => GeometryQueries.ScheduleRows(doc, req.Params),
+            "SNAPSHOT"         => SnapshotQuery.Snapshot(doc, req.Params),
+
             _ => new { error = $"Query không xác định: \"{req.Query}\". " +
-                 "Hợp lệ: document_info, elements, levels, views, sheets, rooms, families, warnings, links, stats." }
+                 "Hợp lệ: document_info, elements, levels, views, sheets, rooms, families, warnings, links, stats, " +
+                 "element_geometry, parameters_of, schedule_rows, snapshot, selection, show_elements, active_view." }
         };
     }
 
