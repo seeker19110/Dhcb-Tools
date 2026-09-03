@@ -865,3 +865,30 @@ Bộ `Shared.Logic`: **569 đạt / 0 trượt** (562 → 569), cả bộ chạy
 Chất lượng tuyến trên model thật — tránh đúng chỗ, cao độ hợp lý — vẫn phải người có nghề nhìn, đúng như
 §18 đã nói. Bản vá này chỉ gỡ ba thứ **đo được là sai**: chậm, mù hướng, và câm khi thua. Nhãn *thử
 nghiệm* của `AutoRoute` giữ nguyên cho tới khi chạy lại trên Snowdon HVAC.
+
+### Chạy lại trên model thật sau bản vá (2026-09-03 19:14 ICT)
+
+`run-in-revit-tests.ps1 -Suite mep` trên `Snowdon Towers Sample HVAC.rvt` + link kiến trúc/kết cấu:
+**19 đạt / 0 trượt / 0 bỏ qua trên 19 ca**. Ca `AutoRoute` chạy ở bước lưới 500 mm (đúng cấu hình ca kiểm
+từ §18 — bước 100 mm mặc định đã chạm trần nên ca kiểm dùng 500):
+
+| | §18 (trước vá) | Sau vá |
+|---|---|---|
+| Vật cản | 546 = 30 trong file + 516 từ link | **546** — không đổi, đúng như phải thế |
+| Thời gian | 0,3 s | **82 ms** |
+| Ô mở rộng | 4.818 | 4.965 |
+| Kết luận | *"Không có đường đi trong hộp tìm kiếm"* | *"điểm đầu chỉ ra tới **782 / 12.025 ô**"* — nói rõ là bị bịt kín |
+
+**Số ô mở rộng KHÔNG giảm, và đó là kết quả đúng.** Khi tuyến không tồn tại, A* buộc phải vét cạn cả
+khoang trống chứa điểm đầu — heuristic dù mạnh tới đâu cũng không rút ngắn được việc chứng minh "không có
+đường". Con số tự nó khớp: 782 ô trống × 6 hướng = 4.692 trạng thái, cộng vài mục cũ trong hàng đợi ra
+4.965. Cái giảm được là **thời gian cho mỗi ô** (raster hoá): 0,3 s → 82 ms, nhanh 3,7 lần.
+
+Và đây là lần đầu §18 được **xác nhận bằng số** thay vì suy đoán: giả thuyết "hai điểm tự do nhưng bị sàn
+và tường của model liên kết bao kín" nay có con số 782/12.025 ô đứng sau — flood-fill đi hết khoang chứa
+điểm đầu và không chạm tới điểm cuối.
+
+Bộ `mep` cũng lên **19 ca** (§14 còn 17), tất cả xanh — bản vá không làm hỏng lệnh MEP nào khác.
+
+**Chưa đo lại ở bước 100 mm** trên model thật (số 17,9 s của §18). Ca kiểm cố định 500 mm nên vòng này
+không chạm tới; muốn có con số đó phải thêm một ca riêng.
