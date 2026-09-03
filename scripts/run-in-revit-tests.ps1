@@ -14,9 +14,14 @@
 #>
 [CmdletBinding()]
 param(
-    # Bộ ca kiểm: "smoke" (model kiến trúc), "mep" (model HVAC) hoặc "plumbing" (model cấp thoát nước).
-    [ValidateSet('smoke', 'mep', 'plumbing')]
+    # Bộ ca kiểm: "smoke" (model kiến trúc), "mep" (model HVAC), "plumbing" (cấp thoát nước)
+    # hoặc "write" (đường ghi thật — xem -AllowWrites).
+    [ValidateSet('smoke', 'mep', 'plumbing', 'write')]
     [string]$Suite = 'smoke',
+
+    # Cho phép ca khai báo "allowWrite" ghi THẬT vào model. Script sẽ chép model mẫu sang thư mục kết
+    # quả và chạy trên bản chép, nên file gốc kèm Revit không bao giờ bị đụng tới.
+    [switch]$AllowWrites,
 
     [int]$RevitVersion = 2024,
 
@@ -72,6 +77,11 @@ if (-not (Test-Path $Model)) {
     Stop-WithMessage "Không tìm thấy model: $Model"
 }
 
+if ($Suite -eq 'write' -and -not $AllowWrites) {
+    Stop-WithMessage ("Bộ 'write' chỉ có nghĩa khi kèm -AllowWrites; không có nó thì mọi ca vẫn bị ép " +
+                      "dryRun và bộ này chỉ lặp lại việc bộ smoke đã làm.")
+}
+
 $suitePath = Join-Path $repo "tests\suites\revit-$Suite.json"
 if (-not (Test-Path $suitePath)) {
     Stop-WithMessage "Không tìm thấy bộ ca kiểm: $suitePath"
@@ -110,6 +120,16 @@ $stamp = Get-Date -Format 'yyyy-MM-dd_HH-mm-ss'
 $outDir = Join-Path $OutputRoot "$Suite-$stamp"
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
+# Ghi thật thì KHÔNG BAO GIỜ chạy trên file gốc: chép sang thư mục kết quả rồi chạy trên bản chép.
+# Model mẫu nằm trong Program Files, hỏng là phải cài lại Revit — không đáng để tiết kiệm một lần chép.
+if ($AllowWrites) {
+    $copy = Join-Path $outDir ("ban-chep-" + [IO.Path]::GetFileName($Model))
+    Write-Host "== Chép model sang bản chép (ghi thật không đụng file gốc)"
+    Copy-Item -LiteralPath $Model -Destination $copy -Force
+    $Model = $copy
+    Write-Host "   $Model"
+}
+
 $job = [ordered]@{
     name         = "DHCB - kiem thu trong Revit ($Suite)"
     app          = 'revit'
@@ -123,6 +143,7 @@ $job = [ordered]@{
         config  = [ordered]@{
             suitePath    = $suitePath -replace '\\', '/'
             outputFolder = '{outputFolder}'
+            allowWrites  = [bool]$AllowWrites
         }
     })
 }

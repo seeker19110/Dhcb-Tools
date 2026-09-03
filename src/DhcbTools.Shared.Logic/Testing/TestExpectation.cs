@@ -48,6 +48,14 @@ namespace DhcbTools.Shared.Logic.Testing
         [JsonProperty("summaryContains")]
         public List<string> SummaryContains { get; set; } = new List<string>();
 
+        /// <summary>
+        /// Summary KHÔNG được chứa. Trường này sinh ra cho đường ghi thật: ca <c>allowWrite</c> phải chốt
+        /// được "đây không phải bản xem trước" bằng <c>summaryNotContains: ["Xem trước"]</c>. Nếu một ngày
+        /// nào đó khoá <c>dryRun</c> bị ép nhầm, ca sẽ đỏ thay vì lặng lẽ chỉ chạy xem trước rồi báo xanh.
+        /// </summary>
+        [JsonProperty("summaryNotContains")]
+        public List<string> SummaryNotContains { get; set; } = new List<string>();
+
         /// <summary>Ít nhất một dòng Messages phải chứa.</summary>
         [JsonProperty("messagesContain")]
         public List<string> MessagesContain { get; set; } = new List<string>();
@@ -111,6 +119,14 @@ namespace DhcbTools.Shared.Logic.Testing
                 if (observed.Summary.IndexOf(needle, StringComparison.OrdinalIgnoreCase) < 0)
                 {
                     failures.Add($"Summary không chứa \"{needle}\" (thực tế: {observed.Summary})");
+                }
+            }
+
+            foreach (var needle in SummaryNotContains.Where(n => !string.IsNullOrEmpty(n)))
+            {
+                if (observed.Summary.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    failures.Add($"Summary không được chứa \"{needle}\" (thực tế: {observed.Summary})");
                 }
             }
 

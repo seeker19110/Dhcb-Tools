@@ -1,0 +1,104 @@
+{
+  "name": "DHCB — đường ghi thật trong AutoCAD",
+  "model": "Data Extraction and Multileaders Sample.dwg",
+  "//": [
+    "Bộ DUY NHẤT có ca ghi thật vào bản vẽ. Ba lớp bảo vệ như bên Revit:",
+    "  1. ca phải khai báo \"allowWrite\": true;",
+    "  2. người chạy phải bật allowWrites (scripts/run-in-autocad-tests.ps1 -AllowWrites);",
+    "  3. script chép bản vẽ mẫu sang thư mục kết quả và chạy trên BẢN CHÉP.",
+    "",
+    "Chuỗi tự chứng minh và tự khôi phục: xuất layer gốc → nhập fixture đổi đúng một ô (ghi thật) →",
+    "nhập lại fixture đó phải ra 0 → nhập lại CSV gốc để trả layer về như cũ.",
+    "Con số 0 ở bước ba là bằng chứng bước hai ĐÃ GHI THẬT."
+  ],
+  "cases": [
+    {
+      "name": "Xuất layer — bản gốc để khôi phục",
+      "command": "LayerExport",
+      "config": {
+        "outputPath": "{outputFolder}/layers-goc.csv"
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxMs": 30000,
+        "filesExist": [
+          "{outputFolder}/layers-goc.csv"
+        ]
+      }
+    },
+    {
+      "name": "Nhập CSV đổi đúng một ô — GHI THẬT",
+      "command": "LayerImport",
+      "allowWrite": true,
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/layers-doi-mot-o.csv"
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxAffected": 1,
+        "summaryContains": [
+          "Đã nhập"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "Nhập lại chính fixture đó — phải không còn gì để đổi",
+      "command": "LayerImport",
+      "allowWrite": true,
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/layers-doi-mot-o.csv"
+      },
+      "//": "0 o doi = bang chung ca truoc DA GHI THAT vao drawing, khong phai rollback.",
+      "expect": {
+        "success": true,
+        "maxAffected": 0,
+        "messagesContain": [
+          "giữ nguyên"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "Nhập lại CSV gốc — GHI THẬT, trả layer về như cũ",
+      "command": "LayerImport",
+      "allowWrite": true,
+      "config": {
+        "inputPath": "{outputFolder}/layers-goc.csv"
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxAffected": 1,
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "Kiểm lại lần cuối — bản vẽ đã về trạng thái gốc",
+      "command": "LayerImport",
+      "allowWrite": true,
+      "config": {
+        "inputPath": "{outputFolder}/layers-goc.csv"
+      },
+      "expect": {
+        "success": true,
+        "maxAffected": 0,
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 30000
+      }
+    }
+  ]
+}
