@@ -611,10 +611,32 @@ kết quả không đổi.
 Bộ `revit-mep.json`: **17 đạt / 0 trượt trên 17 ca**, ca sleeve nay chốt `minAffected: 1` (chống hồi quy
 "0 sleeve vì không đọc link") và `maxMs: 10000` (chống hồi quy hiệu năng).
 
-### Đường ghi của `SleeveAuto` vẫn là nợ
+### Đường ghi của `SleeveAuto` — trả nợ luôn trong cùng ngày
 
-Bộ ghi thật chạy trên **bản chép** đặt ở thư mục kết quả; link của Snowdon lưu theo đường dẫn tương đối
-nên cạnh bản chép không có file kiến trúc — Revit không giải được link. Đó là **giới hạn của bộ test**,
-không phải lỗi lệnh. Hai ca sleeve trong `revit-write-mep.json` nay kiểm đúng điều kiểm được: gặp tình
-huống ấy lệnh phải **nói ra lý do**, chứ không trả số 0 trơ trọi. Muốn chốt đường ghi thật cho
-`SleeveAuto` thì cần model có link giải được từ vị trí bản chép.
+Bộ ghi chạy trên **bản chép**, mà link của Snowdon lưu theo đường dẫn tương đối nên cạnh bản chép không
+có file kiến trúc — Revit không giải được link. Sửa ở `run-in-revit-tests.ps1`: bản chép nay **giữ nguyên
+tên gốc**, nằm trong thư mục `ban-chep/` riêng, và script **chép luôn các model được liên kết** (dò tên
+`*.rvt` ngay trong file, chỉ chép những file có thật cạnh model gốc — sáu file Snowdon, 313 MB).
+
+Với bước đó, đường ghi thật của `SleeveAuto` chạy được lần đầu tiên:
+
+```
+Đặt sleeve — GHI THẬT      → Đã đặt 334 sleeve. Trong đó 334 cái bám tường/sàn
+                             của model liên kết nên đặt tự do.               (5,9 s)
+Đặt sleeve lần hai         → Đã đặt 0 sleeve. Bỏ qua, đã có sleeve: 552 vị trí. (2,1 s)
+```
+
+**334 → 0** là bằng chứng lần một đã **commit thật**, cùng dạng với `HangerAuto` 1120 → 0.
+
+Bộ `revit-write-mep.json` sau khi đổi: **4 đạt / 0 trượt trên 4 ca** (hanger 1120 → 0, sleeve 334 → 0).
+
+Giá phải trả: nạp sáu model liên kết làm vòng chạy chậm hẳn (`HangerAuto` 26 s → 63 s), nên **chỉ bộ ghi
+mới chép link**, không áp cho bộ xem trước.
+
+### Một lỗi diễn đạt lộ ra ngay ở vòng đó
+
+Lần hai báo *"…không có giao cắt nào (thường do lệch cao độ hoặc hostTypeNames lọc quá chặt)"* — **sai**.
+Giao cắt còn nguyên; chỉ là đã có sleeve ở đó rồi. Thông báo tự tin mà sai còn tệ hơn không có thông báo:
+người đọc sẽ đi tìm một nguyên nhân không tồn tại. Nay lệnh đếm số vị trí bỏ qua và nói đúng —
+*"Bỏ qua, đã có sleeve: N vị trí."*, giống `HangerAuto`. Ca kiểm chốt cả hai chiều: phải chứa
+`"Bỏ qua, đã có sleeve"` **và không được chứa** `"không có giao cắt nào"`.
