@@ -22,7 +22,7 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
     public CommandResult Execute(Document document, SleeveConfig config)
     {
         // 1. Find sleeve FamilySymbol
-        var symbol = FindFamilySymbol(document, config.SleeveFamilyName);
+        var symbol = RevitCompat.FindFamilySymbol(document, config.SleeveFamilyName);
         if (symbol == null)
         {
             return CommandResult.Fail(
@@ -225,16 +225,6 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
-
-    private static FamilySymbol? FindFamilySymbol(Document doc, string name)
-    {
-        return new FilteredElementCollector(doc)
-            .OfClass(typeof(FamilySymbol))
-            .Cast<FamilySymbol>()
-            .FirstOrDefault(s =>
-                string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(s.FamilyName + ": " + s.Name, name, StringComparison.OrdinalIgnoreCase));
-    }
 
     private static List<Element> CollectMepElements(Document doc, List<string> categoryFilter)
     {

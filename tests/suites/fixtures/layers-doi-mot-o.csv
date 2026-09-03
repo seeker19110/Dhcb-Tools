@@ -1,0 +1,4 @@
+﻿Name,Color,Linetype,Lineweight,IsPlottable,Description
+0,7,Continuous,ByLineWeightDefault,true,
+2,6,Continuous,ByLineWeightDefault,true,
+4,1,Continuous,ByLineWeightDefault,true,

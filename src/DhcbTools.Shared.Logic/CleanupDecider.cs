@@ -20,6 +20,27 @@ namespace DhcbTools.Shared.Logic
         /// <summary>Linetype hệ thống của AutoCAD — không bao giờ xoá.</summary>
         public static bool IsSystemLinetype(string? name) => name != null && SystemLinetypes.Contains(name);
 
+        /// <summary>Text style hệ thống — "Standard" luôn tồn tại trong mọi DWG, xoá là hỏng file.</summary>
+        public static bool IsSystemTextStyle(string? name) =>
+            name != null && name.Equals("Standard", StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>Dimension style hệ thống — như trên.</summary>
+        public static bool IsSystemDimStyle(string? name) =>
+            name != null && name.Equals("Standard", StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// RegApp hệ thống: mọi tên bắt đầu bằng "ACAD" hoặc "AcDb" là của chính Autodesk
+        /// (ACAD, ACAD_MLEADERVER, AcadAnnotativeDecomposition, AcDbBlockRepETag…).
+        /// Chạy thật trên AutoCAD 2026 (2026-09-03) cho thấy bản vẽ mẫu có AcadAnnoAV, AcadAnnoPO,
+        /// AcadAnnotativeDecomposition đang "không dùng" — về lý thuyết purge được, nhưng đây là dữ liệu
+        /// nội bộ của tính năng annotative nên để nguyên: cái đáng dọn là rác của add-in bên thứ ba
+        /// (AVE_*, CONTENT*, AFM*, RAK…), không phải vài byte của Autodesk.
+        /// </summary>
+        public static bool IsSystemRegApp(string? name) =>
+            name != null
+            && (name.StartsWith("ACAD", StringComparison.OrdinalIgnoreCase)
+                || name.StartsWith("AcDb", StringComparison.OrdinalIgnoreCase));
+
         /// <summary>Có nên xoá một layer/linetype không.</summary>
         /// <param name="name">Tên đối tượng.</param>
         /// <param name="isUsed">Đang được entity, layer definition, block definition hoặc xref tham chiếu.</param>

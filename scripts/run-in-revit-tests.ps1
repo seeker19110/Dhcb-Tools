@@ -14,8 +14,8 @@
 #>
 [CmdletBinding()]
 param(
-    # Bộ ca kiểm: "smoke" (model kiến trúc) hoặc "mep" (model HVAC).
-    [ValidateSet('smoke', 'mep')]
+    # Bộ ca kiểm: "smoke" (model kiến trúc), "mep" (model HVAC) hoặc "plumbing" (model cấp thoát nước).
+    [ValidateSet('smoke', 'mep', 'plumbing')]
     [string]$Suite = 'smoke',
 
     [int]$RevitVersion = 2024,
@@ -42,19 +42,30 @@ function Stop-WithMessage([string]$Message) {
 }
 
 # ── 1. Revit phải đóng: DLL bị khoá khi Revit chạy ───────────────────────────
+# Chờ trước khi bỏ cuộc: chạy ba bộ ca kiểm nối đuôi nhau thì tiến trình Revit của lượt trước còn
+# vài chục giây mới biến mất (BatchRunner đã "kết thúc tiến trình", nhưng Windows dọn không tức thì).
+# Bản trước bỏ cuộc ngay, nên lượt 2 và 3 chưa bao giờ chạy được trong cùng một lệnh.
+$deadline = (Get-Date).AddSeconds(120)
 $running = Get-Process Revit -ErrorAction SilentlyContinue
 if ($running) {
-    Stop-WithMessage ("Revit đang chạy (PID $($running.Id -join ', ')). Đóng Revit rồi chạy lại — " +
+    Write-Host "Revit còn chạy (PID $($running.Id -join ', ')) — chờ tối đa 120 s để nó đóng hẳn..."
+}
+while ($running -and (Get-Date) -lt $deadline) {
+    Start-Sleep -Seconds 3
+    $running = Get-Process Revit -ErrorAction SilentlyContinue
+}
+if ($running) {
+    Stop-WithMessage ("Revit vẫn đang chạy (PID $($running.Id -join ', ')) sau 120 s. Đóng Revit rồi chạy lại — " +
                       "DLL add-in bị khoá khi Revit mở, và batch runner cần tự mở Revit của riêng nó.")
 }
 
 # ── 2. Model ─────────────────────────────────────────────────────────────────
 if (-not $Model) {
     $samples = "C:\Program Files\Autodesk\Revit $RevitVersion\Samples"
-    $Model = if ($Suite -eq 'mep') {
-        Join-Path $samples 'Snowdon Towers Sample HVAC.rvt'
-    } else {
-        Join-Path $samples 'Snowdon Towers Sample Architectural.rvt'
+    $Model = switch ($Suite) {
+        'mep'      { Join-Path $samples 'Snowdon Towers Sample HVAC.rvt' }
+        'plumbing' { Join-Path $samples 'Snowdon Towers Sample Plumbing.rvt' }
+        default    { Join-Path $samples 'Snowdon Towers Sample Architectural.rvt' }
     }
 }
 if (-not (Test-Path $Model)) {

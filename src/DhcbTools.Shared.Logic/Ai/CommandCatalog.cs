@@ -147,7 +147,7 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("grids", "[{name, positionMm, orientation}]").Field("dryRun", "xem trước")
                 .Words("tạo trục", "tạo grid", "create grids"),
             new CommandDescriptor("FamilyLoader", Revit, "Load family theo danh mục", true, "LoadFamilies")
-                .Field("familyPaths", "đường dẫn .rfa").Field("dryRun", "xem trước")
+                .Field("familyFolder", "thư mục chứa .rfa").Field("familyNames", "tên family cần nạp (rỗng = mọi .rfa trong thư mục)").Field("overwriteExisting", "ghi đè family đã có").Field("dryRun", "xem trước")
                 .Words("load family", "nạp family"),
 
             // ── Revit — MEPF ────────────────────────────────────────────────
@@ -174,7 +174,7 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("deviceFamily", "family thiết bị").Field("roomFilter", "{levelName, nameContains}").Field("pattern", "{spacingXMm, spacingYMm, marginMm}").Field("dryRun", "xem trước")
                 .Words("rải sprinkler", "rải miệng gió", "đặt thiết bị theo phòng", "sprinkler", "diffuser"),
             new CommandDescriptor("SizingProposal", Revit, "Đề xuất kích thước duct/pipe theo lưu lượng → CSV", false, "Sizing")
-                .Field("outputPath", "file CSV").Field("maxPaPerM", "ma sát Pa/m").Field("maxVelocityMs", "vận tốc tối đa")
+                .Field("outputPath", "file CSV").Field("maxPaPerM", "ma sát Pa/m").Field("maxDuctVelocityMs", "vận tốc gió tối đa m/s").Field("maxPipeVelocityMs", "vận tốc nước tối đa m/s")
                 .Words("sizing", "tính kích thước", "chọn size ống", "chọn size duct"),
             new CommandDescriptor("ApplySizing", Revit, "Áp kích thước từ CSV đã duyệt", true)
                 .Field("inputPath", "file CSV").Field("dryRun", "xem trước")
@@ -311,6 +311,12 @@ namespace DhcbTools.Shared.Logic.Ai
             new CommandDescriptor("CadLayerMap", AutoCad, "AI offline: gợi ý map layer → Revit type từ danh sách type", false, "LayerMap")
                 .Field("revitTypesPath", "file .txt danh sách type").Field("outputPath", "CSV mapping").Field("useOllama", "dùng model local nếu có")
                 .Words("map layer", "ánh xạ layer"),
+
+            // ── AutoCAD — công cụ nội bộ (không lên lệnh người dùng, không chào ra /tools) ──
+            new CommandDescriptor("RunTests", AutoCad, "Chạy bộ kiểm thử bên trong AutoCAD trên bản vẽ mẫu, ghi TRX + Markdown", false)
+                .Field("suitePath", "file JSON mô tả bộ ca kiểm").Field("outputFolder", "nơi ghi báo cáo")
+                .Field("onlyCommands", "chỉ chạy các lệnh này").Field("allowWrites", "cho phép ca allowWrite ghi thật")
+                .Tooling(),
         };
 
         /// <summary>Lệnh dùng được của một nền tảng — chỉ những lệnh đã có mã nguồn trong Core.</summary>

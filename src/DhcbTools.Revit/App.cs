@@ -66,7 +66,9 @@ public sealed class App : IExternalApplication
             ("DhcbGridFromCsv", "Trục từ CSV", "GridFromCsvRibbonCommand",
                 "Dựng trục từ CSV của Excel hoặc lệnh GridExtract bên AutoCAD."),
             ("DhcbFamilyLoader", "Nạp family", "FamilyLoaderRibbonCommand",
-                "Nạp hàng loạt family từ danh sách đường dẫn."));
+                "Nạp hàng loạt family từ danh sách đường dẫn."),
+            ("DhcbProjectInfo", "Thông tin dự án", "ProjectInfoRibbonCommand",
+                "Ghi tên, mã dự án, chủ đầu tư… vào Project Information."));
         Group(init, path, "DhcbInitTemplate", "Template &\nhồ sơ", "Tạo file từ template, chuyển standards, tạo sheet.",
             ("DhcbProjectFromTemplate", "File từ template", "ProjectFromTemplateRibbonCommand",
                 "Tạo file dự án mới từ template chuẩn của công ty."),

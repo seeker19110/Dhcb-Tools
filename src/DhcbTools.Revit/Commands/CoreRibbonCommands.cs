@@ -28,6 +28,15 @@ public sealed class GridSetupRibbonCommand : IExternalCommand
         => CommandRunner.Run(commandData, "GridSetup");
 }
 
+/// <summary>Ghi thông tin dự án (tên, mã, chủ đầu tư…) vào Project Information.</summary>
+[Transaction(TransactionMode.Manual)]
+[Regeneration(RegenerationOption.Manual)]
+public sealed class ProjectInfoRibbonCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        => CommandRunner.Run(commandData, "ProjectInfo");
+}
+
 /// <summary>Nạp hàng loạt family từ danh sách đường dẫn.</summary>
 [Transaction(TransactionMode.Manual)]
 [Regeneration(RegenerationOption.Manual)]

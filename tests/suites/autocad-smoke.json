@@ -1,0 +1,304 @@
+{
+  "name": "DHCB — kiểm thử trong AutoCAD (smoke)",
+  "model": "Data Extraction and Multileaders Sample.dwg",
+  "//": [
+    "Bộ ca kiểm chạy BÊN TRONG AutoCAD qua lệnh RunTests, kích bằng accoreconsole (không mở giao diện).",
+    "Đối xứng với revit-smoke.json: cùng tầng đánh giá Shared.Logic/Testing, cùng cách viết kỳ vọng.",
+    "Chạy: scripts/run-in-autocad-tests.ps1",
+    "Mọi ca mặc định bị ép dryRun=true nên chạy bao nhiêu lần trên bản vẽ mẫu cũng không làm bẩn nó;",
+    "job cũng đặt saveMode None nên accoreconsole không ghi lại file.",
+    "Token: {outputFolder} nơi ghi kết quả · {suiteFolder} thư mục chứa file này · {sourceFile} chính DWG đang mở.",
+    "Ca 'báo lỗi rõ' là có chủ ý — lỗi của dự án này phần lớn là NO-OP IM LẶNG, nên đường lỗi phải được",
+    "chốt chặn ngang với đường thành công."
+  ],
+  "cases": [
+    {
+      "name": "Xuất layer ra CSV",
+      "command": "LayerExport",
+      "config": {
+        "outputPath": "{outputFolder}/layers.csv"
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxMs": 30000,
+        "filesExist": [
+          "{outputFolder}/layers.csv"
+        ]
+      }
+    },
+    {
+      "name": "Nhập lại chính CSV vừa xuất — phải không đổi layer nào",
+      "command": "LayerImport",
+      "config": {
+        "inputPath": "{outputFolder}/layers.csv"
+      },
+      "//": "Vong tron xuat -> nhap phai la no-op, giong ca ParameterImport ben Revit.",
+      "expect": {
+        "success": true,
+        "maxAffected": 0,
+        "summaryContains": [
+          "Xem trước"
+        ],
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "Nhập CSV đổi đúng một ô — phải thấy đúng một layer đổi",
+      "command": "LayerImport",
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/layers-doi-mot-o.csv"
+      },
+      "//": "Ca song sinh voi ca vong tron ngay tren. Vong tron chung minh 'khong doi thi khong ghi'; ca nay chung minh phep so sanh VAN PHAN BIET duoc — neu ai do lam LayerImport luon tra 0 thi ca tren van xanh, chi co ca nay do. Fixture chep tu ban ve mau, doi mau layer \"4\" tu 4 sang 1.",
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxAffected": 1,
+        "summaryContains": [
+          "Xem trước"
+        ],
+        "messagesContain": [
+          "thuộc tính đổi"
+        ],
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "Xem trước dọn bản vẽ (purge sâu)",
+      "command": "DrawingCleanup",
+      "config": {
+        "purgeUnusedTextStyles": true,
+        "purgeUnusedDimStyles": true,
+        "purgeRegApps": true
+      },
+      "expect": {
+        "success": true,
+        "summaryContains": [
+          "Xem trước"
+        ],
+        "maxMs": 30000,
+        "neverContains": [
+          "ACAD_",
+          "AcDb"
+        ]
+      },
+      "//": "neverContains chot dung phan an toan: khong bao gio de xuat xoa RegApp cua chinh Autodesk."
+    },
+    {
+      "name": "Xuất attribute của block ra CSV",
+      "command": "AttributeExport",
+      "config": {
+        "outputPath": "{outputFolder}/attributes.csv"
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 30000,
+        "filesExist": [
+          "{outputFolder}/attributes.csv"
+        ]
+      }
+    },
+    {
+      "name": "Nhập lại chính CSV attribute vừa xuất",
+      "command": "AttributeImport",
+      "config": {
+        "inputPath": "{outputFolder}/attributes.csv"
+      },
+      "expect": {
+        "success": true,
+        "maxAffected": 0,
+        "summaryContains": [
+          "Xem trước"
+        ],
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "Xem trước thay text",
+      "command": "TextReplace",
+      "config": {
+        "find": "DHCB-KHONG-CO-CHUOI-NAY",
+        "replace": "x"
+      },
+      "expect": {
+        "maxMs": 30000,
+        "neverContains": [
+          "Exception"
+        ]
+      },
+      "//": "Chuoi khong ton tai: chot 'chay duoc, khong nem, khong doi gi'. Duong doi that can ban ve rieng."
+    },
+    {
+      "name": "Kiểm layer theo bộ quy tắc",
+      "command": "LayerStandardCheck",
+      "config": {
+        "rulesPath": "{suiteFolder}/../../configs/layer-rules.sample.json",
+        "outputPath": "{outputFolder}/layer-check.html"
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 30000,
+        "filesExist": [
+          "{outputFolder}/layer-check.html"
+        ]
+      },
+      "//": "Dung luon file mau ship kem repo — the la kiem ca tinh hop le cua file mau do."
+    },
+    {
+      "name": "Báo lỗi rõ khi không có trục trên layer chỉ định",
+      "command": "GridExtract",
+      "config": {
+        "gridLayer": "AXIS",
+        "outputPath": "{outputFolder}/grids.csv"
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "AXIS"
+        ],
+        "maxMs": 30000,
+        "neverContains": [
+          "Exception"
+        ]
+      },
+      "//": "Ban ve mau la ban co khi, khong co layer AXIS. Chot dung dieu do: lenh phai noi ro 'khong tim thay duong Line nao tren layer AXIS' chu khong ghi ra CSV rong roi bao thanh cong. Duong thanh cong can mot ban ve co truc — chua co trong bo mau kem AutoCAD."
+    },
+    {
+      "name": "Kiểm kê xref",
+      "command": "XrefAudit",
+      "config": {
+        "outputPath": "{outputFolder}/xrefs.csv"
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "Đếm block ra CSV",
+      "command": "BlockQuantity",
+      "config": {
+        "outputPath": "{outputFolder}/blocks.csv"
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxMs": 30000,
+        "filesExist": [
+          "{outputFolder}/blocks.csv"
+        ]
+      }
+    },
+    {
+      "name": "So bản vẽ với chính nó — phải không có khác biệt",
+      "command": "DrawingCompare",
+      "config": {
+        "otherPath": "{sourceFile}",
+        "outputPath": "{outputFolder}/compare.csv"
+      },
+      "//": "Phep tu kiem: so mot ban ve voi chinh no ma ra khac biet thi thuat toan sai. Khong can commit DWG nao.",
+      "expect": {
+        "success": true,
+        "maxAffected": 0,
+        "maxMs": 60000,
+        "filesExist": [
+          "{outputFolder}/compare.csv"
+        ]
+      }
+    },
+    {
+      "name": "Xem trước đổi layer theo bảng chuẩn",
+      "command": "LayerTranslate",
+      "config": {
+        "mapCsvPath": "{suiteFolder}/../../configs/layer-map.sample.csv"
+      },
+      "expect": {
+        "maxMs": 30000,
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
+      "name": "Gợi ý map layer → type Revit",
+      "command": "CadLayerMap",
+      "config": {
+        "revitTypesPath": "{suiteFolder}/fixtures/revit-types.txt",
+        "outputPath": "{outputFolder}/layer-map.csv",
+        "useOllama": false
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxMs": 30000,
+        "filesExist": [
+          "{outputFolder}/layer-map.csv"
+        ]
+      }
+    },
+    {
+      "name": "Báo lỗi rõ khi không có block cần đánh số",
+      "command": "AutoNumbering",
+      "config": {
+        "blockName": "DHCB-KHONG-CO-BLOCK",
+        "attributeTag": "MARK",
+        "prefix": "P-"
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "block"
+        ],
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "Báo lỗi rõ khi không có block cần tăng số attribute",
+      "command": "AttributeIncrement",
+      "config": {
+        "blockName": "DHCB-KHONG-CO-BLOCK",
+        "attributeTag": "MARK",
+        "pattern": "P-{n:000}"
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "block"
+        ],
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "Báo lỗi rõ khi thiếu trường bắt buộc outputPath",
+      "command": "LayerExport",
+      "config": {},
+      "//": "Truong `required` cua C# khong chan duoc Newtonsoft (dung object bang reflection). Bang dispatch phai tra E-CONFIG-MISSING thay vi nem NullReference/ArgumentNull.",
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "E-CONFIG-MISSING",
+          "outputPath"
+        ],
+        "maxMs": 30000,
+        "neverContains": [
+          "NullReferenceException"
+        ]
+      }
+    },
+    {
+      "name": "Báo lỗi rõ khi thiếu file quy tắc",
+      "command": "LayerStandardCheck",
+      "config": {
+        "rulesPath": "{suiteFolder}/fixtures/khong-co-quy-tac.json",
+        "outputPath": "{outputFolder}/khong-tao.html"
+      },
+      "expect": {
+        "success": false,
+        "maxMs": 30000,
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    }
+  ]
+}

@@ -22,20 +22,30 @@
 
 | Bộ test | Số lượng | Kết quả |
 |---|---|---|
-| `tests/DhcbTools.Shared.Logic.Tests` (xUnit, .NET 8) | 345 | ✅ 345 passed / 0 failed |
+| `tests/DhcbTools.Shared.Logic.Tests` (xUnit, .NET 8) | 488 | ✅ 488 passed / 0 failed |
 | `tools/autocad-mcp-server/test_panel_api.py` (unittest) | 29 | ✅ 29 passed / 0 failed |
 
 ```
 dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj -c Release
-Passed!  - Failed: 0, Passed: 345, Skipped: 0, Total: 345
+Passed!  - Failed: 0, Passed: 488, Skipped: 0, Total: 488
 
 python -m unittest discover -s tools/autocad-mcp-server -p 'test_*.py'
 Ran 29 tests — OK
 ```
 
-Trong đó `RibbonCoverageTests` (4 test) đối chiếu vỏ Revit với `RevitCommandTable`. Đã kiểm bằng
-**mutation**: đổi hỏng một tên lớp trong `App.cs` thì test đỏ ngay (`344 passed, 1 failed`), nên nó
-bắt thật chứ không xanh suông.
+Bốn bộ trong số này không kiểm logic mà **đối chiếu mã nguồn với mã nguồn**, nên bắt được lớp lỗi
+"tài liệu nói một đằng, mã làm một nẻo" ngay trên CI Linux, không cần Revit/AutoCAD:
+
+| Bộ | Đối chiếu |
+|---|---|
+| `RibbonCoverageTests` | Vỏ Revit ↔ `RevitCommandTable` (mọi lệnh có đường vào từ Ribbon) |
+| `CatalogFieldTests` | `CommandCatalog` ↔ property của lớp `*Config` thật, và "lệnh ghi thì phải có `DryRun`" |
+| `SuiteCoverageTests` | 42/42 lệnh Revit **và 15/15 lệnh AutoCAD** có ít nhất một ca kiểm chạy thật |
+| `VietnameseMessageTests` | Không còn mẫu thông báo tiếng Anh trong Core |
+
+`RibbonCoverageTests` đã kiểm bằng **mutation**: đổi hỏng một tên lớp trong `App.cs` thì test đỏ ngay,
+nên nó bắt thật chứ không xanh suông. `CatalogFieldTests` thì chứng minh bằng chính lần đầu chạy —
+nó tìm ra ngay 5 chỗ lệch có thật (xem §8).
 
 ---
 
@@ -103,17 +113,16 @@ lớp AI offline; cộng phủ Ribbon và gateway panel.
 
 ### ✅ Đã chạy thật trên AutoCAD
 
-Xem [`bang-chung-test-autocad-live.md`](bang-chung-test-autocad-live.md) — AutoCAD 2026, bản vẽ thật
+**15/15 lệnh** có ca kiểm tự động chạy qua `accoreconsole` — §10. Trước đó, kiểm tay trên bản vẽ thật
 6.759 entity / 171 layer: `/health`, 6 loại `query`, `LayerExport`, `DrawingCleanup` (dryRun) và
-`AutoNumbering` **ghi thật 21/21 block**.
+`AutoNumbering` **ghi thật 21/21 block** — [`bang-chung-test-autocad-live.md`](bang-chung-test-autocad-live.md).
 
 ### ⬜ Chưa chạy thật
 
 | Nhóm | Ghi chú |
 |---|---|
-| **Toàn bộ lệnh Revit (42 lệnh)** | Chưa có vòng kiểm thử nào trên Revit thật — rủi ro lớn nhất còn lại |
-| 11 lệnh AutoCAD thêm sau (`AttributeExport/Import`, `TextReplace`, `LayerStandardCheck`, `GridExtract`, `XrefAudit`, `LayerTranslate`, `DrawingCompare`, `BlockQuantity`, `AttributeIncrement`, `CadLayerMap`) | Có mã nguồn, biên dịch xanh, chưa chạy trên AutoCAD thật |
-| Batch chạy đêm đầu-cuối | `BatchStartupHook` mới viết, cần một đêm chạy thật trên máy có license |
+| Đường **ghi thật** của lệnh AutoCAD | 15/15 lệnh đã chạy thật ở chế độ xem trước (§10); chưa lệnh nào chạy lượt ghi thật trên bản vẽ có xref/annotative |
+| Batch chạy đêm đầu-cuối trên dự án thật | Đã chạy được cả hai nhánh (Revit §7–§8, AutoCAD §9) trên model/bản vẽ mẫu; còn thiếu một đêm thật trên dự án thật |
 
 Quy trình kiểm thử tay: [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md).
 
@@ -220,5 +229,166 @@ việc phát hành, xem [`kiem-thu-trong-revit.md`](kiem-thu-trong-revit.md)).
 
 ### Còn lại
 
-Bộ `revit-mep.json` (`SleeveAuto`, `SlopePipes`, `PipeKick`…) cần model MEP mẫu — chạy bằng
-`-Suite mep`. Chưa chạy.
+Bộ `revit-mep.json` đã chạy — xem §8.
+
+---
+
+## 8. Phủ đủ 42/42 lệnh Revit (2026-09-03 11:00 ICT)
+
+Máy: Windows 11, Revit 2024.3. Ba bộ ca kiểm, ba model mẫu kèm Revit, chạy nối tiếp bằng một vòng lặp
+`run-in-revit-tests.ps1`, **không ai đụng vào máy**:
+
+| Bộ | Model mẫu | Kết quả | Mã thoát |
+|---|---|---|---:|
+| `revit-smoke.json` | Snowdon Towers Sample Architectural | **27 đạt / 0 trượt / 1 bỏ qua** trên 28 ca | 0 |
+| `revit-mep.json` | Snowdon Towers Sample HVAC | **17 đạt / 0 trượt** trên 17 ca | 0 |
+| `revit-plumbing.json` | Snowdon Towers Sample Plumbing | **8 đạt / 0 trượt** trên 8 ca | 0 |
+
+Cộng lại **52 ca đạt, 0 trượt**, phủ **42/42 lệnh Revit** — chỉ số "42/42 trước v1.0" của
+[`roadmap.md`](roadmap.md) nay đạt. `SuiteCoverageTests` (chạy trên CI, không cần Revit) giữ cho con số
+này không trôi: thêm lệnh mà quên ca kiểm là CI đỏ.
+
+Vài số đo đáng ghi: `HealthReport` 1.958 ms · `ScheduleExport` 36/36 schedule 6.644 ms ·
+`ParameterRuleCheck` 1.484 giá trị + 6 ngưỡng 194 ms · `ClashDetection` 93 va chạm 543 ms ·
+`SlopePipes` kiểm 1.794 ống 47 ms · `SystemBom` 6.348 phần tử 897 ms · `SleeveAuto` quét
+1.053 phần tử MEP × tường/sàn 223 ms (ngưỡng 30 s).
+
+### Bảy lỗi, không lỗi nào bị 481 test thuần bắt được
+
+| # | Lỗi | Hậu quả thật | Đã sửa |
+|---|---|---|---|
+| 1 | `RunTestsCommand` thay token trên **chuỗi JSON đã serialize** rồi mới parse. Token `{suiteFolder}` trả về `C:\Users\…`, mà `\U` không phải escape JSON hợp lệ | Cả lượt chạy chết ngay ca đầu với `Bad JSON escape sequence: \U`, 27 ca còn lại không chạy lần nào | `JobTokens.ExpandIn` đi theo từng giá trị của cây JSON (dùng chung với batch runner); 4 test |
+| 2 | Khối chuẩn bị config nằm **ngoài** `try` của từng ca | Một ca config hỏng giết cả lượt thay vì trượt một mình | Đưa vào trong `try` |
+| 3 | `ProjectInfoConfig` **không có** `DryRun` trong khi catalog vẫn chào trường đó | Hai lớp khoá "bộ test không bao giờ ghi vào model mẫu" vô hiệu **im lặng** với riêng lệnh này — Newtonsoft không tìm thấy property nào để gán | Thêm `DryRun` (mặc định bật) + `CatalogFieldTests.LenhGhiCuaRevit_DeuCoDryRun` chốt cho cả nhóm lệnh ghi |
+| 4 | `SystemColorConfig.Colors` là `required` nhưng Newtonsoft dựng object bằng reflection nên đi vòng qua `required` của compiler | Gọi thiếu `colors` → `NullReferenceException` trần trụi ném ra Bridge/agent | `RequiredConfig` kiểm sau khi deserialize, trả `E-CONFIG-MISSING: thiếu trường bắt buộc … "colors"`; bảng dispatch đổi `ConfigException` thành `CommandResult.Fail`; 4 test |
+| 5 | `SleeveCommand` và `HangerCommand` mỗi lớp có một bản sao `FindFamilySymbol` **không khớp nhau**: bản của Sleeve không nhận tên family | Truyền tên family (đúng như tên trường `sleeveFamilyName` và ví dụ `M_Generic Model` trong tài liệu) thì `SleeveAuto` **không bao giờ** tra ra — cùng một tên, Hanger chạy được còn Sleeve báo lỗi | Gộp về `RevitCompat.FindFamilySymbol` (type / family / "Family: Type"). Sau khi sửa, SleeveAuto chạy trọn vòng quét: 15 ms → 223 ms |
+| 6 | `PipeSplitter` chỉ nhận tên category **số ít** và **phân biệt hoa thường**; tên lạ bị bỏ **im lặng** | `categories: ["Pipes"]` trên model có 1.794 ống → "không có phần tử MEP nào phù hợp để cắt", không phân biệt được với model rỗng thật | Bảng dùng chung `RevitCompat.MepCurveCategories` (số ít + số nhiều, không phân biệt hoa thường) và **báo tên không nhận ra**. Sau khi sửa: cắt 143 phần tử, 189 điểm cắt |
+| 7 | `HangerCommand` gặp tên category lạ thì âm thầm rơi về **toàn bộ** category mặc định | Gõ sai một tên → lệnh chạy sai phạm vi mà vẫn báo thành công | Dùng chung `ResolveMepCategories`, trả tên sai ra ngoài |
+
+Lỗi 3, 5, 6, 7 cùng một họ với nhóm đã dọn ở giai đoạn 8.1: **không phải crash, mà là báo thành công
+trong khi không làm đúng việc**. Đây cũng là lý do bộ ca kiểm nay có hẳn nhóm ca *"báo lỗi rõ khi…"* —
+đường lỗi được chốt chặn ngang với đường thành công.
+
+### Bốn lỗi lệch tài liệu ↔ mã nguồn, tìm bằng test đối chiếu (không cần Revit)
+
+| # | Lệch | Hậu quả |
+|---|---|---|
+| 1 | `CommandCatalog` khai `FamilyLoader.familyPaths`, config thật là `familyFolder`/`familyNames` | Form động (giai đoạn 9.1) dựng một ô nhập **không dây vào đâu cả**; MCP chào một trường mà lệnh bỏ qua |
+| 2 | `SizingProposal.maxVelocityMs` — config thật có `maxDuctVelocityMs`/`maxPipeVelocityMs` | Như trên |
+| 3 | `DrawingCleanup` khai ba trường `purgeUnusedTextStyles`/`purgeUnusedDimStyles`/`purgeRegApps` mà `CleanupConfig` không có, và lệnh không hề purge ba thứ đó (mục 7.12 chưa từng viết) | `jobs/autocad-nightly.sample.json` **đang dùng** hai trường này — job đêm chạy mỗi tối mà không purge gì |
+| 4 | `RibbonCoverageTests` miễn trừ `ProjectInfo` với lý do "có vỏ riêng", nhưng vỏ đó **không tồn tại** | Test báo "phủ đủ 42/42" trong khi Ribbon chỉ với tới 41 lệnh |
+
+Cả bốn đều được chốt bằng test đọc thẳng mã nguồn (`CatalogFieldTests`, `RibbonCoverageTests`), chạy trên
+CI Linux, không cần Revit/AutoCAD.
+
+### Còn lại sau §8
+
+- **AutoCAD chưa có bộ ca kiểm tự động** tương đương bên Revit. `DrawingCleanup` (gồm phần purge sâu mới
+  viết) đã chạy thật qua `accoreconsole` — xem mục ngay dưới — nhưng 15 lệnh AutoCAD chưa được phủ theo
+  kiểu khai báo kỳ vọng như bên Revit. Đây là khoảng trống lớn nhất còn lại.
+- `SleeveAuto` chạy trọn vòng quét nhưng ra 0 sleeve trên model HVAC mẫu (model không có family Generic
+  Model nào; ca kiểm mượn family `HeatRecoveryUnit` để đi hết đường nặng). Cần một model có family sleeve
+  thật để chốt số lượng đặt được.
+- `AutoRoute` trên model kiến trúc mẫu chạm giới hạn 400.000 ô sau 3,3 s và **báo rõ lý do** — đúng hành
+  vi mong muốn, nhưng chưa có ca nào chứng minh đường tìm-ra-tuyến trên model thật.
+
+---
+
+## 9. Batch AutoCAD — vòng chạy thật đầu tiên (2026-09-03 11:04 ICT)
+
+Máy: Windows 11, **AutoCAD 2026.1** (R25.1.179 → .NET 10). Hai bản vẽ mẫu kèm AutoCAD
+(`Data Extraction and Multileaders Sample.dwg`, `Floor Plan Sample.dwg`), chạy bằng `BatchRunner` →
+`accoreconsole` → `NETLOAD DhcbTools.AutoCAD.Core.dll` → `DHCB_RUN`, không mở giao diện AutoCAD.
+
+**Lỗi chặn — batch AutoCAD chưa từng chạy được lần nào.** `AcadScriptGen` sinh
+`DHCB_RUN "step.json" "run.jsonl" "a.dwg"` trên **một dòng**, trong khi `DHCB_RUN` hỏi ba prompt riêng.
+Script AutoCAD coi mỗi **dòng** là một lần Enter, nên cả ba tham số bị nuốt vào prompt đầu tiên:
+
+```
+' The filename, directory name, or volume label syntax is incorrect. :
+  'C:\Users\...\"C:\...\001-00-LayerExport.json" "C:\...\run.jsonl" "C:\...\mau.dwg"'
+```
+
+Đúng một họ với lỗi journal của Revit ở §7: **giai đoạn 1 đánh dấu xong từ lâu cho cả hai nền tảng,
+nhưng chưa nền tảng nào chạy trọn một lần.** Đáng chú ý là hàm `AcadScriptGen.PlotPdf` ngay bên cạnh đã
+viết đúng ("mỗi tham số một dòng") — chỉ dòng `DHCB_RUN` sai. Đã sửa, có test chốt chặn thứ tự bốn dòng
+và đường dẫn có dấu cách.
+
+**Kết quả sau khi sửa (mã thoát 0):**
+
+| Bản vẽ | Lệnh | Kết quả | ms |
+|---|---|---|---:|
+| `mau.dwg` | `LayerExport` | ✅ 70 layer → CSV | 53 |
+| `mau.dwg` | `DrawingCleanup` (xem trước, purge sâu) | ✅ 10 đối tượng thừa | 30 |
+| `floorplan.dwg` | `LayerExport` | ✅ 29 layer → CSV | 41 |
+| `floorplan.dwg` | `DrawingCleanup` (xem trước, purge sâu) | ✅ 3 đối tượng thừa | 29 |
+
+Đây cũng là lần đầu **purge sâu (text style / dim style / regapp)** chạy thật — mục 7.12 của khảo sát
+thị trường, trước đó `CommandCatalog` chào ba trường `purgeUnusedTextStyles`/`purgeUnusedDimStyles`/
+`purgeRegApps` mà `CleanupConfig` không có và lệnh không hề làm; `jobs/autocad-nightly.sample.json` vẫn
+đang truyền hai trong ba trường đó mỗi đêm. Rác tìm được là rác thật của add-in cũ: `AVE_FINISH`,
+`AVE_GLOBAL`, `RAK`, `CONTENT*` (Content Explorer), `AFM10`/`AFM50` (Autodesk Fabrication).
+
+**Một quyết định phải đổi sau khi nhìn số liệu thật:** vòng đầu còn đề nghị xoá `AcadAnnoAV`,
+`AcadAnnoPO`, `AcadAnnotativeDecomposition` — dữ liệu nội bộ của tính năng annotative. Về lý thuyết
+purge được (không entity nào mang XData của chúng), nhưng cái đáng dọn là rác bên thứ ba, không phải vài
+byte của Autodesk. `CleanupDecider.IsSystemRegApp` nay giữ lại mọi tên bắt đầu bằng `ACAD`/`AcDb`;
+sau khi sửa, danh sách của `mau.dwg` còn 10 mục.
+
+**Còn lại:** `DrawingCleanup` mới chạy ở chế độ **xem trước**; chưa có lượt xoá thật trên bản vẽ có
+xref/annotative để chốt phần `Erase()`.
+
+---
+
+## 10. Phủ đủ 15/15 lệnh AutoCAD (2026-09-03 11:32 ICT)
+
+Khoảng trống lớn nhất sau §8 — "AutoCAD chưa có bộ ca kiểm tự động" — nay đã lấp. Cơ chế đối xứng hoàn
+toàn với bên Revit: lệnh Core `RunTests` của `Core.AutoCAD` chạy qua `accoreconsole`, dùng **chung tầng
+đánh giá** `Shared.Logic/Testing` (`TestSuite`, `TestExpectation`, `TestReport`) với Revit.
+
+```powershell
+.\scripts\run-in-autocad-tests.ps1
+```
+
+| Bộ | Bản vẽ mẫu | Kết quả | Mã thoát |
+|---|---|---|---:|
+| [`autocad-smoke.json`](../tests/suites/autocad-smoke.json) | Data Extraction and Multileaders Sample (kèm AutoCAD 2026) | **18 đạt / 0 trượt trên 18 ca**, phủ **15/15 lệnh** | 0 |
+
+`SuiteCoverageTests` nay đòi cả hai nền tảng: thêm một lệnh AutoCAD mà quên ca kiểm là CI đỏ, y như bên Revit.
+
+### Hai lỗi, cùng một họ với lỗi đã sửa bên Revit
+
+Vòng chạy đầu tiên ra 14/17. Ba ca trượt: một là kỳ vọng sai của chính bộ test (bản vẽ cơ khí không có
+layer `AXIS`, nên `GridExtract` **đúng** khi báo lỗi), hai còn lại là lỗi thật:
+
+| Lệnh | Lỗi | Hậu quả |
+|---|---|---|
+| `LayerImport` | Mở **mọi** layer trong CSV ở chế độ ghi rồi gán lại y nguyên giá trị cũ | Nhập lại chính file vừa xuất vẫn báo "cập nhật 70 layer" — không phân biệt được với việc kỹ sư sửa thật 70 layer, và làm bẩn drawing (dirty flag, một mục undo) mà không đổi gì |
+| `AttributeImport` | Như trên, với 50 attribute; và nhánh xem trước **đánh rơi toàn bộ `Messages`** đã gom | Kỹ sư xem trước không thấy ô nào sẽ đổi |
+
+Đây đúng là lỗi đã sửa cho `ParameterImport` bên Revit ở PR #29 — cùng một hình dạng, ở hai chỗ khác chưa
+ai soi tới. Phát hiện được là nhờ **ca vòng tròn**: xuất ra CSV rồi nhập lại chính file đó, kỳ vọng
+`maxAffected: 0`.
+
+Sửa kèm hai thứ lộ ra khi đọc lại `LayerImport`: nó **bỏ qua hoàn toàn cột Linetype và Lineweight** dù
+header CSV và tài liệu đều nói có (sửa nét đứt trong Excel rồi nhập lại thì không có gì xảy ra, lệnh vẫn
+báo thành công), và nó tự viết bộ tách CSV riêng thay vì dùng `CsvText` đã có test, đọc file không theo
+UTF-8 BOM như lúc xuất.
+
+### Ca song sinh — vì sao `maxAffected: 0` một mình là chưa đủ
+
+Một mình ca vòng tròn vẫn xanh nếu ai đó làm `LayerImport` **luôn** trả 0. Bộ AutoCAD vì thế có thêm ca
+*"nhập CSV đổi đúng một ô"* (`minAffected: 1, maxAffected: 1`) với fixture chép từ chính bản vẽ mẫu, đổi
+màu một layer. Hai ca cạnh nhau mới chứng minh phép so sánh **phân biệt được**:
+
+```
+Nhập lại chính CSV vừa xuất        → [Xem trước] Sẽ cập nhật 0 layer
+Nhập CSV đổi đúng một ô            → [Xem trước] Sẽ cập nhật 1 layer
+```
+
+### Còn lại sau §10
+
+- Mọi ca đều chạy ở chế độ **xem trước**; đường ghi thật (`allowWrite` + `-AllowWrites`) chưa có ca nào.
+- `GridExtract` và `TextReplace` mới chốt được đường lỗi/không-khớp: bản vẽ mẫu kèm AutoCAD không có layer
+  trục và không có chuỗi cần thay. Đường thành công cần một bản vẽ dự án thật.
+- `DrawingCompare` mới so bản vẽ với chính nó; chưa có cặp bản vẽ khác nhau thật để chốt số liệu khác biệt.

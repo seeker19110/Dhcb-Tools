@@ -1,0 +1,7 @@
+Basic Wall: Generic - 200mm
+Basic Wall: Interior - 100mm Partition
+M_Single-Flush: 0915 x 2134mm
+M_Fixed: 0915 x 1220mm
+Floor: Generic 150mm
+M_Round Duct: Taper - Angle
+M_Pipe Types: Standard

@@ -1,95 +1,275 @@
 {
   "name": "DHCB — kiểm thử trong Revit (MEP)",
   "model": "Snowdon Towers Sample HVAC.rvt",
-
   "//": [
     "Bộ ca kiểm cho nhóm MEPF — nhóm rủi ro cao nhất và chưa từng chạy thật.",
     "Model: Snowdon Towers Sample HVAC/Plumbing kèm theo Revit 2024 (C:/Program Files/Autodesk/Revit 2024/Samples).",
     "Mọi ca đều dryRun: mục tiêu ở đây là 'chạy được, không ném, không quá chậm, không no-op im lặng'.",
     "maxMs là lưới bắt hồi quy hiệu năng — SleeveAuto từng dựng collector toàn model trong vòng lặp",
-    "và sẽ vượt timeout 30 s của Bridge trên model thật; ca dưới đây bắt đúng chuyện đó."
+    "và sẽ vượt timeout 30 s của Bridge trên model thật; ca dưới đây bắt đúng chuyện đó.",
+    "Bo sung 2026-09-03: 4 ca cho RouteFromLines, DevicePlacement, ApplySizing, PipeKick — day la",
+    "nhung lenh cuoi cung chua co ca kiem nao, nen 42/42 lenh Revit deu duoc chay it nhat mot lan."
   ],
-
   "cases": [
     {
       "name": "Kiểm connector hở",
       "command": "ConnectorChecker",
-      "config": { "create3dView": false },
-      "expect": { "success": true, "maxMs": 120000 }
+      "config": {
+        "create3dView": false
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 120000
+      }
     },
     {
       "name": "Sleeve tự động — hiệu năng trên model MEP thật",
       "command": "SleeveAuto",
-      "config": { "sleeveFamilyName": "M_Generic Model", "mepCategories": ["Ducts", "Pipes"] },
+      "config": {
+        "sleeveFamilyName": "HeatRecoveryUnit",
+        "mepCategories": [
+          "Ducts",
+          "Pipes"
+        ]
+      },
       "expect": {
+        "success": null,
         "maxMs": 30000,
-        "neverContains": ["Exception", "timed out"]
-      }
+        "neverContains": [
+          "Exception",
+          "timed out"
+        ]
+      },
+      "//": "Model HVAC mau KHONG co family Generic Model nao (kiem bang FamilyAudit tren chinh no: 95 family, khong co Generic Models). 'M_Generic Model' truoc day chi la ten doan mo, nen ca nay dung o buoc tra family va KHONG BAO GIO cham toi vong quet giao cat — tuc luoi maxMs 30 s khong do gi ca. Dung 'HeatRecoveryUnit' (Mechanical Equipment, 37 instance) la co chu y: no ton tai that, nen lenh chay tron phan nang la quet MEP x tuong/san. dryRun van bat nen khong co gi duoc dat vao model."
     },
     {
       "name": "Tag cao độ — xem trước",
       "command": "ElevationTag",
-      "config": { "categories": ["Ducts"] },
-      "expect": { "maxMs": 60000, "neverContains": ["Exception"] }
+      "config": {
+        "categories": [
+          "Ducts"
+        ]
+      },
+      "expect": {
+        "maxMs": 60000,
+        "neverContains": [
+          "Exception"
+        ]
+      }
     },
     {
       "name": "Hanger theo khoảng cách — xem trước",
       "command": "HangerAuto",
-      "config": { "hangerFamilyName": "M_Generic Model", "spacingMm": 3000 },
-      "expect": { "maxMs": 60000, "neverContains": ["Exception"] }
+      "config": {
+        "hangerFamilyName": "HeatRecoveryUnit",
+        "spacingMm": 3000
+      },
+      "expect": {
+        "success": null,
+        "maxMs": 60000,
+        "neverContains": [
+          "Exception"
+        ]
+      },
+      "//": "Cung ly do voi SleeveAuto: dung family co that de chay tron vong tinh vi tri treo."
     },
     {
       "name": "Chia ống theo cây — xem trước",
       "command": "PipeSplitter",
-      "config": { "maxSegmentMm": 6000 },
-      "expect": { "maxMs": 60000, "neverContains": ["Exception"] }
+      "config": {
+        "maxSegmentMm": 6000
+      },
+      "expect": {
+        "maxMs": 60000,
+        "neverContains": [
+          "Exception"
+        ]
+      }
     },
     {
       "name": "Đề xuất kích thước",
       "command": "SizingProposal",
-      "config": { "outputPath": "{outputFolder}/sizing.csv" },
-      "expect": { "success": true, "maxMs": 90000 }
+      "config": {
+        "outputPath": "{outputFolder}/sizing.csv"
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 90000
+      }
     },
     {
       "name": "Đặt tên hệ thống — xem trước",
       "command": "SystemName",
       "config": {},
-      "expect": { "maxMs": 60000, "neverContains": ["Exception"] }
+      "expect": {
+        "maxMs": 60000,
+        "neverContains": [
+          "Exception"
+        ]
+      }
     },
     {
       "name": "Màu theo hệ — xem trước",
       "command": "SystemColor",
-      "config": {},
-      "expect": { "maxMs": 60000, "neverContains": ["Exception"] }
+      "config": {
+        "colors": {
+          "Supply Air": "#0070C0",
+          "Return Air": "#00B050",
+          "Exhaust Air": "#FF0000"
+        }
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 3,
+        "summaryContains": [
+          "Xem trước"
+        ],
+        "maxMs": 60000,
+        "neverContains": [
+          "Exception"
+        ]
+      }
     },
     {
-      "name": "Đánh số theo dòng chảy — xem trước",
+      "name": "Báo lỗi rõ khi thiếu phần tử nguồn",
       "command": "FlowNumbering",
-      "config": {},
-      "expect": { "maxMs": 90000, "neverContains": ["Exception"] }
+      "config": {
+        "sourceElementId": 0
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "phần tử nguồn"
+        ],
+        "maxMs": 90000
+      },
+      "//": "Khong biet truoc Id nguon tren model mau, nen ca nay chot duong loi: phai noi ro 'khong tim thay phan tu nguon' thay vi danh so 0 phan tu roi bao thanh cong."
     },
     {
       "name": "BOM theo hệ",
       "command": "SystemBom",
-      "config": { "outputPath": "{outputFolder}/bom.csv" },
-      "expect": { "success": true, "maxMs": 90000 }
+      "config": {
+        "outputPath": "{outputFolder}/bom.csv"
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 90000
+      }
     },
     {
-      "name": "Kiểm dốc ống thoát",
+      "name": "Báo lỗi rõ khi không có ống nào khớp bộ lọc",
       "command": "SlopePipes",
-      "config": { "checkOnly": true },
-      "expect": { "maxMs": 60000, "neverContains": ["Exception"] }
+      "config": {
+        "checkOnly": true
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "khớp bộ lọc"
+        ],
+        "maxMs": 60000
+      },
+      "//": "Snowdon HVAC chi co duct, khong co ong thoat. Ca nay chot dung dieu do: lenh phai noi 'khong co ong nao khop bo loc' chu khong bao thanh cong voi 0 ong. Duong thanh cong cua SlopePipes nam o bo revit-plumbing.json."
     },
     {
       "name": "Dò va chạm nội bộ",
       "command": "ClashDetection",
       "config": {
-        "categoriesA": ["Ducts"],
-        "categoriesB": ["Structural Framing"],
+        "categoriesA": [
+          "Ducts"
+        ],
+        "categoriesB": [
+          "Structural Framing"
+        ],
         "outputPath": "{outputFolder}/clash.html",
         "create3dView": false
       },
-      "expect": { "success": true, "maxMs": 180000 }
+      "expect": {
+        "success": true,
+        "maxMs": 180000
+      }
+    },
+    {
+      "name": "Áp kích thước từ chính CSV vừa đề xuất",
+      "command": "ApplySizing",
+      "config": {
+        "inputPath": "{outputFolder}/sizing.csv"
+      },
+      "//": "Doc lai file do ca SizingProposal o tren vua ghi — vong tron de xuat -> duyet -> ap. Neu SizingProposal khong ghi gi thi ca nay bao 'khong tim thay file', cung la mot tin.",
+      "expect": {
+        "success": null,
+        "maxMs": 90000,
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
+      "name": "Báo lỗi rõ khi không có line style để dựng tuyến",
+      "command": "RouteFromLines",
+      "config": {
+        "lineStyleName": "DHCB-KHONG-CO-LINE-STYLE",
+        "elementType": "Duct"
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "line style"
+        ],
+        "maxMs": 60000
+      }
+    },
+    {
+      "name": "Báo lỗi rõ khi không có family thiết bị",
+      "command": "DevicePlacement",
+      "config": {
+        "deviceFamily": "DHCB-KHONG-CO-FAMILY",
+        "pattern": {
+          "spacingXMm": 3000,
+          "spacingYMm": 3000
+        }
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "family"
+        ],
+        "maxMs": 60000
+      }
+    },
+    {
+      "name": "Báo lỗi rõ khi Id ống không tồn tại",
+      "command": "PipeKick",
+      "config": {
+        "elementId": 0,
+        "offsetMm": 300,
+        "offsetDirection": "Up",
+        "elbowAngleDeg": 45
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "ống"
+        ],
+        "maxMs": 60000
+      }
+    },
+    {
+      "name": "Báo lỗi rõ khi thiếu trường bắt buộc colors",
+      "command": "SystemColor",
+      "config": {},
+      "//": "Truoc 2026-09-03 ca nay lam lenh nem NullReferenceException tran trui: `required` cua C# chi duoc compiler kiem khi dung object initializer, con Newtonsoft dung object bang reflection nen di vong qua no. Nay bang dispatch kiem truoc va tra E-CONFIG-MISSING.",
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "E-CONFIG-MISSING",
+          "colors"
+        ],
+        "maxMs": 60000,
+        "neverContains": [
+          "NullReferenceException"
+        ]
+      }
     }
   ]
 }

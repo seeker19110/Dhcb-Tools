@@ -60,6 +60,13 @@ public sealed class RunCommand
     private static string? Ask(Editor ed, string prompt)
     {
         var r = ed.GetString(new PromptStringOptions("\n" + prompt + ": ") { AllowSpaces = true });
-        return r.Status == PromptStatus.OK && !string.IsNullOrWhiteSpace(r.StringResult) ? r.StringResult : null;
+        if (r.Status != PromptStatus.OK || string.IsNullOrWhiteSpace(r.StringResult))
+        {
+            return null;
+        }
+
+        // AllowSpaces nhận nguyên dòng, nên nếu ai đó (hoặc một script cũ) bọc nháy thì dấu nháy vào
+        // thẳng tên file và File.ReadAllText ném "syntax is incorrect". Bỏ nháy ở đây cho chắc.
+        return r.StringResult.Trim().Trim('"');
     }
 }

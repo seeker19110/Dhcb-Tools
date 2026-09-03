@@ -103,6 +103,91 @@ public static class RevitCompat
     }
 
     /// <summary>
+    /// Tên category tuyến MEP → <see cref="BuiltInCategory"/>. Nhận cả số ít lẫn số nhiều, không phân
+    /// biệt hoa thường: người dùng và agent gõ tên category của Revit ("Pipes", "Ducts"), trong khi
+    /// vài lệnh trước đây chỉ nhận số ít và phân biệt hoa thường.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, BuiltInCategory> MepCurveCategories =
+        new Dictionary<string, BuiltInCategory>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "Duct", BuiltInCategory.OST_DuctCurves },
+            { "Ducts", BuiltInCategory.OST_DuctCurves },
+            { "Pipe", BuiltInCategory.OST_PipeCurves },
+            { "Pipes", BuiltInCategory.OST_PipeCurves },
+            { "CableTray", BuiltInCategory.OST_CableTray },
+            { "CableTrays", BuiltInCategory.OST_CableTray },
+            { "Conduit", BuiltInCategory.OST_Conduit },
+            { "Conduits", BuiltInCategory.OST_Conduit },
+        };
+
+    /// <summary>
+    /// Đổi danh sách tên thành category, và trả về tên KHÔNG nhận ra qua <paramref name="unknown"/>.
+    /// <para>
+    /// Trả tên sai ra ngoài là điểm mấu chốt: <c>HangerCommand</c> trước đây gặp tên lạ thì âm thầm
+    /// rơi về "toàn bộ category mặc định" (chạy sai phạm vi mà vẫn báo thành công), còn
+    /// <c>PipeSplitterCommand</c> âm thầm bỏ qua rồi kết luận "không có phần tử nào" trên model có
+    /// 1.794 ống. Cả hai lộ ra ở vòng kiểm thử cấp thoát nước 2026-09-03.
+    /// </para>
+    /// </summary>
+    public static List<BuiltInCategory> ResolveMepCategories(IEnumerable<string>? names, out List<string> unknown)
+    {
+        unknown = new List<string>();
+        var result = new List<BuiltInCategory>();
+        if (names == null)
+        {
+            return result;
+        }
+
+        foreach (var name in names)
+        {
+            if (MepCurveCategories.TryGetValue(name ?? string.Empty, out var category))
+            {
+                if (!result.Contains(category))
+                {
+                    result.Add(category);
+                }
+            }
+            else
+            {
+                unknown.Add(name ?? string.Empty);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>Thông báo chuẩn khi tên category không hợp lệ.</summary>
+    public static string UnknownMepCategories(IEnumerable<string> unknown) =>
+        "Không nhận ra category: " + string.Join(", ", unknown)
+        + ". Hợp lệ: " + string.Join(", ", MepCurveCategories.Keys) + ".";
+
+    /// <summary>
+    /// Tra <see cref="FamilySymbol"/> theo tên type, tên family, hoặc dạng đầy đủ "Family: Type".
+    /// <para>
+    /// Một điểm tra duy nhất là có chủ ý: trước đây <c>SleeveCommand</c> và <c>HangerCommand</c> mỗi
+    /// lớp có một bản sao gần giống nhau và **không khớp nhau** — bản của Sleeve chỉ nhận tên type
+    /// hoặc "Family: Type", nên truyền tên family (đúng như tên trường <c>sleeveFamilyName</c> và ví dụ
+    /// trong tài liệu, <c>M_Generic Model</c>) thì không bao giờ tra ra. Vòng kiểm thử MEP đầu tiên
+    /// trong Revit (2026-09-03) cho thấy cùng một tên: Hanger tra được, Sleeve thì không.
+    /// </para>
+    /// </summary>
+    public static FamilySymbol? FindFamilySymbol(Document doc, string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return null;
+        }
+
+        var symbols = new FilteredElementCollector(doc).OfClass(typeof(FamilySymbol)).Cast<FamilySymbol>().ToList();
+
+        return symbols.FirstOrDefault(s => string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase))
+               ?? symbols.FirstOrDefault(s => string.Equals(s.FamilyName + ": " + s.Name, name, StringComparison.OrdinalIgnoreCase))
+               // Tên family: lấy type đầu tiên của family đó — người dùng nói "family sleeve", không
+               // phải "type sleeve", nên đây là cách hiểu đúng thay vì trả về null.
+               ?? symbols.FirstOrDefault(s => string.Equals(s.FamilyName, name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
     /// Luật "chứa chuỗi" cho ParameterFilter. Revit 2023 bỏ tham số <c>caseSensitive</c> và
     /// đánh dấu overload cũ là obsolete; cả hai nhánh đều không phân biệt hoa thường,
     /// nên hành vi giữ nguyên qua mọi phiên bản.

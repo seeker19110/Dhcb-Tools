@@ -192,42 +192,9 @@ namespace DhcbTools.Shared.Logic.Batch
         {
             var ctx = MakeContext(outputFolder, filePath, runTime);
             var clone = (JObject)step.Config.DeepClone();
-            ExpandTokens(clone, ctx);
+            JobTokens.ExpandIn(clone, ctx);
             return clone.ToString(Formatting.None);
         }
 
-        private static void ExpandTokens(JToken token, JobTokenContext ctx)
-        {
-            switch (token.Type)
-            {
-                case JTokenType.Object:
-                    foreach (var prop in ((JObject)token).Properties())
-                    {
-                        if (prop.Value.Type == JTokenType.String)
-                        {
-                            prop.Value = JobTokens.Expand((string?)prop.Value, ctx);
-                        }
-                        else
-                        {
-                            ExpandTokens(prop.Value, ctx);
-                        }
-                    }
-                    break;
-                case JTokenType.Array:
-                    var array = (JArray)token;
-                    for (var i = 0; i < array.Count; i++)
-                    {
-                        if (array[i].Type == JTokenType.String)
-                        {
-                            array[i] = JobTokens.Expand((string?)array[i], ctx);
-                        }
-                        else
-                        {
-                            ExpandTokens(array[i], ctx);
-                        }
-                    }
-                    break;
-            }
-        }
     }
 }

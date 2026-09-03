@@ -6,6 +6,12 @@ namespace DhcbTools.Core.AutoCAD.Attributes;
 /// <summary>
 /// Đọc CSV đúng định dạng do <see cref="AttributeExportCommand"/> tạo ra
 /// (BlockName,Handle,AttributeTag,AttributeValue) và ghi ngược giá trị vào attribute khớp Handle + Tag.
+/// <para>
+/// <b>Chỉ ghi ô đã đổi.</b> Bản trước đếm và ghi mọi dòng trong CSV, nên nhập lại chính file vừa xuất
+/// vẫn báo "cập nhật 50 attribute" — không phân biệt được với việc kỹ sư sửa thật 50 ô. Cùng lỗi đã sửa
+/// cho <c>ParameterImport</c> bên Revit (PR #29) và <c>LayerImport</c>; lộ ra ở vòng kiểm thử AutoCAD
+/// đầu tiên 2026-09-03 nhờ ca "nhập lại chính CSV vừa xuất".
+/// </para>
 /// </summary>
 public sealed class AttributeImportCommand : ICoreCommand<AttributeImportConfig>
 {
@@ -18,7 +24,8 @@ public sealed class AttributeImportCommand : ICoreCommand<AttributeImportConfig>
             return CommandResult.Fail($"Không tìm thấy file: \"{config.InputPath}\".");
         }
 
-        var lines = File.ReadAllLines(config.InputPath);
+        // Cùng encoding với lúc xuất để giá trị tiếng Việt không vỡ.
+        var lines = File.ReadAllLines(config.InputPath, CsvText.Utf8WithBom);
         if (lines.Length < 2)
         {
             return CommandResult.Fail("File CSV không có dữ liệu (chỉ có dòng tiêu đề hoặc rỗng).");
@@ -26,6 +33,7 @@ public sealed class AttributeImportCommand : ICoreCommand<AttributeImportConfig>
 
         var updated = 0;
         var skipped = 0;
+        var unchanged = 0;
         var result = CommandResult.Ok(string.Empty);
 
         using var transaction = database.TransactionManager.StartTransaction();
@@ -75,6 +83,14 @@ public sealed class AttributeImportCommand : ICoreCommand<AttributeImportConfig>
 
                 found = true;
 
+                // Giá trị trùng thì không đụng vào: mở ForWrite một attribute là làm bẩn drawing và
+                // đẩy một mục vào undo, dù không đổi gì.
+                if (string.Equals(attRef.TextString, value, StringComparison.Ordinal))
+                {
+                    unchanged++;
+                    break;
+                }
+
                 if (config.DryRun)
                 {
                     result.Messages.Add($"[Xem trước] Handle {handleText} — {tag}: \"{attRef.TextString}\" → \"{value}\"");
@@ -96,11 +112,20 @@ public sealed class AttributeImportCommand : ICoreCommand<AttributeImportConfig>
             }
         }
 
+        if (unchanged > 0)
+        {
+            result.Messages.Insert(0, $"{unchanged} ô giữ nguyên vì giá trị trong CSV trùng với drawing.");
+        }
+
         if (config.DryRun)
         {
             transaction.Abort();
-            result.Messages.Insert(0, $"[Xem trước] Sẽ cập nhật {updated} attribute, bỏ qua {skipped} dòng.");
-            return CommandResult.Ok($"[Xem trước] Sẽ cập nhật {updated} attribute (chưa ghi vào drawing).", updated);
+            // Giữ nguyên Messages: bản trước tạo CommandResult mới và đánh rơi toàn bộ dòng đã gom ở trên.
+            var preview = CommandResult.Ok(
+                $"[Xem trước] Sẽ cập nhật {updated} attribute, bỏ qua {skipped} dòng (chưa ghi vào drawing).",
+                updated);
+            preview.Messages.AddRange(result.Messages);
+            return preview;
         }
 
         transaction.Commit();

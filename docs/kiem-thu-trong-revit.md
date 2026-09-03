@@ -1,22 +1,31 @@
-# Kiểm thử chạy bên trong Revit
+# Kiểm thử chạy bên trong Revit và AutoCAD
 
-Giai đoạn 8.3 của [`roadmap.md`](roadmap.md). Giải quyết đúng một lỗ hổng: **toàn bộ `DhcbTools.Core` — mọi dòng chạm
-Revit API — không có test tự động nào**, trong khi 360 test xUnit chỉ phủ `Shared.Logic` thuần. Một bộ test xanh mà
-không đụng tới phần rủi ro nhất thì con số đó không nói lên điều gì.
+Giai đoạn 8.3 của [`roadmap.md`](roadmap.md). Giải quyết đúng một lỗ hổng: **toàn bộ `DhcbTools.Core` và
+`DhcbTools.Core.AutoCAD` — mọi dòng chạm API của Revit/AutoCAD — không có test tự động nào**, trong khi
+mấy trăm test xUnit chỉ phủ `Shared.Logic` thuần. Một bộ test xanh mà không đụng tới phần rủi ro nhất thì
+con số đó không nói lên điều gì.
 
-Revit không có chế độ headless chính thức, nhưng batch runner đã mở được Revit không người ngồi máy. Bộ test đi đúng
-đường đó: một lệnh Core (`RunTests`) gọi từng lệnh khác qua `RevitCommandTable` trên model mẫu rồi đối chiếu kỳ vọng.
+Revit không có chế độ headless chính thức, nhưng batch runner đã mở được Revit không người ngồi máy; AutoCAD
+thì có sẵn `accoreconsole`. Bộ test đi đúng hai đường đó: một lệnh Core tên `RunTests` gọi từng lệnh khác qua
+`RevitCommandTable` / `AcadCommandTable` trên file mẫu rồi đối chiếu kỳ vọng. **Hai nền tảng dùng chung tầng
+đánh giá** `Shared.Logic/Testing` (`TestSuite`, `TestExpectation`, `TestReport`), nên cách viết ca kiểm y hệt
+nhau và tầng đó có test riêng trên CI.
 
 ## Chạy
 
 Cách nhanh nhất — một lệnh làm trọn vòng (build → cài add-in → dựng job → chạy → in báo cáo):
 
 ```powershell
-.\scripts\run-in-revit-tests.ps1 -Suite mep
+.\scripts\run-in-revit-tests.ps1 -Suite mep        # smoke | mep | plumbing
+.\scripts\run-in-autocad-tests.ps1                 # bên AutoCAD, qua accoreconsole
 ```
 
-Script **dừng ngay nếu Revit đang mở**: Revit khoá DLL add-in khi chạy, và batch runner cần tự mở
-Revit của riêng nó. Đóng Revit rồi chạy lại.
+Script Revit **chờ tới 120 s cho Revit đóng hẳn** rồi mới bỏ cuộc: Revit khoá DLL add-in khi chạy, và tiến
+trình của lượt trước còn sống vài chục giây sau khi batch kết thúc — chạy ba bộ nối đuôi nhau trong một
+lệnh vẫn được.
+
+Script AutoCAD không cần đóng AutoCAD: `accoreconsole` là tiến trình riêng, không dùng chung DLL với giao
+diện đang mở.
 
 Hoặc gọi thẳng batch runner với file job tự viết:
 
@@ -43,10 +52,18 @@ Có sẵn hai bộ:
 
 | Bộ | Model mẫu | Phủ |
 |---|---|---|
-| [`revit-smoke.json`](../tests/suites/revit-smoke.json) | Snowdon Towers Sample Architectural | Health, tham số, cảnh báo, family, view/sheet, style, schedule |
-| [`revit-mep.json`](../tests/suites/revit-mep.json) | Snowdon Towers Sample HVAC | Connector, sleeve, cao độ, hanger, chia ống, sizing, BOM, dốc ống, clash |
+| [`revit-smoke.json`](../tests/suites/revit-smoke.json) | Snowdon Towers Sample Architectural | Health, tham số, cảnh báo, family, view/sheet, style, schedule, xuất bản vẽ, khởi tạo dự án, kiểm tra, AI offline |
+| [`revit-mep.json`](../tests/suites/revit-mep.json) | Snowdon Towers Sample HVAC | Connector, sleeve, cao độ, hanger, chia ống, routing, sizing, BOM, kick, clash |
+| [`revit-plumbing.json`](../tests/suites/revit-plumbing.json) | Snowdon Towers Sample Plumbing | Dốc ống, sizing ống, BOM ống, chia ống, cao độ ống |
+| [`autocad-smoke.json`](../tests/suites/autocad-smoke.json) | Data Extraction and Multileaders Sample (kèm AutoCAD) | Đủ **15/15 lệnh AutoCAD**: layer, attribute, text, chuẩn layer, trục, xref, block, so bản vẽ, dọn dẹp, map layer |
 
-Cả hai model đều đi kèm Revit (`C:\Program Files\Autodesk\Revit 2024\Samples`), nên không cần chuẩn bị gì thêm.
+Hai bộ cộng lại phủ **đủ 42/42 lệnh Revit** — `SuiteCoverageTests` (chạy trên CI, không cần Revit) đỏ ngay
+khi thêm lệnh mới mà quên ca kiểm, nên con số này không trôi khỏi tài liệu được nữa.
+
+Cả ba model đều đi kèm Revit (`C:\Program Files\Autodesk\Revit 2024\Samples`), nên không cần chuẩn bị gì thêm.
+
+Bộ thứ ba có lý do rõ ràng: model HVAC chỉ có duct, nên trên đó `SlopePipes` và các lệnh về **ống** chỉ chạy
+được đường lỗi ("không có ống nào khớp bộ lọc"). Đường thành công của chúng cần model cấp thoát nước.
 
 ```json
 {
@@ -62,7 +79,24 @@ Cả hai model đều đi kèm Revit (`C:\Program Files\Autodesk\Revit 2024\Samp
 }
 ```
 
-Token `{outputFolder}`, `{fileName}`, `{yyyy-MM-dd}` giống hệt file job của batch runner.
+Token `{outputFolder}`, `{fileName}`, `{yyyy-MM-dd}` giống hệt file job của batch runner, cộng thêm
+`{suiteFolder}` — thư mục chứa chính file bộ ca kiểm. Lệnh cần file đầu vào (CSV trục/level, CSV sheet,
+thuyết minh…) đọc từ [`tests/suites/fixtures/`](../tests/suites/fixtures/) qua token này, thay vì viết
+đường dẫn tuyệt đối chỉ đúng trên một máy.
+
+Bộ AutoCAD có thêm `{sourceFile}` — đường dẫn đầy đủ của chính bản vẽ đang mở; nhờ nó `DrawingCompare` tự
+so bản vẽ với chính nó (phải ra "0 layer khác nhau") mà không cần commit file DWG nào vào repo.
+
+Ca của lệnh cần đầu vào còn có thể **dùng lại kết quả của ca trước**: `ParameterImport` đọc chính file
+`{outputFolder}/doors.csv` mà `ParameterExport` vừa ghi, `ApplySizing` đọc `sizing.csv` của
+`SizingProposal`, và bên AutoCAD `LayerImport`/`AttributeImport` đọc CSV của `LayerExport`/`AttributeExport`.
+Vòng tròn xuất → nhập phải là **không đổi ô nào** (`maxAffected: 0`) — đó là chốt chặn cho lỗi đã sửa ở
+PR #29 (`ParameterImport` ghi đè mọi ô vì coi giá trị giống hệt là "đã đổi"), và chính nó bắt lại đúng lỗi
+ấy ở `LayerImport` và `AttributeImport` trong vòng chạy AutoCAD đầu tiên.
+
+**Luôn viết ca song sinh cho vòng tròn.** Một mình `maxAffected: 0` vẫn xanh nếu ai đó làm lệnh luôn trả 0.
+Bộ AutoCAD vì thế có thêm ca *"nhập CSV đổi đúng một ô"* với `minAffected: 1, maxAffected: 1` — hai ca cạnh
+nhau mới chứng minh phép so sánh **phân biệt được**, chứ không chỉ im lặng.
 
 ### Kỳ vọng
 

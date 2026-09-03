@@ -48,7 +48,7 @@ public sealed class BatchExportCommand : ICoreCommand<ExportConfig>
             if (config.DryRun)
             {
                 var dryResult = CommandResult.Ok(
-                    $"[DryRun] Tìm thấy {sheets.Count} bản vẽ, {config.Formats.Count} định dạng.",
+                    $"[Xem trước] Tìm thấy {sheets.Count} bản vẽ, {config.Formats.Count} định dạng.",
                     sheets.Count);
                 foreach (var s in sheets)
                     dryResult.Messages.Add($"  {s.SheetNumber} - {s.Name}");

@@ -14,7 +14,7 @@ namespace DhcbTools.Core.ProjectInit
         public CommandResult Execute(Document doc, FamilyLoaderConfig config)
         {
             if (!Directory.Exists(config.FamilyFolder))
-                return CommandResult.Fail("Family folder not found: " + config.FamilyFolder);
+                return CommandResult.Fail($"E-PATH-MISSING: không tìm thấy thư mục family \"{config.FamilyFolder}\".");
 
             string[] allRfa = Directory.GetFiles(config.FamilyFolder, "*.rfa", SearchOption.AllDirectories);
             IEnumerable<string> rfaFiles = allRfa;
@@ -36,10 +36,10 @@ namespace DhcbTools.Core.ProjectInit
             {
                 string famName = Path.GetFileNameWithoutExtension(rfaPath);
                 if (!config.OverwriteExisting && existingFamilies.Contains(famName))
-                { messages.AppendLine("[Skip] " + famName); continue; }
+                { messages.AppendLine("[Bỏ qua, đã có] " + famName); continue; }
 
                 if (config.DryRun)
-                { messages.AppendLine("[Dry Run] Would load: " + famName); loaded++; continue; }
+                { messages.AppendLine("[Xem trước] Sẽ nạp: " + famName); loaded++; continue; }
 
                 using (var tx = new Transaction(doc, "DHCB - Load family: " + famName))
                 {
@@ -50,15 +50,15 @@ namespace DhcbTools.Core.ProjectInit
                         Family outFam;
                         bool ok = doc.LoadFamily(rfaPath, out outFam);
                         if (ok || outFam != null) { loaded++; existingFamilies.Add(famName); messages.AppendLine("[OK] " + famName); }
-                        else { messages.AppendLine("[Warn] Load returned false: " + famName); }
+                        else { messages.AppendLine("[Cảnh báo] Revit trả về false khi nạp: " + famName); }
                         tx.Commit();
                     }
-                    catch (System.Exception ex) { tx.RollBack(); messages.AppendLine("[Error] " + famName + ": " + ex.Message); }
+                    catch (System.Exception ex) { tx.RollBack(); messages.AppendLine("[Lỗi] " + famName + ": " + ex.Message); }
                 }
             }
 
-            string prefix = config.DryRun ? "[Dry Run] " : string.Empty;
-            return CommandResult.Ok(prefix + "Loaded " + loaded + " family(ies)." + Environment.NewLine + messages, loaded);
+            string prefix = config.DryRun ? "[Xem trước] " : string.Empty;
+            return CommandResult.Ok(prefix + "Nạp " + loaded + " family." + Environment.NewLine + messages, loaded);
         }
     }
 }

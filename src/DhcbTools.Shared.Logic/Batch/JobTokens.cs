@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Newtonsoft.Json.Linq;
 
 namespace DhcbTools.Shared.Logic.Batch
 {
@@ -83,6 +84,61 @@ namespace DhcbTools.Shared.Logic.Batch
 
                 return match.Value;
             });
+        }
+
+        /// <summary>
+        /// Thay token cho MỌI giá trị chuỗi bên trong một cây JSON (tại chỗ).
+        /// <para>
+        /// Phải đi theo từng giá trị chứ không được thay trên chuỗi JSON đã serialize: giá trị token là
+        /// đường dẫn Windows (<c>C:\Users\…</c>), mà <c>\U</c> là escape không hợp lệ trong JSON — thay ở
+        /// mức văn bản thì cả config vỡ với thông báo "Bad JSON escape sequence", không liên quan gì tới
+        /// việc kỹ sư viết sai. Lỗi này lộ ra trong vòng chạy thật ngày 2026-09-03 khi thêm token
+        /// <c>{suiteFolder}</c> cho bộ kiểm thử trong Revit.
+        /// </para>
+        /// </summary>
+        public static void ExpandIn(JToken? token, JobTokenContext context)
+        {
+            if (token == null)
+            {
+                return;
+            }
+
+            if (context == null)
+            {
+                throw new ArgumentNullException(nameof(context));
+            }
+
+            switch (token.Type)
+            {
+                case JTokenType.Object:
+                    foreach (var property in ((JObject)token).Properties())
+                    {
+                        if (property.Value.Type == JTokenType.String)
+                        {
+                            property.Value = Expand((string?)property.Value, context);
+                        }
+                        else
+                        {
+                            ExpandIn(property.Value, context);
+                        }
+                    }
+                    break;
+
+                case JTokenType.Array:
+                    var array = (JArray)token;
+                    for (var i = 0; i < array.Count; i++)
+                    {
+                        if (array[i].Type == JTokenType.String)
+                        {
+                            array[i] = Expand((string?)array[i], context);
+                        }
+                        else
+                        {
+                            ExpandIn(array[i], context);
+                        }
+                    }
+                    break;
+            }
         }
 
         private static bool ContainsLetter(string key)

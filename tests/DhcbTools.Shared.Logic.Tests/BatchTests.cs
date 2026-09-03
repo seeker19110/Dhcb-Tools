@@ -214,6 +214,33 @@ public class AcadScriptGenTests
         Assert.Equal("QUIT Y", lines[^1]);
     }
 
+    /// <summary>
+    /// Mỗi tham số của DHCB_RUN phải nằm trên MỘT DÒNG RIÊNG. Trong script AutoCAD, một dòng là một
+    /// lần Enter — tức một câu trả lời cho một prompt — mà DHCB_RUN hỏi ba lần. Bản cũ viết cả ba trên
+    /// một dòng nên toàn bộ phần còn lại bị nuốt vào prompt đầu tiên và accoreconsole báo
+    /// "The filename, directory name, or volume label syntax is incorrect": batch AutoCAD chưa từng
+    /// chạy trọn lần nào. Lộ ra khi chạy thật trên AutoCAD 2026 ngày 2026-09-03.
+    /// </summary>
+    [Fact]
+    public void MoiThamSoCuaDhcbRun_MotDongRieng_VaKhongBocNhay()
+    {
+        var scr = AcadScriptGen.Build(
+            @"C:\dhcb\DhcbTools.AutoCAD.Core.dll",
+            new[] { @"C:\t\s1.json" },
+            null,
+            @"D:\out\run.jsonl",
+            @"P:\ban ve\a.dwg");
+
+        var lines = scr.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var i = Array.FindIndex(lines, l => l.StartsWith("DHCB_RUN", StringComparison.Ordinal));
+
+        Assert.Equal("DHCB_RUN", lines[i]);              // lệnh đứng một mình
+        Assert.Equal(@"C:\t\s1.json", lines[i + 1]);
+        Assert.Equal(@"D:\out\run.jsonl", lines[i + 2]);
+        Assert.Equal(@"P:\ban ve\a.dwg", lines[i + 3]);   // đường dẫn có dấu cách vẫn nguyên một dòng
+        Assert.DoesNotContain('"', lines[i + 1]);
+    }
+
     [Fact]
     public void KhongSaveAs_KhiSaveModeNone()
     {
