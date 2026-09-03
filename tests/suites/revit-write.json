@@ -1,0 +1,163 @@
+{
+  "name": "DHCB — đường ghi thật trong Revit",
+  "model": "Snowdon Towers Sample Architectural.rvt",
+  "//": [
+    "Bộ DUY NHẤT có ca ghi thật vào model. Ba lớp bảo vệ, phải đủ cả ba mới ghi:",
+    "  1. ca phải khai báo \"allowWrite\": true;",
+    "  2. người chạy phải bật allowWrites (scripts/run-in-revit-tests.ps1 -AllowWrites);",
+    "  3. script chép model mẫu sang thư mục kết quả và chạy trên BẢN CHÉP — file gốc kèm Revit",
+    "     không bao giờ bị đụng tới.",
+    "",
+    "Chuỗi ca được xếp để TỰ CHỨNG MINH và TỰ KHÔI PHỤC, không cần so file vàng:",
+    "  xuất Mark gốc → đánh số thật → nhập lại CSV gốc (khôi phục) → nhập lần nữa phải ra 0.",
+    "Con số 0 ở bước cuối chính là bằng chứng bước trước ĐÃ GHI THẬT: nếu lệnh chỉ chạy xem trước,",
+    "giá trị trong model không đổi và bước cuối sẽ vẫn báo có ô cần cập nhật.",
+    "",
+    "summaryNotContains: [\"Xem trước\"] chốt thêm một lớp: ca ghi mà lại chạy ra bản xem trước thì đỏ,",
+    "thay vì lặng lẽ xanh."
+  ],
+  "cases": [
+    {
+      "name": "Xuất Mark cửa — bản gốc để khôi phục",
+      "command": "ParameterExport",
+      "config": {
+        "categories": [
+          "Doors"
+        ],
+        "parameterNames": [
+          "Mark"
+        ],
+        "outputPath": "{outputFolder}/doors-goc.csv"
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxMs": 60000,
+        "filesExist": [
+          "{outputFolder}/doors-goc.csv"
+        ]
+      }
+    },
+    {
+      "name": "Đánh số cửa — GHI THẬT",
+      "command": "AutoNumbering",
+      "allowWrite": true,
+      "config": {
+        "category": "Doors",
+        "parameterName": "Mark",
+        "prefix": "DHCB-",
+        "padWidth": 3
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "summaryContains": [
+          "Đã đánh số"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 120000
+      }
+    },
+    {
+      "name": "Xuất lại sau khi ghi — để đối chiếu bằng mắt khi cần",
+      "command": "ParameterExport",
+      "config": {
+        "categories": [
+          "Doors"
+        ],
+        "parameterNames": [
+          "Mark"
+        ],
+        "outputPath": "{outputFolder}/doors-sau-khi-ghi.csv"
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxMs": 60000,
+        "filesExist": [
+          "{outputFolder}/doors-sau-khi-ghi.csv"
+        ]
+      }
+    },
+    {
+      "name": "Nhập lại CSV gốc — GHI THẬT, khôi phục Mark cũ",
+      "command": "ParameterImport",
+      "allowWrite": true,
+      "config": {
+        "inputPath": "{outputFolder}/doors-goc.csv"
+      },
+      "//": "minAffected >= 1 chinh la bang chung ca truoc DA GHI THAT: neu no chi xem truoc thi Mark trong model khong doi va ca nay se khong co gi de khoi phuc.",
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "summaryContains": [
+          "Đã cập nhật"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 120000
+      }
+    },
+    {
+      "name": "Nhập lại lần nữa — phải không còn ô nào để đổi",
+      "command": "ParameterImport",
+      "allowWrite": true,
+      "config": {
+        "inputPath": "{outputFolder}/doors-goc.csv"
+      },
+      "//": "Chot tinh idempotent cua duong ghi: da khoi phuc xong thi lan hai khong duoc ghi gi nua.",
+      "expect": {
+        "success": true,
+        "maxAffected": 0,
+        "messagesContain": [
+          "giữ nguyên"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 120000
+      }
+    },
+    {
+      "name": "Ghi thông tin dự án — GHI THẬT",
+      "command": "ProjectInfo",
+      "allowWrite": true,
+      "config": {
+        "projectName": "DHCB — kiểm thử đường ghi",
+        "projectNumber": "DHCB-TEST-001"
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 2,
+        "summaryContains": [
+          "Đã ghi"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 60000
+      }
+    },
+    {
+      "name": "Ghi lại y hệt — phải 0 trường đổi",
+      "command": "ProjectInfo",
+      "allowWrite": true,
+      "config": {
+        "projectName": "DHCB — kiểm thử đường ghi",
+        "projectNumber": "DHCB-TEST-001"
+      },
+      "//": "Doc lai trong cung phien: 0 truong doi chung to lan truoc da COMMIT that su, khong phai rollback.",
+      "expect": {
+        "success": true,
+        "maxAffected": 0,
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 60000
+      }
+    }
+  ]
+}

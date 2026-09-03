@@ -70,6 +70,23 @@ public class TestingTests
     }
 
     /// <summary>
+    /// Đường ghi thật: ca <c>allowWrite</c> phải chốt được "đây KHÔNG phải bản xem trước". Nếu một ngày
+    /// khoá <c>dryRun</c> bị ép nhầm cho cả ca ghi, ca sẽ đỏ thay vì lặng lẽ chạy xem trước rồi báo xanh —
+    /// đúng loại "test xanh mà không kiểm gì" mà bộ này sinh ra để tránh.
+    /// </summary>
+    [Fact]
+    public void SummaryNotContains_BatDuocKhiCaGhiThatChayThanhXemTruoc()
+    {
+        var preview = Ok(summary: "[Xem trước] Sẽ đánh số 141 phần tử \"Doors\".");
+        var real = Ok(summary: "Đã đánh số 141/141 phần tử \"Doors\".");
+
+        var expectation = new TestExpectation { SummaryNotContains = { "Xem trước" } };
+
+        Assert.Single(expectation.Evaluate(preview));
+        Assert.Empty(expectation.Evaluate(real));
+    }
+
+    /// <summary>
     /// Đây là kỳ vọng bắt được đúng loại lỗi mà giai đoạn 8.1 vừa sửa: lệnh báo thành công nhưng
     /// thực chất không làm gì vì thiếu tham số/family (no-op im lặng).
     /// </summary>

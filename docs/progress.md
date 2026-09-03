@@ -14,8 +14,11 @@
 > bằng cùng cơ chế và cùng tầng đánh giá với bên Revit — §10. Vòng đầu lộ ra 2 lỗi (cùng họ với lỗi
 > `ParameterImport` đã sửa ở PR #29), đã sửa kèm ca song sinh chống test-xanh-suông.
 >
-> **Còn lại:** mọi ca đều ở chế độ xem trước — đường **ghi thật** chưa lệnh nào chạy; và cần một đêm batch
-> trên **dự án thật** thay vì file mẫu.
+> **Đường ghi thật:** 12 ca ghi thật trên bản chép của file mẫu, chuỗi tự chứng minh đã `Commit()` chứ
+> không rollback, và tự khôi phục — §11.
+>
+> **Còn lại:** đường ghi mới phủ 4 lệnh có phép nghịch đảo; lệnh **tạo phần tử mới** chưa có ca ghi. Và
+> cần một đêm batch trên **dự án thật** thay vì file mẫu.
 
 ## Tóm tắt
 
@@ -38,7 +41,7 @@
 | Giai đoạn 7 P1 — khoảng trống so với tool thị trường ([`nghien-cuu-tool-thi-truong-va-ke-hoach.md`](nghien-cuu-tool-thi-truong-va-ke-hoach.md)) | ✅ Mã nguồn (PR #11): SheetRename, RevisionOnSheets, StylePurge, ColorByParameter, FamilyAudit, WarningsExport, checkset ngưỡng; batch autodetect phiên bản Revit + PlotPdf; AI structured outputs + ≤ 8 ứng viên; MCP read-only/nhóm. ⬜ Phần AutoCAD (LayerTranslate, DrawingCompare, BlockQuantity, AttributeIncrement, purge text/dim/regapp) **chưa có mã nguồn** |
 | Giai đoạn 7 P2 | ✅ Mã nguồn (PR #12): SlopePipes, PipeKick, SystemBom, AutoRoute, ScheduleExport, ViewportCopy; vỏ `DhcbTools.AutoCAD.Core` (chỉ AcDbMgd/AcCoreMgd) cho accoreconsole; map năm AutoCAD → package (2026.1+ là .NET 10) |
 | Hướng dẫn cài đặt & kiểm thử thủ công | ✅ (PR #13) [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md) — checklist R1–R48, C1–C17, B1–B12, M1–M4 |
-| Kiểm thử tự động | ✅ **488 test xUnit** (`Shared.Logic` + `Shared.Hosting`), gồm bốn bộ đối chiếu mã nguồn với nhau: `RibbonCoverageTests` (vỏ Revit ↔ bảng lệnh), `CatalogFieldTests` (catalog ↔ property config thật), `SuiteCoverageTests` (42/42 lệnh có ca kiểm chạy trong Revit), `VietnameseMessageTests` (không còn thông báo tiếng Anh trong Core) |
+| Kiểm thử tự động | ✅ **489 test xUnit** (`Shared.Logic` + `Shared.Hosting`), gồm bốn bộ đối chiếu mã nguồn với nhau: `RibbonCoverageTests` (vỏ Revit ↔ bảng lệnh), `CatalogFieldTests` (catalog ↔ property config thật), `SuiteCoverageTests` (42/42 lệnh có ca kiểm chạy trong Revit), `VietnameseMessageTests` (không còn thông báo tiếng Anh trong Core) |
 | CI | ✅ `tests.yml` (test + check-build bằng API package, ubuntu) — xanh |
 | CD | ✅ đóng gói Release thật (Revit 2023/2024/2025, AutoCAD 2024/2025) + GitHub Release khi đẩy tag (`release.yml`, windows-latest) |
 
@@ -135,6 +138,7 @@ Core/vỏ (kể cả vỏ core-only) trên Linux với API Revit 2025 + AutoCAD 
 | **Revit — batch tự động, đủ 42/42 lệnh** | 2026-09-03 | **52 đạt / 0 trượt / 1 bỏ qua trên 53 ca**, ba model mẫu; lộ 7 lỗi runtime + 4 chỗ lệch tài liệu↔mã — §8 |
 | **AutoCAD 2026.1 — batch qua accoreconsole** | 2026-09-03 | Chạy trọn lần đầu sau khi sửa lỗi `DHCB_RUN`; `LayerExport` + `DrawingCleanup` (purge sâu) trên 2 bản vẽ mẫu — §9 |
 | **AutoCAD — bộ ca kiểm tự động, đủ 15/15 lệnh** | 2026-09-03 | **18 đạt / 0 trượt trên 18 ca**; lộ 2 lỗi ghi đè im lặng ở `LayerImport`/`AttributeImport` — §10 |
+| **Đường ghi thật (Revit + AutoCAD)** | 2026-09-03 | **12 đạt / 0 trượt trên 12 ca**, chạy trên bản chép của file mẫu; chuỗi tự chứng minh đã commit thật và tự khôi phục — §11 |
 
 Quy trình và checklist tay: [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md) §10;
 cách viết ca kiểm chạy trong Revit: [`kiem-thu-trong-revit.md`](kiem-thu-trong-revit.md).
@@ -171,8 +175,8 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
 
 ## Việc tiếp theo
 
-1. **Đường ghi thật**: mọi ca kiểm hiện chạy ở chế độ xem trước. Cần một bộ ca `allowWrite` chạy trên bản
-   sao của file mẫu (không phải bản gốc) để chốt phần thật sự ghi vào model/bản vẽ.
+1. **Đường ghi cho lệnh tạo phần tử mới** (`SleeveAuto`, `HangerAuto`, `LevelSetup`, `SheetBatchCreate`…):
+   cần cách dọn lại trong cùng phiên, hoặc chấp nhận chạy trên bản chép rồi bỏ file.
 2. Một đêm batch thật trên **dự án thật** (không phải file mẫu) để chốt Giai đoạn 1 đầu-cuối.
 3. Giai đoạn 9.3 phần còn lại: gom bảng mã lỗi (`E-PARAM-MISSING`, `E-PATH-MISSING`, `E-CONFIG-MISSING`…) vào một trang tài liệu.
 4. Rồi tới **9.4 — đưa cho một nhóm kỹ sư dùng thật**; phản hồi của họ quyết định giai đoạn 10/11 đi sâu vào đâu.

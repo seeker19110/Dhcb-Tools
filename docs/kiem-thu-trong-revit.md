@@ -56,6 +56,7 @@ Có sẵn hai bộ:
 | [`revit-mep.json`](../tests/suites/revit-mep.json) | Snowdon Towers Sample HVAC | Connector, sleeve, cao độ, hanger, chia ống, routing, sizing, BOM, kick, clash |
 | [`revit-plumbing.json`](../tests/suites/revit-plumbing.json) | Snowdon Towers Sample Plumbing | Dốc ống, sizing ống, BOM ống, chia ống, cao độ ống |
 | [`autocad-smoke.json`](../tests/suites/autocad-smoke.json) | Data Extraction and Multileaders Sample (kèm AutoCAD) | Đủ **15/15 lệnh AutoCAD**: layer, attribute, text, chuẩn layer, trục, xref, block, so bản vẽ, dọn dẹp, map layer |
+| [`revit-write.json`](../tests/suites/revit-write.json) · [`autocad-write.json`](../tests/suites/autocad-write.json) | Bản chép của model/bản vẽ mẫu | **Đường ghi thật** — xem mục dưới |
 
 Hai bộ cộng lại phủ **đủ 42/42 lệnh Revit** — `SuiteCoverageTests` (chạy trên CI, không cần Revit) đỏ ngay
 khi thêm lệnh mới mà quên ca kiểm, nên con số này không trôi khỏi tài liệu được nữa.
@@ -98,6 +99,47 @@ PR #29 (`ParameterImport` ghi đè mọi ô vì coi giá trị giống hệt là
 Bộ AutoCAD vì thế có thêm ca *"nhập CSV đổi đúng một ô"* với `minAffected: 1, maxAffected: 1` — hai ca cạnh
 nhau mới chứng minh phép so sánh **phân biệt được**, chứ không chỉ im lặng.
 
+## Đường ghi thật
+
+Mọi ca ở các bộ trên đều chạy **xem trước**. Nhưng phần đáng lo nhất của một lệnh lại nằm ở đoạn sau
+`transaction.Commit()` — và một bộ test chỉ xem trước thì không bao giờ chạm tới đó.
+
+Hai bộ `*-write.json` là nơi duy nhất ghi thật. **Ba lớp khoá, phải đủ cả ba mới ghi:**
+
+1. ca phải khai `"allowWrite": true`;
+2. người chạy phải bật `-AllowWrites`;
+3. script **chép file mẫu sang thư mục kết quả** và chạy trên bản chép — model/bản vẽ gốc kèm
+   Revit/AutoCAD nằm trong `Program Files`, hỏng là phải cài lại phần mềm.
+
+```powershell
+.\scripts\run-in-revit-tests.ps1  -Suite write -AllowWrites
+.\scripts\run-in-autocad-tests.ps1 -Suite write -AllowWrites
+```
+
+Thiếu `-AllowWrites` thì script **dừng có thông báo** thay vì chạy bộ `write` ở chế độ xem trước — một
+lượt như thế chỉ lặp lại việc bộ smoke đã làm, mà báo cáo vẫn xanh, tức là dối.
+
+### Chuỗi tự chứng minh và tự khôi phục
+
+Không so file vàng, không cần model chuẩn bị sẵn. Ca xếp thành chuỗi để **kết quả ca sau chứng minh ca
+trước đã ghi thật**:
+
+```
+xuất Mark gốc ra CSV
+đánh số cửa           GHI THẬT → "Đã đánh số 141/141"
+nhập lại CSV gốc      GHI THẬT → "Đã cập nhật 141"   ← 141 này chứng minh bước trên ĐÃ đổi model
+nhập lại lần nữa      GHI THẬT → "Đã cập nhật 0"     ← 0 này chứng minh bước trên ĐÃ ghi và idempotent
+```
+
+Nếu lệnh chỉ chạy xem trước, giá trị trong model không đổi, và bước "nhập lại CSV gốc" sẽ không có gì để
+khôi phục — ca đỏ. Chuỗi cũng **trả model về đúng trạng thái ban đầu**, nên chạy bao nhiêu lần cũng được.
+
+Cặp `ProjectInfo` ghi → ghi lại y hệt (0 trường đổi) chốt thêm một điều mà xem trước không chốt được:
+transaction đã **commit thật**, không phải rollback.
+
+`summaryNotContains: ["Xem trước"]` là lớp cuối: nếu một ngày nào đó khoá `dryRun` bị ép nhầm cho cả ca
+ghi, ca sẽ đỏ thay vì lặng lẽ xanh.
+
 ### Kỳ vọng
 
 | Trường | Ý nghĩa |
@@ -105,6 +147,7 @@ nhau mới chứng minh phép so sánh **phân biệt được**, chứ không c
 | `success` | `CommandResult.Success` (mặc định `true`) |
 | `minAffected` / `maxAffected` | Chặn dưới/trên số phần tử bị ảnh hưởng |
 | `summaryContains` | Summary phải chứa (không phân biệt hoa thường) |
+| `summaryNotContains` | Summary **không** được chứa — dùng cho ca ghi thật: `["Xem trước"]` |
 | `messagesContain` | Ít nhất một dòng `Messages` chứa |
 | `neverContains` | **Không** dòng `Messages`/`Errors` nào được chứa — bắt no-op im lặng, ví dụ `"không có tham số"` |
 | `noErrors` | `Errors` phải rỗng |

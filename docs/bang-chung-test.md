@@ -22,12 +22,12 @@
 
 | Bộ test | Số lượng | Kết quả |
 |---|---|---|
-| `tests/DhcbTools.Shared.Logic.Tests` (xUnit, .NET 8) | 488 | ✅ 488 passed / 0 failed |
+| `tests/DhcbTools.Shared.Logic.Tests` (xUnit, .NET 8) | 489 | ✅ 489 passed / 0 failed |
 | `tools/autocad-mcp-server/test_panel_api.py` (unittest) | 29 | ✅ 29 passed / 0 failed |
 
 ```
 dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj -c Release
-Passed!  - Failed: 0, Passed: 488, Skipped: 0, Total: 488
+Passed!  - Failed: 0, Passed: 489, Skipped: 0, Total: 489
 
 python -m unittest discover -s tools/autocad-mcp-server -p 'test_*.py'
 Ran 29 tests — OK
@@ -121,7 +121,7 @@ lớp AI offline; cộng phủ Ribbon và gateway panel.
 
 | Nhóm | Ghi chú |
 |---|---|
-| Đường **ghi thật** của lệnh AutoCAD | 15/15 lệnh đã chạy thật ở chế độ xem trước (§10); chưa lệnh nào chạy lượt ghi thật trên bản vẽ có xref/annotative |
+| Lệnh **tạo phần tử mới** ở đường ghi thật | `SleeveAuto`, `HangerAuto`, `LevelSetup`, `SheetBatchCreate`… mới chạy xem trước; đường ghi (§11) hiện phủ 4 lệnh có phép nghịch đảo để tự khôi phục |
 | Batch chạy đêm đầu-cuối trên dự án thật | Đã chạy được cả hai nhánh (Revit §7–§8, AutoCAD §9) trên model/bản vẽ mẫu; còn thiếu một đêm thật trên dự án thật |
 
 Quy trình kiểm thử tay: [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md).
@@ -388,7 +388,59 @@ Nhập CSV đổi đúng một ô            → [Xem trước] Sẽ cập nhậ
 
 ### Còn lại sau §10
 
-- Mọi ca đều chạy ở chế độ **xem trước**; đường ghi thật (`allowWrite` + `-AllowWrites`) chưa có ca nào.
 - `GridExtract` và `TextReplace` mới chốt được đường lỗi/không-khớp: bản vẽ mẫu kèm AutoCAD không có layer
   trục và không có chuỗi cần thay. Đường thành công cần một bản vẽ dự án thật.
 - `DrawingCompare` mới so bản vẽ với chính nó; chưa có cặp bản vẽ khác nhau thật để chốt số liệu khác biệt.
+
+---
+
+## 11. Đường ghi thật (2026-09-03 12:07 ICT)
+
+Tới hết §10, **mọi ca kiểm đều chạy ở chế độ xem trước**. Nhưng phần đáng lo nhất của một lệnh nằm ở đoạn
+sau `transaction.Commit()`, mà một bộ test chỉ xem trước thì không bao giờ chạm tới. Hai bộ `*-write.json`
+lấp chỗ đó.
+
+**Ba lớp khoá, phải đủ cả ba mới ghi:** ca khai `"allowWrite": true` · người chạy bật `-AllowWrites` ·
+script **chép file mẫu sang thư mục kết quả và chạy trên bản chép** (model/bản vẽ gốc nằm trong
+`Program Files`, hỏng là phải cài lại phần mềm). Thiếu `-AllowWrites` thì script dừng có thông báo, thay
+vì chạy bộ `write` ở chế độ xem trước rồi báo xanh — một lượt như thế là dối.
+
+| Bộ | File chạy | Kết quả | Mã thoát |
+|---|---|---|---:|
+| [`revit-write.json`](../tests/suites/revit-write.json) | Bản chép Snowdon Towers Architectural | **7 đạt / 0 trượt trên 7 ca** | 0 |
+| [`autocad-write.json`](../tests/suites/autocad-write.json) | Bản chép Data Extraction and Multileaders Sample | **5 đạt / 0 trượt trên 5 ca** | 0 |
+
+### Chuỗi tự chứng minh — không so file vàng
+
+Ca xếp thành chuỗi để **kết quả ca sau chứng minh ca trước đã ghi thật**, và chuỗi tự trả file về trạng
+thái ban đầu nên chạy lại bao nhiêu lần cũng được:
+
+```
+Xuất Mark cửa — bản gốc            → Đã xuất 142 phần tử
+Đánh số cửa — GHI THẬT             → Đã đánh số 141/141 phần tử "Doors"      (902 ms)
+Nhập lại CSV gốc — GHI THẬT        → Đã cập nhật 141 giá trị tham số         (373 ms)
+Nhập lại lần nữa                   → Đã cập nhật 0 giá trị tham số           (3 ms)
+Ghi thông tin dự án — GHI THẬT     → Đã ghi 2 trường
+Ghi lại y hệt                      → Đã ghi 0 trường
+```
+
+- Con số **141** ở bước khôi phục là bằng chứng bước đánh số **đã đổi model thật**: nếu nó chỉ xem trước,
+  Mark trong model không đổi và bước này sẽ không có gì để khôi phục.
+- Con số **0** ở bước kế là bằng chứng bước khôi phục đã ghi, và đường ghi **idempotent**.
+- Cặp `ProjectInfo` 2 → 0 chốt thêm điều mà xem trước không chốt được: transaction đã **commit thật**,
+  không phải rollback.
+
+Bên AutoCAD cùng một hình dạng, dùng `LayerImport` với fixture đổi đúng một ô: `1 → 0 → 1 (khôi phục) → 0`.
+
+### Kỳ vọng mới: `summaryNotContains`
+
+Thêm vào tầng đánh giá (`Shared.Logic/Testing`, có test thuần) để ca ghi chốt được **"đây không phải bản
+xem trước"**. Nếu một ngày khoá `dryRun` bị ép nhầm cho cả ca ghi, ca sẽ đỏ thay vì lặng lẽ xanh — đúng
+loại "test xanh mà không kiểm gì" mà cả bộ này sinh ra để tránh.
+
+### Còn lại sau §11
+
+- Đường ghi mới phủ 4 lệnh (`AutoNumbering`, `ParameterImport`, `ProjectInfo`, `LayerImport`) — là những
+  lệnh có sẵn phép nghịch đảo để tự khôi phục. Các lệnh **tạo phần tử mới** (`SleeveAuto`, `HangerAuto`,
+  `LevelSetup`, `SheetBatchCreate`…) chưa có ca ghi thật vì chưa có cách xoá lại gọn gàng trong cùng phiên.
+- Vẫn chưa có một đêm batch chạy trên **dự án thật** thay vì file mẫu.

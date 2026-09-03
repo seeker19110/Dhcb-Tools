@@ -19,6 +19,14 @@ param(
     # Phiên bản AutoCAD dùng để build và chạy. 2026.1+ là .NET 10.
     [int]$AcadVersion = 2026,
 
+    # Bộ ca kiểm: "smoke" (mọi lệnh, chỉ xem trước) hoặc "write" (đường ghi thật — xem -AllowWrites).
+    [ValidateSet('smoke', 'write')]
+    [string]$Suite = 'smoke',
+
+    # Cho phép ca khai báo "allowWrite" ghi THẬT vào bản vẽ. Script sẽ chép bản vẽ mẫu sang thư mục kết
+    # quả và chạy trên bản chép, nên file gốc kèm AutoCAD không bao giờ bị đụng tới.
+    [switch]$AllowWrites,
+
     # Bản vẽ .dwg để chạy; không đặt thì lấy bản vẽ mẫu kèm AutoCAD.
     [string]$Drawing,
 
@@ -55,9 +63,14 @@ if (-not (Test-Path $Drawing)) {
     Stop-WithMessage "Không tìm thấy bản vẽ: $Drawing"
 }
 
-$suitePath = Join-Path $repo 'tests\suites\autocad-smoke.json'
+$suitePath = Join-Path $repo "tests\suites\autocad-$Suite.json"
 if (-not (Test-Path $suitePath)) {
     Stop-WithMessage "Không tìm thấy bộ ca kiểm: $suitePath"
+}
+
+if ($Suite -eq 'write' -and -not $AllowWrites) {
+    Stop-WithMessage ("Bộ 'write' chỉ có nghĩa khi kèm -AllowWrites; không có nó thì mọi ca vẫn bị ép " +
+                      "dryRun và bộ này chỉ lặp lại việc bộ smoke đã làm.")
 }
 
 Write-Host "Bộ ca kiểm : $suitePath"
@@ -87,8 +100,17 @@ if (-not $plugin) {
 
 # ── 4. Dựng file job ─────────────────────────────────────────────────────────
 $stamp = Get-Date -Format 'yyyy-MM-dd_HH-mm-ss'
-$outDir = Join-Path $OutputRoot "autocad-$stamp"
+$outDir = Join-Path $OutputRoot "autocad-$Suite-$stamp"
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+
+# Ghi thật thì KHÔNG BAO GIỜ chạy trên file gốc — bản vẽ mẫu nằm trong Program Files.
+if ($AllowWrites) {
+    $copy = Join-Path $outDir ("ban-chep-" + [IO.Path]::GetFileName($Drawing))
+    Write-Host "== Chép bản vẽ sang bản chép (ghi thật không đụng file gốc)"
+    Copy-Item -LiteralPath $Drawing -Destination $copy -Force
+    $Drawing = $copy
+    Write-Host "   $Drawing"
+}
 
 $job = [ordered]@{
     name         = 'DHCB - kiem thu trong AutoCAD'
@@ -102,6 +124,7 @@ $job = [ordered]@{
         config  = [ordered]@{
             suitePath    = $suitePath -replace '\\', '/'
             outputFolder = '{outputFolder}'
+            allowWrites  = [bool]$AllowWrites
         }
     })
 }
