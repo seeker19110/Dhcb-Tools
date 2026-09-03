@@ -341,6 +341,36 @@
           "Exception"
         ]
       }
+    },
+    {
+      "name": "Tìm tuyến tự động — bước lưới 100 mm, đo lại con số 17,9 s của §18",
+      "command": "AutoRoute",
+      "//": "Ca song sinh voi ca tren, khac moi stepMm. §18 do buoc 100 mm het 17,9 s roi cham tran 400.000 o; sau ban va (§19) con so do phai giam han vi raster hoa bo di phep quet 546 hop cho tung o. Ca nay ton tai de con so ay duoc do LAI moi vong chay chu khong nam chet trong tai lieu. KHONG chot 'tim duoc tuyen' — hai diem van bi san/tuong cua link bao kin, dung nhu ca 500 mm cho thay (782/12.025 o).",
+      "config": {
+        "startMm": {
+          "x": 0,
+          "y": 0,
+          "z": 3000
+        },
+        "endMm": {
+          "x": 12000,
+          "y": 6000,
+          "z": 3000
+        },
+        "searchMarginMm": 3000,
+        "buildRoute": false,
+        "stepMm": 100
+      },
+      "expect": {
+        "success": null,
+        "maxMs": 180000,
+        "summaryContains": [
+          "từ model liên kết"
+        ],
+        "neverContains": [
+          "Exception"
+        ]
+      }
     }
   ]
 }

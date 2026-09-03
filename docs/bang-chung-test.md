@@ -892,3 +892,28 @@ Bộ `mep` cũng lên **19 ca** (§14 còn 17), tất cả xanh — bản vá kh
 
 **Chưa đo lại ở bước 100 mm** trên model thật (số 17,9 s của §18). Ca kiểm cố định 500 mm nên vòng này
 không chạm tới; muốn có con số đó phải thêm một ca riêng.
+
+### Bước lưới 100 mm — lấp nốt con số 17,9 s (2026-09-03 19:31 ICT)
+
+Vòng trước còn để trống đúng con số đắt nhất của §18. Nay thêm hẳn một **ca kiểm song sinh** vào
+`revit-mep.json`, khác ca cũ mỗi `stepMm`, để con số đó được đo **lại mỗi vòng chạy** chứ không nằm chết
+trong tài liệu. Bộ `mep` lên **20 đạt / 0 trượt / 0 bỏ qua trên 20 ca**.
+
+| Bước lưới 100 mm | §18 (trước vá) | Sau vá |
+|---|---|---|
+| Thời gian | **17,9 s** | **815 ms** — nhanh **22 lần** |
+| Ô mở rộng | 400.001 (chạm trần) | 400.001 (chạm trần) |
+| Cỡ lưới | không in ra | 1.335.961 ô |
+| Kết luận | *"chạm trần 400.000 ô"* — không biết là hết giờ hay không có đường | *"Hai điểm **KHÔNG nối thông nhau**: điểm đầu chỉ ra tới **79.701 ô** trống — tuyến không tồn tại, **tăng ngân sách cũng vô ích**"* |
+
+Đây là chỗ bản vá đáng giá nhất, và nó không nằm ở con số 22 lần. Trước bản vá, câu "chạm trần 400.000 ô"
+dẫn người dùng đi **đúng hướng sai**: nới ngân sách, nới hộp tìm kiếm, ngồi chờ lâu hơn — trong khi tuyến
+**không tồn tại**, chờ bao lâu cũng vô ích. Flood-fill trả lời dứt điểm câu đó trong cùng 815 ms.
+
+Hai bước lưới nay nói **cùng một kết luận** bằng hai con số độc lập — 782/12.025 ô ở bước 500 mm và
+79.701/1.335.961 ô ở bước 100 mm. Giả thuyết của §18 ("hai điểm bị sàn và tường của model liên kết bao
+kín") coi như đã chứng minh xong: không phải giới hạn của bộ tìm đường, mà là hình học thật của toà nhà.
+
+**Việc còn lại của `AutoRoute` không còn là hiệu năng.** Là chọn được hai điểm nằm trong cùng khoang trần
+kỹ thuật — việc của người có nghề, hoặc của một lớp chọn điểm mà bộ công cụ chưa có. Nhãn *thử nghiệm*
+giữ nguyên vì lý do đó, không còn vì chậm.
