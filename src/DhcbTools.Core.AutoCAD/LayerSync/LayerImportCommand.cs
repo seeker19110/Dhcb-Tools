@@ -1,7 +1,7 @@
-using System.Globalization;
 using Autodesk.AutoCAD.Colors;
 using Autodesk.AutoCAD.DatabaseServices;
 using DhcbTools.Shared.Logic;
+using DhcbTools.Shared.Logic.Cad;
 
 namespace DhcbTools.Core.AutoCAD.LayerSync;
 
@@ -19,6 +19,11 @@ namespace DhcbTools.Core.AutoCAD.LayerSync;
 /// <para>
 /// Bản trước cũng <b>bỏ qua hoàn toàn</b> cột Linetype và Lineweight dù tài liệu và header CSV đều nói
 /// có — sửa nét đứt trong Excel rồi nhập lại thì không có gì xảy ra, mà lệnh vẫn báo thành công.
+/// </para>
+/// <para>
+/// Phần đọc một dòng CSV nằm ở <see cref="LayerCsvRow"/> (Shared.Logic, không có API Autodesk) nên có test
+/// tự động; ở đây chỉ còn phần so sánh với drawing và ghi. Nhờ đó cũng đọc lại được màu true color
+/// (<c>ColorValue</c>) mà lệnh xuất ghi ra cho layer không dùng màu ACI — bản trước chỉ nhận màu ACI.
 /// </para>
 /// </summary>
 public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
@@ -54,12 +59,16 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
                 continue;
             }
 
-            var cells = CsvText.SplitLine(lines[i]);
-            var layerName = cells.Count > 0 ? cells[0].Trim() : string.Empty;
-            if (string.IsNullOrWhiteSpace(layerName))
+            var row = LayerCsvRow.Parse(lines[i], i + 1);
+            if (row.IsEmpty)
             {
                 continue;
             }
+
+            // Ô không đọc được (màu, lineweight, plot sai định dạng) phải nói ra, không bỏ im lặng.
+            result.Messages.AddRange(row.Warnings);
+
+            var layerName = row.Name;
 
             var isNew = !layerTable.Has(layerName);
             if (isNew && !config.CreateMissing)
@@ -90,7 +99,7 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
                 layer = (LayerTableRecord)transaction.GetObject(layerTable[layerName], OpenMode.ForRead);
             }
 
-            var changes = PlanChanges(transaction, database, layer, cells, result.Messages);
+            var changes = PlanChanges(transaction, database, layer, row, result.Messages);
             if (changes.Count == 0)
             {
                 unchanged++;
@@ -139,24 +148,34 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
     /// drawing, không đụng vào bản ghi.
     /// </summary>
     private static List<Action<LayerTableRecord>> PlanChanges(
-        Transaction transaction, Database database, LayerTableRecord layer, IReadOnlyList<string> cells, List<string> notes)
+        Transaction transaction, Database database, LayerTableRecord layer, LayerCsvRow row, List<string> notes)
     {
         var changes = new List<Action<LayerTableRecord>>();
 
         // Cột: Name, Color, Linetype, Lineweight, IsPlottable, Description
-        if (cells.Count > 1 && !string.IsNullOrWhiteSpace(cells[1])
-            && short.TryParse(cells[1].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var aci))
+        if (row.ColorAci.HasValue)
         {
+            var aci = row.ColorAci.Value;
             var current = layer.Color.IsByAci ? layer.Color.ColorIndex : (short)-1;
             if (current != aci)
             {
                 changes.Add(l => l.Color = Color.FromColorIndex(ColorMethod.ByAci, aci));
             }
         }
-
-        if (cells.Count > 2 && !string.IsNullOrWhiteSpace(cells[2]))
+        else if (row.ColorRgb.HasValue)
         {
-            var wanted = cells[2].Trim();
+            var rgb = row.ColorRgb.Value;
+            var current = layer.Color.IsByAci ? -1 : layer.Color.ColorValue & 0xFFFFFF;
+            if (current != rgb)
+            {
+                changes.Add(l => l.Color = Color.FromRgb(
+                    (byte)((rgb >> 16) & 0xFF), (byte)((rgb >> 8) & 0xFF), (byte)(rgb & 0xFF)));
+            }
+        }
+
+        if (!string.IsNullOrEmpty(row.Linetype))
+        {
+            var wanted = row.Linetype!;
             var linetypeTable = (LinetypeTable)transaction.GetObject(database.LinetypeTableId, OpenMode.ForRead);
             if (linetypeTable.Has(wanted))
             {
@@ -173,21 +192,29 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
             }
         }
 
-        if (cells.Count > 3 && !string.IsNullOrWhiteSpace(cells[3])
-            && Enum.TryParse<LineWeight>(cells[3].Trim(), ignoreCase: true, out var lineWeight)
-            && layer.LineWeight != lineWeight)
+        if (row.LineWeight.HasValue)
         {
-            changes.Add(l => l.LineWeight = lineWeight);
+            var lineWeight = (LineWeight)row.LineWeight.Value;
+            if (!Enum.IsDefined(typeof(LineWeight), lineWeight))
+            {
+                notes.Add($"Layer \"{layer.Name}\": lineweight {row.LineWeight.Value} không có trong bảng chuẩn của AutoCAD, giữ nguyên.");
+            }
+            else if (layer.LineWeight != lineWeight)
+            {
+                changes.Add(l => l.LineWeight = lineWeight);
+            }
         }
 
-        if (cells.Count > 4 && bool.TryParse(cells[4].Trim(), out var plottable) && layer.IsPlottable != plottable)
+        if (row.Plottable.HasValue && layer.IsPlottable != row.Plottable.Value)
         {
+            var plottable = row.Plottable.Value;
             changes.Add(l => l.IsPlottable = plottable);
         }
 
-        if (cells.Count > 5 && !string.Equals(layer.Description ?? string.Empty, cells[5], StringComparison.Ordinal))
+        if (row.Description != null
+            && !string.Equals(layer.Description ?? string.Empty, row.Description, StringComparison.Ordinal))
         {
-            var description = cells[5];
+            var description = row.Description;
             changes.Add(l => l.Description = description);
         }
 
