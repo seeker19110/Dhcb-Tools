@@ -119,6 +119,25 @@ Hai bộ `*-write.json` là nơi duy nhất ghi thật. **Ba lớp khoá, phải
 Thiếu `-AllowWrites` thì script **dừng có thông báo** thay vì chạy bộ `write` ở chế độ xem trước — một
 lượt như thế chỉ lặp lại việc bộ smoke đã làm, mà báo cáo vẫn xanh, tức là dối.
 
+### Bản chép mang theo cả model liên kết — và dọn lượt cũ
+
+Bản chép **giữ nguyên tên gốc**, nằm trong `<thư mục kết quả>/ban-chep/`, kèm các model được liên kết
+(script dò tên `*.rvt` ngay trong file, chỉ chép những file có thật cạnh model gốc). Không có bước này
+thì link lưu theo đường dẫn tương đối không giải được từ vị trí bản chép, và `SleeveAuto` không thấy
+tường nào — xem [`bang-chung-test.md`](bang-chung-test.md) §14.
+
+Giá phải trả là dung lượng: một lượt bộ ghi MEP tốn **~320 MB** (sáu model Snowdon). Vì vậy script tự
+dọn lượt cũ **của cùng bộ ca kiểm** trước mỗi lần chạy, giữ `-KeepRuns` lượt gần nhất (mặc định 2):
+
+```powershell
+.\scriptsun-in-revit-tests.ps1 -Suite write-mep -AllowWrites             # giữ 2 lượt
+.\scriptsun-in-revit-tests.ps1 -Suite write-mep -AllowWrites -KeepRuns 5  # giữ 5
+.\scriptsun-in-revit-tests.ps1 -Suite write-mep -AllowWrites -KeepRuns 0  # không dọn gì
+```
+
+Dọn **trước** khi chạy chứ không phải sau: dọn sau thì lượt vừa chạy cũng nằm trong diện đếm, và nếu
+Revit treo thì không bao giờ tới bước dọn.
+
 ### Chuỗi tự chứng minh và tự khôi phục
 
 Không so file vàng, không cần model chuẩn bị sẵn. Ca xếp thành chuỗi để **kết quả ca sau chứng minh ca

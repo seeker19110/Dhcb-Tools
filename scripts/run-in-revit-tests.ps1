@@ -33,7 +33,11 @@ param(
     [string]$OutputRoot = "$env:USERPROFILE\DHCB-test-results",
 
     # Bỏ qua bước build (dùng lại bin/Release có sẵn).
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+
+    # Giữ lại bao nhiêu lượt chạy gần nhất CỦA CÙNG BỘ CA KIỂM; lượt cũ hơn bị xoá trước khi chạy.
+    # Bộ ghi MEP chép cả model liên kết (313 MB/lượt) nên vài lượt là hết ổ — 0 để không dọn gì.
+    [int]$KeepRuns = 2
 )
 
 $ErrorActionPreference = 'Stop'
@@ -119,6 +123,26 @@ Write-Host ("   " + ((Get-ChildItem $addinDir -Filter *.dll).Name -join ', '))
 
 # ── 5. Dựng file job ─────────────────────────────────────────────────────────
 $stamp = Get-Date -Format 'yyyy-MM-dd_HH-mm-ss'
+
+# Dọn lượt cũ TRƯỚC khi chạy, không phải sau: chạy xong mới dọn thì lượt vừa chạy cũng nằm trong diện
+# đếm, và nếu Revit treo thì không bao giờ tới bước dọn. Chỉ đụng thư mục của ĐÚNG bộ ca kiểm này.
+if ($KeepRuns -gt 0 -and (Test-Path $OutputRoot)) {
+    $old = Get-ChildItem $OutputRoot -Directory -ErrorAction SilentlyContinue |
+           Where-Object { $_.Name -like "$Suite-*" } |
+           Sort-Object Name -Descending |
+           Select-Object -Skip ($KeepRuns - 1)
+    if ($old) {
+        $freed = 0
+        foreach ($dir in $old) {
+            $freed += (Get-ChildItem $dir.FullName -Recurse -File -ErrorAction SilentlyContinue |
+                       Measure-Object Length -Sum).Sum
+            # Bản chép model đến từ Program Files nên mang cờ chỉ đọc — Remove-Item cần -Force.
+            Remove-Item $dir.FullName -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        Write-Host ("== Dọn {0} lượt chạy cũ của bộ '{1}' — giải phóng {2:N0} MB" -f $old.Count, $Suite, ($freed / 1MB))
+    }
+}
+
 $outDir = Join-Path $OutputRoot "$Suite-$stamp"
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
