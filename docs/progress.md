@@ -180,6 +180,6 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
    Còn `SleeveAuto`: trên cả hai model mẫu MEP lệnh không tìm thấy giao cắt nào nên đường ghi của
    riêng nó vẫn chưa được chứng minh — cần một model có sleeve thật hoặc một fixture dựng sẵn.
 2. Một đêm batch thật trên **dự án thật** (không phải file mẫu) để chốt Giai đoạn 1 đầu-cuối.
-3. Giai đoạn 9.3 phần còn lại: gom bảng mã lỗi (`E-PARAM-MISSING`, `E-PATH-MISSING`, `E-CONFIG-MISSING`…) vào một trang tài liệu.
+3. ~~Gom bảng mã lỗi vào một trang tài liệu~~ — xong: [`ma-loi.md`](ma-loi.md), có test đối chiếu với mã nguồn hai chiều.
 4. Rồi tới **9.4 — đưa cho một nhóm kỹ sư dùng thật**; phản hồi của họ quyết định giai đoạn 10/11 đi sâu vào đâu.
 5. **Không mở P3** — giữ hướng chiều sâu theo [`roadmap.md`](roadmap.md).
