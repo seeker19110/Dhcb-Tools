@@ -142,6 +142,7 @@ Core/vỏ (kể cả vỏ core-only) trên Linux với API Revit 2025 + AutoCAD 
 | **Quét hồi quy sau 10 PR** | 2026-09-03 | **90 đạt / 0 trượt / 1 bỏ qua trên 91 ca**, cả 7 bộ (Revit smoke·mep·plumbing·write·write-mep, AutoCAD smoke·write) — §15 |
 | **`SleeveAuto` đọc model liên kết** | 2026-09-03 | **0 → 345 sleeve** trên Snowdon HVAC (tường nằm ở link kiến trúc); tối ưu hộp bao 49,8 s → **1,2 s**; bộ mep 17/17 — §14 |
 | **Bộ tìm đường `AutoRoute`** | 2026-09-03 | **4049 ms → 10 ms**, 58.720 → 5.783 ô mở rộng trên 550 vật cản (đo bản cũ cạnh bản mới); trên Snowdon HVAC **0,3 s → 82 ms** (bước 500 mm) và **17,9 s → 815 ms** (bước 100 mm); thất bại nay chứng minh được tuyến KHÔNG tồn tại thay vì chỉ báo hết giờ; bộ `mep` **20/20** — §19 |
+| **Đêm batch thật đầu tiên — dự án GOLDVIEW TTTM** | 2026-09-04 | **8/9 file `.rvt` thật** (00–03 kiến trúc, 05–08 MEP, 139–176 MB/file) chạy trọn 10 bước chỉ đọc, không đụng file gốc; lộ TaskDialog nâng cấp phiên bản treo batch 43 phút — sửa bằng `DialogBoxShowing`, chạy lại qua đúng chỗ đó trong 86 giây; file 04 lỗi mạng tới central model (`\\192.168.1.11`), không phải lỗi mã nguồn; tạo bản sao Revit 2024 cho 8/9 file để lần sau mở tức thì — §20 |
 | **Lệnh chạy nền + `/progress/<id>`** | 2026-09-03 | 202 → `running` → `done`, hỏi lại kết quả không mất; 404/401 đúng — §13 |
 | **Đường ghi cho nhóm lệnh tạo phần tử mới** | 2026-09-03 | **11/11 (kiến trúc) + 4/4 (HVAC)**; `HangerAuto` 1120 → 0 sau khi bổ sung chống trùng; lộ lỗi chặn "batch treo ở hộp thoại cảnh báo lúc mở model" — §12 |
 
@@ -162,6 +163,7 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
 | 10 | Hiệu năng collector | `ElementMulticategoryFilter` / `ElementLevelFilter` trong ParameterExport, AutoNumbering (và mọi lệnh mới) |
 | 11 | Hanger/PipeSplitter chưa gắn UI/Bridge | `CatalogCommands` + `RevitCommandTable` |
 | 12 | Không có test MEPF/Export/ProjectInit | Phần thuần đã có test; phần Revit theo §4 kiểm thử thủ công |
+| 13 | Batch treo ở TaskDialog nâng cấp phiên bản (Revit tự bật lúc mở file cũ, ngoài mọi transaction) — 43 phút không xong một file | `UIApplication.DialogBoxShowing` đăng ký cho cả phiên batch, cạnh `FailuresProcessing` — `BatchStartupHook` — §20 |
 
 ### Còn mở
 
@@ -192,9 +194,12 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
 1. ~~Đường ghi cho lệnh tạo phần tử mới~~ — xong (§12): chốt bằng tính idempotent thay vì dọn lại.
    `SleeveAuto` cũng xong trong cùng ngày (§14): sửa lệnh để đọc model liên kết, sửa script để chép
    luôn model liên kết cạnh bản chép — chuỗi ghi thật **334 → 0** trên model thật.
-2. Một đêm batch thật trên **dự án thật** (không phải file mẫu) để chốt Giai đoạn 1 đầu-cuối.
-   **Đang chờ đúng một thứ: đường dẫn tới một file dự án thật.** Cơ chế đã sẵn —
-   `scripts/install-nightly-task.ps1` đăng ký Task Scheduler, `jobs/nightly.sample.json` là mẫu job.
+2. ~~Một đêm batch thật trên **dự án thật**~~ — phần "chạy được, chạy đúng, không làm hỏng gì trên dữ
+   liệu thật" xong (§20): 8/9 file dự án GOLDVIEW TTTM (~700 MB), lộ và sửa lỗi treo TaskDialog nâng cấp
+   phiên bản (bug #13). File 04 lỗi mạng tới central model, việc của hạ tầng chứ không phải mã nguồn.
+   Còn lại: **chưa có job nào thật sự chạy tự động qua `install-nightly-task.ps1`** — hai lượt ở §20 đều
+   chạy tay. Đăng ký Task Scheduler khi có một job cần lặp lại định kỳ thật (ví dụ báo cáo đêm trên bản
+   `_upgraded-2024/`), không đáng làm cho một lượt một-lần-cho-biết.
 3. ~~Gom bảng mã lỗi vào một trang tài liệu~~ — xong: [`ma-loi.md`](ma-loi.md), có test đối chiếu với mã nguồn hai chiều.
 4. Rồi tới **9.4 — đưa cho một nhóm kỹ sư dùng thật**; phản hồi của họ quyết định giai đoạn 10/11 đi sâu
    vào đâu. **Mẫu thu phản hồi đã có**: [`mau-phan-hoi-9-4.md`](mau-phan-hoi-9-4.md) — bảng tick
