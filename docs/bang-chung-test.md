@@ -1025,3 +1025,90 @@ với dữ liệu thật thì không có gì cần lưu cả nên đăng ký tas
 roadmap ("chốt Giai đoạn 1 đầu-cuối") coi như xong phần "chạy được, chạy đúng, không làm hỏng gì trên dữ
 liệu thật" — phần "tự động hoá qua Task Scheduler" vẫn còn nguyên, để dành cho khi có một job thật sự cần
 lặp lại định kỳ (ví dụ chạy `HealthReport`/`WarningsExport`/`ClashDetection` mỗi đêm trên bản `_upgraded-2024/`).
+
+## 21. Đóng vai kỹ sư dùng thử — và một lỗi ngầm nguy hiểm hơn cả lỗi crash (2026-09-04 06:35 ICT)
+
+Chưa có kỹ sư thật nào ngồi dùng (9.4 còn ở phía trước). Vòng này đóng vai kỹ sư mới nhận dự án GOLDVIEW,
+đóng bộ, tự bấm thử — trên bản `_upgraded-2024/` từ §20 (mở nhanh: 2–10 giây thay vì 90 giây–14 phút),
+`saveMode: "None"` nên **không có gì lưu lại**, kể cả các bước bật `dryRun: false` chạy ghi thật trong bộ
+nhớ rồi đóng không lưu — kiểm đúng luồng ghi mà không đụng gì tới bất kỳ file nào trên đĩa.
+
+### Việc bật lên dùng được ngay
+
+| Lệnh | Kết quả thật |
+|---|---|
+| `ApplySizing` | 113/113 đoạn — vòng đề xuất → duyệt CSV → áp dụng chạy trót lọt |
+| `HangerAuto` (đúng family dự án, `REDY_Pipe_ Support (None Insulation)`) | Đề xuất 4769 hanger trên 4470 phần tử, **tự bỏ qua 108 vị trí đã có hanger** |
+| `RemoveUnusedViews` | Xem trước và chạy thật khớp tuyệt đối: 16 = 16 |
+| `FamilyAudit` | 102 family, ổn định qua nhiều lần chạy |
+
+### Việc bấm rồi vướng ngay — friction thật, không phải lỗi mã nguồn
+
+| Lệnh | Vướng | Vì sao |
+|---|---|---|
+| `ElevationTag` | `E-PARAM-MISSING`, 0/5780 phần tử | Dự án không dùng tên tham số DHCB (`DHCB_Bottom_Elevation`…) — cần thêm tên đúng của dự án vào `dictionary.json` trước khi dùng được. Thông báo lỗi tự liệt kê đủ 3 tên đã thử — đúng thiết kế 9.2 |
+| `HangerAuto` (family mặc định `DHCB_Hanger`) | "Không tìm thấy FamilySymbol" | Cùng nguyên nhân: công cụ giả định family theo template DHCB, dự án khác phải tự tra tên thật (đã tra được ở CSV `FamilyAudit` — quy trình hai bước là hợp lý, không phải lỗi) |
+| `SlopePipes` (lọc `systemContains: "Sanitary"`) | "Không có ống nào khớp" | Lọc theo từ tiếng Anh; không lọc thì chạy tốt (1832 ống, §20). Hệ thống Việt đặt tên khác — đáng ghi vào tài liệu dùng, không phải sửa mã |
+
+### Việc gần-bug: `StylePurge` xem trước lạc quan hơn thật một chút
+
+Chạy thật: **"Đã xoá 319/327 style"**, trong khi §20 xem trước (trước khi `RemoveUnusedViews` chạy thật
+làm đổi bớt tham chiếu) từng nói "Sẽ xoá 323". 8 style xoá hụt đều cùng một lý do — Revit từ chối, không
+phải lệnh bỏ sót:
+
+```
+Không xoá được TextType "1.8 mm Arial": ElementId cannot be deleted.
+Không xoá được DimensionType "Horizontal": ElementId cannot be deleted.
+... (8 cái, đều DimensionType/TextType)
+```
+
+Đây là style **cuối cùng còn lại của loại đó** — Revit tự bảo vệ, không cho xoá hết sạch một loại
+DimensionType/TextType dù phân tích tham chiếu nói đúng là 0 chỗ dùng. Lệnh xử lý **đúng**: bắt lỗi từng
+style, không sập transaction, báo rõ tên + lý do trong `Messages`. Không sửa mã — ghi nhận làm giới hạn đã
+biết: con số "sẽ xoá N" của `StylePurge` là *ứng viên*, không phải cam kết.
+
+### Lỗi thật, nguy hiểm hơn hẳn: bản sao nhanh làm mất trạng thái nạp link
+
+Chạy lại đúng `ClashDetection` (Ducts/Pipes × Kết cấu/Tường/Sàn, `IncludeLinkedModels` mặc định bật) trên
+đúng file 06 vừa dùng trong §20 — nhưng lần này qua bản `_upgraded-2024/`:
+
+| | File gốc (§20) | Bản `_upgraded-2024/` (trước vá) |
+|---|---:|---:|
+| Va chạm | **479** | **0** |
+
+Cả ba link của file (`00 GRL`, `02 ARC L02`, `07 MEP L03`) đều **"chưa nạp"**. Nguy hiểm hơn một exception:
+`ClashDetection` đã được dạy nói rõ "0 va chạm đáng ngờ" từ §16, và nó CÓ nói — nhưng một người bận rộn
+đọc lướt summary "Tìm thấy 0 va chạm" rất dễ đọc thành "sạch", nhất là khi §20 cùng ngày từng cho phép tin
+0/0 ở file 05/07 (khi đó là *thật* sự thiếu link, không phải lỗi bản sao).
+
+**Nguyên nhân, đúng bài học §14 lặp lại ở một chỗ khác:** `SaveAs` sau `DetachFromCentral` không giữ lại
+đường dẫn có thể giải được của link — link vẫn ghi đường dẫn network central cũ
+(`\192.168.1.101\mep-project\...`), không tự trỏ sang file cùng tên vừa được lưu cạnh nó trong
+`_upgraded-2024/`.
+
+### Sửa: nạp lại link lúc mở file, thử cả đường dẫn cạnh file host khi đường ghi sẵn hỏng
+
+`BatchJobRunner.Open()` giờ gọi `LoadUnloadedLinks(doc)` ngay sau khi mở: quét mọi `RevitLinkType` chưa
+`Loaded`, gọi `.Load()`. Nếu kết quả là `LinkNotFound` (đường dẫn ghi sẵn không giải được), thử **đúng một
+nước tiếp theo**: lấy tên file gốc của link (qua `GetExternalFileReference()`), tìm file cùng tên **cạnh
+chính file host đang mở** (`Path.GetDirectoryName(doc.PathName)`), và `LoadFrom()` từ đó nếu file tồn tại.
+Đúng cách bố trí phổ biến của hồ sơ Việt Nam — các file kỷ luật tách rời nằm cùng một thư mục dự án. Lỗi
+nạp từng link không làm chết việc mở file — bắt riêng từng link, ghi vào log để thấy được, không im lặng.
+
+`src/DhcbTools.Core/Batch/BatchJobRunner.cs`.
+
+### Đo trên đúng file, đúng bug
+
+| | Trước vá | Sau vá |
+|---|---|---|
+| Trạng thái 3 link | `LinkNotFound` (cả 3) | `LinkNotFound → thử lại cạnh file host: LinkLoaded` (cả 3) |
+| `ClashDetection` | **0 va chạm** (sai) | **479 va chạm** — khớp đúng file gốc |
+
+check-build.sh xanh (2023/2024/2025); Shared.Logic 574 test, 0 trượt — không có test mới, `RevitLinkType`/
+`Document.PathName`/`File.Exists` đều cần Revit thật, không thuần hoá được, đúng như bản vá §20.
+
+### Việc phát sinh, chưa làm ở vòng này
+
+Bản vá chỉ thử MỘT nước (cạnh file host) — nếu bố cục dự án khác (link nằm thư mục con, hoặc thật sự
+network không tới được như file 04 ở §20) thì vẫn báo `LinkNotFound` và log nói rõ "(không có file cùng
+tên cạnh file host)". Đủ cho bố cục phổ biến nhất; không cố đoán thêm các bố cục khác khi chưa có ca thật.

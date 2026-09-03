@@ -143,6 +143,7 @@ Core/vỏ (kể cả vỏ core-only) trên Linux với API Revit 2025 + AutoCAD 
 | **`SleeveAuto` đọc model liên kết** | 2026-09-03 | **0 → 345 sleeve** trên Snowdon HVAC (tường nằm ở link kiến trúc); tối ưu hộp bao 49,8 s → **1,2 s**; bộ mep 17/17 — §14 |
 | **Bộ tìm đường `AutoRoute`** | 2026-09-03 | **4049 ms → 10 ms**, 58.720 → 5.783 ô mở rộng trên 550 vật cản (đo bản cũ cạnh bản mới); trên Snowdon HVAC **0,3 s → 82 ms** (bước 500 mm) và **17,9 s → 815 ms** (bước 100 mm); thất bại nay chứng minh được tuyến KHÔNG tồn tại thay vì chỉ báo hết giờ; bộ `mep` **20/20** — §19 |
 | **Đêm batch thật đầu tiên — dự án GOLDVIEW TTTM** | 2026-09-04 | **8/9 file `.rvt` thật** (00–03 kiến trúc, 05–08 MEP, 139–176 MB/file) chạy trọn 10 bước chỉ đọc, không đụng file gốc; lộ TaskDialog nâng cấp phiên bản treo batch 43 phút — sửa bằng `DialogBoxShowing`, chạy lại qua đúng chỗ đó trong 86 giây; file 04 lỗi mạng tới central model (`\\192.168.1.11`), không phải lỗi mã nguồn; tạo bản sao Revit 2024 cho 8/9 file để lần sau mở tức thì — §20 |
+| **Đóng vai kỹ sư dùng thử trên GOLDVIEW** | 2026-09-04 | `ApplySizing` 113/113, `HangerAuto` nhận đúng family thật của dự án, `RemoveUnusedViews` xem trước khớp thật tuyệt đối; lộ friction thật (`ElevationTag`/`HangerAuto` cần tên tham số/family riêng dự án — đúng thiết kế báo lỗi 9.2, không phải bug) và **một lỗi ngầm nguy hiểm**: bản sao mất trạng thái nạp link khiến `ClashDetection` báo sai **0** thay vì **479** va chạm — sửa bằng nạp lại link + thử file cạnh host, đo lại đúng 479 — §21 |
 | **Lệnh chạy nền + `/progress/<id>`** | 2026-09-03 | 202 → `running` → `done`, hỏi lại kết quả không mất; 404/401 đúng — §13 |
 | **Đường ghi cho nhóm lệnh tạo phần tử mới** | 2026-09-03 | **11/11 (kiến trúc) + 4/4 (HVAC)**; `HangerAuto` 1120 → 0 sau khi bổ sung chống trùng; lộ lỗi chặn "batch treo ở hộp thoại cảnh báo lúc mở model" — §12 |
 
@@ -164,6 +165,7 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
 | 11 | Hanger/PipeSplitter chưa gắn UI/Bridge | `CatalogCommands` + `RevitCommandTable` |
 | 12 | Không có test MEPF/Export/ProjectInit | Phần thuần đã có test; phần Revit theo §4 kiểm thử thủ công |
 | 13 | Batch treo ở TaskDialog nâng cấp phiên bản (Revit tự bật lúc mở file cũ, ngoài mọi transaction) — 43 phút không xong một file | `UIApplication.DialogBoxShowing` đăng ký cho cả phiên batch, cạnh `FailuresProcessing` — `BatchStartupHook` — §20 |
+| 14 | Bản sao (`SaveAs` sau `DetachFromCentral`) làm mất trạng thái nạp link — `ClashDetection` báo sai **0** va chạm thay vì 479 thật, im lặng vì summary "0 va chạm" trông y hệt kết quả sạch | `BatchJobRunner.Open()` gọi `LoadUnloadedLinks` — nạp lại link, thử tiếp file cùng tên cạnh file host nếu đường dẫn ghi sẵn hỏng — §21 |
 
 ### Còn mở
 
