@@ -139,6 +139,7 @@ Core/vỏ (kể cả vỏ core-only) trên Linux với API Revit 2025 + AutoCAD 
 | **AutoCAD 2026.1 — batch qua accoreconsole** | 2026-09-03 | Chạy trọn lần đầu sau khi sửa lỗi `DHCB_RUN`; `LayerExport` + `DrawingCleanup` (purge sâu) trên 2 bản vẽ mẫu — §9 |
 | **AutoCAD — bộ ca kiểm tự động, đủ 15/15 lệnh** | 2026-09-03 | **18 đạt / 0 trượt trên 18 ca**; lộ 2 lỗi ghi đè im lặng ở `LayerImport`/`AttributeImport` — §10 |
 | **Đường ghi thật (Revit + AutoCAD)** | 2026-09-03 | **12 đạt / 0 trượt trên 12 ca**, chạy trên bản chép của file mẫu; chuỗi tự chứng minh đã commit thật và tự khôi phục — §11 |
+| **Đường ghi cho nhóm lệnh tạo phần tử mới** | 2026-09-03 | **11/11 (kiến trúc) + 4/4 (HVAC)**; `HangerAuto` 1120 → 0 sau khi bổ sung chống trùng; lộ lỗi chặn "batch treo ở hộp thoại cảnh báo lúc mở model" — §12 |
 
 Quy trình và checklist tay: [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md) §10;
 cách viết ca kiểm chạy trong Revit: [`kiem-thu-trong-revit.md`](kiem-thu-trong-revit.md).
@@ -175,8 +176,9 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
 
 ## Việc tiếp theo
 
-1. **Đường ghi cho lệnh tạo phần tử mới** (`SleeveAuto`, `HangerAuto`, `LevelSetup`, `SheetBatchCreate`…):
-   cần cách dọn lại trong cùng phiên, hoặc chấp nhận chạy trên bản chép rồi bỏ file.
+1. ~~Đường ghi cho lệnh tạo phần tử mới~~ — xong (§12): chốt bằng tính idempotent thay vì dọn lại.
+   Còn `SleeveAuto`: trên cả hai model mẫu MEP lệnh không tìm thấy giao cắt nào nên đường ghi của
+   riêng nó vẫn chưa được chứng minh — cần một model có sleeve thật hoặc một fixture dựng sẵn.
 2. Một đêm batch thật trên **dự án thật** (không phải file mẫu) để chốt Giai đoạn 1 đầu-cuối.
 3. Giai đoạn 9.3 phần còn lại: gom bảng mã lỗi (`E-PARAM-MISSING`, `E-PATH-MISSING`, `E-CONFIG-MISSING`…) vào một trang tài liệu.
 4. Rồi tới **9.4 — đưa cho một nhóm kỹ sư dùng thật**; phản hồi của họ quyết định giai đoạn 10/11 đi sâu vào đâu.

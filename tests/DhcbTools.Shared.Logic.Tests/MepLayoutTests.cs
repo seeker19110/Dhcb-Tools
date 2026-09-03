@@ -1,4 +1,4 @@
-using DhcbTools.Shared.Logic;
+﻿using DhcbTools.Shared.Logic;
 using Xunit;
 
 namespace DhcbTools.Shared.Logic.Tests;
@@ -179,5 +179,47 @@ public class MepLayoutTests
             0, 0, 0, 10, 10, 10,
             10.2, 0, 0, 20, 10, 10,
             toleranceFt: 0.5));
+    }
+
+    // ── IsNearAny — phép chống trùng dùng chung cho SleeveAuto và HangerAuto ──────────────
+
+    [Fact]
+    public void IsNearAny_KhongCoDiemNao_TraVeFalse()
+    {
+        Assert.False(MepLayout.IsNearAny(1, 2, 3, new (double, double, double)[0], toleranceFt: 1));
+    }
+
+    [Fact]
+    public void IsNearAny_TrongBanKinh_TraVeTrue()
+    {
+        var existing = new[] { (10.0, 0.0, 0.0), (0.0, 0.0, 0.0) };
+        Assert.True(MepLayout.IsNearAny(0.2, 0, 0, existing, toleranceFt: 0.5));
+    }
+
+    [Fact]
+    public void IsNearAny_NgoaiBanKinh_TraVeFalse()
+    {
+        var existing = new[] { (0.0, 0.0, 0.0) };
+        Assert.False(MepLayout.IsNearAny(0.6, 0, 0, existing, toleranceFt: 0.5));
+    }
+
+    [Fact]
+    public void IsNearAny_LechTheoTrucZ_VanTinhLaTrung()
+    {
+        var existing = new[] { (0.0, 0.0, 0.0) };
+        Assert.True(MepLayout.IsNearAny(0, 0, 0.3, existing, toleranceFt: 0.5));
+    }
+
+    [Fact]
+    public void IsNearAny_DungSaiKhongDuong_TatChongTrung()
+    {
+        var existing = new[] { (0.0, 0.0, 0.0) };
+        Assert.False(MepLayout.IsNearAny(0, 0, 0, existing, toleranceFt: 0));
+    }
+
+    [Fact]
+    public void IsNearAny_DanhSachNull_TraVeFalse()
+    {
+        Assert.False(MepLayout.IsNearAny(0, 0, 0, null!, toleranceFt: 1));
     }
 }
