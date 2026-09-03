@@ -23,7 +23,7 @@
       }
     },
     {
-      "name": "Sleeve tự động — hiệu năng trên model MEP thật",
+      "name": "Sleeve tự động — tường nằm ở model liên kết",
       "command": "SleeveAuto",
       "config": {
         "sleeveFamilyName": "HeatRecoveryUnit",
@@ -33,14 +33,18 @@
         ]
       },
       "expect": {
-        "success": null,
-        "maxMs": 30000,
+        "success": true,
+        "minAffected": 1,
+        "maxMs": 10000,
+        "summaryNotContains": [
+          "Không có tường/sàn nào để xét"
+        ],
         "neverContains": [
           "Exception",
           "timed out"
         ]
       },
-      "//": "Model HVAC mau KHONG co family Generic Model nao (kiem bang FamilyAudit tren chinh no: 95 family, khong co Generic Models). 'M_Generic Model' truoc day chi la ten doan mo, nen ca nay dung o buoc tra family va KHONG BAO GIO cham toi vong quet giao cat — tuc luoi maxMs 30 s khong do gi ca. Dung 'HeatRecoveryUnit' (Mechanical Equipment, 37 instance) la co chu y: no ton tai that, nen lenh chay tron phan nang la quet MEP x tuong/san. dryRun van bat nen khong co gi duoc dat vao model."
+      "//": "Model HVAC mau KHONG co tuong/san nao cua rieng no: tuong nam o model kien truc LIEN KET. Truoc khi SleeveCommand biet doc link, ca nay ra 0 sleeve va trong nhu thanh cong — dung cau hinh pho bien nhat o Viet Nam. minAffected 1 chot lai dieu do. maxMs 10 s chot luon phan hieu nang: ban dau tinh hop bao cho tung ung vien trong vong lap tung phan tu MEP mat 49,8 s; tinh mot lan luc dung ung vien con 1,2 s."
     },
     {
       "name": "Tag cao độ — xem trước",
