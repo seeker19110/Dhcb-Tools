@@ -311,6 +311,36 @@
         ],
         "maxMs": 120000
       }
+    },
+    {
+      "name": "Tìm tuyến tự động — vật cản (dầm/cột) nằm ở model liên kết",
+      "command": "AutoRoute",
+      "//": "File MEP chi co ong/duct cua chinh no; dam, cot, tuong nam o model ket cau/kien truc LIEN KET. Truoc khi lenh biet doc link, A* chay trong khong gian gan nhu trong va luon tim duoc tuyen — tuyen xuyen thang qua dam. Ca nay chot rang co vat can den TU LINK; chat luong tuyen thi phai nguoi co nghe nhin, khong chot bang so duoc. stepMm 500 chu khong phai 100 mac dinh: voi vat can THAT, buoc 100 mm tren nhip 13 m cham tran 400.000 o va khong ra tuyen — chinh vong do la bang chung.",
+      "config": {
+        "startMm": {
+          "x": 0,
+          "y": 0,
+          "z": 3000
+        },
+        "endMm": {
+          "x": 12000,
+          "y": 6000,
+          "z": 3000
+        },
+        "searchMarginMm": 3000,
+        "buildRoute": false,
+        "stepMm": 500
+      },
+      "expect": {
+        "success": null,
+        "maxMs": 180000,
+        "summaryContains": [
+          "từ model liên kết"
+        ],
+        "neverContains": [
+          "Exception"
+        ]
+      }
     }
   ]
 }

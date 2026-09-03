@@ -757,3 +757,59 @@ Bộ `mep`: **18/18**.
 
 `AutoRoute` vẫn mù vật cản bên link (tuyến đề xuất có thể xuyên dầm/tường của model liên kết). Nó đang
 mang nhãn *thử nghiệm* theo roadmap; phải sửa trước khi bỏ nhãn đó.
+
+---
+
+## 18. `AutoRoute` — 30 → 546 vật cản, và giới hạn thật của bộ tìm đường (2026-09-03 18:50 ICT)
+
+Lệnh cuối cùng trong họ "mù model liên kết". Vật cản (dầm, cột, tường, sàn) nằm ở model kết cấu/kiến
+trúc liên kết, nên A* chạy trong một không gian gần như trống và **luôn tìm được tuyến** — tuyến xuyên
+thẳng qua dầm.
+
+### Sửa
+
+Cùng khuôn với §14/§16/§17, thêm một chi tiết riêng: **hộp tìm kiếm phải đưa về toạ độ link trước khi
+lọc** (`BoundingBoxIntersectsFilter` chạy trong document của link), rồi hộp bao từng vật cản đưa ngược
+về toạ độ file chủ bằng cả tám đỉnh.
+
+Số vật cản nay nằm trong **Summary** chứ không chỉ `Messages`: báo cáo batch chỉ in Summary, mà "tuyến
+đẹp" tìm trong không gian trống là kết quả vô nghĩa **trông y hệt** kết quả tốt. Khi không có vật cản
+nào, lệnh nói thẳng *"tuyến này chỉ là đường nối hai điểm"*.
+
+### Đo trên model thật (Snowdon HVAC + link kiến trúc/kết cấu)
+
+| | Trước | Sau |
+|---|---:|---:|
+| Vật cản trong hộp tìm kiếm | **30** (chỉ ống/duct của chính file) | **546** = 30 trong file + **516 từ link** |
+
+### Và ngay lập tức lộ ra giới hạn thật của bộ tìm đường
+
+Có vật cản thật thì bài toán khác hẳn:
+
+| Bước lưới | Kết quả | Node | Thời gian |
+|---|---|---:|---:|
+| 100 mm (mặc định) | chạm trần 400.000 ô, không ra tuyến | 400.001 | 17,9 s |
+| 500 mm | *"Không có đường đi trong hộp tìm kiếm"* | 4.818 | 0,3 s |
+
+Bộ tìm đường **phân biệt đúng** hai tình huống (`Điểm đầu/cuối nằm trong chướng ngại` là một lý do
+riêng), nên kết quả trên nghĩa là: hai điểm tự do nhưng bị bao kín trong hộp tìm kiếm — sàn và tường
+của model liên kết chặn hết, đúng như thực tế một toà nhà.
+
+**Không "chữa" bằng cách dò toạ độ may mắn cho ra tuyến đẹp.** Ca kiểm chỉ chốt thứ đo được: có vật cản
+đến từ link, không ném, thời gian có trần. Chất lượng tuyến — tránh đúng chỗ, cao độ hợp lý — phải người
+có nghề nhìn.
+
+### Đối chiếu trước/sau trên bộ `smoke` — bản vá không làm hỏng gì
+
+| | Trước bản vá | Sau |
+|---|---|---|
+| Vật cản xét tới | 153 | **561** (153 trong file + 408 từ link) |
+| Kết quả | chạm trần 400.000 ô | chạm trần 400.000 ô |
+| Thời gian | 6,1 s | 18,5 s |
+
+Ca đó **chưa bao giờ tìm được tuyến**, cả trước lẫn sau — giới hạn có sẵn của bộ tìm đường với bước
+100 mm, không phải hệ quả của bản vá. Bản vá chỉ làm nó xét đúng số vật cản, và chậm hơn ba lần.
+
+Đây cũng là số liệu để giữ nhãn *thử nghiệm* của `AutoRoute` trong roadmap: giờ có lý do đo được thay vì
+cảm tính. Muốn dùng thật thì cần chọn điểm đầu/cuối trong cùng không gian trần kỹ thuật và cho đủ
+`searchMarginMm`, hoặc chấp nhận bước lưới thô.
