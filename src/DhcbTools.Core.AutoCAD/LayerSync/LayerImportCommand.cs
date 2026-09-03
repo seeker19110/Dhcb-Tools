@@ -165,7 +165,8 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
         else if (row.ColorRgb.HasValue)
         {
             var rgb = row.ColorRgb.Value;
-            var current = layer.Color.IsByAci ? -1 : layer.Color.ColorValue & 0xFFFFFF;
+            // ColorValue là System.Drawing.Color, phải qua ToArgb() mới so được với RGB đọc từ CSV.
+            var current = layer.Color.IsByAci ? -1 : layer.Color.ColorValue.ToArgb() & 0xFFFFFF;
             if (current != rgb)
             {
                 changes.Add(l => l.Color = Color.FromRgb(
