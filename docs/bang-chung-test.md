@@ -22,12 +22,12 @@
 
 | Bộ test | Số lượng | Kết quả |
 |---|---|---|
-| `tests/DhcbTools.Shared.Logic.Tests` (xUnit, .NET 8) | 489 | ✅ 489 passed / 0 failed |
+| `tests/DhcbTools.Shared.Logic.Tests` (xUnit, .NET 8) | 569 | ✅ 569 passed / 0 failed |
 | `tools/autocad-mcp-server/test_panel_api.py` (unittest) | 29 | ✅ 29 passed / 0 failed |
 
 ```
 dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj -c Release
-Passed!  - Failed: 0, Passed: 489, Skipped: 0, Total: 489
+Passed!  - Failed: 0, Passed: 569, Skipped: 0, Total: 569
 
 python -m unittest discover -s tools/autocad-mcp-server -p 'test_*.py'
 Ran 29 tests — OK
@@ -813,3 +813,55 @@ Ca đó **chưa bao giờ tìm được tuyến**, cả trước lẫn sau — g
 Đây cũng là số liệu để giữ nhãn *thử nghiệm* của `AutoRoute` trong roadmap: giờ có lý do đo được thay vì
 cảm tính. Muốn dùng thật thì cần chọn điểm đầu/cuối trong cùng không gian trần kỹ thuật và cho đủ
 `searchMarginMm`, hoặc chấp nhận bước lưới thô.
+
+## 19. Bộ tìm đường `AutoRoute` — 4049 ms → 10 ms, và thất bại biết nói (2026-09-03 20:10 ICT)
+
+§18 chốt được số vật cản (30 → 546) nhưng để lại ba thứ chưa động tới, cả ba đều là lỗi thuần logic —
+không cần Revit để thấy:
+
+| # | Lỗi | Hậu quả đo được ở §18 |
+|---|---|---|
+| 1 | `Blocked()` quét tuyến tính cả danh sách hộp cho **từng ô** | 546 hộp × 400.000 ô × 6 hướng × 2 lượt ≈ 2,6 tỉ phép thử = 17,9 s |
+| 2 | Heuristic Manhattan **bỏ qua `TurnPenalty = 20`** | Ước lượng thấp hơn chi phí thật cả chục lần → A* thoái hoá gần thành Dijkstra → chạm trần 400.000 ô |
+| 3 | Thất bại chỉ nói *"Không có đường đi"* | Không phân biệt **bị kết cấu bịt kín** với **hết ngân sách tìm kiếm** — hai thứ chữa khác hẳn nhau |
+
+### Sửa
+
+1. **Raster hoá chướng ngại** vào lưới bit một lần trước khi chạy (`OccupancyGrid`): chi phí tỉ lệ với
+   *thể tích vật cản* thay vì *số ô × số vật cản*, tra ô bị chặn còn O(1). Điều kiện chặn giữ **nguyên
+   định nghĩa cũ** — tâm ô nằm trong hộp đã nới `clearance` — nên không có tuyến nào đổi nghĩa.
+2. **Heuristic cộng phạt rẽ**: Manhattan + (số trục còn phải đi − 1) × `TurnPenalty`, cộng thêm một lần rẽ
+   nếu hướng đang đi không trùng chiều với trục còn lại. Vẫn là **chặn dưới** của chi phí thật nên A* giữ
+   nguyên tính tối ưu — ca kiểm cũ vẫn ra đúng 2 lần rẽ.
+3. **Chẩn đoán bằng flood-fill** khi thất bại: nói thẳng điểm đầu ra tới bao nhiêu ô trống, và hai điểm
+   **có nối thông nhau không**. Thêm `MaxCells` (mặc định 16 triệu ô): hộp quá lớn so với bước lưới thì
+   **từ chối ngay** thay vì chạy 18 giây rồi mới báo thua.
+
+### Đo — chạy đúng bản cũ cạnh bản mới trên cùng dữ liệu
+
+550 vật cản đặt ngẫu nhiên (đúng quy mô §18), lưới 100 mm, hộp 10×10×3 m, khoảng hở 100 mm:
+
+| | Trước | Sau |
+|---|---:|---:|
+| Thời gian | **4.049 ms** | **10 ms** |
+| Ô mở rộng | 58.720 | **5.783** |
+| Tuyến | tìm được | tìm được (cùng kết quả) |
+
+Ca hành lang một tường, lưới 100 mm: 15.465 → **9.884** ô, 14 → 7 ms, **cùng 2 lần rẽ** — heuristic mạnh
+hơn nhưng không đánh đổi chất lượng tuyến.
+
+### Ca kiểm mới — [`PathFinder3DGridTests.cs`](../tests/DhcbTools.Shared.Logic.Tests/PathFinder3DGridTests.cs)
+
+7 ca, trong đó ca quan trọng nhất là **đối chiếu vét cạn**: 40 lượt với hộp đặt ngẫu nhiên, trải lại mọi
+ô giữa hai đỉnh polyline và khẳng định không ô nào rơi vào vật cản đã nới khoảng hở — raster hoá mà lệch
+một ô so với cách cũ thì tuyến xuyên dầm. Còn lại: heuristic không quét cả lưới, tuyến vẫn tối ưu, bịt kín
+báo đúng là bịt kín, hết ngân sách báo đúng là hết ngân sách, lưới quá lớn từ chối dưới 1 giây, và quy mô
+550 vật cản xong trong vài giây.
+
+Bộ `Shared.Logic`: **569 đạt / 0 trượt** (562 → 569), cả bộ chạy trong 0,2 s. `check-build.sh` xanh.
+
+### Cái này vẫn KHÔNG chứng minh
+
+Chất lượng tuyến trên model thật — tránh đúng chỗ, cao độ hợp lý — vẫn phải người có nghề nhìn, đúng như
+§18 đã nói. Bản vá này chỉ gỡ ba thứ **đo được là sai**: chậm, mù hướng, và câm khi thua. Nhãn *thử
+nghiệm* của `AutoRoute` giữ nguyên cho tới khi chạy lại trên Snowdon HVAC.

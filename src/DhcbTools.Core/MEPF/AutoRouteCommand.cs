@@ -198,7 +198,11 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
         var source = $"{inDocument} trong file + {inLinks} từ model liên kết";
         if (!path.Found)
         {
-            return CommandResult.Fail($"Không tìm được tuyến ({path.Reason}). Đã xét {obstacles.Count} chướng ngại ({source}), {path.ExpandedNodes} node.");
+            // `path.Reason` đã nói rõ thua vì bị bịt kín hay vì hết ngân sách — hai thứ cần cách chữa khác
+            // hẳn nhau, nên đừng nuốt mất; kèm cỡ lưới để người đọc biết bước lưới có hợp với hộp không.
+            return CommandResult.Fail(
+                $"Không tìm được tuyến ({path.Reason}). Đã xét {obstacles.Count} chướng ngại ({source}), "
+                + $"lưới {path.GridCells:N0} ô bước {config.StepMm:F0} mm, mở rộng {path.ExpandedNodes} node.");
         }
 
         var segments = PolylineSimplifier.ToSegments(path.Polyline);
