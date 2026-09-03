@@ -148,8 +148,28 @@ public static class Program
 
         if (!File.Exists(done))
         {
-            Console.Error.WriteLine("Add-in không báo hoàn thành (batch-done.json). Kiểm tra add-in đã cài cho Revit " + version + " và batch-error.txt.");
-            File.Delete(pending);
+            // Báo cho đúng chỗ. Bản trước luôn đổ tại "add-in chưa cài" nên lần chạy thật đầu tiên đi tìm
+            // nhầm hướng mất nhiều thời gian, trong khi add-in đã cài đúng và thủ phạm là một hộp thoại
+            // của Revit chặn ngay lúc khởi động (hết hạn license, cập nhật, đăng nhập…).
+            var addinLog = Path.ChangeExtension(Path.GetFullPath(runLog), ".addin.log");
+            var errorFile = Path.Combine(dhcbDir, "batch-error.txt");
+            var addinRan = File.Exists(addinLog) || File.Exists(errorFile);
+
+            Console.Error.WriteLine("Add-in không báo hoàn thành (batch-done.json).");
+            if (addinRan)
+            {
+                Console.Error.WriteLine("  Add-in ĐÃ chạy nhưng không kết thúc — xem " + errorFile + " và " + addinLog + ".");
+            }
+            else
+            {
+                Console.Error.WriteLine("  Add-in CHƯA từng chạy: không có " + addinLog + ".");
+                Console.Error.WriteLine("  Thường gặp nhất là Revit dừng ở một hộp thoại lúc khởi động (license hết hạn,");
+                Console.Error.WriteLine("  cập nhật, đăng nhập) — journal không tắt được loại hộp thoại này.");
+                Console.Error.WriteLine("  Mở Revit " + version + " bằng tay một lần, xử lý hộp thoại đang chờ, rồi chạy lại.");
+                Console.Error.WriteLine("  Kiểm chứng: mở journal Revit vừa ghi và tìm dòng 'ADialog::doModal start'.");
+            }
+
+            TryDeletePending(pending);
             return 1;
         }
 
@@ -158,18 +178,42 @@ public static class Program
         return exit;
     }
 
-    /// <summary>Journal tối giản: tắt hộp thoại hỏi khi lỗi để chạy không người trực. Add-in tự làm phần còn lại.</summary>
-    internal static string RevitJournal()
+    /// <summary>
+    /// Xoá <c>pending-job.json</c> bằng mọi giá. Để sót file này là lần mở Revit tương tác kế tiếp sẽ
+    /// âm thầm chạy lại job rồi tự đóng Revit — đúng cái bẫy đã sửa ở phía add-in (giai đoạn 8.1), nhưng
+    /// runner cũng phải tự dọn cho trường hợp add-in chưa từng chạy.
+    /// </summary>
+    private static void TryDeletePending(string pending)
     {
-        return string.Join("\r\n",
-            "' DHCB Tools batch journal",
-            "Dim Jrn",
-            "Set Jrn = CrsJournalScript",
-            "Jrn.Directive \"DebugMode\", \"PerformAutomaticActionInErrorDialog\", 1",
-            "Jrn.Directive \"DebugMode\", \"PermissiveJournal\", 1",
-            "Jrn.Directive \"DocSymbol\", \"[]\"",
-            string.Empty);
+        if (!File.Exists(pending))
+        {
+            return;
+        }
+
+        try
+        {
+            File.Delete(pending);
+        }
+        catch (Exception)
+        {
+            try
+            {
+                // Xoá không được (đang bị khoá) thì đổi tên — hook chỉ tìm đúng tên pending-job.json.
+                File.Move(pending, pending + ".stale-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("CẢNH BÁO: không dọn được " + pending + " (" + ex.Message + "). "
+                    + "Xoá tay trước khi mở Revit, nếu không Revit sẽ tự chạy lại job này rồi tự đóng.");
+            }
+        }
     }
+
+    /// <summary>
+    /// Journal khởi động Revit cho batch. Nội dung nằm ở <see cref="RevitJournalGen"/> trong Shared.Logic
+    /// để có test — một dòng thừa trong journal làm hỏng cả vòng batch mà không lỗi biên dịch nào bắt được.
+    /// </summary>
+    internal static string RevitJournal() => RevitJournalGen.Build();
 
     // ── AutoCAD: accoreconsole cho từng DWG ─────────────────────────────────────────────────────────
 
