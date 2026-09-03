@@ -5,11 +5,16 @@ using Xunit;
 namespace DhcbTools.Shared.Logic.Tests;
 
 /// <summary>
-/// Mọi lệnh Revit phải có ít nhất một ca kiểm chạy THẬT trong Revit (giai đoạn 8.3/8.4).
+/// Mọi lệnh Revit <b>và AutoCAD</b> phải có ít nhất một ca kiểm chạy THẬT trong phần mềm tương ứng
+/// (giai đoạn 8.3/8.4).
 /// <para>
 /// Chỉ số của lộ trình là "42/42 lệnh có test chạy trong Revit trước v1.0". Không có test này thì con số
 /// đó chỉ nằm trong tài liệu: thêm một lệnh mới mà quên bộ ca kiểm sẽ không ai biết. Test cũng bắt lỗi
 /// cú pháp/tên lệnh sai trong file JSON của bộ ca kiểm — trước đây chỉ phát hiện khi Revit đã mở xong.
+/// </para>
+/// <para>
+/// Phía AutoCAD dùng cùng cơ chế: `RunTests` của Core.AutoCAD chạy qua accoreconsole
+/// (`scripts/run-in-autocad-tests.ps1`), cùng tầng đánh giá <c>Shared.Logic/Testing</c>.
 /// </para>
 /// </summary>
 public class SuiteCoverageTests
@@ -25,38 +30,45 @@ public class SuiteCoverageTests
         return Path.Combine(root, "tests", "suites");
     }
 
+    private static List<TestSuite> Suites(string prefix) =>
+        Directory.EnumerateFiles(SuiteFolder(), prefix + "-*.json").Select(TestSuite.Load).ToList();
+
     private static List<TestSuite> Suites() =>
-        Directory.EnumerateFiles(SuiteFolder(), "revit-*.json").Select(TestSuite.Load).ToList();
+        Suites("revit").Concat(Suites("autocad")).ToList();
 
     [Fact]
     public void MoiBoCaKiem_DocDuocVaCoCa()
     {
-        var suites = Suites();
-        Assert.True(suites.Count >= 2, "Cần ít nhất bộ smoke (kiến trúc) và bộ mep.");
-        Assert.All(suites, s => Assert.NotEmpty(s.Cases));
+        Assert.True(Suites("revit").Count >= 3, "Cần ít nhất ba bộ Revit: kiến trúc, MEP, cấp thoát nước.");
+        Assert.True(Suites("autocad").Count >= 1, "Cần ít nhất một bộ AutoCAD.");
+        Assert.All(Suites(), s => Assert.NotEmpty(s.Cases));
     }
 
-    [Fact]
-    public void MoiCaKiem_TroToiMotLenhCoThat()
+    [Theory]
+    [InlineData("revit", CommandCatalog.Revit)]
+    [InlineData("autocad", CommandCatalog.AutoCad)]
+    public void MoiCaKiem_TroToiMotLenhCoThat(string prefix, string platform)
     {
-        var unknown = Suites()
+        var unknown = Suites(prefix)
             .SelectMany(s => s.Cases)
             .Select(c => c.Command)
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Where(name => CommandCatalog.Find(CommandCatalog.Revit, name) == null)
+            .Where(name => CommandCatalog.Find(platform, name) == null)
             .ToList();
 
         Assert.True(unknown.Count == 0, "Ca kiểm gọi lệnh không có trong catalog: " + string.Join(", ", unknown));
     }
 
-    [Fact]
-    public void MoiLenhRevit_DeuCoItNhatMotCaKiem()
+    [Theory]
+    [InlineData("revit", CommandCatalog.Revit)]
+    [InlineData("autocad", CommandCatalog.AutoCad)]
+    public void MoiLenh_DeuCoItNhatMotCaKiem(string prefix, string platform)
     {
         var covered = new HashSet<string>(
-            Suites().SelectMany(s => s.Cases).Select(c => c.Command),
+            Suites(prefix).SelectMany(s => s.Cases).Select(c => c.Command),
             StringComparer.OrdinalIgnoreCase);
 
-        var missing = CommandCatalog.AllFor(CommandCatalog.Revit)
+        var missing = CommandCatalog.AllFor(platform)
             .Where(c => c.Implemented && !c.Internal)   // RunTests là chính bộ chạy, không tự kiểm mình.
             .Select(c => c.Name)
             .Where(name => !covered.Contains(name))
@@ -64,7 +76,7 @@ public class SuiteCoverageTests
 
         Assert.True(
             missing.Count == 0,
-            $"Lệnh chưa có ca kiểm nào chạy trong Revit ({missing.Count}): " + string.Join(", ", missing));
+            $"Lệnh {platform} chưa có ca kiểm nào chạy thật ({missing.Count}): " + string.Join(", ", missing));
     }
 
     /// <summary>

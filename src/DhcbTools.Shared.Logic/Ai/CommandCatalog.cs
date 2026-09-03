@@ -311,6 +311,12 @@ namespace DhcbTools.Shared.Logic.Ai
             new CommandDescriptor("CadLayerMap", AutoCad, "AI offline: gợi ý map layer → Revit type từ danh sách type", false, "LayerMap")
                 .Field("revitTypesPath", "file .txt danh sách type").Field("outputPath", "CSV mapping").Field("useOllama", "dùng model local nếu có")
                 .Words("map layer", "ánh xạ layer"),
+
+            // ── AutoCAD — công cụ nội bộ (không lên lệnh người dùng, không chào ra /tools) ──
+            new CommandDescriptor("RunTests", AutoCad, "Chạy bộ kiểm thử bên trong AutoCAD trên bản vẽ mẫu, ghi TRX + Markdown", false)
+                .Field("suitePath", "file JSON mô tả bộ ca kiểm").Field("outputFolder", "nơi ghi báo cáo")
+                .Field("onlyCommands", "chỉ chạy các lệnh này").Field("allowWrites", "cho phép ca allowWrite ghi thật")
+                .Tooling(),
         };
 
         /// <summary>Lệnh dùng được của một nền tảng — chỉ những lệnh đã có mã nguồn trong Core.</summary>

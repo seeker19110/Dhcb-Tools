@@ -5,6 +5,7 @@ using DhcbTools.Core.AutoCAD.LayerSync;
 using DhcbTools.Core.AutoCAD.LayerTools;
 using DhcbTools.Core.AutoCAD.Reporting;
 using DhcbTools.Core.AutoCAD.TextTools;
+using DhcbTools.Core.AutoCAD.Testing;
 using DhcbTools.Shared.Logic.Ai;
 using Autodesk.AutoCAD.DatabaseServices;
 using Newtonsoft.Json;
@@ -45,6 +46,7 @@ public static class AcadCommandTable
                 "BLOCKQUANTITY" => new BlockQuantityCommand().Execute(db, Deserialize<BlockQuantityConfig>(configJson)),
                 "ATTRIBUTEINCREMENT" => new AttributeIncrementCommand().Execute(db, Deserialize<AttributeIncrementConfig>(configJson)),
                 "CADLAYERMAP" => new CadLayerMapCommand().Execute(db, Deserialize<CadLayerMapConfig>(configJson)),
+                "RUNTESTS" => new RunTestsCommand().Execute(db, Deserialize<RunTestsConfig>(configJson)),
 
                 _ => CommandResult.Fail($"Lệnh không xác định: \"{command}\". Hợp lệ: {string.Join(", ", CommandCatalog.Names(CommandCatalog.AutoCad))}."),
             };

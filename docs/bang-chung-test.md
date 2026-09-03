@@ -22,12 +22,12 @@
 
 | Bộ test | Số lượng | Kết quả |
 |---|---|---|
-| `tests/DhcbTools.Shared.Logic.Tests` (xUnit, .NET 8) | 486 | ✅ 486 passed / 0 failed |
+| `tests/DhcbTools.Shared.Logic.Tests` (xUnit, .NET 8) | 488 | ✅ 488 passed / 0 failed |
 | `tools/autocad-mcp-server/test_panel_api.py` (unittest) | 29 | ✅ 29 passed / 0 failed |
 
 ```
 dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj -c Release
-Passed!  - Failed: 0, Passed: 486, Skipped: 0, Total: 486
+Passed!  - Failed: 0, Passed: 488, Skipped: 0, Total: 488
 
 python -m unittest discover -s tools/autocad-mcp-server -p 'test_*.py'
 Ran 29 tests — OK
@@ -40,7 +40,7 @@ Bốn bộ trong số này không kiểm logic mà **đối chiếu mã nguồn 
 |---|---|
 | `RibbonCoverageTests` | Vỏ Revit ↔ `RevitCommandTable` (mọi lệnh có đường vào từ Ribbon) |
 | `CatalogFieldTests` | `CommandCatalog` ↔ property của lớp `*Config` thật, và "lệnh ghi thì phải có `DryRun`" |
-| `SuiteCoverageTests` | 42/42 lệnh Revit có ít nhất một ca kiểm chạy trong Revit |
+| `SuiteCoverageTests` | 42/42 lệnh Revit **và 15/15 lệnh AutoCAD** có ít nhất một ca kiểm chạy thật |
 | `VietnameseMessageTests` | Không còn mẫu thông báo tiếng Anh trong Core |
 
 `RibbonCoverageTests` đã kiểm bằng **mutation**: đổi hỏng một tên lớp trong `App.cs` thì test đỏ ngay,
@@ -113,15 +113,15 @@ lớp AI offline; cộng phủ Ribbon và gateway panel.
 
 ### ✅ Đã chạy thật trên AutoCAD
 
-Xem [`bang-chung-test-autocad-live.md`](bang-chung-test-autocad-live.md) — AutoCAD 2026, bản vẽ thật
+**15/15 lệnh** có ca kiểm tự động chạy qua `accoreconsole` — §10. Trước đó, kiểm tay trên bản vẽ thật
 6.759 entity / 171 layer: `/health`, 6 loại `query`, `LayerExport`, `DrawingCleanup` (dryRun) và
-`AutoNumbering` **ghi thật 21/21 block**.
+`AutoNumbering` **ghi thật 21/21 block** — [`bang-chung-test-autocad-live.md`](bang-chung-test-autocad-live.md).
 
 ### ⬜ Chưa chạy thật
 
 | Nhóm | Ghi chú |
 |---|---|
-| 13/15 lệnh AutoCAD (`AttributeExport/Import`, `TextReplace`, `LayerStandardCheck`, `GridExtract`, `XrefAudit`, `LayerTranslate`, `DrawingCompare`, `BlockQuantity`, `AttributeIncrement`, `CadLayerMap`…) | Có mã nguồn, biên dịch xanh, chưa có bộ ca kiểm tự động. `LayerExport` và `DrawingCleanup` đã chạy thật qua accoreconsole — §9 |
+| Đường **ghi thật** của lệnh AutoCAD | 15/15 lệnh đã chạy thật ở chế độ xem trước (§10); chưa lệnh nào chạy lượt ghi thật trên bản vẽ có xref/annotative |
 | Batch chạy đêm đầu-cuối trên dự án thật | Đã chạy được cả hai nhánh (Revit §7–§8, AutoCAD §9) trên model/bản vẽ mẫu; còn thiếu một đêm thật trên dự án thật |
 
 Quy trình kiểm thử tay: [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md).
@@ -336,4 +336,59 @@ byte của Autodesk. `CleanupDecider.IsSystemRegApp` nay giữ lại mọi tên 
 sau khi sửa, danh sách của `mau.dwg` còn 10 mục.
 
 **Còn lại:** `DrawingCleanup` mới chạy ở chế độ **xem trước**; chưa có lượt xoá thật trên bản vẽ có
-xref/annotative để chốt phần `Erase()`. 13 lệnh AutoCAD khác vẫn chưa có bộ ca kiểm tự động.
+xref/annotative để chốt phần `Erase()`.
+
+---
+
+## 10. Phủ đủ 15/15 lệnh AutoCAD (2026-09-03 11:32 ICT)
+
+Khoảng trống lớn nhất sau §8 — "AutoCAD chưa có bộ ca kiểm tự động" — nay đã lấp. Cơ chế đối xứng hoàn
+toàn với bên Revit: lệnh Core `RunTests` của `Core.AutoCAD` chạy qua `accoreconsole`, dùng **chung tầng
+đánh giá** `Shared.Logic/Testing` (`TestSuite`, `TestExpectation`, `TestReport`) với Revit.
+
+```powershell
+.\scripts\run-in-autocad-tests.ps1
+```
+
+| Bộ | Bản vẽ mẫu | Kết quả | Mã thoát |
+|---|---|---|---:|
+| [`autocad-smoke.json`](../tests/suites/autocad-smoke.json) | Data Extraction and Multileaders Sample (kèm AutoCAD 2026) | **18 đạt / 0 trượt trên 18 ca**, phủ **15/15 lệnh** | 0 |
+
+`SuiteCoverageTests` nay đòi cả hai nền tảng: thêm một lệnh AutoCAD mà quên ca kiểm là CI đỏ, y như bên Revit.
+
+### Hai lỗi, cùng một họ với lỗi đã sửa bên Revit
+
+Vòng chạy đầu tiên ra 14/17. Ba ca trượt: một là kỳ vọng sai của chính bộ test (bản vẽ cơ khí không có
+layer `AXIS`, nên `GridExtract` **đúng** khi báo lỗi), hai còn lại là lỗi thật:
+
+| Lệnh | Lỗi | Hậu quả |
+|---|---|---|
+| `LayerImport` | Mở **mọi** layer trong CSV ở chế độ ghi rồi gán lại y nguyên giá trị cũ | Nhập lại chính file vừa xuất vẫn báo "cập nhật 70 layer" — không phân biệt được với việc kỹ sư sửa thật 70 layer, và làm bẩn drawing (dirty flag, một mục undo) mà không đổi gì |
+| `AttributeImport` | Như trên, với 50 attribute; và nhánh xem trước **đánh rơi toàn bộ `Messages`** đã gom | Kỹ sư xem trước không thấy ô nào sẽ đổi |
+
+Đây đúng là lỗi đã sửa cho `ParameterImport` bên Revit ở PR #29 — cùng một hình dạng, ở hai chỗ khác chưa
+ai soi tới. Phát hiện được là nhờ **ca vòng tròn**: xuất ra CSV rồi nhập lại chính file đó, kỳ vọng
+`maxAffected: 0`.
+
+Sửa kèm hai thứ lộ ra khi đọc lại `LayerImport`: nó **bỏ qua hoàn toàn cột Linetype và Lineweight** dù
+header CSV và tài liệu đều nói có (sửa nét đứt trong Excel rồi nhập lại thì không có gì xảy ra, lệnh vẫn
+báo thành công), và nó tự viết bộ tách CSV riêng thay vì dùng `CsvText` đã có test, đọc file không theo
+UTF-8 BOM như lúc xuất.
+
+### Ca song sinh — vì sao `maxAffected: 0` một mình là chưa đủ
+
+Một mình ca vòng tròn vẫn xanh nếu ai đó làm `LayerImport` **luôn** trả 0. Bộ AutoCAD vì thế có thêm ca
+*"nhập CSV đổi đúng một ô"* (`minAffected: 1, maxAffected: 1`) với fixture chép từ chính bản vẽ mẫu, đổi
+màu một layer. Hai ca cạnh nhau mới chứng minh phép so sánh **phân biệt được**:
+
+```
+Nhập lại chính CSV vừa xuất        → [Xem trước] Sẽ cập nhật 0 layer
+Nhập CSV đổi đúng một ô            → [Xem trước] Sẽ cập nhật 1 layer
+```
+
+### Còn lại sau §10
+
+- Mọi ca đều chạy ở chế độ **xem trước**; đường ghi thật (`allowWrite` + `-AllowWrites`) chưa có ca nào.
+- `GridExtract` và `TextReplace` mới chốt được đường lỗi/không-khớp: bản vẽ mẫu kèm AutoCAD không có layer
+  trục và không có chuỗi cần thay. Đường thành công cần một bản vẽ dự án thật.
+- `DrawingCompare` mới so bản vẽ với chính nó; chưa có cặp bản vẽ khác nhau thật để chốt số liệu khác biệt.
