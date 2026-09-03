@@ -526,3 +526,46 @@ phải của mình.
 `SuiteCoverageTests.CaGhiThat_PhaiChotKhongPhaiXemTruoc` — mọi ca khai `allowWrite` bắt buộc có
 `summaryNotContains: ["Xem trước"]`. Thiếu lưới này thì một ngày khoá `dryRun` bị ép nhầm cho cả ca ghi,
 cả bộ write sẽ xanh trong khi không ghi gì.
+
+---
+
+## 13. Lệnh chạy nền và `GET /progress/<id>` (2026-09-03 13:35 ICT)
+
+Giai đoạn 10.5 phần còn lại. Trước đây mọi lệnh qua Bridge đều giữ một kết nối HTTP suốt thời gian chạy;
+với `HangerAuto` 26,6 s (§12) hay `AutoRoute` trên hộp lớn, kết nối đứt giữa chừng là **mất kết quả của
+một việc đã chạy xong** — Revit đã ghi vào model nhưng client không còn cách nào biết.
+
+Nay `POST /execute` nhận thêm `"async": true`: server trả ngay `202` kèm `id`, lệnh chạy tiếp trên luồng
+UI, client hỏi `GET /progress/<id>` tới khi xong. Kết quả nằm ở server theo id nên hỏi lại bao nhiêu lần
+cũng được (giữ 30 phút hoặc 50 lệnh gần nhất; **không bao giờ** bỏ lệnh đang chạy).
+
+Chạy thật trên Revit 2024.3, model Snowdon Towers Architectural:
+
+```
+POST /execute {"command":"AutoNumbering","async":true,…}
+  → 202 { "id": "b81fc5256cac", "status": "running", "progressUrl": "/progress/b81fc5256cac" }
+
+GET /progress/b81fc5256cac
+  → { "status": "done", "elapsedMs": 94,
+      "result": { "success": true, "affectedCount": 141,
+                  "summary": "[Xem trước] Sẽ đánh số 141 phần tử \"Doors\"…" } }
+
+GET /progress/b81fc5256cac   (hỏi lại hai lần nữa)
+  → kết quả y hệt, elapsedMs vẫn 94 — kết quả không đi theo kết nối
+```
+
+`GET /progress/<id>` sai id → **404**; không token → **401** (kiểm chứng bằng curl trên máy thật, cùng
+lượt chạy). Client `dhcb_agent.py --background` tự hỏi vòng và in tiến độ:
+
+```
+$ python scripts/dhcb_agent.py revit exec HealthReport --config '{"outputPath":"…"}' --background
+  … đang chạy 0 s
+  … đang chạy 2 s
+✓ Health Report: 34 cảnh báo, 91 view chưa đặt, 0 connector hở, 2 in-place family.
+```
+
+`result` có **đúng hình dạng** của `/execute` đồng bộ (kể cả `changedIds` của giai đoạn 10.2) — đường
+đồng bộ nay cũng dựng payload bằng chính hàm đó, nên agent không phải viết hai đường đọc.
+
+Phần thuần (`BridgeJob`, `BridgeJobStore`) có 7 test, đường HTTP có 3 test chạy trên server thật trong
+tiến trình test — gồm cả ca "lệnh còn đang chạy thì `/progress` phải trả `running`".

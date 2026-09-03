@@ -21,6 +21,7 @@ Cách dùng:
 
 import argparse
 import json
+import time
 import os
 import sys
 import urllib.error
@@ -92,6 +93,47 @@ def send(app: str, command: str, config: dict, timeout_seconds: int = 0) -> dict
                    timeout=timeout_seconds + 10 if timeout_seconds > 0 else 35)
 
 
+def send_background(app: str, command: str, config: dict,
+                    poll_seconds: float = 2.0, max_wait_seconds: int = 1800,
+                    on_tick=None) -> dict:
+    """Chạy một lệnh ở chế độ nền rồi hỏi /progress/<id> cho tới khi xong (giai đoạn 10.5).
+
+    Dùng cho lệnh chạy hàng chục giây trở lên: kết quả nằm ở server theo id, nên đứt kết nối
+    giữa chừng không làm mất kết quả của việc đã chạy xong — hỏi lại bằng id là thấy.
+    """
+    accepted = request(app, "POST", "/execute",
+                       {"command": command, "config": config, "async": True}, timeout=35)
+    job_id = accepted.get("id")
+    if not job_id:
+        return accepted  # lỗi (401, 400…) — trả nguyên để print_result hiện ra
+
+    deadline = time.time() + max_wait_seconds
+    while True:
+        state = request(app, "GET", f"/progress/{job_id}", timeout=35)
+        status = state.get("status")
+        if status == "done":
+            return state.get("result", state)
+        if status == "error":
+            return {"success": False, "summary": state.get("error", "Lệnh nền lỗi.")}
+        if status is None:
+            return state  # 404 hoặc lỗi khác
+        if on_tick:
+            on_tick(state.get("elapsedMs", 0))
+        if time.time() > deadline:
+            return {"success": False,
+                    "summary": f"Đã chờ quá {max_wait_seconds} s. Lệnh VẪN ĐANG CHẠY trong {app}; "
+                               f"hỏi lại bằng: GET /progress/{job_id}"}
+        time.sleep(poll_seconds)
+
+
+def run(app: str, command: str, config: dict, args) -> dict:
+    """Một chỗ duy nhất quyết định chạy đồng bộ hay chạy nền, để ba lối gọi lệnh cư xử giống nhau."""
+    if getattr(args, "background", False):
+        return send_background(app, command, config,
+                               on_tick=lambda ms: print(f"  … đang chạy {ms / 1000:.0f} s", flush=True))
+    return send(app, command, config)
+
+
 def print_result(result: dict):
     if "success" in result:
         icon = "✓" if result.get("success") else "✗"
@@ -158,6 +200,9 @@ def main():
     parser.add_argument("--level")
     parser.add_argument("--create-missing", action="store_true")
     parser.add_argument("--filter")
+    parser.add_argument("--background", action="store_true",
+                        help="Chạy nền rồi hỏi /progress/<id> tới khi xong — cho lệnh chạy hàng chục giây "
+                             "(SleeveAuto, HangerAuto, AutoRoute). Đứt kết nối không mất kết quả.")
     args = parser.parse_args()
 
     app = args.app
@@ -196,7 +241,7 @@ def main():
             print("Cần JSON thô sau 'raw'.", file=sys.stderr)
             sys.exit(1)
         data = json.loads(args.arg)
-        result = send(app, data["command"], data.get("config", {}))
+        result = run(app, data["command"], data.get("config", {}), args)
         print_result(result)
         sys.exit(0 if result.get("success") else 1)
 
@@ -214,11 +259,11 @@ def main():
             config["dryRun"] = False
         elif "dryRun" not in config:
             config["dryRun"] = True
-        result = send(app, args.arg, config)
+        result = run(app, args.arg, config, args)
         print_result(result)
         sys.exit(0 if result.get("success") else 1)
 
-    result = send(app, args.command, build_config(args, app, dry_run))
+    result = run(app, args.command, build_config(args, app, dry_run), args)
     print_result(result)
     sys.exit(0 if result.get("success") else 1)
 
