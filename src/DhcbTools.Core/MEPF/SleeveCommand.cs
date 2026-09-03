@@ -46,6 +46,10 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         // mà không ai biết. Nay gom lại để báo trong CommandResult.
         var unknownSize = new List<long>();
 
+        // Đếm vị trí bỏ qua vì đã có sleeve. Thiếu con số này thì lần chạy thứ hai báo "0 sleeve" kèm lý
+        // do SAI ("không có giao cắt nào"), trong khi thật ra giao cắt vẫn còn nguyên và đã có sleeve rồi.
+        var skippedExisting = 0;
+
         // Lỗi hiệu năng đã sửa: trước đây FilteredElementCollector toàn model (Walls+Floors) được dựng lại
         // BÊN TRONG vòng lặp cho từng phần tử MEP — O(n·m) trên model lớn, vượt timeout Bridge 30 s.
         // Thu thập một lần ở đây, lọc bbox trong bộ nhớ cho từng phần tử MEP.
@@ -160,7 +164,10 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
 
                 // Check duplicate
                 if (IsNearExistingSleeve(intersectionPt, existingSleeveLocations))
+                {
+                    skippedExisting++;
                     continue;
+                }
 
                 // Check already in placements list
                 bool alreadyPlanned = false;
@@ -183,7 +190,7 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
             var previewSummary = $"[Xem trước] Sẽ đặt {placements.Count} sleeve tại giao cắt MEP × Tường/Sàn.";
             if (placements.Count == 0)
             {
-                previewSummary += " " + WhyNothing(hostCandidatesAll, mepElements.Count, config);
+                previewSummary += " " + WhyNothing(hostCandidatesAll, mepElements.Count, skippedExisting, config);
             }
 
             var preview = CommandResult.Ok(previewSummary, placements.Count);
@@ -275,11 +282,16 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         {
             // Con số 0 trơ trọi khiến người dùng tưởng model không có giao cắt. Nói ngay trong Summary
             // vì báo cáo batch chỉ in Summary — Messages không lọt tới mắt người đọc báo cáo.
-            summary += " " + WhyNothing(hostCandidatesAll, mepElements.Count, config);
+            summary += " " + WhyNothing(hostCandidatesAll, mepElements.Count, skippedExisting, config);
         }
         if (placedOnLink > 0)
         {
             summary += $" Trong đó {placedOnLink} cái bám tường/sàn của model liên kết nên đặt tự do (không host được vào link).";
+        }
+
+        if (skippedExisting > 0 && placed > 0)
+        {
+            summary += $" Bỏ qua, đã có sleeve: {skippedExisting} vị trí.";
         }
 
         var result = CommandResult.Ok(summary, placed).WithChanged(placedIds);
@@ -294,10 +306,17 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
     /// Một câu ngắn giải thích vì sao không đặt được cái nào — ghép thẳng vào Summary. Báo cáo batch chỉ
     /// in Summary, nên lời giải thích nằm trong Messages là lời giải thích không ai đọc.
     /// </summary>
-    private static string WhyNothing(List<HostCandidate> hosts, int mepCount, SleeveConfig config)
+    private static string WhyNothing(List<HostCandidate> hosts, int mepCount, int skippedExisting, SleeveConfig config)
     {
         var inDocument = hosts.Count(h => h.Transform == null);
         var inLinks = hosts.Count - inDocument;
+
+        // Chạy lại lần hai là trường hợp phổ biến nhất của "0 sleeve" — và nó KHÔNG phải "không có giao
+        // cắt". Nói đúng chuyện đang xảy ra, vì đây cũng là bằng chứng lần trước đã ghi thật.
+        if (skippedExisting > 0)
+        {
+            return $"Bỏ qua, đã có sleeve: {skippedExisting} vị trí.";
+        }
 
         if (hosts.Count == 0)
         {

@@ -19,7 +19,10 @@
     "model mẫu không có family hanger/sleeve chuyên dụng nào; phần được kiểm ở đây là đường ghi, không",
     "phải tính đúng đắn của loại family.",
     "",
-    "tìm thấy giao cắt nào nên cả hai lần đều 'đã đặt 0 sleeve'. Chỉ cặp HangerAuto (1120 → 0) là bằng chứng."
+    "",
+    "Bộ này chạy trên bản chép KÈM CÁC MODEL LIÊN KẾT (script chép cả sáu file Snowdon cạnh nhau, giữ",
+    "nguyên tên gốc). Không có bước đó thì link lưu theo đường dẫn tương đối không giải được, SleeveAuto",
+    "không thấy tường nào và ca kiểm xanh vô nghĩa — xem docs/bang-chung-test.md §14."
   ],
   "cases": [
     {
@@ -70,7 +73,7 @@
       }
     },
     {
-      "name": "Sleeve — bản chép mất link, lệnh phải NÓI RA thay vì báo 0 trơ trọi",
+      "name": "Đặt sleeve — GHI THẬT (tường ở model liên kết)",
       "command": "SleeveAuto",
       "allowWrite": true,
       "config": {
@@ -82,9 +85,10 @@
       },
       "expect": {
         "success": true,
-        "maxAffected": 0,
+        "minAffected": 1,
         "summaryContains": [
-          "Không có tường/sàn nào để xét"
+          "Đã đặt",
+          "model liên kết"
         ],
         "summaryNotContains": [
           "Xem trước"
@@ -94,10 +98,10 @@
         ],
         "maxMs": 300000
       },
-      "//": "Bo ghi that chay tren BAN CHEP dat o thu muc ket qua; link cua Snowdon luu theo duong dan tuong doi nen canh ban chep khong co file kien truc — Revit khong giai duoc link. Day la gioi han cua bo test, khong phai loi lenh. Cai ca nay kiem: gap tinh huong do lenh phai noi ro 'khong co tuong/san nao de xet', chu khong tra so 0 tron troi de nguoi doc tuong model khong co giao cat. Duong ghi that cua SleeveAuto van la NO — can model co link giai duoc."
+      "//": "Chay duoc tu khi script chep ca model LIEN KET canh ban chep (giu nguyen ten goc) — truoc do link khong giai duoc tu vi tri ban chep nen lenh khong thay tuong nao. 334 sleeve nay deu bam tuong/san cua link nen dat tu do: Revit khong cho family instance bam mat phan tu cua link."
     },
     {
-      "name": "Sleeve lần hai — vẫn nói ra lý do, không ném",
+      "name": "Đặt sleeve lần hai — phải 0 cái, tất cả đã có",
       "command": "SleeveAuto",
       "allowWrite": true,
       "config": {
@@ -107,15 +111,16 @@
           "Pipes"
         ]
       },
-      "//": "Cung ly do voi ca tren.",
+      "//": "Bang chung lan mot DA COMMIT: neu transaction bi rollback thi sleeve khong ton tai va lan hai lai dat dung ngan ay cai nua. Cau 'Bo qua, da co sleeve' cung chot rang lenh noi DUNG ly do — vong chay 14:59 tung bao 'khong co giao cat nao' trong khi giao cat con nguyen.",
       "expect": {
         "success": true,
         "maxAffected": 0,
         "summaryContains": [
-          "Không có tường/sàn nào để xét"
+          "Bỏ qua, đã có sleeve"
         ],
         "summaryNotContains": [
-          "Xem trước"
+          "Xem trước",
+          "không có giao cắt nào"
         ],
         "neverContains": [
           "Exception"

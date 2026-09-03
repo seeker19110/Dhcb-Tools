@@ -124,12 +124,48 @@ New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
 # Ghi thật thì KHÔNG BAO GIỜ chạy trên file gốc: chép sang thư mục kết quả rồi chạy trên bản chép.
 # Model mẫu nằm trong Program Files, hỏng là phải cài lại Revit — không đáng để tiết kiệm một lần chép.
+#
+# Bản chép phải GIỮ NGUYÊN TÊN và nằm trong thư mục riêng, kèm theo các model được LIÊN KẾT.
+# Lý do (tìm ra 2026-09-03, xem docs/bang-chung-test.md §14): bản trước chép thành "ban-chep-<tên>.rvt"
+# nằm trơ trọi, mà link của Snowdon lưu theo đường dẫn tương đối — cạnh bản chép không có file kiến trúc
+# nên Revit không giải được link. Hệ quả: SleeveAuto không thấy tường nào (tường nằm ở model liên kết),
+# ca kiểm "xanh" với 0 sleeve và không chứng minh được gì.
 if ($AllowWrites) {
-    $copy = Join-Path $outDir ("ban-chep-" + [IO.Path]::GetFileName($Model))
+    $copyDir = Join-Path $outDir 'ban-chep'
+    New-Item -ItemType Directory -Force -Path $copyDir | Out-Null
+
+    $sourceDir = Split-Path -Parent $Model
+    $modelName = [IO.Path]::GetFileName($Model)
+    $copy = Join-Path $copyDir $modelName
+
     Write-Host "== Chép model sang bản chép (ghi thật không đụng file gốc)"
     Copy-Item -LiteralPath $Model -Destination $copy -Force
+    Write-Host "   $copy"
+
+    # Dò tên model được liên kết ngay trong file .rvt: tên file link nằm dưới dạng chuỗi UTF-16.
+    # Thô nhưng đủ và không cần Revit — chỉ chép những file CÓ THẬT cạnh model gốc.
+    $bytes = [IO.File]::ReadAllBytes($Model)
+    $text  = [Text.Encoding]::Unicode.GetString($bytes)
+    $linkNames = [regex]::Matches($text, '[A-Za-z0-9 _\-\.\(\)]{1,80}\.rvt') |
+                 ForEach-Object { $_.Value } |
+                 Where-Object { $_ -ne $modelName } |
+                 Sort-Object -Unique
+
+    $copiedLinks = 0
+    foreach ($name in $linkNames) {
+        $source = Join-Path $sourceDir $name
+        if (Test-Path -LiteralPath $source) {
+            Copy-Item -LiteralPath $source -Destination (Join-Path $copyDir $name) -Force
+            $copiedLinks++
+            Write-Host ("   + link: " + $name)
+        }
+    }
+
+    if ($copiedLinks -eq 0) {
+        Write-Host "   (model này không liên kết model nào cạnh nó)"
+    }
+
     $Model = $copy
-    Write-Host "   $Model"
 }
 
 $job = [ordered]@{

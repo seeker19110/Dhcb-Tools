@@ -179,9 +179,8 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
 ## Việc tiếp theo
 
 1. ~~Đường ghi cho lệnh tạo phần tử mới~~ — xong (§12): chốt bằng tính idempotent thay vì dọn lại.
-   Còn `SleeveAuto`: đã tìm ra vì sao "0 giao cắt" — lệnh không đọc model liên kết (§14, đã sửa, 345
-   sleeve trên model thật). Đường ghi của riêng nó vẫn là nợ vì bộ ghi chạy trên bản chép mà link
-   Snowdon lưu đường dẫn tương đối nên không giải được từ đó.
+   `SleeveAuto` cũng xong trong cùng ngày (§14): sửa lệnh để đọc model liên kết, sửa script để chép
+   luôn model liên kết cạnh bản chép — chuỗi ghi thật **334 → 0** trên model thật.
 2. Một đêm batch thật trên **dự án thật** (không phải file mẫu) để chốt Giai đoạn 1 đầu-cuối.
 3. ~~Gom bảng mã lỗi vào một trang tài liệu~~ — xong: [`ma-loi.md`](ma-loi.md), có test đối chiếu với mã nguồn hai chiều.
 4. Rồi tới **9.4 — đưa cho một nhóm kỹ sư dùng thật**; phản hồi của họ quyết định giai đoạn 10/11 đi sâu vào đâu.
