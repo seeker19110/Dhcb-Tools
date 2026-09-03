@@ -141,6 +141,7 @@ Core/vỏ (kể cả vỏ core-only) trên Linux với API Revit 2025 + AutoCAD 
 | **Đường ghi thật (Revit + AutoCAD)** | 2026-09-03 | **12 đạt / 0 trượt trên 12 ca**, chạy trên bản chép của file mẫu; chuỗi tự chứng minh đã commit thật và tự khôi phục — §11 |
 | **Quét hồi quy sau 10 PR** | 2026-09-03 | **90 đạt / 0 trượt / 1 bỏ qua trên 91 ca**, cả 7 bộ (Revit smoke·mep·plumbing·write·write-mep, AutoCAD smoke·write) — §15 |
 | **`SleeveAuto` đọc model liên kết** | 2026-09-03 | **0 → 345 sleeve** trên Snowdon HVAC (tường nằm ở link kiến trúc); tối ưu hộp bao 49,8 s → **1,2 s**; bộ mep 17/17 — §14 |
+| **Bộ tìm đường `AutoRoute`** | 2026-09-03 | **4049 ms → 10 ms**, 58.720 → 5.783 ô mở rộng trên 550 vật cản (đo bản cũ cạnh bản mới); thất bại nay phân biệt bị bịt kín / hết ngân sách; 7 ca kiểm mới — §19 |
 | **Lệnh chạy nền + `/progress/<id>`** | 2026-09-03 | 202 → `running` → `done`, hỏi lại kết quả không mất; 404/401 đúng — §13 |
 | **Đường ghi cho nhóm lệnh tạo phần tử mới** | 2026-09-03 | **11/11 (kiến trúc) + 4/4 (HVAC)**; `HangerAuto` 1120 → 0 sau khi bổ sung chống trùng; lộ lỗi chặn "batch treo ở hộp thoại cảnh báo lúc mở model" — §12 |
 
@@ -165,8 +166,9 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
 ### Còn mở
 
 - **`AutoRoute` — chất lượng tuyến chưa chứng minh được.** Phần đọc model liên kết đã sửa (§18: vật cản
-  30 → 546), nhưng với vật cản thật thì không ra tuyến giữa hai điểm của ca kiểm: bước 100 mm chạm trần
-  400.000 ô, bước 500 mm báo "không có đường đi". Giữ nhãn *thử nghiệm*, nay có số liệu làm căn cứ.
+  30 → 546); bộ tìm đường cũng đã vá ba lỗi đo được (§19: chậm, heuristic mù hướng, thất bại câm —
+  4049 ms → 10 ms trên 550 vật cản). Nhưng **tuyến đi có đúng chỗ không thì vẫn phải người có nghề nhìn**,
+  và chưa chạy lại trên Snowdon HVAC sau bản vá. Giữ nhãn *thử nghiệm*.
 - **Chưa kiểm thử trên Revit/AutoCAD thật** cho toàn bộ lệnh — chỉ mới biên dịch với API package. Rủi ro cao nhất theo thứ tự:
   `RouteFromLines` và `PipeKick` (fitting/cút 45° phụ thuộc routing preference), `AutoRoute` (thời gian A* với bước 100 mm
   trên hộp lớn), `TransferStandards` (LineStyles/ObjectStyles không copy được qua API — đã ghi rõ trong Messages),
