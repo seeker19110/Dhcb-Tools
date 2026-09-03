@@ -1,6 +1,8 @@
 ﻿using System.IO;
 using Autodesk.Revit.ApplicationServices;
 using Autodesk.Revit.DB.Events;
+using Autodesk.Revit.UI;
+using Autodesk.Revit.UI.Events;
 using DhcbTools.Core;
 using DhcbTools.Core.Batch;
 using DhcbTools.Shared.Logic.Batch;
@@ -41,6 +43,18 @@ internal static class BatchStartupHook
         // Bắt ở mức Application là chỗ duy nhất phủ được cả những transaction không phải của mình.
         application.FailuresProcessing += OnFailuresProcessing;
 
+        // FailuresProcessing chỉ bắt cảnh báo/lỗi trong transaction — nó KHÔNG bắt TaskDialog mà Revit
+        // tự bật thẳng lúc mở file, ví dụ hộp thoại nâng cấp phiên bản "Some annotations, schedules...
+        // related to analytical elements might be modified or lost during the upgrade process." Đây là
+        // dạng lỗi chặn thứ hai cùng họ với FailuresProcessing (xem chú thích trên) nhưng khác cơ chế:
+        // batch treo im re, CPU về 0, không log nào ghi, tới khi hết --max-minutes mới chết — lộ ra khi
+        // chạy trên một file .rvt R19 thật (2019) được Revit 2024 nâng cấp lúc mở, có phần tử kết cấu
+        // dạng analytical. UIApplication.DialogBoxShowing bắt được cả TaskDialog lẫn dialog kiểu cũ;
+        // dựng UIApplication từ chính Application vì hook chỉ nhận được Application (không phải
+        // UIControlledApplication) từ ApplicationInitialized.
+        var uiApplication = new UIApplication(application);
+        uiApplication.DialogBoxShowing += OnDialogBoxShowing;
+
         try
         {
             var request = JObject.Parse(File.ReadAllText(PendingPath));
@@ -71,6 +85,7 @@ internal static class BatchStartupHook
         finally
         {
             application.FailuresProcessing -= OnFailuresProcessing;
+            uiApplication.DialogBoxShowing -= OnDialogBoxShowing;
 
             // Lỗi vận hành nghiêm trọng đã sửa: TryDelete cũ chỉ bắt IOException — nếu pending-job.json
             // không xoá được (khoá bởi AV, sync OneDrive…), lần mở Revit tương tác kế tiếp sẽ ÂM THẦM
@@ -94,6 +109,28 @@ internal static class BatchStartupHook
         var accessor = e.GetFailuresAccessor();
         var result = new SilentFailuresPreprocessor(FailurePolicy.Silent).PreprocessFailures(accessor);
         e.SetProcessingResult(result);
+    }
+
+    /// <summary>
+    /// Đóng thay mọi TaskDialog/hộp thoại Revit tự bật ngoài transaction — batch không có ai bấm nút.
+    /// Ghi lại vào <see cref="CoreContext.SuppressedWarnings"/> (cùng chỗ với cảnh báo bị nuốt ở
+    /// <see cref="OnFailuresProcessing"/>) nên vẫn hiện trong <c>CommandResult</c> của lệnh chạy kế tiếp,
+    /// không biến mất lặng lẽ. TaskDialog dùng <see cref="TaskDialogResult.Close"/>; dialog kiểu cũ
+    /// (không phải TaskDialog) dùng mã IDOK=1 — cả hai chỉ nhằm mục đích thoát khỏi màn hình chờ, không
+    /// tác động dữ liệu vì phiên batch luôn đóng file bằng <c>doc.Close(false)</c> hoặc chỉ lưu bản chép.
+    /// </summary>
+    private static void OnDialogBoxShowing(object? sender, DialogBoxShowingEventArgs e)
+    {
+        if (e is TaskDialogShowingEventArgs taskDialog)
+        {
+            CoreContext.SuppressedWarnings.Add(
+                $"[Hộp thoại tự đóng] TaskDialog \"{taskDialog.DialogId}\": {taskDialog.Message}");
+            e.OverrideResult((int)TaskDialogResult.Close);
+            return;
+        }
+
+        CoreContext.SuppressedWarnings.Add($"[Hộp thoại tự đóng] {e.DialogId}");
+        e.OverrideResult(1); // IDOK — thoát màn hình chờ, không có gì để lưu nên không rủi ro dữ liệu.
     }
 
     /// <summary>Đổi tên <c>pending-job.json</c> thành <c>.done</c> rồi xoá — không để nó sống sót sang phiên sau.</summary>

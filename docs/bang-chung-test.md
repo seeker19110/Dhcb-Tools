@@ -917,3 +917,111 @@ kín") coi như đã chứng minh xong: không phải giới hạn của bộ t�
 **Việc còn lại của `AutoRoute` không còn là hiệu năng.** Là chọn được hai điểm nằm trong cùng khoang trần
 kỹ thuật — việc của người có nghề, hoặc của một lớp chọn điểm mà bộ công cụ chưa có. Nhãn *thử nghiệm*
 giữ nguyên vì lý do đó, không còn vì chậm.
+
+## 20. Đêm batch thật đầu tiên trên dự án thật — GOLDVIEW TTTM, và hộp thoại thứ hai chưa ai bắt được (2026-09-04 00:35 ICT)
+
+Việc #2 còn treo từ đầu roadmap: "một đêm batch thật trên dự án thật (không phải file mẫu)". Có đường dẫn
+thật — 9 file `.rvt` Revit 2019 (R19) của một trung tâm thương mại, 4 file kiến trúc (00 GRL + 01–04, mỗi
+file 7–23 MB) và 4 file MEP (05–08, mỗi file 139–176 MB), tổng ~700 MB.
+
+### Lộ ra ngay: hộp thoại thứ hai mà §12 chưa bắt được
+
+Job đầu tiên (10 bước chỉ đọc/xem trước mỗi file — `HealthReport`, `WarningsExport`, `FamilyAudit`,
+`StylePurge` (dryRun), `ScheduleExport`, và với file MEP thêm `ConnectorChecker`, `SlopePipes`,
+`SystemBom`, `SizingProposal`, `ClashDetection`; `saveMode: "None"` — không đụng file gốc) treo **43 phút
+không nhúc nhích** ngay ở file kiến trúc thứ ba. CPU đo được gần như 0 trong 5 giây (0,02 s/5 s) — không
+phải đang xử lý, đang **chờ người bấm nút**.
+
+Journal của Revit (`%APPDATA%\DHCB\dhcb-batch.txt` → journal thật ghi ở `%APPDATA%\Roaming\DHCB\`) chỉ ra
+đúng chỗ đứng, cùng kỹ thuật đã dùng ở §7/§12:
+
+```
+' 4:< TaskDialog "Some annotations, schedules, view templates, filters, and views related to analytical
+elements might be modified or lost during the upgrade process."
+'Id : TaskDialog_Views_Related_To_Analytical_Changed
+'CommonButtons : Close
+'DefaultButton : Close
+'C ...;   4:< License Idle: Enter
+```
+
+Đây là **hộp thoại nâng cấp phiên bản** — Revit tự bật khi mở một file cũ (2019) có phần tử kết cấu dạng
+analytical, cảnh báo view/schedule/filter liên quan có thể đổi. Khác hẳn loại lỗi ở §12
+(`Application.FailuresProcessing` bắt cảnh báo/lỗi *trong* transaction): đây là `TaskDialog` Revit tự bật
+**ngoài** mọi transaction, lúc mở file, nên preprocessor cũ không chạm tới. Batch đứng chờ tới hết
+`--max-minutes` mới chết — đúng hình dạng lỗi của §12, khác cơ chế.
+
+### Sửa: `UIApplication.DialogBoxShowing` đăng ký cho cả phiên batch
+
+Cùng khuôn với `OnFailuresProcessing` (đăng ký ở mức `Application`, gỡ ở `finally`), thêm
+`UIApplication.DialogBoxShowing` — bắt được cả `TaskDialog` lẫn hộp thoại kiểu cũ. Hook chỉ nhận được
+`Application` (không phải `UIControlledApplication`) từ `ApplicationInitialized`, nên dựng
+`new UIApplication(application)` ngay trong hook. `TaskDialogShowingEventArgs` đóng bằng
+`TaskDialogResult.Close`; hộp thoại kiểu cũ (không phải TaskDialog) đóng bằng mã `IDOK=1`. Cả hai chỉ
+nhằm thoát màn hình chờ — phiên batch luôn `doc.Close(false)` hoặc chỉ lưu bản sao, không có gì để hộp
+thoại "chọn sai" làm hỏng. Ghi lại vào `CoreContext.SuppressedWarnings` (chỗ cũ) nên vẫn hiện trong
+`CommandResult` của lệnh chạy kế tiếp — không biến mất lặng lẽ.
+
+`src/DhcbTools.Revit/Batch/BatchStartupHook.cs`, xanh cả `check-build.sh` (2023/2024/2025) lẫn 574 test
+`Shared.Logic`.
+
+### Chạy lại — qua đúng chỗ đứng trong 86 giây thay vì 43 phút
+
+| | Trước vá | Sau vá |
+|---|---|---|
+| File 02 (kiến trúc, chỗ đứng) | 40+ phút, không xong | **86 giây**, xong cả 5 bước |
+
+### Kết quả trên 8/9 file (file 04 xem mục riêng bên dưới)
+
+| File | Cảnh báo | Family | Va chạm Ducts/Pipes × Kết cấu (gồm link) |
+|---|---:|---:|---|
+| 00 GRL | 0 | 87 | — |
+| 01 ARC L01 | 114 | 107 | — |
+| 02 ARC L02 | 273 | 102 | — |
+| 03 ARC L03 | 11 | 102 | — |
+| 05 MEP L01 | 1163 | 206 | 0 — "Không có phần tử nhóm B nào để xét, kể cả trong model liên kết" |
+| 06 MEP L02 | 1524 | 175 | **479**, toàn bộ từ model liên kết |
+| 07 MEP L03 | 1866 | 186 | 0 — cùng lý do như file 05 |
+| 08 MEP L04 | 573 | 236 | **570**, toàn bộ từ model liên kết |
+
+Đáng chú ý: 05 và 07 báo **0 va chạm vì không tìm thấy phần tử nhóm B nào**, kể cả từ link — khác hẳn
+06/08 tìm ra hàng trăm. Đây là câu "0 va chạm" *đáng ngờ* mà `ClashDetection` đã được dạy phải nói rõ
+(§16): không phải mô hình sạch, mà nhiều khả năng thiếu link kết cấu/kiến trúc đã nạp cho hai file đó —
+việc của người phụ trách dự án, không phải lỗi mã nguồn.
+
+### File 04 thất bại — lỗi hạ tầng, không phải lỗi mã nguồn
+
+`04.GOLDVIEW_DD_ARC_LEVEL 04_R19.rvt`: `Open` trả `"Opening was canceled."`. Journal cho thấy central
+model của file này nằm ở `\192.168.1.11\03.The Goldview\...` — **khác** `\192.168.1.101\mep-project\...`
+mà các file khác dùng. Revit thử `fileExists` qua mạng, hết 42 giây, và sau vài lần bật lại đúng cái
+TaskDialog nâng cấp (bị đóng đúng như thiết kế, log ghi rõ `TaskDialog API event result : 8` mỗi lần) rồi
+tự huỷ việc mở. Chạy lại job SaveAs bên dưới **lặp lại đúng lỗi này** — xác nhận đây không liên quan gì
+tới bản vá hộp thoại, mà là máy chủ `192.168.1.11` không với tới được từ máy chạy batch.
+
+### Việc phát sinh: mỗi lần mở file cũ đều trả phí nâng cấp — tạo bản sao 2024 một lần
+
+File 2019 mở trên Revit 2024 tốn 12 giây (GRL nhỏ) tới **841 giây** (MEP L04, 176 MB) chỉ để audit/upgrade
+— và với `saveMode: "None"`, phí này trả lại **từ đầu mỗi lần chạy**. Dựng job riêng
+(`saveMode: "SaveAs"`, `detachFromCentral: true`) mở từng file, lưu bản sao định dạng 2024 vào
+`_upgraded-2024/` cạnh 9 file gốc — **9 file gốc không hề bị đụng tới**.
+
+**8/9 file lưu bản sao thành công** (file 04 lặp lại lỗi mạng ở trên, không lưu được vì không mở được):
+
+| File | Dung lượng bản 2024 |
+|---|---:|
+| 00 GRL | 7,9 MB |
+| 01–03 ARC | 21,2–22,8 MB |
+| 05 MEP L01 | 162,8 MB |
+| 06 MEP L02 | 174,8 MB |
+| 07 MEP L03 | 149,8 MB |
+| 08 MEP L04 | 175,8 MB |
+
+Từ giờ, job trỏ vào `_upgraded-2024/` mở gần như tức thì thay vì trả lại phí audit mỗi lần — việc này chỉ
+đáng làm cho một bộ file dùng lặp lại nhiều lần, không phải cho một lượt chạy một-lần-cho-biết.
+
+### Vẫn không chốt được gì về "batch một đêm" thật sự
+
+Cả hai lượt chạy trên đều làm ban đêm nhưng **chạy tay, không qua Task Scheduler** — `saveMode: "None"`
+với dữ liệu thật thì không có gì cần lưu cả nên đăng ký task đêm cho lượt này không có ý nghĩa. Việc #2 của
+roadmap ("chốt Giai đoạn 1 đầu-cuối") coi như xong phần "chạy được, chạy đúng, không làm hỏng gì trên dữ
+liệu thật" — phần "tự động hoá qua Task Scheduler" vẫn còn nguyên, để dành cho khi có một job thật sự cần
+lặp lại định kỳ (ví dụ chạy `HealthReport`/`WarningsExport`/`ClashDetection` mỗi đêm trên bản `_upgraded-2024/`).
