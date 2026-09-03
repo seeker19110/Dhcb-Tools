@@ -91,6 +91,10 @@ python scripts/dhcb_agent.py revit query snapshot --params '{"imageWidth":1600}'
 Không có gì trong giai đoạn 10 nới lỏng các rào đã có:
 
 - `POST /execute` vẫn ép `dryRun:true` trừ khi có `confirm:true`.
+- Lệnh chạy lâu (`SleeveAuto`, `HangerAuto`, `AutoRoute`): gửi kèm `"async": true`, nhận `202 {id}`, rồi
+  hỏi `GET /progress/<id>` tới khi `status: "done"`. `result` có đúng hình dạng của `/execute` đồng bộ
+  (kèm `changedIds`), nên vòng khép của agent — xem trước → chạy → kiểm lại đúng id → `snapshot` — không
+  phải viết hai đường đọc. Đứt kết nối giữa chừng thì hỏi lại bằng id, kết quả vẫn còn (30 phút).
 - Bridge vẫn bind 127.0.0.1, vẫn cần token, vẫn khoá 5 phút sau 5 lần sai.
 - `snapshot` chỉ đọc và ghi ảnh vào thư mục tạm; không đụng mô hình.
 - `selection`/`show_elements` chỉ đổi lựa chọn trên màn hình, không sửa mô hình, không mở transaction.

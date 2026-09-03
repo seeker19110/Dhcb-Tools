@@ -76,8 +76,13 @@ lưu ở `%APPDATA%\DHCB\configs\revit\<Lệnh>.json` cho lần sau.
 
 Revit `http://127.0.0.1:8765`, AutoCAD `http://127.0.0.1:8766`. Token sinh lần đầu ở `%APPDATA%\DHCB\bridge-token.txt`
 (header `Authorization: Bearer …`, sai 5 lần/60 s → khoá 5 phút). Endpoint: `GET /health`, `GET /tools`,
-`POST /execute`, `POST /query`, `POST /chat` (đề xuất lệnh từ tiếng Việt, không chạy). Lệnh client bỏ đi vì timeout
-**không** được chạy.
+`POST /execute`, `POST /query`, `POST /chat` (đề xuất lệnh từ tiếng Việt, không chạy),
+`GET /progress/<id>`. Lệnh client bỏ đi vì timeout **không** được chạy.
+
+**Lệnh chạy lâu**: gửi `POST /execute` kèm `"async": true` → nhận ngay `202 {id}`, rồi hỏi
+`GET /progress/<id>` tới khi `status` là `done`. Kết quả nằm ở server theo id nên đứt kết nối giữa chừng
+không làm mất kết quả của việc đã chạy xong (giữ 30 phút hoặc 50 lệnh gần nhất). Từ client:
+`python scripts/dhcb_agent.py revit HangerAuto --background …`.
 
 ```bash
 python scripts/dhcb_agent.py revit tools

@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace DhcbTools.Shared.Hosting
@@ -24,6 +24,14 @@ namespace DhcbTools.Shared.Hosting
         /// </summary>
         [JsonProperty("timeoutSeconds")]
         public int? TimeoutSeconds { get; set; }
+
+        /// <summary>
+        /// Chạy nền (giai đoạn 10.5): server trả ngay <c>202</c> kèm <c>id</c>, client hỏi kết quả ở
+        /// <c>GET /progress/&lt;id&gt;</c>. Dành cho lệnh chạy hàng chục giây — giữ một kết nối HTTP suốt
+        /// thời gian đó là mong manh, ngắt giữa chừng là mất kết quả của việc đã chạy xong.
+        /// </summary>
+        [JsonProperty("async")]
+        public bool Async { get; set; }
 
         /// <summary>Config dưới dạng chuỗi JSON ("{}" nếu thiếu) — để vỏ deserialize sang kiểu config cụ thể.</summary>
         public string ConfigJson => Config?.ToString(Formatting.None) ?? "{}";
