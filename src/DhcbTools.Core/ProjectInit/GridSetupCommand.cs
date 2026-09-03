@@ -27,7 +27,7 @@ namespace DhcbTools.Core.ProjectInit
                     foreach (var def in config.Grids)
                     {
                         if (config.SkipExisting && existingNames.Contains(def.Name))
-                        { messages.AppendLine("[Skip] " + def.Name); continue; }
+                        { messages.AppendLine("[Bỏ qua, đã có] " + def.Name); continue; }
 
                         double pos   = RevitCompat.MmToFt(def.PositionMm);
                         double start = RevitCompat.MmToFt(def.StartMm);
@@ -40,15 +40,15 @@ namespace DhcbTools.Core.ProjectInit
                         Grid grid = Grid.Create(doc, line);
                         grid.Name = def.Name;
                         created++;
-                        messages.AppendLine("[Create] Grid: " + def.Name + " (" + def.Orientation + ") @ " + def.PositionMm + " mm");
+                        messages.AppendLine("[Tạo] Trục: " + def.Name + " (" + def.Orientation + ") @ " + def.PositionMm + " mm");
                     }
 
-                    if (config.DryRun) { tx.RollBack(); return CommandResult.Ok("[Dry Run] Would create " + created + " grid(s)." + Environment.NewLine + messages, created); }
+                    if (config.DryRun) { tx.RollBack(); return CommandResult.Ok("[Xem trước] Sẽ tạo " + created + " trục." + Environment.NewLine + messages, created); }
                     tx.Commit();
                 }
-                catch (System.Exception ex) { tx.RollBack(); return CommandResult.Fail("Error: " + ex.Message); }
+                catch (System.Exception ex) { tx.RollBack(); return CommandResult.Fail("Lỗi khi tạo trục, đã hoàn tác: " + ex.Message); }
             }
-            return CommandResult.Ok("Created " + created + " grid(s)." + Environment.NewLine + messages, created);
+            return CommandResult.Ok("Đã tạo " + created + " trục." + Environment.NewLine + messages, created);
         }
     }
 }

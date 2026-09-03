@@ -44,7 +44,10 @@ public class RibbonCoverageTests
         // Các lệnh có cửa sổ/luồng riêng, không đi qua CommandRunner theo tên.
         var handledByDedicatedShell = new HashSet<string>(StringComparer.Ordinal)
         {
-            "RemoveUnusedViews", "BatchExport", "HealthReport", "ProjectInfo",
+            // Chỉ ba lệnh này thật sự có cửa sổ riêng trong src/DhcbTools.Revit/Commands.
+            // ProjectInfo từng nằm ở đây nhưng KHÔNG có vỏ nào cả — miễn trừ sai khiến test báo
+            // "phủ đủ 42/42" trong khi Ribbon chỉ với tới 41 lệnh. Nay nó đi qua CommandRunner.
+            "RemoveUnusedViews", "BatchExport", "HealthReport",
         };
 
         var missing = CommandCatalog.AllFor(CommandCatalog.Revit)

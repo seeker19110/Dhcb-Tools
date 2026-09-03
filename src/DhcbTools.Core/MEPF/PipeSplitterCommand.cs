@@ -27,7 +27,14 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
         double maxSegmentFt = MepLayout.MmToFeet(config.MaxSegmentMm);
 
         // 1. Collect MEP elements
-        var elements = CollectElements(document, config);
+        var unknownCategories = new List<string>();
+        var elements = CollectElements(document, config, unknownCategories);
+        if (unknownCategories.Count > 0)
+        {
+            // Tên category không nhận ra phải báo, không được bỏ im lặng rồi kết luận "model rỗng".
+            return CommandResult.Fail(RevitCompat.UnknownMepCategories(unknownCategories));
+        }
+
         if (elements.Count == 0)
         {
             return CommandResult.Fail("Không có phần tử MEP nào phù hợp để cắt.");
@@ -123,16 +130,8 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private static readonly Dictionary<string, BuiltInCategory> CategoryMap =
-        new Dictionary<string, BuiltInCategory>
-        {
-            { "Duct", BuiltInCategory.OST_DuctCurves },
-            { "Pipe", BuiltInCategory.OST_PipeCurves },
-            { "CableTray", BuiltInCategory.OST_CableTray },
-            { "Conduit", BuiltInCategory.OST_Conduit },
-        };
 
-    private static List<(Element Element, string Category)> CollectElements(Document doc, PipeSplitterConfig config)
+    private static List<(Element Element, string Category)> CollectElements(Document doc, PipeSplitterConfig config, List<string> unknown)
     {
         var result = new List<(Element, string)>();
 
@@ -143,14 +142,16 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
             foreach (var cat in config.Categories)
             {
                 BuiltInCategory bic;
-                if (CategoryMap.TryGetValue(cat, out bic))
+                if (RevitCompat.MepCurveCategories.TryGetValue(cat, out bic))
                     filtered.Add(new KeyValuePair<string, BuiltInCategory>(cat, bic));
+                else
+                    unknown.Add(cat);
             }
             categoriesToSearch = filtered;
         }
         else
         {
-            categoriesToSearch = CategoryMap;
+            categoriesToSearch = RevitCompat.MepCurveCategories;
         }
 
         foreach (var kvp in categoriesToSearch)

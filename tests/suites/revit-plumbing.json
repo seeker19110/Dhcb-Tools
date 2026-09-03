@@ -1,0 +1,135 @@
+{
+  "name": "DHCB — kiểm thử trong Revit (cấp thoát nước)",
+  "model": "Snowdon Towers Sample Plumbing.rvt",
+  "//": [
+    "Bộ thứ ba, thêm 2026-09-03. Lý do tồn tại: model HVAC chỉ có duct, không có ống thoát, nên trên bộ",
+    "revit-mep.json các lệnh về ỐNG chỉ chạy được đường lỗi ('không có ống nào khớp bộ lọc'). Đường",
+    "thành công của chúng nằm ở đây, trên model cấp thoát nước kèm theo Revit.",
+    "Chạy: scripts/run-in-revit-tests.ps1 -Suite plumbing"
+  ],
+  "cases": [
+    {
+      "name": "Kiểm dốc ống thoát",
+      "command": "SlopePipes",
+      "config": {
+        "checkOnly": true
+      },
+      "expect": {
+        "success": true,
+        "summaryContains": [
+          "Kiểm"
+        ],
+        "maxMs": 60000,
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
+      "name": "Xem trước đặt dốc ống",
+      "command": "SlopePipes",
+      "config": {
+        "slopePercent": 2,
+        "checkOnly": false
+      },
+      "expect": {
+        "success": true,
+        "summaryContains": [
+          "Xem trước"
+        ],
+        "maxMs": 60000,
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
+      "name": "Đề xuất kích thước ống",
+      "command": "SizingProposal",
+      "config": {
+        "outputPath": "{outputFolder}/sizing-plumbing.csv"
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 90000,
+        "filesExist": [
+          "{outputFolder}/sizing-plumbing.csv"
+        ]
+      }
+    },
+    {
+      "name": "BOM ống theo hệ",
+      "command": "SystemBom",
+      "config": {
+        "outputPath": "{outputFolder}/bom-plumbing.csv",
+        "stockLengthMm": 6000
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxMs": 90000
+      }
+    },
+    {
+      "name": "Chia ống theo chiều dài cây",
+      "command": "PipeSplitter",
+      "config": {
+        "maxSegmentMm": 6000,
+        "categories": [
+          "Pipes"
+        ]
+      },
+      "expect": {
+        "maxMs": 60000,
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
+      "name": "Tag cao độ ống — xem trước",
+      "command": "ElevationTag",
+      "config": {
+        "categories": [
+          "Pipes"
+        ]
+      },
+      "expect": {
+        "maxMs": 60000,
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
+      "name": "Kiểm connector hở",
+      "command": "ConnectorChecker",
+      "config": {
+        "create3dView": false
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 120000
+      }
+    },
+    {
+      "name": "Báo lỗi rõ khi tên category sai",
+      "command": "PipeSplitter",
+      "config": {
+        "maxSegmentMm": 6000,
+        "categories": [
+          "Ong nuoc"
+        ]
+      },
+      "//": "Ten category go sai truoc day bi BO IM LANG roi lenh ket luan 'khong co phan tu nao' — khong phan biet duoc voi model rong that. Nay phai liet ke ten hop le.",
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "Không nhận ra category",
+          "Pipes"
+        ],
+        "maxMs": 60000
+      }
+    }
+  ]
+}

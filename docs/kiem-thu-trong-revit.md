@@ -43,10 +43,17 @@ Có sẵn hai bộ:
 
 | Bộ | Model mẫu | Phủ |
 |---|---|---|
-| [`revit-smoke.json`](../tests/suites/revit-smoke.json) | Snowdon Towers Sample Architectural | Health, tham số, cảnh báo, family, view/sheet, style, schedule |
-| [`revit-mep.json`](../tests/suites/revit-mep.json) | Snowdon Towers Sample HVAC | Connector, sleeve, cao độ, hanger, chia ống, sizing, BOM, dốc ống, clash |
+| [`revit-smoke.json`](../tests/suites/revit-smoke.json) | Snowdon Towers Sample Architectural | Health, tham số, cảnh báo, family, view/sheet, style, schedule, xuất bản vẽ, khởi tạo dự án, kiểm tra, AI offline |
+| [`revit-mep.json`](../tests/suites/revit-mep.json) | Snowdon Towers Sample HVAC | Connector, sleeve, cao độ, hanger, chia ống, routing, sizing, BOM, kick, clash |
+| [`revit-plumbing.json`](../tests/suites/revit-plumbing.json) | Snowdon Towers Sample Plumbing | Dốc ống, sizing ống, BOM ống, chia ống, cao độ ống |
 
-Cả hai model đều đi kèm Revit (`C:\Program Files\Autodesk\Revit 2024\Samples`), nên không cần chuẩn bị gì thêm.
+Hai bộ cộng lại phủ **đủ 42/42 lệnh Revit** — `SuiteCoverageTests` (chạy trên CI, không cần Revit) đỏ ngay
+khi thêm lệnh mới mà quên ca kiểm, nên con số này không trôi khỏi tài liệu được nữa.
+
+Cả ba model đều đi kèm Revit (`C:\Program Files\Autodesk\Revit 2024\Samples`), nên không cần chuẩn bị gì thêm.
+
+Bộ thứ ba có lý do rõ ràng: model HVAC chỉ có duct, nên trên đó `SlopePipes` và các lệnh về **ống** chỉ chạy
+được đường lỗi ("không có ống nào khớp bộ lọc"). Đường thành công của chúng cần model cấp thoát nước.
 
 ```json
 {
@@ -62,7 +69,15 @@ Cả hai model đều đi kèm Revit (`C:\Program Files\Autodesk\Revit 2024\Samp
 }
 ```
 
-Token `{outputFolder}`, `{fileName}`, `{yyyy-MM-dd}` giống hệt file job của batch runner.
+Token `{outputFolder}`, `{fileName}`, `{yyyy-MM-dd}` giống hệt file job của batch runner, cộng thêm
+`{suiteFolder}` — thư mục chứa chính file bộ ca kiểm. Lệnh cần file đầu vào (CSV trục/level, CSV sheet,
+thuyết minh…) đọc từ [`tests/suites/fixtures/`](../tests/suites/fixtures/) qua token này, thay vì viết
+đường dẫn tuyệt đối chỉ đúng trên một máy.
+
+Ca của lệnh cần đầu vào còn có thể **dùng lại kết quả của ca trước**: `ParameterImport` đọc chính file
+`{outputFolder}/doors.csv` mà `ParameterExport` vừa ghi, và `ApplySizing` đọc `sizing.csv` của
+`SizingProposal`. Vòng tròn xuất → nhập phải là **không đổi ô nào** (`maxAffected: 0`) — đó là chốt chặn
+cho lỗi đã sửa ở PR #29, khi `ParameterImport` ghi đè mọi ô vì coi giá trị giống hệt là "đã đổi".
 
 ### Kỳ vọng
 

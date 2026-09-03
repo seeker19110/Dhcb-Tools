@@ -29,7 +29,17 @@ namespace DhcbTools.Shared.Logic.Batch
             sb.Append("NETLOAD \"").Append(Escape(pluginDllPath)).Append("\"\n");
             foreach (var stepPath in stepJsonPaths)
             {
-                sb.Append("DHCB_RUN \"").Append(Escape(stepPath)).Append("\" \"").Append(Escape(runLogPath)).Append("\" \"").Append(Escape(sourceFile)).Append("\"\n");
+                // MỖI THAM SỐ MỘT DÒNG. Trong script AutoCAD, một dòng = một lần Enter, tức một câu trả
+                // lời cho một prompt; DHCB_RUN hỏi ba lần (step JSON, run.jsonl, file nguồn). Bản cũ viết
+                // cả ba trên cùng một dòng nên toàn bộ phần còn lại của dòng bị nuốt vào prompt ĐẦU TIÊN,
+                // accoreconsole báo "The filename, directory name, or volume label syntax is incorrect"
+                // và batch AutoCAD chưa từng chạy trọn một lần nào. Lộ ra khi chạy thật trên AutoCAD 2026
+                // ngày 2026-09-03 — cùng họ với lỗi journal của Revit ở giai đoạn 8.4.
+                // Không bọc nháy: GetString(AllowSpaces = true) nhận nguyên dòng, nháy sẽ thành ký tự thật.
+                sb.Append("DHCB_RUN\n");
+                sb.Append(Escape(stepPath)).Append('\n');
+                sb.Append(Escape(runLogPath)).Append('\n');
+                sb.Append(Escape(sourceFile)).Append('\n');
             }
 
             if (!string.IsNullOrEmpty(plotScript))

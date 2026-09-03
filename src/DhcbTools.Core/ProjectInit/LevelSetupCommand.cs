@@ -35,13 +35,13 @@ namespace DhcbTools.Core.ProjectInit
                     foreach (var def in config.Levels)
                     {
                         if (config.SkipExisting && existingNames.Contains(def.Name))
-                        { messages.AppendLine("[Skip] " + def.Name); continue; }
+                        { messages.AppendLine("[Bỏ qua, đã có] " + def.Name); continue; }
 
                         double elevFeet = RevitCompat.MmToFt(def.ElevationMm);
                         Level level = Level.Create(doc, elevFeet);
                         level.Name = def.Name;
                         created++;
-                        messages.AppendLine("[Create] Level: " + def.Name + " @ " + def.ElevationMm + " mm");
+                        messages.AppendLine("[Tạo] Tầng: " + def.Name + " @ " + def.ElevationMm + " mm");
 
                         if (def.CreateFloorPlan && floorPlanVft != null)
                         {
@@ -59,12 +59,12 @@ namespace DhcbTools.Core.ProjectInit
                         }
                     }
 
-                    if (config.DryRun) { tx.RollBack(); return CommandResult.Ok("[Dry Run] Would create " + created + " level(s)." + Environment.NewLine + messages, created); }
+                    if (config.DryRun) { tx.RollBack(); return CommandResult.Ok("[Xem trước] Sẽ tạo " + created + " tầng." + Environment.NewLine + messages, created); }
                     tx.Commit();
                 }
-                catch (System.Exception ex) { tx.RollBack(); return CommandResult.Fail("Error: " + ex.Message); }
+                catch (System.Exception ex) { tx.RollBack(); return CommandResult.Fail("Lỗi khi tạo tầng, đã hoàn tác: " + ex.Message); }
             }
-            return CommandResult.Ok("Created " + created + " level(s)." + Environment.NewLine + messages, created);
+            return CommandResult.Ok("Đã tạo " + created + " tầng." + Environment.NewLine + messages, created);
         }
     }
 }

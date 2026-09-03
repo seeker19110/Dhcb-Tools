@@ -120,12 +120,24 @@ public sealed class DhcbCommands
         var dryResult = ed.GetKeywords(dryOpt);
         var isDryRun = dryResult.Status != PromptStatus.OK || dryResult.StringResult != "Thật";
 
+        // Purge sâu (text style / dim style / regapp) hỏi riêng: đây là nhóm dễ làm hỏng bản vẽ nhất
+        // nếu bản vẽ có XData của add-in khác, nên mặc định TẮT thay vì lặng lẽ bật.
+        var deepOpt = new PromptKeywordOptions("\nPurge sâu text style/dim style/regapp [Có/Không] <Không>: ");
+        deepOpt.Keywords.Add("Có");
+        deepOpt.Keywords.Add("Không");
+        deepOpt.AllowNone = true;
+        var deepResult = ed.GetKeywords(deepOpt);
+        var deep = deepResult.Status == PromptStatus.OK && deepResult.StringResult == "Có";
+
         var config = new CleanupConfig
         {
             DryRun = isDryRun,
             RemoveEmptyLayers = true,
             PurgeUnusedBlocks = true,
             PurgeUnusedLinetypes = true,
+            PurgeUnusedTextStyles = deep,
+            PurgeUnusedDimStyles = deep,
+            PurgeRegApps = deep,
         };
 
         var command = new DrawingCleanupCommand();

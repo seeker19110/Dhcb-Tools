@@ -41,7 +41,7 @@ src/
 scripts/  dhcb_agent.py · dhcb_mcp_server.py · dhcb_ai.py · install-nightly-task.ps1 · check-build.sh
 jobs/     nightly.sample.json · autocad-nightly.sample.json
 configs/  parameter-rules · layer-rules · ai · settings (mẫu)
-tests/    DhcbTools.Shared.Logic.Tests (345 test, chạy trên CI Linux)
+tests/    DhcbTools.Shared.Logic.Tests (481 test, chạy trên CI Linux) + suites/ (ca kiểm chạy trong Revit)
 ```
 
 ## Lệnh
@@ -188,7 +188,7 @@ Tra không ra thì lệnh **báo lỗi `E-PARAM-MISSING` kèm danh sách tên đ
 Toàn bộ giai đoạn 0–5, 6.1/6.2 của [`docs/dac-ta-tinh-nang.md`](docs/dac-ta-tinh-nang.md) và P1 giai đoạn 7
 ([`docs/nghien-cuu-tool-thi-truong-va-ke-hoach.md`](docs/nghien-cuu-tool-thi-truong-va-ke-hoach.md) — khoảng trống so với
 pyRevit, DiRoots, Ideate, Colour Splasher, LAYTRANS, Drawing Compare, RevitBatchProcessor) đã có mã nguồn, biên dịch xanh
-với API Revit 2023/2024/2025 và AutoCAD 2024/2025, 345 test thuần xanh. P2 giai đoạn 7 (ống dốc, kick, BOM spool, AutoRoute,
+với API Revit 2023/2024/2025 và AutoCAD 2024/2025, 481 test thuần xanh. P2 giai đoạn 7 (ống dốc, kick, BOM spool, AutoRoute,
 ScheduleExport, ViewportCopy, vỏ AutoCAD core-only) cũng đã có mã nguồn. **Chưa kiểm thử trên Revit/AutoCAD thật** cho
 các lệnh mới — kịch bản ở [`docs/dac-ta-kiem-thu.md`](docs/dac-ta-kiem-thu.md) §4. Chi tiết và lỗi còn mở:
 [`docs/progress.md`](docs/progress.md) · lộ trình: [`docs/roadmap.md`](docs/roadmap.md).

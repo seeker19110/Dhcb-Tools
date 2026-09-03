@@ -1,12 +1,16 @@
 {
-  "name": "DHCB — kiểm thử trong Revit (smoke)",
+  "name": "DHCB — kiểm thử trong Revit (model kiến trúc)",
   "model": "Snowdon Towers Sample Architectural.rvt",
   "//": [
     "Bộ ca kiểm chạy BÊN TRONG Revit qua lệnh RunTests (giai đoạn 8.3).",
     "Mọi ca mặc định bị ép dryRun=true nên chạy bao nhiêu lần trên model mẫu cũng không làm bẩn nó.",
-    "Chạy: DhcbTools.BatchRunner.exe --job jobs/in-revit-tests.json --log-dir D:/DHCB/logs",
+    "Chạy: scripts/run-in-revit-tests.ps1 -Suite smoke",
     "Kỳ vọng viết theo kiểu khai báo (đạt/ít nhất N/chứa chuỗi) thay vì so file vàng, để đổi model mẫu",
-    "không làm đỏ hàng loạt. Ngưỡng maxMs là lưới bắt hồi quy hiệu năng — SleeveAuto từng vượt 30 s."
+    "không làm đỏ hàng loạt. Ngưỡng maxMs là lưới bắt hồi quy hiệu năng — SleeveAuto từng vượt 30 s.",
+    "Bộ này phủ nhóm lệnh chạy được trên model KIẾN TRÚC; nhóm MEPF nằm ở revit-mep.json.",
+    "Token {suiteFolder} trỏ tới thư mục chứa chính file này, dùng cho fixtures/ và configs/.",
+    "Ca 'báo lỗi rõ' là có chủ ý: nhiều lỗi của dự án này là NO-OP IM LẶNG (báo thành công mà không",
+    "làm gì), nên đường lỗi cũng phải được chốt chặn chứ không chỉ đường thành công."
   ],
   "cases": [
     {
@@ -43,6 +47,25 @@
         "filesExist": [
           "{outputFolder}/doors.csv"
         ]
+      }
+    },
+    {
+      "name": "Nhập lại chính CSV vừa xuất — phải không đổi ô nào",
+      "command": "ParameterImport",
+      "config": {
+        "inputPath": "{outputFolder}/doors.csv"
+      },
+      "//": "Vong tron xuat -> nhap phai la no-op. Chot chan cho loi da sua o PR #29: ParameterImport tung ghi de MOI o vi coi gia tri giong het la 'da doi'.",
+      "expect": {
+        "success": true,
+        "maxAffected": 0,
+        "summaryContains": [
+          "Xem trước"
+        ],
+        "messagesContain": [
+          "giữ nguyên"
+        ],
+        "maxMs": 60000
       }
     },
     {
@@ -89,7 +112,7 @@
       "config": {
         "category": "Doors",
         "prefix": "D-",
-        "digits": 3
+        "padWidth": 3
       },
       "expect": {
         "success": true,
@@ -123,14 +146,14 @@
         "parameterName": "Mark",
         "dryRun": true
       },
+      "//": "Chay trong batch thi khong co view dang mo, nen lenh nay PHAI bao loi ro rang thay vi am tham khong lam gi. Vong kiem thu that dau tien (2026-09-03) bat duoc dung tinh huong nay. Muon to mau that trong batch thi truyen viewName cu the.",
       "expect": {
         "success": false,
         "summaryContains": [
           "view"
         ],
         "maxMs": 60000
-      },
-      "//": "Chay trong batch thi khong co view dang mo, nen lenh nay PHAI bao loi ro rang thay vi am tham khong lam gi. Vong kiem thu that dau tien (2026-09-03) bat duoc dung tinh huong nay. Muon to mau that trong batch thi truyen viewName cu the."
+      }
     },
     {
       "name": "Xem trước purge style",
@@ -156,14 +179,299 @@
       }
     },
     {
-      "name": "Kiểm connector hở",
-      "command": "ConnectorChecker",
+      "name": "Xem trước xuất bản vẽ",
+      "command": "BatchExport",
       "config": {
+        "outputFolder": "{outputFolder}/export",
+        "formats": [
+          "Pdf"
+        ]
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "summaryContains": [
+          "Xem trước"
+        ],
+        "maxMs": 60000
+      }
+    },
+    {
+      "name": "Xem trước ghi thông tin dự án",
+      "command": "ProjectInfo",
+      "config": {
+        "projectName": "DHCB-TEST — không được ghi thật",
+        "projectNumber": "DHCB-000"
+      },
+      "//": "ProjectInfoConfig truoc day KHONG co truong DryRun, nen khoa ep dryRun cua bo test khong co tac dung va lenh ghi thang vao model mau. CatalogFieldTests nay chot chan.",
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "summaryContains": [
+          "Xem trước"
+        ],
+        "maxMs": 60000
+      }
+    },
+    {
+      "name": "Xem trước tạo tầng",
+      "command": "LevelSetup",
+      "config": {
+        "levels": [
+          {
+            "name": "DHCB-TEST-L1",
+            "elevationMm": 0
+          },
+          {
+            "name": "DHCB-TEST-L2",
+            "elevationMm": 3600
+          }
+        ]
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 60000,
+        "neverContains": [
+          "Exception"
+        ],
+        "summaryContains": [
+          "Xem trước"
+        ]
+      }
+    },
+    {
+      "name": "Xem trước tạo trục",
+      "command": "GridSetup",
+      "config": {
+        "grids": [
+          {
+            "name": "DHCB-TEST-1",
+            "positionMm": 0,
+            "orientation": "Vertical"
+          },
+          {
+            "name": "DHCB-TEST-A",
+            "positionMm": 0,
+            "orientation": "Horizontal"
+          }
+        ]
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 60000,
+        "neverContains": [
+          "Exception"
+        ],
+        "summaryContains": [
+          "Xem trước"
+        ]
+      }
+    },
+    {
+      "name": "Xem trước dựng trục/tầng từ CSV",
+      "command": "GridFromCsv",
+      "config": {
+        "gridCsvPath": "{suiteFolder}/fixtures/grids.csv",
+        "levelCsvPath": "{suiteFolder}/fixtures/levels.csv"
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "summaryContains": [
+          "Xem trước"
+        ],
+        "maxMs": 60000
+      }
+    },
+    {
+      "name": "Xem trước tạo sheet hàng loạt",
+      "command": "SheetBatchCreate",
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/sheets.csv"
+      },
+      "expect": {
+        "success": true,
+        "summaryContains": [
+          "Xem trước"
+        ],
+        "maxMs": 60000
+      }
+    },
+    {
+      "name": "Kiểm tra tham số theo bộ quy tắc",
+      "command": "ParameterRuleCheck",
+      "config": {
+        "rulesPath": "{suiteFolder}/../../configs/parameter-rules.sample.json",
+        "outputPath": "{outputFolder}/rule-check.html",
+        "create3dView": false
+      },
+      "//": "Dung luon file mau ship kem repo — the la kiem ca tinh hop le cua file mau do.",
+      "expect": {
+        "success": true,
+        "maxMs": 120000,
+        "filesExist": [
+          "{outputFolder}/rule-check.html"
+        ]
+      }
+    },
+    {
+      "name": "Dò va chạm nội bộ (kiến trúc)",
+      "command": "ClashDetection",
+      "config": {
+        "categoriesA": [
+          "Walls"
+        ],
+        "categoriesB": [
+          "Doors"
+        ],
+        "outputPath": "{outputFolder}/clash-arch.html",
         "create3dView": false
       },
       "expect": {
         "success": true,
-        "maxMs": 120000
+        "maxMs": 180000,
+        "filesExist": [
+          "{outputFolder}/clash-arch.html"
+        ]
+      }
+    },
+    {
+      "name": "Gợi ý map layer CAD → type Revit",
+      "command": "CadLayerMap",
+      "config": {
+        "layersCsvPath": "{suiteFolder}/fixtures/cad-layers.csv",
+        "outputPath": "{outputFolder}/layer-map.csv",
+        "useOllama": false
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxMs": 60000,
+        "filesExist": [
+          "{outputFolder}/layer-map.csv"
+        ]
+      }
+    },
+    {
+      "name": "Trích cao độ tầng từ thuyết minh",
+      "command": "SpecToConfig",
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/spec.md",
+        "outputPath": "{outputFolder}/spec-config.json"
+      },
+      "//": "Fixture co dung 3 tang, nen minAffected=3 bat duoc truong hop bo trich rong ma van bao xanh.",
+      "expect": {
+        "success": true,
+        "minAffected": 3,
+        "maxMs": 60000,
+        "filesExist": [
+          "{outputFolder}/spec-config.json"
+        ]
+      }
+    },
+    {
+      "name": "Tìm tuyến tự động né chướng ngại",
+      "command": "AutoRoute",
+      "config": {
+        "startMm": {
+          "x": 0,
+          "y": 0,
+          "z": 3000
+        },
+        "endMm": {
+          "x": 12000,
+          "y": 6000,
+          "z": 3000
+        },
+        "searchMarginMm": 3000,
+        "buildRoute": false
+      },
+      "//": "Tim duoc tuyen hay khong phu thuoc hinh hoc model mau, nen khong chot success. Cai chot o day la: khong nem, khong chay qua lau, va co bao ly do khi that bai.",
+      "expect": {
+        "success": null,
+        "maxMs": 120000,
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
+      "name": "Báo lỗi rõ khi thiếu thư mục family",
+      "command": "FamilyLoader",
+      "config": {
+        "familyFolder": "{suiteFolder}/fixtures/khong-co-thu-muc-nay"
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "E-PATH-MISSING"
+        ],
+        "maxMs": 60000
+      }
+    },
+    {
+      "name": "Báo lỗi rõ khi thiếu template",
+      "command": "ProjectFromTemplate",
+      "config": {
+        "templatePath": "{suiteFolder}/fixtures/khong-co.rte",
+        "outputPath": "{outputFolder}/khong-bao-gio-tao.rvt"
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "template"
+        ],
+        "maxMs": 60000,
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
+      "name": "Báo lỗi rõ khi thiếu file chuẩn",
+      "command": "TransferStandards",
+      "config": {
+        "sourcePath": "{suiteFolder}/fixtures/khong-co.rvt",
+        "categories": [
+          "ViewTemplates"
+        ]
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "file chuẩn"
+        ],
+        "maxMs": 60000
+      }
+    },
+    {
+      "name": "Báo lỗi rõ khi không có sheet nguồn",
+      "command": "ViewportCopy",
+      "config": {
+        "sourceSheetNumber": "DHCB-KHONG-CO",
+        "targetSheetContains": "A"
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "sheet"
+        ],
+        "maxMs": 60000
+      }
+    },
+    {
+      "name": "Gán revision lên sheet",
+      "command": "RevisionOnSheets",
+      "config": {
+        "revisionSequence": 1
+      },
+      "//": "Model mau co the khong co revision nao; ca nay chot 'khong nem, va neu khong co thi phai noi ro co nhung revision nao' chu khong chot success.",
+      "expect": {
+        "success": null,
+        "maxMs": 60000,
+        "neverContains": [
+          "Exception"
+        ]
       }
     },
     {

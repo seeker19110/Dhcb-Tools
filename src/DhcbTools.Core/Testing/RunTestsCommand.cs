@@ -66,6 +66,11 @@ public sealed class RunTestsCommand : ICoreCommand<RunTestsConfig>
         var outputFolder = ResolveOutputFolder(config);
         var tokens = new JobTokenContext(outputFolder, Path.GetFileNameWithoutExtension(document.PathName ?? string.Empty), DateTime.Now);
 
+        // {suiteFolder} — thư mục chứa chính file bộ test. Nhiều lệnh cần file đầu vào (CSV tham số,
+        // CSV sizing, quy tắc JSON…); không có token này thì bộ test phải viết đường dẫn tuyệt đối của
+        // máy đang chạy, tức là chỉ chạy được trên đúng một máy.
+        tokens.Extra["suiteFolder"] = Path.GetDirectoryName(Path.GetFullPath(config.SuitePath)) ?? ".";
+
         foreach (var testCase in suite.Cases)
         {
             if (only.Count > 0 && !only.Contains(testCase.Command))
@@ -101,15 +106,20 @@ public sealed class RunTestsCommand : ICoreCommand<RunTestsConfig>
 
     private static TestObservation Run(Document document, TestCase testCase, bool allowWrites, JobTokenContext tokens)
     {
-        // Ép dryRun trừ khi ca này khai báo allowWrite VÀ người chạy bật AllowWrites — hai lớp khoá để
-        // một lần chạy test không bao giờ vô tình sửa model mẫu.
-        var config = JObject.Parse(JobTokens.Expand(testCase.Config.ToString(Newtonsoft.Json.Formatting.None), tokens));
-        var write = testCase.AllowWrite && allowWrites;
-        config["dryRun"] = !write;
-
         var stopwatch = Stopwatch.StartNew();
         try
         {
+            // Ép dryRun trừ khi ca này khai báo allowWrite VÀ người chạy bật AllowWrites — hai lớp khoá
+            // để một lần chạy test không bao giờ vô tình sửa model mẫu.
+            // Thay token theo TỪNG giá trị, không phải trên chuỗi JSON đã serialize: đường dẫn Windows
+            // ("C:\Users\...") có "\U" — escape không hợp lệ trong JSON — nên cách cũ làm vỡ cả config.
+            // Cả khối này nằm TRONG try: một ca có config hỏng phải trượt một mình, không được giết
+            // cả lượt chạy (trước đây nó ném ra ngoài Execute và 27 ca còn lại không chạy lần nào).
+            var config = (JObject)testCase.Config.DeepClone();
+            JobTokens.ExpandIn(config, tokens);
+            var write = testCase.AllowWrite && allowWrites;
+            config["dryRun"] = !write;
+
             // Test chạy không người ngồi máy: cảnh báo Revit phải được nuốt có ghi lại, không hiện hộp thoại.
             using var _ = CoreContext.Use(FailurePolicy.SuppressWarnings);
             CoreContext.SuppressedWarnings.Clear();

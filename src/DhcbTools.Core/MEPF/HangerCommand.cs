@@ -25,7 +25,7 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
     public CommandResult Execute(Document document, HangerConfig config)
     {
         // 1. Find hanger FamilySymbol
-        var symbol = FindFamilySymbol(document, config.HangerFamilyName);
+        var symbol = RevitCompat.FindFamilySymbol(document, config.HangerFamilyName);
         if (symbol == null)
         {
             return CommandResult.Fail(
@@ -33,7 +33,12 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
         }
 
         // 2. Collect MEP elements
-        var elements = CollectElements(document, config);
+        var elements = CollectElements(document, config, out var unknownCategories);
+        if (unknownCategories.Count > 0)
+        {
+            return CommandResult.Fail(RevitCompat.UnknownMepCategories(unknownCategories));
+        }
+
         if (elements.Count == 0)
         {
             return CommandResult.Fail("Không có phần tử MEP nào phù hợp với cấu hình.");
@@ -129,22 +134,13 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private static FamilySymbol? FindFamilySymbol(Document doc, string name)
+    private static List<Element> CollectElements(Document doc, HangerConfig config, out List<string> unknown)
     {
-        return new FilteredElementCollector(doc)
-            .OfClass(typeof(FamilySymbol))
-            .Cast<FamilySymbol>()
-            .FirstOrDefault(s =>
-                string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(s.FamilyName, name, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static List<Element> CollectElements(Document doc, HangerConfig config)
-    {
+        unknown = new List<string>();
         var result = new List<Element>();
         bool filterCat = config.Categories != null && config.Categories.Count > 0;
 
-        var categories = filterCat && config.Categories != null ? FilterCategories(config.Categories) : DefaultCategories;
+        var categories = filterCat && config.Categories != null ? FilterCategories(config.Categories, out unknown) : DefaultCategories;
 
         foreach (var bic in categories)
         {
@@ -165,22 +161,14 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
         return result;
     }
 
-    private static BuiltInCategory[] FilterCategories(List<string> names)
+    /// <summary>
+    /// Đổi tên category thành BuiltInCategory. Tên không nhận ra được trả ra ngoài qua
+    /// <paramref name="unknown"/> — bản trước âm thầm rơi về DefaultCategories, tức là gõ sai một tên
+    /// thì lệnh chạy trên TOÀN BỘ category mà vẫn báo thành công.
+    /// </summary>
+    private static BuiltInCategory[] FilterCategories(List<string> names, out List<string> unknown)
     {
-        var all = new Dictionary<string, BuiltInCategory>
-        {
-            { "Duct", BuiltInCategory.OST_DuctCurves },
-            { "Pipe", BuiltInCategory.OST_PipeCurves },
-            { "CableTray", BuiltInCategory.OST_CableTray },
-            { "Conduit", BuiltInCategory.OST_Conduit },
-        };
-        var result = new List<BuiltInCategory>();
-        foreach (var n in names)
-        {
-            BuiltInCategory bic;
-            if (all.TryGetValue(n, out bic))
-                result.Add(bic);
-        }
+        var result = RevitCompat.ResolveMepCategories(names, out unknown);
         return result.Count > 0 ? result.ToArray() : DefaultCategories;
     }
 
