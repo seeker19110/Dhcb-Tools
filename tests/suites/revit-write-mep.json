@@ -1,0 +1,120 @@
+{
+  "name": "DHCB — đường ghi thật, nhóm lệnh tạo phần tử MEP",
+  "model": "Snowdon Towers Sample HVAC.rvt",
+  "//": [
+    "Bộ ghi thật thứ hai, chạy trên model HVAC (bộ revit-write.json chạy trên model kiến trúc nên",
+    "không có duct/pipe nào để đặt hanger).",
+    "",
+    "Cùng ba lớp khoá: ca khai allowWrite → người chạy bật -AllowWrites → script chạy trên BẢN CHÉP.",
+    "",
+    "Chuỗi tự chứng minh cho nhóm TẠO PHẦN TỬ MỚI: không có phép nghịch đảo để khôi phục, nên dựa vào",
+    "tính idempotent. Đặt hanger lần một ra n > 0; lần hai phải ra 0 và báo 'Bỏ qua, đã có hanger'.",
+    "Số 0 đó chỉ xảy ra khi lần một đã COMMIT thật — transaction bị rollback thì model không có hanger",
+    "nào và lần hai lại đặt đúng n cái nữa.",
+    "",
+    "Chính bộ này là lý do HangerAuto được thêm chống trùng (MepLayout.IsNearAny): trước đó chạy lệnh",
+    "lần hai là hanger chồng lên hanger cũ, vừa sai nghiệp vụ vừa không kiểm được đường ghi.",
+    "",
+    "Family 'HeatRecoveryUnit' có thật trong model mẫu (Mechanical Equipment, 37 instance) — chọn nó vì",
+    "model mẫu không có family hanger/sleeve chuyên dụng nào; phần được kiểm ở đây là đường ghi, không",
+    "phải tính đúng đắn của loại family.",
+    "",
+    "LƯU Ý THẬT THÀ: hai ca SleeveAuto ở cuối chưa chứng minh được đường ghi — trên model mẫu lệnh không",
+    "tìm thấy giao cắt nào nên cả hai lần đều 'đã đặt 0 sleeve'. Chỉ cặp HangerAuto (1120 → 0) là bằng chứng."
+  ],
+  "cases": [
+    {
+      "name": "Đặt hanger — GHI THẬT",
+      "command": "HangerAuto",
+      "allowWrite": true,
+      "config": {
+        "hangerFamilyName": "HeatRecoveryUnit",
+        "spacingMm": 3000,
+        "categories": [
+          "Ducts"
+        ]
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "summaryContains": [
+          "Đã đặt"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 300000
+      }
+    },
+    {
+      "name": "Đặt hanger lần hai — phải 0 cái, tất cả đã có",
+      "command": "HangerAuto",
+      "allowWrite": true,
+      "config": {
+        "hangerFamilyName": "HeatRecoveryUnit",
+        "spacingMm": 3000,
+        "categories": [
+          "Ducts"
+        ]
+      },
+      "//": "maxAffected 0 + 'Bo qua, da co hanger' la bang chung lan truoc da commit that.",
+      "expect": {
+        "success": true,
+        "maxAffected": 0,
+        "summaryContains": [
+          "Bỏ qua, đã có hanger"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 300000
+      }
+    },
+    {
+      "name": "Sleeve — chạy trọn đường ghi (model mẫu không có giao cắt nào)",
+      "command": "SleeveAuto",
+      "allowWrite": true,
+      "config": {
+        "sleeveFamilyName": "HeatRecoveryUnit",
+        "mepCategories": [
+          "Ducts",
+          "Pipes"
+        ]
+      },
+      "expect": {
+        "success": true,
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "neverContains": [
+          "Exception"
+        ],
+        "maxMs": 300000
+      },
+      "//": "Ca nay CHUA chung minh duoc duong ghi cua SleeveAuto: tren model mau lenh tim thay 0 giao cat nen 'da dat 0 sleeve' ca hai lan. Giu lai vi no van chay tron nhanh ghi (tim family, quet giao cat, mo/commit transaction) ma khong nem. Muon chung minh that thi can model co giao cat MEP x tuong/san — ghi trong docs/bang-chung-test.md §12."
+    },
+    {
+      "name": "Sleeve lần hai — chạy lại không ném",
+      "command": "SleeveAuto",
+      "allowWrite": true,
+      "config": {
+        "sleeveFamilyName": "HeatRecoveryUnit",
+        "mepCategories": [
+          "Ducts",
+          "Pipes"
+        ]
+      },
+      "//": "Cung ly do voi ca tren: chua chung minh duoc gi ngoai viec chay lai duoc.",
+      "expect": {
+        "success": true,
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "neverContains": [
+          "Exception"
+        ],
+        "maxMs": 300000
+      }
+    }
+  ]
+}

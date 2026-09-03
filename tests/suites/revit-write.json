@@ -14,7 +14,11 @@
     "giá trị trong model không đổi và bước cuối sẽ vẫn báo có ô cần cập nhật.",
     "",
     "summaryNotContains: [\"Xem trước\"] chốt thêm một lớp: ca ghi mà lại chạy ra bản xem trước thì đỏ,",
-    "thay vì lặng lẽ xanh."
+    "thay vì lặng lẽ xanh.",
+    "",
+    "Nhom lenh TAO PHAN TU MOI (LevelSetup, SheetBatchCreate) khong co phep nghich dao nen khong tu khoi",
+    "phuc duoc — bu lai bang tinh idempotent: lan hai phai tao 0 cai va bao 'da co'. Bo bản chép bị bẩn",
+    "sau lượt chạy là chấp nhận được vì nó bị xoá cùng thư mục kết quả."
   ],
   "cases": [
     {
@@ -157,6 +161,106 @@
           "Xem trước"
         ],
         "maxMs": 60000
+      }
+    },
+    {
+      "name": "Tạo tầng — GHI THẬT",
+      "command": "LevelSetup",
+      "allowWrite": true,
+      "config": {
+        "levels": [
+          {
+            "name": "DHCB-WRITE-L1",
+            "elevationMm": 24000
+          },
+          {
+            "name": "DHCB-WRITE-L2",
+            "elevationMm": 27600
+          }
+        ],
+        "skipExisting": true
+      },
+      "//": "Nhom lenh TAO PHAN TU MOI: khong co phep nghich dao de khoi phuc, nen chuoi tu chung minh dua vao tinh idempotent — lan hai phai bo qua vi da co. Cao do 24 m/27,6 m de khong dung ten/cao do tang co san cua model mau.",
+      "expect": {
+        "success": true,
+        "minAffected": 2,
+        "summaryContains": [
+          "Đã tạo",
+          "[Tạo]"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 120000
+      }
+    },
+    {
+      "name": "Tạo lại y hệt — phải 0 tầng mới",
+      "command": "LevelSetup",
+      "allowWrite": true,
+      "config": {
+        "levels": [
+          {
+            "name": "DHCB-WRITE-L1",
+            "elevationMm": 24000
+          },
+          {
+            "name": "DHCB-WRITE-L2",
+            "elevationMm": 27600
+          }
+        ],
+        "skipExisting": true
+      },
+      "//": "0 tang moi + dong '[Bo qua, da co]' la bang chung lan truoc DA COMMIT: neu transaction bi rollback thi tang khong ton tai va lan nay lai tao ra 2 cai nua.",
+      "expect": {
+        "success": true,
+        "maxAffected": 0,
+        "summaryContains": [
+          "Bỏ qua, đã có"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 120000
+      }
+    },
+    {
+      "name": "Tạo sheet hàng loạt — GHI THẬT",
+      "command": "SheetBatchCreate",
+      "allowWrite": true,
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/sheets.csv"
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "summaryContains": [
+          "Đã tạo"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 120000
+      }
+    },
+    {
+      "name": "Tạo lại bộ sheet đó — phải 0 sheet mới",
+      "command": "SheetBatchCreate",
+      "allowWrite": true,
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/sheets.csv"
+      },
+      "//": "Cung hinh dang voi LevelSetup: sheet number da ton tai thi lenh bo qua. maxAffected 0 chot rang sheet lan truoc con nam that trong model.",
+      "expect": {
+        "success": true,
+        "maxAffected": 0,
+        "messagesContain": [
+          "đã tồn tại"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 120000
       }
     }
   ]

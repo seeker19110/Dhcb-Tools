@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace DhcbTools.Core.MEPF;
 
@@ -19,6 +19,16 @@ public sealed class HangerConfig
 
     /// <summary>Level name filter (empty = all levels).</summary>
     public string? LevelName { get; init; } = null;
+
+    /// <summary>
+    /// Bỏ qua vị trí đã có sẵn một hanger cùng family trong bán kính
+    /// <see cref="ExistingToleranceMm"/>. Mặc định bật — chạy lệnh lần hai không được đặt chồng
+    /// lên lần một (SleeveAuto đã chống trùng từ đầu, HangerAuto trước đây thì không).
+    /// </summary>
+    public bool SkipExisting { get; init; } = true;
+
+    /// <summary>Bán kính coi là "đã có hanger ở đây" (mm). Cùng dung sai 100 mm với SleeveAuto.</summary>
+    public double ExistingToleranceMm { get; init; } = 100;
 
     /// <summary>If true, report placements without writing to the model.</summary>
     public bool DryRun { get; init; } = true;

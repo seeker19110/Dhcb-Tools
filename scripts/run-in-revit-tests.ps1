@@ -15,8 +15,9 @@
 [CmdletBinding()]
 param(
     # Bộ ca kiểm: "smoke" (model kiến trúc), "mep" (model HVAC), "plumbing" (cấp thoát nước)
-    # hoặc "write" (đường ghi thật — xem -AllowWrites).
-    [ValidateSet('smoke', 'mep', 'plumbing', 'write')]
+    # "write" (đường ghi thật trên model kiến trúc — xem -AllowWrites), hoặc "write-mep" (đường ghi
+    # cho nhóm lệnh tạo phần tử MEP, chạy trên model HVAC).
+    [ValidateSet('smoke', 'mep', 'plumbing', 'write', 'write-mep')]
     [string]$Suite = 'smoke',
 
     # Cho phép ca khai báo "allowWrite" ghi THẬT vào model. Script sẽ chép model mẫu sang thư mục kết
@@ -69,6 +70,7 @@ if (-not $Model) {
     $samples = "C:\Program Files\Autodesk\Revit $RevitVersion\Samples"
     $Model = switch ($Suite) {
         'mep'      { Join-Path $samples 'Snowdon Towers Sample HVAC.rvt' }
+        'write-mep' { Join-Path $samples 'Snowdon Towers Sample HVAC.rvt' }
         'plumbing' { Join-Path $samples 'Snowdon Towers Sample Plumbing.rvt' }
         default    { Join-Path $samples 'Snowdon Towers Sample Architectural.rvt' }
     }
@@ -77,7 +79,7 @@ if (-not (Test-Path $Model)) {
     Stop-WithMessage "Không tìm thấy model: $Model"
 }
 
-if ($Suite -eq 'write' -and -not $AllowWrites) {
+if ($Suite -like 'write*' -and -not $AllowWrites) {
     Stop-WithMessage ("Bộ 'write' chỉ có nghĩa khi kèm -AllowWrites; không có nó thì mọi ca vẫn bị ép " +
                       "dryRun và bộ này chỉ lặp lại việc bộ smoke đã làm.")
 }

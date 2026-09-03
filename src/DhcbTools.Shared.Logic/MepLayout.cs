@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace DhcbTools.Shared.Logic
@@ -115,6 +115,44 @@ namespace DhcbTools.Shared.Logic
                 FeetToMillimetres(minZFt),
                 FeetToMillimetres(maxZFt),
                 FeetToMillimetres((minZFt + maxZFt) / 2.0));
+        }
+
+        /// <summary>
+        /// Điểm <paramref name="x"/>/<paramref name="y"/>/<paramref name="z"/> có nằm sát (trong
+        /// <paramref name="toleranceFt"/>) một điểm nào trong <paramref name="existing"/> không.
+        ///
+        /// Sinh ra để hai lệnh đặt phần tử dùng chung một phép chống trùng: <c>SleeveAuto</c> đã có
+        /// từ đầu, còn <c>HangerAuto</c> thì không — chạy lại lần hai là hanger chồng lên hanger cũ.
+        /// Đây cũng là thứ làm đường ghi của <c>HangerAuto</c> kiểm được: lần hai phải đặt 0 cái.
+        /// </summary>
+        /// <param name="x">Toạ độ X của điểm cần kiểm (feet).</param>
+        /// <param name="y">Toạ độ Y của điểm cần kiểm (feet).</param>
+        /// <param name="z">Toạ độ Z của điểm cần kiểm (feet).</param>
+        /// <param name="existing">Các điểm đã có (feet).</param>
+        /// <param name="toleranceFt">Khoảng cách coi là "cùng một chỗ" (feet). ≤ 0 thì không chống trùng.</param>
+        public static bool IsNearAny(
+            double x, double y, double z,
+            IEnumerable<(double X, double Y, double Z)> existing,
+            double toleranceFt)
+        {
+            if (existing == null || toleranceFt <= 0)
+            {
+                return false;
+            }
+
+            var toleranceSq = toleranceFt * toleranceFt;
+            foreach (var p in existing)
+            {
+                var dx = p.X - x;
+                var dy = p.Y - y;
+                var dz = p.Z - z;
+                if ((dx * dx) + (dy * dy) + (dz * dz) < toleranceSq)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>

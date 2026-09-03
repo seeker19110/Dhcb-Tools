@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
@@ -53,6 +53,15 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
         double offsetFt = MepLayout.MmToFeet(config.OffsetMm);
 
         // 3. Build placement plan
+        // Chống trùng: hanger cùng family đã có trong model thì không đặt thêm ở đúng chỗ đó.
+        // Thiếu bước này thì chạy lệnh lần hai là số hanger nhân đôi, và đường ghi thật cũng không
+        // kiểm được gì (lần hai phải ra 0 mới chứng minh lần một đã commit).
+        var existing = config.SkipExisting
+            ? CollectExistingHangerPoints(document, config.HangerFamilyName)
+            : new List<(double X, double Y, double Z)>();
+        double existingToleranceFt = MepLayout.MmToFeet(config.ExistingToleranceMm);
+        int skippedExisting = 0;
+
         var plan = new List<(XYZ Point, XYZ Direction)>();
 
         foreach (var elem in elements)
@@ -75,6 +84,16 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
 
                 // Offset upward
                 var insertPoint = new XYZ(point.X, point.Y, point.Z + offsetFt);
+
+                if (MepLayout.IsNearAny(insertPoint.X, insertPoint.Y, insertPoint.Z, existing, existingToleranceFt))
+                {
+                    skippedExisting++;
+                    continue;
+                }
+
+                // Hai đoạn khác nhau có thể sinh vị trí trùng nhau (chỗ nối) — tính cả những cái vừa
+                // lên kế hoạch trong chính lượt này, không chỉ cái đã có sẵn trong model.
+                existing.Add((insertPoint.X, insertPoint.Y, insertPoint.Z));
                 plan.Add((insertPoint, tangent));
             }
         }
@@ -82,7 +101,8 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
         if (config.DryRun)
         {
             var preview = CommandResult.Ok(
-                $"[Xem trước] Sẽ đặt {plan.Count} hanger trên {elements.Count} phần tử MEP.",
+                $"[Xem trước] Sẽ đặt {plan.Count} hanger trên {elements.Count} phần tử MEP."
+                + SkipNote(skippedExisting),
                 plan.Count);
             foreach (var (pt, dir) in plan)
             {
@@ -128,11 +148,37 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
         }
 
         tx.Commit();
-        return CommandResult.Ok($"Đã đặt {placed} hanger trên {elements.Count} phần tử MEP.", placed)
+        return CommandResult.Ok(
+                $"Đã đặt {placed} hanger trên {elements.Count} phần tử MEP." + SkipNote(skippedExisting),
+                placed)
             .WithChanged(placedIds);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
+
+    private static string SkipNote(int skippedExisting) =>
+        skippedExisting > 0 ? $" Bỏ qua, đã có hanger: {skippedExisting} vị trí." : string.Empty;
+
+    /// <summary>Vị trí các hanger cùng family đã có sẵn trong model (feet, toạ độ nội bộ Revit).</summary>
+    private static List<(double X, double Y, double Z)> CollectExistingHangerPoints(Document doc, string familyName)
+    {
+        var points = new List<(double X, double Y, double Z)>();
+        var instances = new FilteredElementCollector(doc)
+            .OfClass(typeof(FamilyInstance))
+            .Cast<FamilyInstance>()
+            .Where(fi => fi.Symbol != null &&
+                         (fi.Symbol.Name.IndexOf(familyName, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                          fi.Symbol.FamilyName.IndexOf(familyName, StringComparison.OrdinalIgnoreCase) >= 0));
+
+        foreach (var fi in instances)
+        {
+            if (fi.Location is LocationPoint lp && lp.Point != null)
+            {
+                points.Add((lp.Point.X, lp.Point.Y, lp.Point.Z));
+            }
+        }
+        return points;
+    }
 
     private static List<Element> CollectElements(Document doc, HangerConfig config, out List<string> unknown)
     {

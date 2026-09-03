@@ -1,4 +1,4 @@
-using DhcbTools.Shared.Logic.Ai;
+﻿using DhcbTools.Shared.Logic.Ai;
 using DhcbTools.Shared.Logic.Testing;
 using Xunit;
 
@@ -93,5 +93,23 @@ public class SuiteCoverageTests
             .ToList();
 
         Assert.True(noReason.Count == 0, "Ca bỏ qua mà không ghi lý do: " + string.Join(", ", noReason));
+    }
+
+    /// <summary>
+    /// Mọi ca ghi thật phải chốt "đây không phải bản xem trước". Không có lưới này thì một ngày nào đó
+    /// khoá <c>dryRun</c> bị ép nhầm cho cả ca ghi, và cả bộ write sẽ xanh trong khi không ghi gì —
+    /// đúng loại test xanh mà không kiểm gì mà bộ này sinh ra để tránh.
+    /// </summary>
+    [Fact]
+    public void CaGhiThat_PhaiChotKhongPhaiXemTruoc()
+    {
+        var thieu = Suites()
+            .SelectMany(s => s.Cases)
+            .Where(c => c.AllowWrite && !c.Skip)
+            .Where(c => !c.Expect.SummaryNotContains.Any(n => n.IndexOf("Xem trước", StringComparison.OrdinalIgnoreCase) >= 0))
+            .Select(c => c.DisplayName)
+            .ToList();
+
+        Assert.True(thieu.Count == 0, "Ca allowWrite thiếu summaryNotContains \"Xem trước\": " + string.Join(", ", thieu));
     }
 }

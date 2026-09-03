@@ -444,3 +444,85 @@ loại "test xanh mà không kiểm gì" mà cả bộ này sinh ra để tránh
   lệnh có sẵn phép nghịch đảo để tự khôi phục. Các lệnh **tạo phần tử mới** (`SleeveAuto`, `HangerAuto`,
   `LevelSetup`, `SheetBatchCreate`…) chưa có ca ghi thật vì chưa có cách xoá lại gọn gàng trong cùng phiên.
 - Vẫn chưa có một đêm batch chạy trên **dự án thật** thay vì file mẫu.
+
+---
+
+## 12. Đường ghi cho nhóm lệnh **tạo phần tử mới** (2026-09-03 12:45 ICT)
+
+§11 chỉ phủ được những lệnh có **phép nghịch đảo** (xuất ra rồi nhập lại). Nhóm lệnh tạo phần tử mới không
+có phép đó: tạo xong không xoá lại được gọn gàng trong cùng phiên. Chỗ này giải bằng **tính idempotent**
+thay vì khôi phục — chạy lệnh hai lần, lần hai phải tạo **0** cái và nói rõ "đã có":
+
+```
+Tạo tầng — GHI THẬT              → Đã tạo 2 tầng. [Tạo] DHCB-WRITE-L1 @ 24000 · [Tạo] DHCB-WRITE-L2 @ 27600   (67 ms)
+Tạo lại y hệt                    → Đã tạo 0 tầng. [Bỏ qua, đã có] DHCB-WRITE-L1 · [Bỏ qua, đã có] DHCB-WRITE-L2 (10 ms)
+Tạo sheet hàng loạt — GHI THẬT   → Đã tạo 2/2 sheet, đặt 0 view                                                (375 ms)
+Tạo lại bộ sheet đó              → Đã tạo 0/0 sheet — "DHCB-TEST-01 đã tồn tại"                                (13 ms)
+```
+
+Con số **0** ở mỗi bước hai chính là bằng chứng bước một đã **commit thật**: nếu transaction bị rollback
+thì tầng/sheet không tồn tại, và bước hai lại tạo ra đúng 2 cái nữa. Đây cũng là lý do đủ để không cần
+dọn: bản chép bị bẩn sau lượt chạy là chấp nhận được vì nó nằm trong thư mục kết quả.
+
+**Kết quả:** [`revit-write.json`](../tests/suites/revit-write.json) — **11 đạt / 0 trượt trên 11 ca**
+(7 ca của §11 + 4 ca mới), mã thoát 0, trên bản chép Snowdon Towers Architectural, Revit 2024.3.
+
+### `HangerAuto` phải sửa trước khi kiểm được
+
+Bộ ghi cho MEP chạy trên model HVAC ([`revit-write-mep.json`](../tests/suites/revit-write-mep.json), gọi
+bằng `-Suite write-mep`) lộ ra một lỗi nghiệp vụ thật, không phải lỗi test: **`SleeveAuto` chống trùng từ
+đầu, còn `HangerAuto` thì không** — chạy lệnh lần hai là hanger chồng đúng lên hanger cũ, và người dùng
+không có cách nào biết ngoài việc tự đếm.
+
+Sửa: `HangerAuto` nay bỏ qua vị trí đã có hanger cùng family trong bán kính `existingToleranceMm`
+(mặc định 100 mm, cùng dung sai với `SleeveAuto`), tắt được bằng `skipExisting: false`. Phép so khoảng
+cách tách ra `MepLayout.IsNearAny` ở `Shared.Logic` để hai lệnh dùng chung và có test thuần (6 ca).
+Lệnh còn tính cả những vị trí vừa lên kế hoạch trong chính lượt chạy, nên hai đoạn ống nối nhau không
+sinh hai hanger chồng ở chỗ nối.
+
+### Bộ ghi cho MEP: `HangerAuto` 1120 → 0
+
+[`revit-write-mep.json`](../tests/suites/revit-write-mep.json), bản chép Snowdon Towers HVAC,
+**4 đạt / 0 trượt trên 4 ca**:
+
+```
+Đặt hanger — GHI THẬT        → Đã đặt 1120 hanger trên 1053 phần tử MEP                    (30,5 s)
+Đặt hanger lần hai           → Đã đặt 0. Bỏ qua, đã có hanger: 1120 vị trí                 (51 ms)
+```
+
+**1120 → 0** là bằng chứng cùng dạng với cặp `ProjectInfo` 2 → 0 ở §11, nhưng cho nhóm lệnh tạo phần tử:
+transaction bị rollback thì model không có hanger nào và lần hai lại đặt đúng 1120 cái nữa.
+
+Hai ca `SleeveAuto` trong cùng bộ **chưa chứng minh được gì**: trên model mẫu lệnh không tìm thấy giao cắt
+MEP × tường/sàn nào nên cả hai lần đều "đã đặt 0 sleeve" — con số 0 ở lần hai không nói lên điều gì. Giữ
+lại vì chúng vẫn chạy trọn nhánh ghi mà không ném, nhưng ghi rõ là **nợ**: cần một model có giao cắt thật
+(hoặc fixture dựng sẵn) mới chốt được. Thử chạy bộ này trên model Plumbing thì lệnh dừng ngay ở bước tra
+family — model đó không có `HeatRecoveryUnit`.
+
+### Lỗi chặn mà chỉ đường ghi trên model MEP mới lộ ra: batch treo ở hộp thoại cảnh báo
+
+Lượt chạy `write-mep` đầu tiên **treo 15 phút không chạy nổi một ca nào**, không log, không báo cáo.
+Journal của phiên đó chỉ ra chỗ đứng im:
+
+```
+' 6:< Error dialog summary
+' 6:< Warning: Space is not in a properly enclosed region - 67 times
+Jrn.Data "Error dialog" , "0 failures, 0 errors, 67 warnings"
+'C 12:56:54.355; 6:< ADialog::doModal start
+```
+
+Revit tính lại Space **lúc mở model** HVAC và bật hộp thoại cảnh báo — nằm **ngoài mọi transaction của
+lệnh DHCB**, nên `SilentFailuresPreprocessor` gắn theo từng transaction không bao giờ chạm tới. Batch
+đứng chờ người bấm nút, đến hết `--max-minutes` mới chết. Model kiến trúc không có cảnh báo lúc mở, nên
+7 vòng chạy trước đó không hề lộ ra chuyện này.
+
+Sửa: `BatchStartupHook` đăng ký `Application.FailuresProcessing` cho **cả phiên batch** (gỡ ở `finally`),
+dùng chính `SilentFailuresPreprocessor` với `FailurePolicy.Silent` — cảnh báo bị nuốt nhưng vẫn ghi vào
+`CoreContext.SuppressedWarnings` để báo cáo thấy được. Đây là chỗ duy nhất phủ được transaction không
+phải của mình.
+
+### Lưới mới: ca ghi phải chốt "không phải xem trước"
+
+`SuiteCoverageTests.CaGhiThat_PhaiChotKhongPhaiXemTruoc` — mọi ca khai `allowWrite` bắt buộc có
+`summaryNotContains: ["Xem trước"]`. Thiếu lưới này thì một ngày khoá `dryRun` bị ép nhầm cho cả ca ghi,
+cả bộ write sẽ xanh trong khi không ghi gì.
