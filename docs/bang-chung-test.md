@@ -165,3 +165,60 @@ Kịch bản theo `huong-dan-cai-dat-va-kiem-thu-thu-cong.md` §5.1.
 | R13 | BatchExport PDF+DWG mẫu `{SheetNumber}-{SheetName}` | ❌ → ✅ sau sửa: bản cũ gọi Export cả lô nên Revit tự đặt `Sheet-Cover.pdf` và `<Dự án>-Sheet - G000 - Cover.dwg`, bỏ qua mẫu tên, hai sheet trùng tên ghi đè nhau, DWG tách mỗi view thành xref riêng. Core nay xuất từng sheet (`Combine=true`+`FileName`, `MergedViews=true`, `MakeUnique`) → `S000-Cover Sheet.pdf` / `.dwg` |
 
 Chưa chạy: R15+ (giai đoạn 7 P1) và MEPF.
+
+---
+
+## 7. Batch trong Revit — vòng chạy tự động đầu tiên (2026-09-03 09:51 ICT)
+
+Máy: Windows 11, Revit 2024.3. Chạy bằng một lệnh, **không ai đụng vào máy**:
+
+```powershell
+.\scripts\run-in-revit-tests.ps1 -Suite smoke -RevitVersion 2024
+```
+
+Revit tự mở → chạy 12 ca → tự đóng → sinh `report.html`, `in-revit-tests.md`, `in-revit-tests.trx`.
+
+**Kết quả: mã thoát 0 — 11 đạt / 0 trượt / 1 bỏ qua trên 12 ca.**
+
+| Ca | Lệnh | Kết quả | ms |
+|---|---|---|---:|
+| Đọc thông tin mô hình | `HealthReport` | ✅ | 1827 |
+| Xuất tham số ra CSV | `ParameterExport` | ✅ 142 phần tử, 2 tham số | 37 |
+| Xuất cảnh báo ra CSV | `WarningsExport` | ✅ 34 warning, 10 loại | 9 |
+| Kiểm kê family | `FamilyAudit` | ✅ 286 family | 64 |
+| Xem trước dọn view thừa | `RemoveUnusedViews` | ✅ sẽ xoá 90 | 28 |
+| Xem trước đánh số cửa | `AutoNumbering` | ✅ 141 cửa | 33 |
+| Xem trước đổi tên sheet | `SheetRename` | ✅ 16/55 sheet | 72 |
+| Tô màu theo tham số | `ColorByParameter` | ✅ báo lỗi rõ (batch không có view đang mở) | 17 |
+| Xem trước purge style | `StylePurge` | ✅ 105 style thừa | 144 |
+| Xuất schedule | `ScheduleExport` | ✅ 36/36 schedule | 6453 |
+| Kiểm connector hở | `ConnectorChecker` | ✅ | 40 |
+| Sleeve — hiệu năng | `SleeveAuto` | ⭐ bỏ qua (model kiến trúc không có MEP) | 0 |
+
+### Ba lỗi chặn, chỉ lộ ra khi chạy thật
+
+Trước vòng này, **batch chạy đêm chưa từng chạy trọn một lần nào** dù đã đánh dấu xong từ giai đoạn 1.
+Không lỗi nào trong ba lỗi dưới đây bị 448 test thuần bắt được.
+
+| # | Lỗi | Cách phát hiện |
+|---|---|---|
+| 1 | Journal có `Jrn.Directive "DocSymbol", "[]"` — cần document đang mở để bind, mà lúc khởi động chưa có. Revit ghi *"no DocumentStorage available to bind"*, coi journal sai nhịp và **dừng playback ở dòng 6**, rồi treo ở một hộp thoại 10 phút rưỡi | Đọc journal Revit ghi ra |
+| 2 | Runner luôn báo "chưa cài add-in" dù add-in đã cài đúng | Đi tìm nhầm hướng mất thời gian |
+| 3 | **Revit khởi động bằng journal chỉ nạp add-in có `.addin` cùng thư mục với journal** (Autodesk cố ý, để add-in lạ không xen vào khi chạy kiểm thử hồi quy). Add-in bị bỏ qua **im lặng**: không lỗi, không hộp thoại, Revit ngồi im tới hết giờ | Đếm add-in trong journal: phiên tương tác 48, phiên journal 38 — không add-in bên thứ ba nào |
+
+Lỗi 3 là nguyên nhân gốc. Cách tách biến: chạy `Revit.exe /nosplash` không journal → add-in nạp được;
+thêm journal → không. Đã thử ký số DLL trước đó — **không giải quyết được** lỗi này (nhưng vẫn cần cho
+việc phát hành, xem [`kiem-thu-trong-revit.md`](kiem-thu-trong-revit.md)).
+
+### Hai vấn đề nhỏ phát hiện kèm
+
+- `ColorByParameter` trong batch không có view đang mở nên báo lỗi. Đây là hành vi **đúng** sau các bản
+  sửa ở giai đoạn 8.1 — trước đó lệnh loại này âm thầm không làm gì mà vẫn báo thành công. Bộ ca kiểm nay
+  chốt đúng hành vi này.
+- Báo cáo hiện ra tiếng Việt vỡ trên console. File trên đĩa **đúng UTF-8**; chỉ `Get-Content` của Windows
+  PowerShell 5.1 mặc định đọc cp1252. Cùng họ với lỗi `dhcb_agent.py` ở §6.
+
+### Còn lại
+
+Bộ `revit-mep.json` (`SleeveAuto`, `SlopePipes`, `PipeKick`…) cần model MEP mẫu — chạy bằng
+`-Suite mep`. Chưa chạy.
