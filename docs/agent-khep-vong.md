@@ -133,8 +133,28 @@ model thật. Gửi kèm `timeoutSeconds`:
 
 Server chặn trên ở 10 phút: Revit chỉ có một luồng nên không thể để một request giữ hàng đợi vô hạn.
 
+## Phía AutoCAD (giai đoạn 10.1)
+
+Đối xứng với Revit, khác ở **định danh**: AutoCAD dùng **handle** (hex, bền trong file) chứ không phải
+ElementId. `HandleText` nhận cả `1A3`, `0x1A3`, `(1A3)` — agent copy từ đâu cũng đọc được.
+
+| Query | Ở đâu | Trả về |
+|---|---|---|
+| `entity_geometry` | Core (chỉ cần `Database`) | hộp bao, layer, linetype + chi tiết theo loại; block: tên **thật** của block động, vị trí, góc, tỉ lệ, thuộc tính |
+| `attributes_of` | Core | tag, prompt, giá trị mặc định, **ghi được không** (thuộc tính hằng thì không), kèm giá trị mẫu từ 3 insert |
+| `selection` | Vỏ (cần `Editor`) | entity đang chọn; kèm `handles` thì **đặt** lựa chọn |
+| `show_entities` | Vỏ | zoom ôm trọn + chọn; không có entity hợp lệ thì **giữ nguyên khung nhìn** |
+| `active_layout` | Vỏ | Model hay layout nào, khổ giấy, tâm/kích thước khung nhìn, layer hiện hành |
+
+Handle sai định dạng hoặc không có trong bản vẽ luôn được **nói ra** trong `notFound` — im lặng trả rỗng
+nghĩa là agent tưởng lệnh không đụng tới gì.
+
+Core cố ý **không** biết tới `Editor`: đó là điều kiện để mọi thứ ở Core còn chạy được trong
+`accoreconsole` (batch đêm không có giao diện). `QueryCatalogTests` chốt ranh giới đó.
+
+**Chưa có**: `snapshot` phía AutoCAD — AutoCAD không có API tương đương `Document.ExportImage` của
+Revit; `PNGOUT` là lệnh tương tác, gọi từ Bridge sẽ chiếm dòng lệnh của kỹ sư. Để mở.
+
 ## Còn lại của giai đoạn 10
 
-- Phần AutoCAD tương ứng của các query mới.
-- `/progress/<id>` để theo dõi lệnh chạy lâu thay vì chỉ ngồi chờ.
-- Hai playbook còn lại: dựng grid/level từ CAD, xuất bộ PDF theo revision.
+- `snapshot` cho AutoCAD (xem trên) — chưa có đường nào sạch.
