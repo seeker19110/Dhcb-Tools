@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using Autodesk.AutoCAD.ApplicationServices;
 using DhcbTools.Core.AutoCAD;
 using DhcbTools.Core.AutoCAD.Query;
@@ -37,9 +37,11 @@ public sealed class DhcbHttpBridge : IDisposable
                 database => AcadCommandTable.Dispatch(database, item.Request.Command, item.Request.ConfigJson),
                 message => CommandResult.Fail(message)),
 
-            QueryAsync = item => RunOnAutoCadThread(
+            // Giai đoạn 10.1: truy vấn cần Editor (selection, show_entities, active_layout) đi qua vỏ;
+            // còn lại rơi xuống AcadQueryHandler thuần Database như cũ.
+            QueryAsync = item => RunOnAutoCadDocument(
                 item,
-                database => AcadQueryHandler.Handle(database, ToQueryRequest(item.Request)),
+                document => AcadUiQueryHandler.Handle(document, ToQueryRequest(item.Request)),
                 message => (object)new { error = message }),
 
             Chat = text => CommandIntentParser.Parse(text, CommandCatalog.AutoCad).ToPayload(),
@@ -89,6 +91,43 @@ public sealed class DhcbHttpBridge : IDisposable
                     item.Completion.TrySetResult(document is null
                         ? onError("Không có drawing nào đang mở trong AutoCAD.")
                         : work(document.Database));
+                }
+                catch (Exception ex)
+                {
+                    item.Completion.TrySetResult(onError($"Lỗi khi chạy trong AutoCAD: {ex.Message}"));
+                }
+
+                return Task.CompletedTask;
+            },
+            null);
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Như <see cref="RunOnAutoCadThread"/> nhưng đưa cả <see cref="Document"/> cho việc cần
+    /// <c>Editor</c> (chọn, zoom, layout đang mở) — Core cố ý chỉ nhận <c>Database</c> để còn chạy
+    /// được trong <c>accoreconsole</c>, nơi không có Editor nào cả.
+    /// </summary>
+    private static Task RunOnAutoCadDocument<TRequest, TResult>(
+        BridgeWorkItem<TRequest, TResult> item,
+        Func<Document, TResult> work,
+        Func<string, TResult> onError)
+    {
+        Application.DocumentManager.ExecuteInCommandContextAsync(
+            _ =>
+            {
+                if (!item.TryClaim())
+                {
+                    return Task.CompletedTask;
+                }
+
+                try
+                {
+                    var document = Application.DocumentManager.MdiActiveDocument;
+                    item.Completion.TrySetResult(document is null
+                        ? onError("Không có drawing nào đang mở trong AutoCAD.")
+                        : work(document));
                 }
                 catch (Exception ex)
                 {

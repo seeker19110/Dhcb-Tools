@@ -1,7 +1,8 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.Geometry;
+using DhcbTools.Shared.Logic.Cad;
 
 namespace DhcbTools.Core.AutoCAD.Query;
 
@@ -12,6 +13,14 @@ namespace DhcbTools.Core.AutoCAD.Query;
 /// </summary>
 public static class AcadQueryHandler
 {
+    /// <summary>
+    /// Danh sách truy vấn hợp lệ, để **một chỗ duy nhất**: agent gõ sai tên thì đọc đúng danh sách này.
+    /// Trước đây câu báo lỗi là chuỗi rời, thêm truy vấn mới mà quên sửa nó thì agent không có cách nào
+    /// biết truy vấn đó tồn tại (<c>QueryCatalogTests</c> chốt cho khỏi lệch).
+    /// </summary>
+    public const string ValidQueries =
+        "drawing_info, layers, blocks, inserts, entities, text, xrefs, layouts, stats, entity_geometry, attributes_of";
+
     public static object Handle(Database db, QueryRequest req)
     {
         return req.Query.ToUpperInvariant() switch
@@ -25,8 +34,10 @@ public static class AcadQueryHandler
             "XREFS"        => GetXrefs(db),
             "LAYOUTS"      => GetLayouts(db),
             "STATS"        => GetStats(db),
-            _ => new { error = $"Query không xác định: \"{req.Query}\". " +
-                 "Hợp lệ: drawing_info, layers, blocks, inserts, entities, text, xrefs, layouts, stats." }
+            // Giai đoạn 10.1 — đủ để agent nhìn và kiểm được đúng đối tượng vừa đụng tới.
+            "ENTITY_GEOMETRY" => GetEntityGeometry(db, req.Params),
+            "ATTRIBUTES_OF"   => GetAttributesOf(db, req.Params),
+            _ => new { error = $"Query không xác định: \"{req.Query}\". Hợp lệ: {ValidQueries}." }
         };
     }
 
@@ -304,6 +315,232 @@ public static class AcadQueryHandler
         tr.Abort();
         if (p.Limit > 0) list = list.Take(p.Limit).ToList();
         return new { count = list.Count, texts = list };
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // entity_geometry (giai đoạn 10.1) — hộp bao + chi tiết theo loại, tra bằng handle
+    // ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Hình học của những entity được chỉ đích danh. Đối xứng với <c>element_geometry</c> bên Revit:
+    /// agent chạy lệnh xong, cầm handle trả về rồi hỏi lại đúng những cái đó thay vì quét cả bản vẽ.
+    /// <para>
+    /// Handle sai định dạng hoặc không có trong bản vẽ đều được NÓI RA trong <c>notFound</c>, không im
+    /// lặng trả rỗng — im lặng ở đây nghĩa là agent tưởng lệnh không đổi gì.
+    /// </para>
+    /// </summary>
+    private static object GetEntityGeometry(Database db, AcadQueryParams p)
+    {
+        if (p.Handles is null || p.Handles.Count == 0)
+        {
+            return new { error = "entity_geometry cần \"handles\" — danh sách handle (hex) của entity cần xem." };
+        }
+
+        using var tr = db.TransactionManager.StartTransaction();
+        var found = new List<object>();
+        var notFound = new List<string>();
+
+        foreach (var text in p.Handles)
+        {
+            if (!HandleText.TryParse(text, out var raw))
+            {
+                notFound.Add(text + " (không phải handle hex)");
+                continue;
+            }
+
+            ObjectId id;
+            try
+            {
+                id = db.GetObjectId(false, new Handle(raw), 0);
+            }
+            catch (Autodesk.AutoCAD.Runtime.Exception)
+            {
+                notFound.Add(text + " (không có trong bản vẽ)");
+                continue;
+            }
+
+            if (id.IsNull || tr.GetObject(id, OpenMode.ForRead) is not Entity entity)
+            {
+                notFound.Add(text + " (không phải entity)");
+                continue;
+            }
+
+            var row = new Dictionary<string, object?>
+            {
+                ["handle"]   = HandleText.ToText(raw),
+                ["objectId"] = id.ToString(),
+                ["type"]     = entity.GetType().Name,
+                ["layer"]    = entity.Layer,
+                ["linetype"] = entity.Linetype,
+            };
+
+            // Entity suy biến (text rỗng, đường dài 0) không có extents — hỏi là ném.
+            try
+            {
+                var ext = entity.GeometricExtents;
+                row["extentsMin"] = Pt(ext.MinPoint);
+                row["extentsMax"] = Pt(ext.MaxPoint);
+            }
+            catch (Autodesk.AutoCAD.Runtime.Exception)
+            {
+                row["extentsMin"] = null;
+                row["extentsMax"] = null;
+            }
+
+            AddTypeDetails(row, entity, tr);
+            found.Add(row);
+        }
+
+        tr.Abort();
+        return new { count = found.Count, entities = found, notFound };
+    }
+
+    /// <summary>Chi tiết theo loại entity — dùng chung cho <c>entities</c> và <c>entity_geometry</c>.</summary>
+    private static void AddTypeDetails(Dictionary<string, object?> row, Entity entity, Transaction tr)
+    {
+        switch (entity)
+        {
+            case Line ln:
+                row["start"]  = Pt(ln.StartPoint);
+                row["end"]    = Pt(ln.EndPoint);
+                row["length"] = Math.Round(ln.Length, 6);
+                break;
+            case Arc arc:
+                row["center"]        = Pt(arc.Center);
+                row["radius"]        = arc.Radius;
+                row["startAngleDeg"] = Math.Round(arc.StartAngle * 180 / Math.PI, 4);
+                row["endAngleDeg"]   = Math.Round(arc.EndAngle   * 180 / Math.PI, 4);
+                break;
+            case Circle c:
+                row["center"] = Pt(c.Center);
+                row["radius"] = c.Radius;
+                break;
+            case Polyline pl:
+                row["vertexCount"] = pl.NumberOfVertices;
+                row["isClosed"]    = pl.Closed;
+                row["length"]      = Math.Round(pl.Length, 6);
+                break;
+            case DBText t:
+                row["text"]     = t.TextString;
+                row["position"] = Pt(t.Position);
+                row["height"]   = t.Height;
+                break;
+            case MText mt:
+                row["text"]     = mt.Contents;
+                row["location"] = Pt(mt.Location);
+                row["width"]    = mt.Width;
+                break;
+            case BlockReference br:
+                row["blockName"]   = BlockNameOf(br, tr);
+                row["position"]    = Pt(br.Position);
+                row["rotationDeg"] = Math.Round(br.Rotation * 180 / Math.PI, 4);
+                row["scale"]       = new { x = br.ScaleFactors.X, y = br.ScaleFactors.Y, z = br.ScaleFactors.Z };
+                row["attributes"]  = AttributeValues(br, tr);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Tên block người dùng nhìn thấy. Block động: <c>Name</c> là tên bản sao vô danh (<c>*U12</c>),
+    /// tên thật nằm ở <c>DynamicBlockTableRecordId</c> — lấy nhầm là agent lọc theo tên không ra gì.
+    /// </summary>
+    private static string BlockNameOf(BlockReference br, Transaction tr)
+    {
+        var id = br.IsDynamicBlock ? br.DynamicBlockTableRecord : br.BlockTableRecord;
+        return tr.GetObject(id, OpenMode.ForRead) is BlockTableRecord btr ? btr.Name : br.Name;
+    }
+
+    private static Dictionary<string, string> AttributeValues(BlockReference br, Transaction tr)
+    {
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (ObjectId attId in br.AttributeCollection)
+        {
+            if (tr.GetObject(attId, OpenMode.ForRead) is AttributeReference att)
+            {
+                values[att.Tag] = att.TextString;
+            }
+        }
+        return values;
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // attributes_of (giai đoạn 10.1) — thuộc tính của một block, kèm giá trị mẫu
+    // ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Định nghĩa thuộc tính của một block + giá trị mẫu từ vài insert có thật. Đối xứng với
+    /// <c>parameters_of</c> bên Revit, và sinh ra vì cùng một lý do: agent phải biết TAG CÓ THẬT LÀ GÌ
+    /// trước khi ghi, thay vì đoán tên rồi chạy một lệnh không đổi được gì mà vẫn báo thành công.
+    /// </summary>
+    private static object GetAttributesOf(Database db, AcadQueryParams p)
+    {
+        if (string.IsNullOrWhiteSpace(p.BlockName))
+        {
+            return new { error = "attributes_of cần \"blockName\"." };
+        }
+
+        using var tr = db.TransactionManager.StartTransaction();
+        var blockTable = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+
+        if (!blockTable.Has(p.BlockName!))
+        {
+            var names = new List<string>();
+            foreach (ObjectId anyId in blockTable)
+            {
+                if (tr.GetObject(anyId, OpenMode.ForRead) is BlockTableRecord b && !b.IsAnonymous && !b.IsLayout)
+                {
+                    names.Add(b.Name);
+                }
+            }
+            tr.Abort();
+            names.Sort(StringComparer.OrdinalIgnoreCase);
+            return new { error = "Không có block \"" + p.BlockName + "\".", availableBlocks = names };
+        }
+
+        var btr = (BlockTableRecord)tr.GetObject(blockTable[p.BlockName!], OpenMode.ForRead);
+
+        var definitions = new List<object>();
+        foreach (ObjectId id in btr)
+        {
+            if (tr.GetObject(id, OpenMode.ForRead) is not AttributeDefinition def) continue;
+            definitions.Add(new
+            {
+                tag          = def.Tag,
+                prompt       = def.Prompt,
+                defaultValue = def.TextString,
+                constant     = def.Constant,
+                preset       = def.Preset,
+                invisible    = def.Invisible,
+                // Thuộc tính hằng KHÔNG ghi được qua AttributeReference — nói trước, còn hơn để lệnh
+                // chạy xong báo thành công mà giá trị không đổi.
+                writable     = !def.Constant,
+            });
+        }
+
+        var referenceIds = btr.GetBlockReferenceIds(true, false);
+        var samples = new List<object>();
+        foreach (ObjectId refId in referenceIds)
+        {
+            if (samples.Count >= 3) break;
+            if (tr.GetObject(refId, OpenMode.ForRead) is not BlockReference br) continue;
+            samples.Add(new
+            {
+                handle = br.Handle.ToString(),
+                layer  = br.Layer,
+                values = AttributeValues(br, tr),
+            });
+        }
+
+        var insertCount = referenceIds.Count;
+        tr.Abort();
+        return new
+        {
+            blockName      = p.BlockName,
+            insertCount,
+            attributeCount = definitions.Count,
+            attributes     = definitions,
+            samples,
+        };
     }
 
     // ──────────────────────────────────────────────────────────────

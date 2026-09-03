@@ -79,6 +79,10 @@ Revit `http://127.0.0.1:8765`, AutoCAD `http://127.0.0.1:8766`. Token sinh lần
 `POST /execute`, `POST /query`, `POST /chat` (đề xuất lệnh từ tiếng Việt, không chạy),
 `GET /progress/<id>`. Lệnh client bỏ đi vì timeout **không** được chạy.
 
+Truy vấn đọc (`POST /query`): Revit có 17 loại, AutoCAD 12 — gồm `entity_geometry`, `attributes_of`,
+`selection`, `show_entities`, `active_layout` để agent nhìn và chỉ được đúng đối tượng vừa đụng tới
+(AutoCAD định danh bằng **handle** hex). Chi tiết: [`docs/agent-khep-vong.md`](docs/agent-khep-vong.md).
+
 **Lệnh chạy lâu**: gửi `POST /execute` kèm `"async": true` → nhận ngay `202 {id}`, rồi hỏi
 `GET /progress/<id>` tới khi `status` là `done`. Kết quả nằm ở server theo id nên đứt kết nối giữa chừng
 không làm mất kết quả của việc đã chạy xong (giữ 30 phút hoặc 50 lệnh gần nhất). Từ client:
