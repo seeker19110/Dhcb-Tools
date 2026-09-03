@@ -163,6 +163,11 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
 | 12 | Không có test MEPF/Export/ProjectInit | Phần thuần đã có test; phần Revit theo §4 kiểm thử thủ công |
 
 ### Còn mở
+
+- **Hai lệnh còn mù model liên kết** (cùng loại lỗi với `SleeveAuto`/`ClashDetection` đã sửa ở §14/§16):
+  `AutoRoute` quét vật cản chỉ trong file đang mở nên tuyến đề xuất có thể xuyên dầm/tường bên link;
+  `DevicePlacement` đọc `OST_Rooms` trong file đang mở nên trên file MEP thuần sẽ không thấy phòng nào.
+  Sửa theo cùng khuôn, nhưng cần model mẫu có Room/vật cản bên link để chốt bằng số thật.
 - **Chưa kiểm thử trên Revit/AutoCAD thật** cho toàn bộ lệnh — chỉ mới biên dịch với API package. Rủi ro cao nhất theo thứ tự:
   `RouteFromLines` và `PipeKick` (fitting/cút 45° phụ thuộc routing preference), `AutoRoute` (thời gian A* với bước 100 mm
   trên hộp lớn), `TransferStandards` (LineStyles/ObjectStyles không copy được qua API — đã ghi rõ trong Messages),
