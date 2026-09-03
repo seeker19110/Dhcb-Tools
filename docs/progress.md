@@ -164,9 +164,9 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
 
 ### Còn mở
 
-- **`AutoRoute` còn mù model liên kết** (cùng loại lỗi với `SleeveAuto`/`ClashDetection`/`DevicePlacement`
-  đã sửa ở §14/§16/§17): quét vật cản chỉ trong file đang mở nên tuyến đề xuất có thể xuyên dầm/tường bên
-  link. Đang mang nhãn *thử nghiệm* theo roadmap; phải sửa trước khi bỏ nhãn đó.
+- **`AutoRoute` — chất lượng tuyến chưa chứng minh được.** Phần đọc model liên kết đã sửa (§18: vật cản
+  30 → 546), nhưng với vật cản thật thì không ra tuyến giữa hai điểm của ca kiểm: bước 100 mm chạm trần
+  400.000 ô, bước 500 mm báo "không có đường đi". Giữ nhãn *thử nghiệm*, nay có số liệu làm căn cứ.
 - **Chưa kiểm thử trên Revit/AutoCAD thật** cho toàn bộ lệnh — chỉ mới biên dịch với API package. Rủi ro cao nhất theo thứ tự:
   `RouteFromLines` và `PipeKick` (fitting/cút 45° phụ thuộc routing preference), `AutoRoute` (thời gian A* với bước 100 mm
   trên hộp lớn), `TransferStandards` (LineStyles/ObjectStyles không copy được qua API — đã ghi rõ trong Messages),
