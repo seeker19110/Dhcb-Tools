@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Autodesk.Revit.DB;
 using DhcbTools.Shared.Logic;
 using DhcbTools.Shared.Logic.Checks;
@@ -11,6 +11,16 @@ public sealed class ClashDetectionConfig
     public required List<string> CategoriesA { get; init; }
 
     public required List<string> CategoriesB { get; init; }
+
+    /// <summary>
+    /// Xét cả phần tử ở model LIÊN KẾT cho nhóm B (mặc định bật). Hồ sơ Việt Nam tách file MEP với
+    /// kiến trúc/kết cấu rồi link vào nhau, nên tắt cái này là "MEP × Kết cấu" không tìm thấy gì mà
+    /// vẫn báo thành công — một báo cáo va chạm nói "không có va chạm" là thứ người ta tin và làm theo.
+    /// </summary>
+    public bool IncludeLinkedModels { get; init; } = true;
+
+    /// <summary>Chỉ xét link có tên chứa một trong các chuỗi này (rỗng = mọi link đã nạp).</summary>
+    public List<string> LinkNameContains { get; init; } = new List<string>();
 
     public required string OutputPath { get; init; }
 
@@ -33,7 +43,10 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
 {
     public string CommandName => "ClashDetection";
 
-    private sealed record Clash(Element A, Element B, XYZ Centre, string Key);
+    private sealed record Clash(Element A, Element B, XYZ Centre, string Key, string? LinkName);
+
+    /// <summary>Phần tử nhóm B kèm hộp bao ĐÃ ĐƯA VỀ toạ độ file chủ (link thì khác toạ độ).</summary>
+    private sealed record Candidate(Element Element, XYZ Min, XYZ Max, Transform? Transform, string? LinkName);
 
     public CommandResult Execute(Document document, ClashDetectionConfig config)
     {
@@ -47,7 +60,49 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
         var result = CommandResult.Ok(string.Empty);
         var elementsA = new FilteredElementCollector(document).WhereElementIsNotElementType().WherePasses(new ElementMulticategoryFilter(idsA.ToList())).ToElements();
         var elementsB = new FilteredElementCollector(document).WhereElementIsNotElementType().WherePasses(new ElementMulticategoryFilter(idsB.ToList())).ToElements()
-            .Select(e => (Element: e, Box: e.get_BoundingBox(null))).Where(t => t.Box != null).ToList();
+            .Select(e => Describe(e, null, null)).Where(c => c != null).Select(c => c!).ToList();
+
+        // Nhóm B ở model liên kết. Không có nhánh này thì "Ducts × Structural Framing" trên file MEP
+        // luôn ra 0 va chạm — dầm nằm bên link kết cấu (đo được trên Snowdon HVAC, 2026-09-03).
+        var linkSummary = new List<string>();
+        if (config.IncludeLinkedModels)
+        {
+            foreach (var linkInstance in new FilteredElementCollector(document).OfClass(typeof(RevitLinkInstance)).Cast<RevitLinkInstance>())
+            {
+                var linkDoc = linkInstance.GetLinkDocument();
+                if (linkDoc == null)
+                {
+                    linkSummary.Add($"{linkInstance.Name}: chưa nạp (unloaded) — bỏ qua");
+                    continue;
+                }
+
+                if (config.LinkNameContains.Count > 0 &&
+                    !config.LinkNameContains.Any(f => linkInstance.Name.IndexOf(f, StringComparison.OrdinalIgnoreCase) >= 0))
+                {
+                    continue;
+                }
+
+                // Category phải tra TRONG chính link: id category là của từng document.
+                var idsLink = ParameterSync.ParameterExportCommand.ResolveCategoryIds(linkDoc, config.CategoriesB, out _);
+                if (idsLink.Count == 0)
+                {
+                    linkSummary.Add($"{linkInstance.Name}: không có category nào của nhóm B");
+                    continue;
+                }
+
+                var transform = linkInstance.GetTotalTransform();
+                var added = 0;
+                foreach (var e in new FilteredElementCollector(linkDoc).WhereElementIsNotElementType()
+                             .WherePasses(new ElementMulticategoryFilter(idsLink.ToList())).ToElements())
+                {
+                    var candidate = Describe(e, transform, linkInstance.Name);
+                    if (candidate == null) continue;
+                    elementsB.Add(candidate);
+                    added++;
+                }
+                linkSummary.Add($"{linkInstance.Name}: {added} phần tử nhóm B");
+            }
+        }
 
         var accepted = ClashAcceptance.LoadKeys(config.AcceptedPath);
         var tol = RevitCompat.MmToFt(config.BoundingBoxToleranceMm);
@@ -60,32 +115,20 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
             var boxA = a.get_BoundingBox(null);
             if (boxA == null) continue;
 
-            var candidates = elementsB.Where(t => t.Element.Id != a.Id && MepLayout.BoundingBoxesIntersect(
+            var candidates = elementsB.Where(t => (t.LinkName != null || t.Element.Id != a.Id) && MepLayout.BoundingBoxesIntersect(
                 boxA.Min.X, boxA.Min.Y, boxA.Min.Z, boxA.Max.X, boxA.Max.Y, boxA.Max.Z,
-                t.Box!.Min.X, t.Box.Min.Y, t.Box.Min.Z, t.Box.Max.X, t.Box.Max.Y, t.Box.Max.Z, tol)).ToList();
+                t.Min.X, t.Min.Y, t.Min.Z, t.Max.X, t.Max.Y, t.Max.Z, tol)).ToList();
             if (candidates.Count == 0) continue;
 
-            ICollection<ElementId> hits;
-            try
-            {
-                hits = new FilteredElementCollector(document, candidates.Select(c => c.Element.Id).ToList())
-                    .WherePasses(new ElementIntersectsElementFilter(a))
-                    .ToElementIds();
-            }
-            catch (Exception ex)
-            {
-                result.Messages.Add($"{a.Id}: không kiểm được solid ({ex.Message}) — dùng kết quả bounding box.");
-                hits = candidates.Select(c => c.Element.Id).ToList();
-            }
+            var hits = PreciseHits(document, a, candidates, result);
 
-            foreach (var hitId in hits)
+            foreach (var b in hits)
             {
-                var b = candidates.First(c => c.Element.Id == hitId);
                 var centre = new XYZ(
-                    (Math.Max(boxA.Min.X, b.Box!.Min.X) + Math.Min(boxA.Max.X, b.Box.Max.X)) / 2,
-                    (Math.Max(boxA.Min.Y, b.Box.Min.Y) + Math.Min(boxA.Max.Y, b.Box.Max.Y)) / 2,
-                    (Math.Max(boxA.Min.Z, b.Box.Min.Z) + Math.Min(boxA.Max.Z, b.Box.Max.Z)) / 2);
-                var key = ClashAcceptance.MakeKey(RevitCompat.IdValue(a.Id), RevitCompat.IdValue(hitId), RevitCompat.FtToMm(centre.X), RevitCompat.FtToMm(centre.Y), RevitCompat.FtToMm(centre.Z));
+                    (Math.Max(boxA.Min.X, b.Min.X) + Math.Min(boxA.Max.X, b.Max.X)) / 2,
+                    (Math.Max(boxA.Min.Y, b.Min.Y) + Math.Min(boxA.Max.Y, b.Max.Y)) / 2,
+                    (Math.Max(boxA.Min.Z, b.Min.Z) + Math.Min(boxA.Max.Z, b.Max.Z)) / 2);
+                var key = ClashAcceptance.MakeKey(RevitCompat.IdValue(a.Id), RevitCompat.IdValue(b.Element.Id), RevitCompat.FtToMm(centre.X), RevitCompat.FtToMm(centre.Y), RevitCompat.FtToMm(centre.Z));
                 if (!seen.Add(key)) continue;
                 if (accepted.Contains(key))
                 {
@@ -93,7 +136,7 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
                     continue;
                 }
 
-                clashes.Add(new Clash(a, b.Element, centre, key));
+                clashes.Add(new Clash(a, b.Element, centre, key, b.LinkName));
                 if (config.MaxResults > 0 && clashes.Count >= config.MaxResults)
                 {
                     result.Messages.Add($"Đạt giới hạn {config.MaxResults} va chạm — dừng quét.");
@@ -128,12 +171,158 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
 
         foreach (var c in clashes.Take(500))
         {
-            result.Messages.Add($"Va chạm {c.A.Id} ({c.A.Category?.Name}) × {c.B.Id} ({c.B.Category?.Name}) tại ({RevitCompat.FtToMm(c.Centre.X):F0},{RevitCompat.FtToMm(c.Centre.Y):F0},{RevitCompat.FtToMm(c.Centre.Z):F0}) mm  key={c.Key}");
+            var bDesc = c.LinkName == null ? $"{c.B.Id}" : $"{c.B.Id} (link \"{c.LinkName}\")";
+            result.Messages.Add($"Va chạm {c.A.Id} ({c.A.Category?.Name}) × {bDesc} ({c.B.Category?.Name}) tại ({RevitCompat.FtToMm(c.Centre.X):F0},{RevitCompat.FtToMm(c.Centre.Y):F0},{RevitCompat.FtToMm(c.Centre.Z):F0}) mm  key={c.Key}");
+        }
+
+        var inDocument = elementsB.Count(c => c.LinkName == null);
+        var inLinks = elementsB.Count - inDocument;
+        result.Messages.Add($"Nhóm B xét tới: {inDocument} phần tử trong file, {inLinks} từ model liên kết.");
+        foreach (var line in linkSummary)
+        {
+            result.Messages.Add("  Link — " + line);
         }
 
         result.Summary = $"Tìm thấy {clashes.Count} va chạm ({skippedAccepted} đã chấp nhận, bỏ qua) → \"{config.OutputPath}\".";
+
+        // "0 va chạm" là kết luận người ta TIN VÀ LÀM THEO, nên nó phải kèm cơ sở: xét bao nhiêu phần tử,
+        // từ đâu. Bản trước chỉ có con số 0 trơ trọi, và trên file MEP link kết cấu thì con số đó luôn là 0.
+        if (clashes.Count == 0)
+        {
+            result.Summary += elementsB.Count == 0
+                ? (config.IncludeLinkedModels
+                    ? " Không có phần tử nhóm B nào để xét, kể cả trong model liên kết — kiểm lại link đã nạp chưa."
+                    : " Không có phần tử nhóm B nào trong file này và includeLinkedModels đang tắt — bật lên nếu nhóm B nằm ở model liên kết.")
+                : $" Đã xét {elementsA.Count} × ({inDocument} trong file + {inLinks} từ model liên kết).";
+        }
+        else if (inLinks > 0)
+        {
+            var fromLinks = clashes.Count(c => c.LinkName != null);
+            result.Summary += $" Trong đó {fromLinks} va chạm với model liên kết.";
+        }
         result.AffectedCount = clashes.Count;
         return result;
+    }
+
+
+    /// <summary>
+    /// Phần tử nhóm B kèm hộp bao ở toạ độ file chủ. Link xoay thì hộp bao dựng lại từ tám đỉnh —
+    /// lấy hai điểm min/max qua phép biến đổi là sai khi có xoay.
+    /// </summary>
+    private static Candidate? Describe(Element element, Transform? transform, string? linkName)
+    {
+        var box = element.get_BoundingBox(null);
+        if (box == null) return null;
+
+        if (transform == null)
+        {
+            return new Candidate(element, box.Min, box.Max, null, null);
+        }
+
+        double minX = double.MaxValue, minY = double.MaxValue, minZ = double.MaxValue;
+        double maxX = double.MinValue, maxY = double.MinValue, maxZ = double.MinValue;
+        for (var i = 0; i < 8; i++)
+        {
+            var corner = transform.OfPoint(new XYZ(
+                (i & 1) == 0 ? box.Min.X : box.Max.X,
+                (i & 2) == 0 ? box.Min.Y : box.Max.Y,
+                (i & 4) == 0 ? box.Min.Z : box.Max.Z));
+            minX = Math.Min(minX, corner.X); maxX = Math.Max(maxX, corner.X);
+            minY = Math.Min(minY, corner.Y); maxY = Math.Max(maxY, corner.Y);
+            minZ = Math.Min(minZ, corner.Z); maxZ = Math.Max(maxZ, corner.Z);
+        }
+
+        return new Candidate(element, new XYZ(minX, minY, minZ), new XYZ(maxX, maxY, maxZ), transform, linkName);
+    }
+
+    /// <summary>
+    /// Lọc tinh (solid × solid) sau bước hộp bao.
+    /// <para>
+    /// Ứng viên cùng file dùng <see cref="ElementIntersectsElementFilter"/> như cũ. Ứng viên ở link thì
+    /// KHÔNG dùng được filter đó (nó so trong một document), nên đưa solid của A về toạ độ link rồi lọc
+    /// bằng <see cref="ElementIntersectsSolidFilter"/> ngay trong document của link — vẫn là phép so
+    /// solid thật, không rơi về mức hộp bao.
+    /// </para>
+    /// </summary>
+    private static List<Candidate> PreciseHits(Document document, Element a, List<Candidate> candidates, CommandResult result)
+    {
+        var hits = new List<Candidate>();
+
+        var sameDoc = candidates.Where(c => c.LinkName == null).ToList();
+        if (sameDoc.Count > 0)
+        {
+            try
+            {
+                var ids = new FilteredElementCollector(document, sameDoc.Select(c => c.Element.Id).ToList())
+                    .WherePasses(new ElementIntersectsElementFilter(a))
+                    .ToElementIds();
+                hits.AddRange(sameDoc.Where(c => ids.Contains(c.Element.Id)));
+            }
+            catch (Exception ex)
+            {
+                result.Messages.Add($"{a.Id}: không kiểm được solid ({ex.Message}) — dùng kết quả bounding box.");
+                hits.AddRange(sameDoc);
+            }
+        }
+
+        foreach (var group in candidates.Where(c => c.LinkName != null).GroupBy(c => c.LinkName))
+        {
+            var list = group.ToList();
+            var transform = list[0].Transform!;
+            var solid = FirstSolid(a);
+            if (solid == null)
+            {
+                // Không lấy được solid của A (phần tử suy biến, geometry rỗng) — giữ kết quả hộp bao và
+                // nói rõ, thay vì âm thầm bỏ qua cả nhóm link.
+                result.Messages.Add($"{a.Id}: không lấy được solid — va chạm với link \"{group.Key}\" chỉ ở mức hộp bao.");
+                hits.AddRange(list);
+                continue;
+            }
+
+            try
+            {
+                var inLinkCoords = SolidUtils.CreateTransformed(solid, transform.Inverse);
+                var linkDoc = list[0].Element.Document;
+                var ids = new FilteredElementCollector(linkDoc, list.Select(c => c.Element.Id).ToList())
+                    .WherePasses(new ElementIntersectsSolidFilter(inLinkCoords))
+                    .ToElementIds();
+                hits.AddRange(list.Where(c => ids.Contains(c.Element.Id)));
+            }
+            catch (Exception ex)
+            {
+                result.Messages.Add($"{a.Id}: không kiểm được solid với link \"{group.Key}\" ({ex.Message}) — dùng kết quả bounding box.");
+                hits.AddRange(list);
+            }
+        }
+
+        return hits;
+    }
+
+    private static Solid? FirstSolid(Element element)
+    {
+        try
+        {
+            var geometry = element.get_Geometry(new Options { ComputeReferences = false, DetailLevel = ViewDetailLevel.Coarse });
+            if (geometry == null) return null;
+
+            foreach (var obj in geometry)
+            {
+                if (obj is Solid s && s.Volume > 1e-9) return s;
+                if (obj is GeometryInstance gi)
+                {
+                    foreach (var inner in gi.GetInstanceGeometry())
+                    {
+                        if (inner is Solid s2 && s2.Volume > 1e-9) return s2;
+                    }
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // Không đọc được geometry thì coi như không có solid — người gọi tự xử lý.
+        }
+
+        return null;
     }
 
     private static void WriteHtml(Document doc, ClashDetectionConfig config, List<Clash> clashes, int skipped)

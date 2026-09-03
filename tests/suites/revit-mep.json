@@ -176,7 +176,7 @@
       "//": "Snowdon HVAC chi co duct, khong co ong thoat. Ca nay chot dung dieu do: lenh phai noi 'khong co ong nao khop bo loc' chu khong bao thanh cong voi 0 ong. Duong thanh cong cua SlopePipes nam o bo revit-plumbing.json."
     },
     {
-      "name": "Dò va chạm nội bộ",
+      "name": "Dò va chạm MEP × kết cấu (kết cấu nằm ở model liên kết)",
       "command": "ClashDetection",
       "config": {
         "categoriesA": [
@@ -190,8 +190,19 @@
       },
       "expect": {
         "success": true,
-        "maxMs": 180000
-      }
+        "minAffected": 1,
+        "maxMs": 60000,
+        "summaryNotContains": [
+          "Không có phần tử nhóm B nào để xét"
+        ],
+        "filesExist": [
+          "{outputFolder}/clash.html"
+        ],
+        "neverContains": [
+          "Exception"
+        ]
+      },
+      "//": "Ducts trong file MEP, Structural Framing trong model kien truc/ket cau LIEN KET. Truoc khi ClashDetection biet doc link, ca nay ra 0 va cham va xanh — mot bao cao va cham noi 'khong co va cham' la thu nguoi ta tin va lam theo. minAffected 1 chot lai dieu do."
     },
     {
       "name": "Áp kích thước từ chính CSV vừa đề xuất",

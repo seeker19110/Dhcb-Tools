@@ -664,3 +664,51 @@ lần đo cũ — nên chạy hết mọi bộ ca kiểm trên `main` sau khi me
 
 Ca bỏ qua là `SleeveAuto` trong bộ `smoke` — model kiến trúc không có hệ MEP, ca thật của nó nằm ở bộ
 `mep`; lý do ghi trong `skipReason` và `SuiteCoverageTests` chốt rằng mọi ca bỏ qua đều phải có lý do.
+
+---
+
+## 16. Cùng lỗi ở `ClashDetection` — 0 → 7 va chạm (2026-09-03 18:25 ICT)
+
+Sau §14, câu hỏi tự nhiên là: **lệnh nào khác cũng mù model liên kết?** Rà `FilteredElementCollector`
+trên category kiến trúc/kết cấu tìm ra ngay `ClashDetection` — và đây là ca nặng hơn `SleeveAuto`:
+
+> Một báo cáo va chạm nói *"không có va chạm"* là kết luận người ta **tin và làm theo**.
+
+Bằng chứng có sẵn trong chính báo cáo cũ: ca *"Dò va chạm nội bộ"* (`Ducts × Structural Framing`) trên
+model HVAC báo **0 va chạm** và xanh, vì dầm nằm ở model kết cấu liên kết.
+
+### Sửa
+
+- Nhóm B lấy thêm từ mọi `RevitLinkInstance` đã nạp. **Category phải tra trong chính link** — id
+  category là của từng document, dùng id của file chủ là không khớp gì cả.
+- Lọc tinh vẫn là **solid × solid**, không rơi về hộp bao: đưa solid của A về toạ độ link bằng
+  `SolidUtils.CreateTransformed(solid, transform.Inverse)` rồi lọc bằng `ElementIntersectsSolidFilter`
+  ngay trong document của link (`ElementIntersectsElementFilter` chỉ so trong một document).
+- Hộp bao của phần tử link dựng từ **tám đỉnh** — link xoay thì lấy hai điểm min/max qua phép biến đổi
+  là sai.
+- `0 va chạm` nay luôn kèm cơ sở: xét bao nhiêu phần tử, từ file hay từ link, hoặc "không có phần tử
+  nhóm B nào để xét — kiểm lại link đã nạp chưa".
+
+### Đo trên model thật (Snowdon HVAC + link kết cấu)
+
+| | Trước | Sau |
+|---|---:|---:|
+| Va chạm tìm được | **0** | **7** (đều với model liên kết) |
+| Thời gian | 31 ms | 1.023 ms |
+
+Ca kiểm nay chốt `minAffected: 1` và `maxMs: 60000`. Bộ `mep`: **17/17**; bộ `smoke` (clash `Walls ×
+Doors` cùng document) vẫn **27/0/1** — nhánh cùng-file không hồi quy.
+
+### Rà nốt: còn lệnh nào mù model liên kết?
+
+| Lệnh | Kết luận |
+|---|---|
+| `SleeveAuto` | ✅ đã sửa (§14) |
+| `ClashDetection` | ✅ đã sửa (§16) |
+| `AutoRoute` | ⬜ **còn mù** — quét vật cản (`Walls`, `Floors`, `StructuralFraming`, `StructuralColumns`) chỉ trong file đang mở, nên tuyến đề xuất có thể xuyên qua dầm/tường bên link. Đang gắn nhãn *thử nghiệm* theo roadmap nên chưa sửa vội, nhưng phải sửa trước khi bỏ nhãn đó |
+| `DevicePlacement` | ⬜ **còn mù** — đọc `OST_Rooms` trong file đang mở; hồ sơ tách file thì Room nằm ở model kiến trúc. Trên file MEP thuần, lệnh sẽ không thấy phòng nào |
+| `ConnectorChecker`, `ParameterRuleCheck`, `HealthReport` | Không cần: chúng chỉ xét phần tử của chính file, đúng ý nghĩa |
+
+Hai lệnh còn mù đã ghi vào [`progress.md`](progress.md) mục *Còn mở* — sửa theo cùng khuôn
+(`includeLinkedModels` + biến đổi toạ độ + nói rõ nguồn), nhưng cần model mẫu có Room/vật cản bên link
+để chốt bằng số thật, không sửa mò.
