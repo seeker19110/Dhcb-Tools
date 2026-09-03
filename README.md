@@ -1,4 +1,4 @@
-# DHCB Tools — Revit & AutoCAD
+﻿# DHCB Tools — Revit & AutoCAD
 
 Add-in **2-trong-1** (C#) tự động hoá các tác vụ lặp lại cho kỹ sư xây dựng, chạy trực tiếp trên **Revit desktop**
 và **AutoCAD desktop**, có **batch chạy đêm**, **HTTP Bridge/MCP cho agent AI**, và **lớp AI offline** (heuristic +
@@ -145,6 +145,10 @@ Packages: Revit `Nice3point.Revit.Api.RevitAPI/RevitAPIUI`, AutoCAD `AutoCAD.NET
 ```powershell
 git tag v1.0.0 && git push origin v1.0.0   # kích hoạt release.yml
 ```
+
+## Gặp lỗi có mã `E-...`?
+
+Tra ở [`docs/ma-loi.md`](docs/ma-loi.md) — mỗi mã kèm nghĩa, khi nào gặp và cách xử lý.
 
 ## Cài đặt và kiểm thử trên máy thật
 
