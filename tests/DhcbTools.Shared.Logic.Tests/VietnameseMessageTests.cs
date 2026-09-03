@@ -1,4 +1,4 @@
-using Xunit;
+﻿using Xunit;
 
 namespace DhcbTools.Shared.Logic.Tests;
 
@@ -68,4 +68,54 @@ public class VietnameseMessageTests
 
         Assert.True(hits.Count == 0, "Thông báo còn tiếng Anh: " + string.Join("; ", hits));
     }
+
+    /// <summary>
+    /// Tên transaction hiện trong danh sách <b>Undo</b> của Revit — kỹ sư đọc nó mỗi lần muốn hoàn tác.
+    /// Vòng rà 2026-09-03 thấy hai cái còn viết không dấu (<c>"DHCB - Tao luoi truc"</c>,
+    /// <c>"DHCB - Tao tang va view plan"</c>) lọt qua vì danh sách mẫu tiếng Anh không bắt được chữ
+    /// Việt không dấu. Test này kiểm theo hướng ngược lại: tên phải CÓ dấu tiếng Việt.
+    /// </summary>
+    [Fact]
+    public void TenTransaction_PhaiCoDauTiengViet()
+    {
+        var pattern = new System.Text.RegularExpressions.Regex(
+            @"(?:new Transaction|StartTransaction)\(\s*doc(?:ument)?\s*,\s*""([^""]+)""");
+
+        var thieuDau = new List<string>();
+        foreach (var file in CoreFiles("DhcbTools.Core"))
+        {
+            foreach (System.Text.RegularExpressions.Match m in pattern.Matches(File.ReadAllText(file)))
+            {
+                var name = m.Groups[1].Value;
+                if (!name.Any(CoDauTiengViet))
+                {
+                    thieuDau.Add($"{Path.GetFileName(file)}: \"{name}\"");
+                }
+            }
+        }
+
+        Assert.True(thieuDau.Count == 0,
+            "Tên transaction (hiện trong danh sách Undo của Revit) còn viết không dấu: " + string.Join("; ", thieuDau));
+    }
+
+    /// <summary>
+    /// Báo cáo HTML là thứ kỹ sư gửi cho chủ đầu tư — tiêu đề tiếng Anh trong đó lộ ngay ra ngoài.
+    /// </summary>
+    [Fact]
+    public void BaoCaoHtml_TieuDeBangTiengViet()
+    {
+        var source = File.ReadAllText(Path.Combine(RepoRoot(), "src", "DhcbTools.Core", "Health", "HealthReportCommand.cs"));
+
+        Assert.DoesNotContain("DHCB Health Report", source);
+        Assert.Contains("Báo cáo sức khoẻ mô hình", source);
+    }
+
+    private static IEnumerable<string> CoreFiles(string projectFolder) =>
+        Directory
+            .EnumerateFiles(Path.Combine(RepoRoot(), "src", projectFolder), "*.cs", SearchOption.AllDirectories)
+            .Where(f => !f.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                        && !f.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.Ordinal));
+
+    private static bool CoDauTiengViet(char c) =>
+        "ăâđêôơưàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵĂÂĐÊÔƠƯ".IndexOf(c) >= 0;
 }

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Autodesk.Revit.DB;
 using DhcbTools.Core.MEPF;
 using DhcbTools.Shared.Logic;
@@ -159,5 +159,5 @@ public sealed class ElevationUpdater : IUpdater
 
     public UpdaterId GetUpdaterId() => _id;
 
-    public string GetUpdaterName() => "DHCB Elevation Updater";
+    public string GetUpdaterName() => "DHCB — Cập nhật cao độ MEP";
 }

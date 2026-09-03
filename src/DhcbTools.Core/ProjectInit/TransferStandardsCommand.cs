@@ -1,4 +1,4 @@
-using Autodesk.Revit.DB;
+﻿using Autodesk.Revit.DB;
 
 namespace DhcbTools.Core.ProjectInit;
 
@@ -109,7 +109,7 @@ public sealed class TransferStandardsCommand : ICoreCommand<TransferStandardsCon
             var options = new CopyPasteOptions();
             options.SetDuplicateTypeNamesHandler(handler);
 
-            using var tx = RevitCompat.StartTransaction(document, "DHCB - Transfer standards");
+            using var tx = RevitCompat.StartTransaction(document, "DHCB - Chuyển tiêu chuẩn");
             foreach (var g in groups.Where(g => g.Value.Count > 0))
             {
                 try
