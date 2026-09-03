@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Autodesk.Revit.DB;
 using DhcbTools.Shared.Logic;
 
@@ -99,7 +99,17 @@ public static class RevitCompat
                 && string.Equals(t.FamilyName, family, StringComparison.OrdinalIgnoreCase));
         }
 
-        return types.FirstOrDefault(t => t.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0);
+        var byTypeName = types.FirstOrDefault(t => t.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0);
+        if (byTypeName != null)
+        {
+            return byTypeName;
+        }
+
+        // Người dùng (và agent) hay gõ TÊN FAMILY chứ không phải tên type — "HeatRecoveryUnit" thay vì
+        // "HeatRecoveryUnit: 1200x600". HangerAuto/SleeveAuto nhận được vì dùng FindFamilySymbol, còn
+        // DevicePlacement thì không: cùng một sản phẩm mà hai lệnh hiểu tên khác nhau là bẫy cho người
+        // dùng. Khớp theo tên family là bước cuối, sau khi đã thử đúng tên type.
+        return types.FirstOrDefault(t => t.FamilyName.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0);
     }
 
     /// <summary>
