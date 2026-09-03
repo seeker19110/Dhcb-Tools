@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Autodesk.Revit.DB;
 using DhcbTools.Shared.Logic;
 using DhcbTools.Shared.Logic.Mep;
@@ -194,7 +194,7 @@ public sealed class StylePurgeCommand : ICoreCommand<StylePurgeConfig>
         }
 
         var deleted = 0;
-        using var tx = RevitCompat.StartTransaction(document, "DHCB - Purge style");
+        using var tx = RevitCompat.StartTransaction(document, "DHCB - Dọn style thừa");
         foreach (var (id, kind, name) in toDelete)
         {
             try

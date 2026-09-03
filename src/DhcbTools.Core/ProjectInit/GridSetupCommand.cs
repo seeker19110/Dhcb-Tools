@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
 using Autodesk.Revit.DB;
@@ -18,7 +18,7 @@ namespace DhcbTools.Core.ProjectInit
             var messages = new StringBuilder();
             int created = 0;
 
-            using (var tx = new Transaction(doc, "DHCB - Tao luoi truc"))
+            using (var tx = new Transaction(doc, "DHCB - Tạo lưới trục"))
             {
                 RevitCompat.ApplyFailurePolicy(tx);
                 tx.Start();

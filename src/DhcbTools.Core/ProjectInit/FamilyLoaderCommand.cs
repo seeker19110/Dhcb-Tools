@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -41,7 +41,7 @@ namespace DhcbTools.Core.ProjectInit
                 if (config.DryRun)
                 { messages.AppendLine("[Xem trước] Sẽ nạp: " + famName); loaded++; continue; }
 
-                using (var tx = new Transaction(doc, "DHCB - Load family: " + famName))
+                using (var tx = new Transaction(doc, "DHCB - Nạp family: " + famName))
                 {
                     RevitCompat.ApplyFailurePolicy(tx);
                     tx.Start();

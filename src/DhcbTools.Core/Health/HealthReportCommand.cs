@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -189,7 +189,7 @@ public sealed class HealthReportCommand : ICoreCommand<HealthReportConfig>
         sb.AppendLine("<head>");
         sb.AppendLine("<meta charset=\"UTF-8\">");
         sb.AppendLine("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">");
-        sb.AppendLine($"<title>DHCB Health Report – {projectName}</title>");
+        sb.AppendLine($"<title>DHCB — Báo cáo sức khoẻ mô hình – {projectName}</title>");
         sb.AppendLine("<style>");
         sb.AppendLine("  body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #f5f5f5; color: #222; }");
         sb.AppendLine("  .header { background: #1a1a2e; color: #fff; padding: 24px 32px; }");
@@ -213,7 +213,7 @@ public sealed class HealthReportCommand : ICoreCommand<HealthReportConfig>
         sb.AppendLine("</head>");
         sb.AppendLine("<body>");
         sb.AppendLine("<div class=\"header\">");
-        sb.AppendLine($"  <h1>🏗️ DHCB Health Report</h1>");
+        sb.AppendLine($"  <h1>🏗️ DHCB — Báo cáo sức khoẻ mô hình</h1>");
         sb.AppendLine($"  <div class=\"meta\">");
         sb.AppendLine($"    <strong>{HtmlEncode(projectName)}</strong> &nbsp;|&nbsp; #{HtmlEncode(projectNumber)} &nbsp;|&nbsp; {date}");
         sb.AppendLine($"    <br>{HtmlEncode(filePath)}");

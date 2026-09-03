@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Autodesk.Revit.DB;
 using DhcbTools.Shared.Logic;
 
@@ -140,7 +140,7 @@ public sealed class ViewportCopyCommand : ICoreCommand<ViewportCopyConfig>
         }
 
         var done = 0;
-        using var tx = RevitCompat.StartTransaction(document, "DHCB - Copy viewport");
+        using var tx = RevitCompat.StartTransaction(document, "DHCB - Chép viewport");
         foreach (var t in targets)
         {
             foreach (var lg in legends)
