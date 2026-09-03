@@ -19,7 +19,6 @@
     "model mẫu không có family hanger/sleeve chuyên dụng nào; phần được kiểm ở đây là đường ghi, không",
     "phải tính đúng đắn của loại family.",
     "",
-    "LƯU Ý THẬT THÀ: hai ca SleeveAuto ở cuối chưa chứng minh được đường ghi — trên model mẫu lệnh không",
     "tìm thấy giao cắt nào nên cả hai lần đều 'đã đặt 0 sleeve'. Chỉ cặp HangerAuto (1120 → 0) là bằng chứng."
   ],
   "cases": [
@@ -71,7 +70,7 @@
       }
     },
     {
-      "name": "Sleeve — chạy trọn đường ghi (model mẫu không có giao cắt nào)",
+      "name": "Sleeve — bản chép mất link, lệnh phải NÓI RA thay vì báo 0 trơ trọi",
       "command": "SleeveAuto",
       "allowWrite": true,
       "config": {
@@ -83,6 +82,10 @@
       },
       "expect": {
         "success": true,
+        "maxAffected": 0,
+        "summaryContains": [
+          "Không có tường/sàn nào để xét"
+        ],
         "summaryNotContains": [
           "Xem trước"
         ],
@@ -91,10 +94,10 @@
         ],
         "maxMs": 300000
       },
-      "//": "Ca nay CHUA chung minh duoc duong ghi cua SleeveAuto: tren model mau lenh tim thay 0 giao cat nen 'da dat 0 sleeve' ca hai lan. Giu lai vi no van chay tron nhanh ghi (tim family, quet giao cat, mo/commit transaction) ma khong nem. Muon chung minh that thi can model co giao cat MEP x tuong/san — ghi trong docs/bang-chung-test.md §12."
+      "//": "Bo ghi that chay tren BAN CHEP dat o thu muc ket qua; link cua Snowdon luu theo duong dan tuong doi nen canh ban chep khong co file kien truc — Revit khong giai duoc link. Day la gioi han cua bo test, khong phai loi lenh. Cai ca nay kiem: gap tinh huong do lenh phai noi ro 'khong co tuong/san nao de xet', chu khong tra so 0 tron troi de nguoi doc tuong model khong co giao cat. Duong ghi that cua SleeveAuto van la NO — can model co link giai duoc."
     },
     {
-      "name": "Sleeve lần hai — chạy lại không ném",
+      "name": "Sleeve lần hai — vẫn nói ra lý do, không ném",
       "command": "SleeveAuto",
       "allowWrite": true,
       "config": {
@@ -104,9 +107,13 @@
           "Pipes"
         ]
       },
-      "//": "Cung ly do voi ca tren: chua chung minh duoc gi ngoai viec chay lai duoc.",
+      "//": "Cung ly do voi ca tren.",
       "expect": {
         "success": true,
+        "maxAffected": 0,
+        "summaryContains": [
+          "Không có tường/sàn nào để xét"
+        ],
         "summaryNotContains": [
           "Xem trước"
         ],

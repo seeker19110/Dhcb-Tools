@@ -569,3 +569,52 @@ $ python scripts/dhcb_agent.py revit exec HealthReport --config '{"outputPath":"
 
 Phần thuần (`BridgeJob`, `BridgeJobStore`) có 7 test, đường HTTP có 3 test chạy trên server thật trong
 tiến trình test — gồm cả ca "lệnh còn đang chạy thì `/progress` phải trả `running`".
+
+---
+
+## 14. `SleeveAuto` không nhìn thấy model liên kết — 0 → 345 (2026-09-03 14:40 ICT)
+
+Hai ca `SleeveAuto` ở §12 "xanh" mà không chứng minh được gì: lệnh báo *"Đã đặt 0 sleeve"* trên cả hai
+lượt. Ghi là nợ với giả định "model mẫu không có giao cắt". **Giả định đó sai.**
+
+Model Snowdon Towers HVAC **không có tường/sàn nào của riêng nó** — tường nằm ở model kiến trúc **liên
+kết**. `SleeveCommand` chỉ dựng `FilteredElementCollector` trên `document`, nên không thấy gì để giao
+cắt, trả về 0 và **báo thành công**. Đây đúng là cách hồ sơ Việt Nam được tổ chức (file MEP link file
+kiến trúc), nghĩa là lệnh gần như **chưa từng dùng được trên dự án thật** mà vẫn luôn xanh.
+
+### Sửa
+
+- `includeLinkedModels` (mặc định **bật**) + `linkNameContains`: quét tường/sàn của mọi
+  `RevitLinkInstance` đã nạp, kèm `GetTotalTransform()` để đưa về toạ độ file chủ. Link xoay thì hộp bao
+  dựng lại từ **tám đỉnh**, không chỉ hai điểm min/max.
+- Host nằm trong link thì **không host được** (Revit không cho tạo family instance bám mặt phần tử của
+  link) — đặt tự do tại điểm giao và nói rõ trong Summary, thay vì lặng lẽ đặt kiểu khác.
+- `ElementIntersectsSolidFilter` chỉ áp cho host **cùng file**: nó so trong một document, đưa phần tử
+  của link vào là sai kết quả.
+- Số 0 không còn trơ trọi: Summary nói luôn *"Không có tường/sàn nào để xét, kể cả trong model liên
+  kết — kiểm lại link đã nạp chưa"* hoặc *"Đã xét N tường/sàn trong file + M từ model liên kết trên K
+  phần tử MEP nhưng không có giao cắt nào"*. Báo cáo batch chỉ in Summary, nên lời giải thích nằm trong
+  `Messages` là lời giải thích không ai đọc.
+
+### Đo trên model thật (Revit 2024.3, Snowdon Towers HVAC + link kiến trúc)
+
+| | Trước | Sau khi đọc link | Sau khi tối ưu |
+|---|---:|---:|---:|
+| Sleeve tìm được | **0** | **345** | **345** |
+| Thời gian | 0,2 s | **49,8 s** ❌ | **1,2 s** ✅ |
+
+49,8 s là ngưỡng chết: Bridge mặc định chờ 30 s. Nguyên nhân lộ ra ngay từ vòng đo — `get_BoundingBox`
+gọi lại cho **từng** ứng viên host bên trong vòng lặp **từng** phần tử MEP (1.053 MEP × hàng nghìn
+tường/sàn của link). Nay hộp bao tính **một lần** lúc dựng ứng viên, ở toạ độ file chủ: **nhanh 41 lần**,
+kết quả không đổi.
+
+Bộ `revit-mep.json`: **17 đạt / 0 trượt trên 17 ca**, ca sleeve nay chốt `minAffected: 1` (chống hồi quy
+"0 sleeve vì không đọc link") và `maxMs: 10000` (chống hồi quy hiệu năng).
+
+### Đường ghi của `SleeveAuto` vẫn là nợ
+
+Bộ ghi thật chạy trên **bản chép** đặt ở thư mục kết quả; link của Snowdon lưu theo đường dẫn tương đối
+nên cạnh bản chép không có file kiến trúc — Revit không giải được link. Đó là **giới hạn của bộ test**,
+không phải lỗi lệnh. Hai ca sleeve trong `revit-write-mep.json` nay kiểm đúng điều kiểm được: gặp tình
+huống ấy lệnh phải **nói ra lý do**, chứ không trả số 0 trơ trọi. Muốn chốt đường ghi thật cho
+`SleeveAuto` thì cần model có link giải được từ vị trí bản chép.

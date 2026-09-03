@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace DhcbTools.Core.MEPF;
 
@@ -24,5 +24,15 @@ public sealed class SleeveConfig
     public List<string> HostTypeNames { get; init; } = new List<string>();
 
     /// <summary>If true, compute and report placements without writing to the model.</summary>
+    /// <summary>
+    /// Xét cả tường/sàn ở model LIÊN KẾT (mặc định bật). Dự án Việt Nam hầu như luôn tách file MEP và
+    /// kiến trúc rồi link vào nhau, nên tắt cái này là lệnh không tìm thấy giao cắt nào mà vẫn báo
+    /// thành công.
+    /// </summary>
+    public bool IncludeLinkedModels { get; init; } = true;
+
+    /// <summary>Chỉ xét link có tên chứa một trong các chuỗi này (rỗng = mọi link đã nạp).</summary>
+    public List<string> LinkNameContains { get; init; } = new List<string>();
+
     public bool DryRun { get; init; } = true;
 }
