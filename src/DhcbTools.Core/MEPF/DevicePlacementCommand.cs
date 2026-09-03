@@ -1,4 +1,4 @@
-using Autodesk.Revit.DB;
+﻿using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Architecture;
 using DhcbTools.Shared.Logic.Mep;
 
@@ -29,6 +29,15 @@ public sealed class DevicePatternConfig
 /// <summary>Cấu hình routing mức B (mục 3.2): rải thiết bị đầu cuối theo phòng.</summary>
 public sealed class DevicePlacementConfig
 {
+    /// <summary>
+    /// Xét cả phòng ở model LIÊN KẾT (mặc định bật). File MEP thuần không có phòng nào — phòng nằm ở
+    /// model kiến trúc, nên tắt cái này là lệnh dừng ngay ở bước tìm phòng.
+    /// </summary>
+    public bool IncludeLinkedModels { get; init; } = true;
+
+    /// <summary>Chỉ xét link có tên chứa một trong các chuỗi này (rỗng = mọi link đã nạp).</summary>
+    public List<string> LinkNameContains { get; init; } = new List<string>();
+
     /// <summary>"Family: Type" hoặc tên type của FamilySymbol (sprinkler, miệng gió, đèn…).</summary>
     public required string DeviceFamily { get; init; }
 
@@ -65,17 +74,46 @@ public sealed class DevicePlacementCommand : ICoreCommand<DevicePlacementConfig>
             return CommandResult.Fail($"Không tìm thấy family/type \"{config.DeviceFamily}\" trong mô hình (đã load chưa?).");
         }
 
-        var rooms = new FilteredElementCollector(document).OfCategory(BuiltInCategory.OST_Rooms).WhereElementIsNotElementType()
-            .Cast<Room>()
-            .Where(r => r.Area > 0 && r.Location != null)
-            .Where(r => string.IsNullOrEmpty(config.RoomFilter.LevelName) || string.Equals(r.Level?.Name, config.RoomFilter.LevelName, StringComparison.OrdinalIgnoreCase))
-            .Where(r => string.IsNullOrEmpty(config.RoomFilter.NameContains) || (r.Name ?? string.Empty).IndexOf(config.RoomFilter.NameContains!, StringComparison.OrdinalIgnoreCase) >= 0)
-            .Where(r => config.RoomFilter.MinAreaM2 <= 0 || RevitCompat.SqFtToSqm(r.Area) >= config.RoomFilter.MinAreaM2)
-            .ToList();
+        // Room hầu như luôn nằm ở model KIẾN TRÚC liên kết: file MEP thuần không có phòng nào. Bản trước
+        // chỉ quét document đang mở nên trên đúng cấu hình phổ biến nhất, lệnh dừng ở "không có phòng nào
+        // khớp bộ lọc" — câu đó đổ lỗi cho bộ lọc, trong khi vấn đề là chỗ tìm.
+        var inDocument = RoomsIn(document, config, null, null);
+        var rooms = new List<RoomSource>(inDocument);
+        var resolvedType = $"{symbol.FamilyName}: {symbol.Name}";
+
+        var linkSummary = new List<string>();
+        if (config.IncludeLinkedModels)
+        {
+            foreach (var linkInstance in new FilteredElementCollector(document).OfClass(typeof(RevitLinkInstance)).Cast<RevitLinkInstance>())
+            {
+                var linkDoc = linkInstance.GetLinkDocument();
+                if (linkDoc == null)
+                {
+                    linkSummary.Add($"{linkInstance.Name}: chưa nạp (unloaded) — bỏ qua");
+                    continue;
+                }
+
+                if (config.LinkNameContains.Count > 0 &&
+                    !config.LinkNameContains.Any(f => linkInstance.Name.IndexOf(f, StringComparison.OrdinalIgnoreCase) >= 0))
+                {
+                    continue;
+                }
+
+                var fromLink = RoomsIn(linkDoc, config, linkInstance.GetTotalTransform(), linkInstance.Name);
+                rooms.AddRange(fromLink);
+                linkSummary.Add($"{linkInstance.Name}: {fromLink.Count} phòng khớp bộ lọc");
+            }
+        }
 
         if (rooms.Count == 0)
         {
-            return CommandResult.Fail("Không có phòng nào khớp bộ lọc.");
+            var roomsInFile = new FilteredElementCollector(document).OfCategory(BuiltInCategory.OST_Rooms)
+                .WhereElementIsNotElementType().GetElementCount();
+            return CommandResult.Fail(roomsInFile == 0
+                ? (config.IncludeLinkedModels
+                    ? "Không có phòng nào — cả trong file này lẫn trong model liên kết. Kiểm lại link đã nạp chưa (Manage → Manage Links)."
+                    : "File này không có phòng nào và includeLinkedModels đang tắt — bật lên nếu phòng nằm ở model kiến trúc liên kết.")
+                : $"File có {roomsInFile} phòng nhưng không phòng nào khớp bộ lọc (tầng/tên/diện tích tối thiểu).");
         }
 
         var obstacles = CollectObstacles(document, config.ObstacleCategories);
@@ -90,9 +128,17 @@ public sealed class DevicePlacementCommand : ICoreCommand<DevicePlacementConfig>
         var plans = new List<(Room Room, DevicePlacementPlan Plan, double ZFt)>();
         var result = CommandResult.Ok(string.Empty);
 
-        foreach (var room in rooms)
+        // Nói rõ đã chọn type nào: tra theo tên family có thể ra nhiều type, người dùng phải thấy cái
+        // thực sự được dùng thay vì đoán.
+        if (!string.Equals(resolvedType, config.DeviceFamily, StringComparison.OrdinalIgnoreCase))
         {
-            var boundary = OuterBoundaryMm(room);
+            result.Messages.Add($"Dùng type \"{resolvedType}\" cho \"{config.DeviceFamily}\".");
+        }
+
+        foreach (var source in rooms)
+        {
+            var room = source.Room;
+            var boundary = OuterBoundaryMm(room, source.Transform);
             if (boundary == null || boundary.Count < 3)
             {
                 result.Messages.Add($"Phòng {room.Name} ({room.Id}): không lấy được biên — bỏ qua.");
@@ -157,7 +203,13 @@ public sealed class DevicePlacementCommand : ICoreCommand<DevicePlacementConfig>
     }
 
     /// <summary>Biên ngoài của phòng (vòng dài nhất) đổi sang mm, XY.</summary>
-    internal static List<Point2>? OuterBoundaryMm(Room room)
+    internal static List<Point2>? OuterBoundaryMm(Room room) => OuterBoundaryMm(room, null);
+
+    /// <summary>
+    /// Biên ngoài của phòng, tính bằng mm ở toạ độ FILE CHỦ. Phòng ở model liên kết có toạ độ riêng —
+    /// không đưa về toạ độ file chủ thì thiết bị rơi lệch đúng bằng độ lệch gốc của link.
+    /// </summary>
+    internal static List<Point2>? OuterBoundaryMm(Room room, Transform? transform)
     {
         var loops = room.GetBoundarySegments(new SpatialElementBoundaryOptions { SpatialElementBoundaryLocation = SpatialElementBoundaryLocation.Finish });
         if (loops == null || loops.Count == 0)
@@ -176,7 +228,8 @@ public sealed class DevicePlacementCommand : ICoreCommand<DevicePlacementConfig>
                 var tess = curve.Tessellate();
                 for (var i = 0; i < tess.Count - 1; i++)
                 {
-                    pts.Add(new Point2(RevitCompat.FtToMm(tess[i].X), RevitCompat.FtToMm(tess[i].Y)));
+                    var pt = transform == null ? tess[i] : transform.OfPoint(tess[i]);
+                    pts.Add(new Point2(RevitCompat.FtToMm(pt.X), RevitCompat.FtToMm(pt.Y)));
                 }
             }
 
@@ -195,6 +248,20 @@ public sealed class DevicePlacementCommand : ICoreCommand<DevicePlacementConfig>
 
         return best;
     }
+
+    /// <summary>Một phòng cùng phép biến đổi về toạ độ file chủ (<c>null</c> = phòng cùng file).</summary>
+    private sealed record RoomSource(Room Room, Transform? Transform, string? LinkName);
+
+    /// <summary>Phòng trong một document (file chủ hoặc link) đã lọc theo tầng/tên/diện tích.</summary>
+    private static List<RoomSource> RoomsIn(Document doc, DevicePlacementConfig config, Transform? transform, string? linkName) =>
+        new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Rooms).WhereElementIsNotElementType()
+            .Cast<Room>()
+            .Where(r => r.Area > 0 && r.Location != null)
+            .Where(r => string.IsNullOrEmpty(config.RoomFilter.LevelName) || string.Equals(r.Level?.Name, config.RoomFilter.LevelName, StringComparison.OrdinalIgnoreCase))
+            .Where(r => string.IsNullOrEmpty(config.RoomFilter.NameContains) || (r.Name ?? string.Empty).IndexOf(config.RoomFilter.NameContains!, StringComparison.OrdinalIgnoreCase) >= 0)
+            .Where(r => config.RoomFilter.MinAreaM2 <= 0 || RevitCompat.SqFtToSqm(r.Area) >= config.RoomFilter.MinAreaM2)
+            .Select(r => new RoomSource(r, transform, linkName))
+            .ToList();
 
     private static List<List<Point2>> CollectObstacles(Document doc, List<string> categoryNames)
     {

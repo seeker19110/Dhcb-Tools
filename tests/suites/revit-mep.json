@@ -285,6 +285,32 @@
           "NullReferenceException"
         ]
       }
+    },
+    {
+      "name": "Rải thiết bị theo phòng — phòng nằm ở model kiến trúc liên kết",
+      "command": "DevicePlacement",
+      "//": "File MEP thuan KHONG co phong nao: phong nam o model kien truc lien ket. Truoc khi lenh biet doc link, no dung ngay o 'Khong co phong nao khop bo loc' — cau do do loi cho bo loc trong khi van de la cho tim. Dung family HeatRecoveryUnit vi no CO THAT trong model mau (giong ca sleeve/hanger).",
+      "config": {
+        "deviceFamily": "HeatRecoveryUnit",
+        "pattern": {
+          "spacingXMm": 4000,
+          "spacingYMm": 4000
+        },
+        "roomFilter": {
+          "minAreaM2": 20
+        }
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "summaryNotContains": [
+          "Không có phòng nào"
+        ],
+        "neverContains": [
+          "Exception"
+        ],
+        "maxMs": 120000
+      }
     }
   ]
 }

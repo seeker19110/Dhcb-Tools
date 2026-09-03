@@ -712,3 +712,48 @@ Doors` cùng document) vẫn **27/0/1** — nhánh cùng-file không hồi quy.
 Hai lệnh còn mù đã ghi vào [`progress.md`](progress.md) mục *Còn mở* — sửa theo cùng khuôn
 (`includeLinkedModels` + biến đổi toạ độ + nói rõ nguồn), nhưng cần model mẫu có Room/vật cản bên link
 để chốt bằng số thật, không sửa mò.
+
+---
+
+## 17. `DevicePlacement` — 0 phòng → 44 phòng, và cái bẫy tên family (2026-09-03 18:40 ICT)
+
+Ở §16 tôi ghi `DevicePlacement` là "còn mù nhưng chưa có model để đo". **Nhận định đó sai**: Snowdon
+HVAC link thẳng model kiến trúc, mà Room nằm đúng bên đó — vậy là có model để đo, chỉ là ca kiểm cũ
+dừng quá sớm để chạm tới. Ca cũ dùng family không tồn tại (`DHCB-KHONG-CO-FAMILY`) nên lệnh thoát ngay
+ở bước tra family; phần quét phòng **chưa từng chạy lần nào**.
+
+### Hai lỗi, không phải một
+
+**1. Mù model liên kết.** Room chỉ được quét trong document đang mở, nên trên file MEP thuần lệnh dừng ở
+*"Không có phòng nào khớp bộ lọc"* — câu đó **đổ lỗi cho bộ lọc** trong khi vấn đề là chỗ tìm. Nay:
+
+- quét Room từ mọi `RevitLinkInstance` đã nạp (`includeLinkedModels`, mặc định bật);
+- **biên phòng đưa về toạ độ file chủ** — bỏ bước này thì thiết bị rơi lệch đúng bằng độ lệch gốc của
+  link, sai kiểu khó phát hiện hơn nhiều so với không chạy;
+- câu báo lỗi phân biệt ba tình huống: không có phòng ở đâu cả · có phòng nhưng bộ lọc loại hết ·
+  `includeLinkedModels` đang tắt.
+
+**2. Hai lệnh cùng sản phẩm hiểu tên family khác nhau.** `HangerAuto`/`SleeveAuto` dùng
+`FindFamilySymbol` nên nhận **tên family**; `DevicePlacement` dùng `FindType` vốn chỉ nhận **tên type**
+hoặc `Family: Type`. Cùng chuỗi `"HeatRecoveryUnit"`: chỗ chạy, chỗ báo "không tìm thấy (đã load chưa?)".
+Nay `FindType` thử theo thứ tự *đúng tên type → `Family: Type` → chứa trong tên type → **tên family***,
+và lệnh nói rõ đã chọn type nào — tra theo tên family có thể ra nhiều type, người dùng phải thấy cái
+thực sự được dùng.
+
+Lỗi thứ hai lộ ra vì ca kiểm mới **trượt**. Nếu sửa ca cho khớp mã thay vì hỏi vì sao, cái bẫy vẫn còn
+nguyên cho người dùng.
+
+### Đo trên model thật (Snowdon HVAC + link kiến trúc)
+
+| | Trước | Sau |
+|---|---:|---:|
+| Phòng tìm được | **0** (lệnh thoát) | **44** |
+| Thiết bị lên kế hoạch | — | **551** |
+| Thời gian | — | 267 ms |
+
+Bộ `mep`: **18/18**.
+
+### Còn lại
+
+`AutoRoute` vẫn mù vật cản bên link (tuyến đề xuất có thể xuyên dầm/tường của model liên kết). Nó đang
+mang nhãn *thử nghiệm* theo roadmap; phải sửa trước khi bỏ nhãn đó.
