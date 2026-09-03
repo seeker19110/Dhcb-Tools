@@ -139,6 +139,7 @@ Core/vỏ (kể cả vỏ core-only) trên Linux với API Revit 2025 + AutoCAD 
 | **AutoCAD 2026.1 — batch qua accoreconsole** | 2026-09-03 | Chạy trọn lần đầu sau khi sửa lỗi `DHCB_RUN`; `LayerExport` + `DrawingCleanup` (purge sâu) trên 2 bản vẽ mẫu — §9 |
 | **AutoCAD — bộ ca kiểm tự động, đủ 15/15 lệnh** | 2026-09-03 | **18 đạt / 0 trượt trên 18 ca**; lộ 2 lỗi ghi đè im lặng ở `LayerImport`/`AttributeImport` — §10 |
 | **Đường ghi thật (Revit + AutoCAD)** | 2026-09-03 | **12 đạt / 0 trượt trên 12 ca**, chạy trên bản chép của file mẫu; chuỗi tự chứng minh đã commit thật và tự khôi phục — §11 |
+| **Quét hồi quy sau 10 PR** | 2026-09-03 | **90 đạt / 0 trượt / 1 bỏ qua trên 91 ca**, cả 7 bộ (Revit smoke·mep·plumbing·write·write-mep, AutoCAD smoke·write) — §15 |
 | **`SleeveAuto` đọc model liên kết** | 2026-09-03 | **0 → 345 sleeve** trên Snowdon HVAC (tường nằm ở link kiến trúc); tối ưu hộp bao 49,8 s → **1,2 s**; bộ mep 17/17 — §14 |
 | **Lệnh chạy nền + `/progress/<id>`** | 2026-09-03 | 202 → `running` → `done`, hỏi lại kết quả không mất; 404/401 đúng — §13 |
 | **Đường ghi cho nhóm lệnh tạo phần tử mới** | 2026-09-03 | **11/11 (kiến trúc) + 4/4 (HVAC)**; `HangerAuto` 1120 → 0 sau khi bổ sung chống trùng; lộ lỗi chặn "batch treo ở hộp thoại cảnh báo lúc mở model" — §12 |
