@@ -158,7 +158,93 @@ public sealed class BatchJobRunner
             options.SetOpenWorksetsConfiguration(config);
         }
 
-        return _app.OpenDocumentFile(modelPath, options);
+        var doc = _app.OpenDocumentFile(modelPath, options);
+        LoadUnloadedLinks(doc);
+        return doc;
+    }
+
+    /// <summary>
+    /// Nạp lại mọi link đang ở trạng thái "chưa nạp" — trạng thái link được LƯU theo file (không phải
+    /// theo lần mở), nên một file dù đường dẫn link vẫn đúng vẫn có thể mở lên với link chưa nạp (ví dụ
+    /// kỹ sư lưu lần cuối lúc đang tắt link để nhẹ máy, hoặc <c>SaveAs</c> sau <c>DetachFromCentral</c>
+    /// không giữ lại trạng thái đã nạp — thấy trên dự án GOLDVIEW thật: bản sao nâng cấp báo
+    /// <c>ClashDetection</c> "0 va chạm" trong khi bản gốc cùng file báo 479, chỉ vì cả ba link đều
+    /// "chưa nạp" sau <c>SaveAs</c>). Lệnh nào đọc model liên kết (ClashDetection, SleeveAuto,
+    /// DevicePlacement, AutoRoute) mà link chưa nạp thì âm thầm báo "sạch"/"0 vật cản" — sai lệch nguy
+    /// hiểm hơn một exception, vì trông y hệt kết quả tốt. Lỗi nạp từng link (đường dẫn hỏng, file thiếu)
+    /// không được làm chết cả việc mở file — bắt riêng từng link, ghi vào <see cref="Log"/> để thấy được.
+    /// </summary>
+    private void LoadUnloadedLinks(Document doc)
+    {
+        foreach (var linkType in new FilteredElementCollector(doc).OfClass(typeof(RevitLinkType)).Cast<RevitLinkType>())
+        {
+            if (linkType.GetLinkedFileStatus() == LinkedFileStatus.Loaded)
+            {
+                continue;
+            }
+
+            try
+            {
+                var result = linkType.Load();
+                if (result.LoadResult == LinkLoadResultType.LinkNotFound)
+                {
+                    // Đường dẫn GHI TRONG link (network central, hoặc đường dẫn cũ trước khi SaveAs) không
+                    // giải được nữa — thường xảy ra khi SaveAs sang thư mục khác (xem chú thích trên hàm).
+                    // Thử lại đúng MỘT nước: file cùng tên nằm CẠNH chính file host đang mở, đúng cách bố
+                    // trí phổ biến của hồ sơ Việt Nam (các file kỷ luật tách rời cùng một thư mục dự án).
+                    var retried = TryLoadFromSiblingFolder(doc, linkType, result);
+                    Log?.Invoke($"  Nạp lại link \"{linkType.Name}\": {result.LoadResult}"
+                        + (retried != null ? $" → thử lại cạnh file host: {retried.LoadResult}" : " (không có file cùng tên cạnh file host)"));
+                }
+                else
+                {
+                    Log?.Invoke($"  Nạp lại link \"{linkType.Name}\": {result.LoadResult}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log?.Invoke($"  Không nạp lại được link \"{linkType.Name}\": {ex.Message}");
+            }
+        }
+    }
+
+    private static LinkLoadResult? TryLoadFromSiblingFolder(Document doc, RevitLinkType linkType, LinkLoadResult original)
+    {
+        if (string.IsNullOrEmpty(doc.PathName))
+        {
+            return null;
+        }
+
+        var hostFolder = Path.GetDirectoryName(doc.PathName);
+        if (string.IsNullOrEmpty(hostFolder))
+        {
+            return null;
+        }
+
+        string recordedFileName;
+        try
+        {
+            var externalRef = linkType.GetExternalFileReference();
+            var recordedPath = ModelPathUtils.ConvertModelPathToUserVisiblePath(externalRef.GetAbsolutePath());
+            recordedFileName = Path.GetFileName(recordedPath);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+
+        if (string.IsNullOrEmpty(recordedFileName))
+        {
+            return null;
+        }
+
+        var candidate = Path.Combine(hostFolder, recordedFileName);
+        if (!File.Exists(candidate))
+        {
+            return null;
+        }
+
+        return linkType.LoadFrom(ModelPathUtils.ConvertUserVisiblePathToModelPath(candidate), new WorksetConfiguration(WorksetConfigurationOption.OpenAllWorksets));
     }
 
     private void Save(Document doc, BatchJob job, BatchJobFile file, string outputFolder, string runLogPath, List<RunLogEntry> entries, bool forceDryRun)
