@@ -126,9 +126,34 @@ if (-not (Test-Path $runner)) {
     Stop-WithMessage "Không tìm thấy BatchRunner: $runner (bỏ -SkipBuild để build)"
 }
 
+# Hộp thoại "Security - Unsigned Add-In" chặn việc nạp add-in, và journal không tắt được loại này.
+# Revit nhớ lựa chọn "Always Load" theo chữ ký của DLL, nên MỖI LẦN BUILD LẠI là hỏi lại — tức batch
+# không người trực không bao giờ chạy được nếu chưa xử lý. Theo dõi song song để báo ngay, thay vì để
+# runner ngồi chờ hết giờ (vòng kiểm thử đầu tiên treo 10 phút rưỡi đúng vì chuyện này).
+$watcher = Start-Job -ScriptBlock {
+    for ($i = 0; $i -lt 360; $i++) {
+        Start-Sleep -Seconds 5
+        $dlg = Get-Process -Name Revit -ErrorAction SilentlyContinue |
+               Where-Object { $_.MainWindowTitle -like "*Unsigned Add-In*" }
+        if ($dlg) { return $dlg[0].MainWindowTitle }
+    }
+    return $null
+}
+
 Write-Host "`n== Chạy — Revit sẽ tự mở rồi tự đóng, đừng đụng vào máy trong lúc này`n"
 & $runner --job $jobPath --log-dir $outDir --max-minutes 30
 $exit = $LASTEXITCODE
+
+$blocking = Receive-Job $watcher -ErrorAction SilentlyContinue
+Stop-Job $watcher -ErrorAction SilentlyContinue
+Remove-Job $watcher -Force -ErrorAction SilentlyContinue
+if ($blocking) {
+    Write-Host ""
+    Write-Host "!! Revit dung o hop thoai: $blocking" -ForegroundColor Yellow
+    Write-Host "   Add-in chua ky so nen Revit hoi truoc khi nap, va hoi LAI sau moi lan build." -ForegroundColor Yellow
+    Write-Host "   Xu ly: mo Revit $RevitVersion bang tay, chon 'Always Load', dong Revit, chay lai." -ForegroundColor Yellow
+    Write-Host "   Ben hon: ky so DhcbTools.Revit.dll - xem docs/kiem-thu-trong-revit.md." -ForegroundColor Yellow
+}
 
 # ── 7. Báo cáo ───────────────────────────────────────────────────────────────
 $report = Join-Path $outDir 'in-revit-tests.md'

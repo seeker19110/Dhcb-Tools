@@ -86,6 +86,56 @@ sẽ đỏ hàng loạt mỗi lần đổi model mẫu — rồi người ta s�
 - `SleeveAuto` dựng `FilteredElementCollector` toàn model bên trong vòng lặp → vượt timeout 30 s của Bridge.
 - Lệnh báo *thành công* nhưng không làm gì vì thiếu tham số/family, chỉ ghi một dòng trong `Messages`.
 
+## Ký số add-in — bắt buộc để chạy không người trực
+
+Revit hỏi trước khi nạp add-in chưa ký số, bằng hộp thoại **`Security - Unsigned Add-In`**. Ba điều khiến
+nó là vấn đề thật chứ không phải phiền toái nhỏ:
+
+1. Hộp thoại **chặn hẳn** việc nạp add-in — không bấm thì add-in không bao giờ chạy.
+2. Journal **không tắt được** loại hộp thoại này (`PerformAutomaticActionInErrorDialog` chỉ áp cho hộp
+   thoại lỗi), nên batch không người trực đứng chờ tới hết giờ.
+3. Revit nhớ lựa chọn *Always Load* theo **chữ ký của file**, nên **mỗi lần build lại là hỏi lại**.
+
+Hệ quả: trước khi ký số, batch chạy đêm không thể chạy tự động được. Vòng kiểm thử thật đầu tiên
+(2026-09-03) treo 10 phút rưỡi đúng vì chuyện này, và runner khi đó lại báo nhầm là "chưa cài add-in".
+
+### Ký trên máy dev
+
+```powershell
+.\scripts\sign-addin.ps1 -RevitVersion 2024
+```
+
+Script tự tạo (hoặc dùng lại) một chứng chỉ **tự ký**, cài vào kho `CurrentUser\Root` và
+`CurrentUser\TrustedPublisher` — không cần quyền admin — rồi ký mọi `DhcbTools*.dll` trong thư mục
+add-in và kiểm lại bằng `Get-AuthenticodeSignature`.
+
+Chứng chỉ được **dùng lại giữa các lần build**. Tạo mới mỗi lần thì Revit coi là nhà phát hành khác và
+lại hỏi — đúng cái đang muốn tránh.
+
+### Giới hạn của chứng chỉ tự ký
+
+| | Chứng chỉ tự ký | Chứng chỉ thương mại (OV/EV) |
+|---|---|---|
+| Máy đã cài chứng chỉ | Tin cậy | Tin cậy |
+| Máy khác | **Vẫn hỏi** | Tin cậy |
+| Chi phí | 0 | Có phí, cần xác minh danh tính |
+
+Tự ký giải quyết được máy dev và máy chạy batch của công ty. **Phát hành cho kỹ sư khác thì phải có
+chứng chỉ thương mại** — khi có, truyền vào bằng `-PfxPath`:
+
+```powershell
+.\scripts\sign-addin.ps1 -PfxPath C:\certs\dhcb.pfx -PfxPassword (Read-Host -AsSecureString)
+```
+
+Trong CI, giữ `.pfx` ở GitHub Secrets rồi ký ở bước đóng gói của `release.yml`; **không commit `.pfx`
+vào repo**.
+
+### Khi vẫn thấy hộp thoại
+
+`scripts/run-in-revit-tests.ps1` theo dõi song song và báo ngay nếu thấy hộp thoại này, thay vì để
+runner ngồi chờ hết giờ. Thấy báo thì: mở Revit bằng tay một lần, chọn *Always Load*, đóng Revit, chạy
+lại — hoặc chạy `sign-addin.ps1` để khỏi gặp lại.
+
 ## An toàn với model mẫu
 
 Hai lớp khoá, phải mở cả hai thì mới ghi được vào model:
