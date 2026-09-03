@@ -159,7 +159,9 @@ if ($blocking) {
 $report = Join-Path $outDir 'in-revit-tests.md'
 if (Test-Path $report) {
     Write-Host "`n=================== BÁO CÁO ==================="
-    Get-Content $report | Write-Host
+    # File bao cao ghi UTF-8 khong BOM; Windows PowerShell 5.1 mac dinh doc cp1252 nen tieng Viet
+    # vo het ("kiem thu" thanh "kiá»ƒm thá»­"). File tren dia van dung — chi khau hien thi sai.
+    Get-Content $report -Encoding UTF8 | Write-Host
     Write-Host "===============================================`n"
     Write-Host "TRX: $(Join-Path $outDir 'in-revit-tests.trx')"
 } else {

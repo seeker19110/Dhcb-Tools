@@ -123,6 +123,26 @@ public static class Program
         var journal = Path.Combine(dhcbDir, "dhcb-batch.txt");
         File.WriteAllText(journal, RevitJournal(), new UTF8Encoding(false));
 
+        // Revit chạy bằng journal CHỈ nạp add-in có .addin nằm cùng thư mục với journal (Autodesk cố ý,
+        // để chạy kiểm thử hồi quy không bị add-in lạ xen vào). Không có file này thì add-in bị bỏ qua
+        // hoàn toàn: không lỗi, không hộp thoại, Revit chỉ ngồi im tới hết giờ.
+        var addinDll = FindInstalledAddin(version);
+        if (addinDll is null)
+        {
+            Console.Error.WriteLine("Không tìm thấy DhcbTools.Revit.dll đã cài cho Revit " + version + ".");
+            Console.Error.WriteLine("  Đã tìm trong:");
+            foreach (var dir in AddinSearchDirs(version))
+            {
+                Console.Error.WriteLine("    " + dir);
+            }
+            Console.Error.WriteLine("  Cài add-in trước (installer hoặc scripts/run-in-revit-tests.ps1).");
+            return 2;
+        }
+
+        File.WriteAllText(Path.Combine(dhcbDir, "DhcbTools.Revit.addin"),
+            RevitAddinManifest.Build(addinDll), new UTF8Encoding(false));
+        Console.WriteLine("Add-in cho batch: " + addinDll);
+
         Console.WriteLine($"Mở Revit: {revitExe}");
         using var process = Process.Start(new ProcessStartInfo(revitExe, "\"" + journal + "\" /nosplash") { UseShellExecute = false });
         if (process is null)
@@ -207,6 +227,33 @@ public static class Program
                     + "Xoá tay trước khi mở Revit, nếu không Revit sẽ tự chạy lại job này rồi tự đóng.");
             }
         }
+    }
+
+    /// <summary>Nơi Revit tìm add-in của người dùng và của toàn máy.</summary>
+    private static IEnumerable<string> AddinSearchDirs(int version)
+    {
+        yield return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "Autodesk", "Revit", "Addins", version.ToString());
+
+        yield return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            "Autodesk", "Revit", "Addins", version.ToString());
+    }
+
+    /// <summary>Đường dẫn DhcbTools.Revit.dll đã cài, hoặc null nếu chưa cài.</summary>
+    private static string? FindInstalledAddin(int version)
+    {
+        foreach (var dir in AddinSearchDirs(version))
+        {
+            var dll = Path.Combine(dir, "DhcbTools.Revit.dll");
+            if (File.Exists(dll))
+            {
+                return dll;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
