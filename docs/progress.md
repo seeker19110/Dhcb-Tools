@@ -41,7 +41,7 @@
 | Giai đoạn 7 P1 — khoảng trống so với tool thị trường ([`nghien-cuu-tool-thi-truong-va-ke-hoach.md`](nghien-cuu-tool-thi-truong-va-ke-hoach.md)) | ✅ Mã nguồn (PR #11): SheetRename, RevisionOnSheets, StylePurge, ColorByParameter, FamilyAudit, WarningsExport, checkset ngưỡng; batch autodetect phiên bản Revit + PlotPdf; AI structured outputs + ≤ 8 ứng viên; MCP read-only/nhóm. ⬜ Phần AutoCAD (LayerTranslate, DrawingCompare, BlockQuantity, AttributeIncrement, purge text/dim/regapp) **chưa có mã nguồn** |
 | Giai đoạn 7 P2 | ✅ Mã nguồn (PR #12): SlopePipes, PipeKick, SystemBom, AutoRoute, ScheduleExport, ViewportCopy; vỏ `DhcbTools.AutoCAD.Core` (chỉ AcDbMgd/AcCoreMgd) cho accoreconsole; map năm AutoCAD → package (2026.1+ là .NET 10) |
 | Hướng dẫn cài đặt & kiểm thử thủ công | ✅ (PR #13) [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md) — checklist R1–R48, C1–C17, B1–B12, M1–M4 |
-| Kiểm thử tự động | ✅ **489 test xUnit** (`Shared.Logic` + `Shared.Hosting`), gồm bốn bộ đối chiếu mã nguồn với nhau: `RibbonCoverageTests` (vỏ Revit ↔ bảng lệnh), `CatalogFieldTests` (catalog ↔ property config thật), `SuiteCoverageTests` (42/42 lệnh có ca kiểm chạy trong Revit), `VietnameseMessageTests` (không còn thông báo tiếng Anh trong Core) |
+| Kiểm thử tự động | ✅ **574 test xUnit** (`Shared.Logic` + `Shared.Hosting`), gồm bốn bộ đối chiếu mã nguồn với nhau: `RibbonCoverageTests` (vỏ Revit ↔ bảng lệnh), `CatalogFieldTests` (catalog ↔ property config thật), `SuiteCoverageTests` (42/42 lệnh có ca kiểm chạy trong Revit), `VietnameseMessageTests` (không còn thông báo tiếng Anh trong Core) |
 | CI | ✅ `tests.yml` (test + check-build bằng API package, ubuntu) — xanh |
 | CD | ✅ đóng gói Release thật (Revit 2023/2024/2025, AutoCAD 2024/2025) + GitHub Release khi đẩy tag (`release.yml`, windows-latest) |
 
@@ -141,7 +141,7 @@ Core/vỏ (kể cả vỏ core-only) trên Linux với API Revit 2025 + AutoCAD 
 | **Đường ghi thật (Revit + AutoCAD)** | 2026-09-03 | **12 đạt / 0 trượt trên 12 ca**, chạy trên bản chép của file mẫu; chuỗi tự chứng minh đã commit thật và tự khôi phục — §11 |
 | **Quét hồi quy sau 10 PR** | 2026-09-03 | **90 đạt / 0 trượt / 1 bỏ qua trên 91 ca**, cả 7 bộ (Revit smoke·mep·plumbing·write·write-mep, AutoCAD smoke·write) — §15 |
 | **`SleeveAuto` đọc model liên kết** | 2026-09-03 | **0 → 345 sleeve** trên Snowdon HVAC (tường nằm ở link kiến trúc); tối ưu hộp bao 49,8 s → **1,2 s**; bộ mep 17/17 — §14 |
-| **Bộ tìm đường `AutoRoute`** | 2026-09-03 | **4049 ms → 10 ms**, 58.720 → 5.783 ô mở rộng trên 550 vật cản (đo bản cũ cạnh bản mới); trên Snowdon HVAC **0,3 s → 82 ms** và nói rõ bị bịt kín (**782/12.025 ô**); bộ `mep` **19/19** — §19 |
+| **Bộ tìm đường `AutoRoute`** | 2026-09-03 | **4049 ms → 10 ms**, 58.720 → 5.783 ô mở rộng trên 550 vật cản (đo bản cũ cạnh bản mới); trên Snowdon HVAC **0,3 s → 82 ms** (bước 500 mm) và **17,9 s → 815 ms** (bước 100 mm); thất bại nay chứng minh được tuyến KHÔNG tồn tại thay vì chỉ báo hết giờ; bộ `mep` **20/20** — §19 |
 | **Lệnh chạy nền + `/progress/<id>`** | 2026-09-03 | 202 → `running` → `done`, hỏi lại kết quả không mất; 404/401 đúng — §13 |
 | **Đường ghi cho nhóm lệnh tạo phần tử mới** | 2026-09-03 | **11/11 (kiến trúc) + 4/4 (HVAC)**; `HangerAuto` 1120 → 0 sau khi bổ sung chống trùng; lộ lỗi chặn "batch treo ở hộp thoại cảnh báo lúc mở model" — §12 |
 
@@ -168,9 +168,11 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
 - **`AutoRoute` — chất lượng tuyến chưa chứng minh được.** Phần đọc model liên kết đã sửa (§18: vật cản
   30 → 546); bộ tìm đường cũng đã vá ba lỗi đo được (§19: chậm, heuristic mù hướng, thất bại câm —
   4049 ms → 10 ms trên 550 vật cản), và đã chạy lại trên Snowdon HVAC: bộ `mep` 19/19, `AutoRoute`
-  0,3 s → 82 ms, thất bại nay chỉ đúng nguyên nhân (782/12.025 ô — bị bịt kín). Nhưng **tuyến đi có đúng
-  chỗ không thì vẫn phải người có nghề nhìn** — ca kiểm trên model thật hiện chưa lần nào ra được tuyến,
-  nên chất lượng tuyến vẫn là con số không có. Giữ nhãn *thử nghiệm*.
+  0,3 s → 82 ms (bước 500 mm) và 17,9 s → 815 ms (bước 100 mm). Hai bước lưới cho **cùng một kết luận
+  bằng hai con số độc lập**: hai điểm của ca kiểm không nối thông nhau (782/12.025 và 79.701/1.335.961 ô),
+  tức bị sàn và tường của model liên kết bao kín — không phải giới hạn bộ tìm đường. **Việc còn lại không
+  còn là hiệu năng** mà là chọn được hai điểm trong cùng khoang trần kỹ thuật, nên chất lượng tuyến vẫn là
+  con số không có. Giữ nhãn *thử nghiệm* vì lý do đó, không còn vì chậm.
 - **Chưa kiểm thử trên Revit/AutoCAD thật** cho toàn bộ lệnh — chỉ mới biên dịch với API package. Rủi ro cao nhất theo thứ tự:
   `RouteFromLines` và `PipeKick` (fitting/cút 45° phụ thuộc routing preference), `AutoRoute` (thời gian A* với bước 100 mm
   trên hộp lớn), `TransferStandards` (LineStyles/ObjectStyles không copy được qua API — đã ghi rõ trong Messages),
@@ -191,6 +193,12 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
    `SleeveAuto` cũng xong trong cùng ngày (§14): sửa lệnh để đọc model liên kết, sửa script để chép
    luôn model liên kết cạnh bản chép — chuỗi ghi thật **334 → 0** trên model thật.
 2. Một đêm batch thật trên **dự án thật** (không phải file mẫu) để chốt Giai đoạn 1 đầu-cuối.
+   **Đang chờ đúng một thứ: đường dẫn tới một file dự án thật.** Cơ chế đã sẵn —
+   `scripts/install-nightly-task.ps1` đăng ký Task Scheduler, `jobs/nightly.sample.json` là mẫu job.
 3. ~~Gom bảng mã lỗi vào một trang tài liệu~~ — xong: [`ma-loi.md`](ma-loi.md), có test đối chiếu với mã nguồn hai chiều.
-4. Rồi tới **9.4 — đưa cho một nhóm kỹ sư dùng thật**; phản hồi của họ quyết định giai đoạn 10/11 đi sâu vào đâu.
+4. Rồi tới **9.4 — đưa cho một nhóm kỹ sư dùng thật**; phản hồi của họ quyết định giai đoạn 10/11 đi sâu
+   vào đâu. **Mẫu thu phản hồi đã có**: [`mau-phan-hoi-9-4.md`](mau-phan-hoi-9-4.md) — bảng tick
+   *dùng hằng tuần / bấm rồi bỏ / chưa dùng* cho đủ 42 lệnh Revit + 15 lệnh AutoCAD, kèm bốn câu hỏi mở.
+   `PhanHoiFormTests` đối chiếu danh sách lệnh trong mẫu với `CommandCatalog` hai chiều nên mẫu không trôi.
+   Còn thiếu: phát hành v1.1 và chọn nhóm kỹ sư — cả hai đều là việc của người, không phải của mã.
 5. **Không mở P3** — giữ hướng chiều sâu theo [`roadmap.md`](roadmap.md).
