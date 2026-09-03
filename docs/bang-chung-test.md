@@ -640,3 +640,27 @@ Giao cắt còn nguyên; chỉ là đã có sleeve ở đó rồi. Thông báo t
 người đọc sẽ đi tìm một nguyên nhân không tồn tại. Nay lệnh đếm số vị trí bỏ qua và nói đúng —
 *"Bỏ qua, đã có sleeve: N vị trí."*, giống `HangerAuto`. Ca kiểm chốt cả hai chiều: phải chứa
 `"Bỏ qua, đã có sleeve"` **và không được chứa** `"không có giao cắt nào"`.
+
+---
+
+## 15. Quét hồi quy sau 10 PR trong một ngày (2026-09-03 16:50 ICT)
+
+Ngày 03/09 có mười PR vào `main`, trong đó ba cái đụng vào đường chạy chung: `SleeveCommand` (đọc model
+liên kết), `BatchStartupHook` (nuốt cảnh báo cả phiên), `HttpBridgeServer` (lệnh chạy nền). Con số
+"42/42 lệnh Revit có test chạy thật" chỉ có giá trị nếu **đo lại** sau đợt đó, không phải trích lại từ
+lần đo cũ — nên chạy hết mọi bộ ca kiểm trên `main` sau khi merge PR cuối.
+
+| Bộ | Model / bản vẽ | Kết quả |
+|---|---|---|
+| Revit `smoke` | Snowdon Architectural | **27 đạt / 0 trượt / 1 bỏ qua** trên 28 |
+| Revit `mep` | Snowdon HVAC (+ link kiến trúc) | **17 / 0** trên 17 |
+| Revit `plumbing` | Snowdon Plumbing | **8 / 0** trên 8 |
+| Revit `write` (ghi thật) | bản chép Architectural | **11 / 0** trên 11 |
+| Revit `write-mep` (ghi thật) | bản chép HVAC + 6 link | **4 / 0** trên 4 |
+| AutoCAD `smoke` (accoreconsole) | bản vẽ mẫu | **18 / 0** trên 18 |
+| AutoCAD `write` (ghi thật) | bản chép bản vẽ mẫu | **5 / 0** trên 5 |
+
+**90 ca đạt / 0 trượt / 1 bỏ qua trên 91 ca**, phủ 42/42 lệnh Revit và 15/15 lệnh AutoCAD.
+
+Ca bỏ qua là `SleeveAuto` trong bộ `smoke` — model kiến trúc không có hệ MEP, ca thật của nó nằm ở bộ
+`mep`; lý do ghi trong `skipReason` và `SuiteCoverageTests` chốt rằng mọi ca bỏ qua đều phải có lý do.
