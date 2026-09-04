@@ -25,6 +25,30 @@ internal static class BatchStartupHook
     private static string DonePath => Path.Combine(DhcbDirectory, "batch-done.json");
     private static string ErrorPath => Path.Combine(DhcbDirectory, "batch-error.txt");
 
+    /// <summary>Ghi một dòng vào <c>.addin.log</c> của lần chạy (đặt trong <see cref="RunIfRequested"/>).</summary>
+    private static Action<string>? _log;
+
+    /// <summary>
+    /// Hộp thoại kiểu cũ (không phải TaskDialog) được phép trả lời OK — chỉ những id đã gặp và biết chắc OK
+    /// là "đọc rồi, đi tiếp", không phải "đồng ý ghi/xoá". Mọi id khác bị Cancel: đóng màn hình chờ mà không
+    /// xác nhận bất cứ điều gì. Thêm id vào đây sau khi đã thấy nó trong log <c>[Hộp thoại]</c>.
+    /// </summary>
+    private static readonly HashSet<string> BenignOkDialogIds = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // Chưa có id nào được xác nhận an toàn — chờ log thật. Ví dụ ứng viên: hộp thoại thông tin
+        // "model was last saved in an earlier version" (chỉ báo, không hỏi gì).
+    };
+
+    /// <summary>TaskDialog đã gặp và biết chắc Ok/Close chỉ đóng thông báo, không đổi dữ liệu.</summary>
+    private static readonly HashSet<string> BenignOkTaskDialogIds = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "TaskDialog_Views_Related_To_Analytical_Changed", // nâng cấp file cũ có phần tử analytical (GOLDVIEW 2019 → 2024)
+        "TaskDialog_Missing_Third_Party_Updater",         // thiếu updater của add-in khác — không liên quan batch
+    };
+
+    private const int IdOk = 1;
+    private const int IdCancel = 2;
+
     /// <summary>Trả về true nếu đã chạy batch (khi đó Revit đang tự đóng).</summary>
     public static bool RunIfRequested(Application application)
     {
@@ -65,10 +89,9 @@ internal static class BatchStartupHook
                 throw new InvalidOperationException("pending-job.json thiếu jobPath hoặc runLogPath.");
             }
 
-            var runner = new BatchJobRunner(application)
-            {
-                Log = line => File.AppendAllText(Path.ChangeExtension(runLogPath, ".addin.log"), line + Environment.NewLine),
-            };
+            var addinLog = Path.ChangeExtension(runLogPath, ".addin.log");
+            _log = line => File.AppendAllText(addinLog, line + Environment.NewLine);
+            var runner = new BatchJobRunner(application) { Log = _log };
 
             exitCode = runner.Run(
                 BatchJob.Load(jobPath!),
@@ -86,6 +109,7 @@ internal static class BatchStartupHook
         {
             application.FailuresProcessing -= OnFailuresProcessing;
             uiApplication.DialogBoxShowing -= OnDialogBoxShowing;
+            _log = null;
 
             // Lỗi vận hành nghiêm trọng đã sửa: TryDelete cũ chỉ bắt IOException — nếu pending-job.json
             // không xoá được (khoá bởi AV, sync OneDrive…), lần mở Revit tương tác kế tiếp sẽ ÂM THẦM
@@ -114,23 +138,47 @@ internal static class BatchStartupHook
     /// <summary>
     /// Đóng thay mọi TaskDialog/hộp thoại Revit tự bật ngoài transaction — batch không có ai bấm nút.
     /// Ghi lại vào <see cref="CoreContext.SuppressedWarnings"/> (cùng chỗ với cảnh báo bị nuốt ở
-    /// <see cref="OnFailuresProcessing"/>) nên vẫn hiện trong <c>CommandResult</c> của lệnh chạy kế tiếp,
-    /// không biến mất lặng lẽ. TaskDialog dùng <see cref="TaskDialogResult.Close"/>; dialog kiểu cũ
-    /// (không phải TaskDialog) dùng mã IDOK=1 — cả hai chỉ nhằm mục đích thoát khỏi màn hình chờ, không
-    /// tác động dữ liệu vì phiên batch luôn đóng file bằng <c>doc.Close(false)</c> hoặc chỉ lưu bản chép.
+    /// <see cref="OnFailuresProcessing"/>) nên vẫn hiện trong dòng log của step kế tiếp, và ghi cả vào
+    /// <c>.addin.log</c> để có id mà đưa vào danh sách trắng.
+    /// <para>
+    /// Nguyên tắc: KHÔNG bấm OK bừa. Bản cũ trả IDOK cho mọi hộp thoại kiểu cũ — với "Do you want to
+    /// save changes?" hay "Overwrite?" thì OK chính là đồng ý. Chỉ id trong danh sách trắng mới được OK;
+    /// còn lại Cancel (hộp thoại cũ) / Close (TaskDialog) — thoát màn hình chờ mà không xác nhận gì.
+    /// </para>
     /// </summary>
     private static void OnDialogBoxShowing(object? sender, DialogBoxShowingEventArgs e)
     {
-        if (e is TaskDialogShowingEventArgs taskDialog)
+        try
         {
-            CoreContext.SuppressedWarnings.Add(
-                $"[Hộp thoại tự đóng] TaskDialog \"{taskDialog.DialogId}\": {taskDialog.Message}");
-            e.OverrideResult((int)TaskDialogResult.Close);
-            return;
-        }
+            if (e is TaskDialogShowingEventArgs taskDialog)
+            {
+                var id = taskDialog.DialogId ?? string.Empty;
+                var ok = BenignOkTaskDialogIds.Contains(id);
+                var text = $"[Hộp thoại tự đóng] TaskDialog \"{id}\" → {(ok ? "OK" : "Close")}: {taskDialog.Message}";
+                CoreContext.SuppressedWarnings.Add(text);
+                SafeLog(text);
+                e.OverrideResult((int)(ok ? TaskDialogResult.Ok : TaskDialogResult.Close));
+                return;
+            }
 
-        CoreContext.SuppressedWarnings.Add($"[Hộp thoại tự đóng] {e.DialogId}");
-        e.OverrideResult(1); // IDOK — thoát màn hình chờ, không có gì để lưu nên không rủi ro dữ liệu.
+            var dialogId = e.DialogId ?? string.Empty;
+            var allowOk = BenignOkDialogIds.Contains(dialogId);
+            var line = $"[Hộp thoại tự đóng] {dialogId} → {(allowOk ? "OK" : "Cancel")}";
+            CoreContext.SuppressedWarnings.Add(line);
+            SafeLog(line);
+            e.OverrideResult(allowOk ? IdOk : IdCancel);
+        }
+        catch (Exception ex)
+        {
+            // Không để lỗi trong handler làm Revit chết — cùng lắm là hộp thoại vẫn hiện và batch hết giờ.
+            SafeLog("[Hộp thoại] lỗi khi xử lý: " + ex.Message);
+        }
+    }
+
+    private static void SafeLog(string line)
+    {
+        try { _log?.Invoke(line); } catch { /* log phụ trợ */ }
+        DhcbTools.Shared.Hosting.DhcbLog.Write("Revit", line);
     }
 
     /// <summary>Đổi tên <c>pending-job.json</c> thành <c>.done</c> rồi xoá — không để nó sống sót sang phiên sau.</summary>
@@ -165,9 +213,10 @@ internal static class BatchStartupHook
             Directory.CreateDirectory(DhcbDirectory);
             File.WriteAllText(path, content);
         }
-        catch (IOException)
+        catch (Exception)
         {
-            // Hết cách báo ra ngoài; runner sẽ coi như add-in không hoàn thành.
+            // IOException, UnauthorizedAccessException (thư mục bị chặn quyền/AV)… — hết cách báo ra ngoài;
+            // runner sẽ coi như add-in không hoàn thành. Tuyệt đối không ném khỏi ApplicationInitialized.
         }
     }
 }

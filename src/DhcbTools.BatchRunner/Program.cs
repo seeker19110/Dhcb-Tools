@@ -12,6 +12,7 @@ namespace DhcbTools.BatchRunner;
 ///                           [--accoreconsole "C:\Program Files\Autodesk\AutoCAD 2024\accoreconsole.exe"] [--plugin-dll path]
 ///                           [--report-only] [--analyze]
 /// Mã thoát: 0 mọi step OK · 1 có step lỗi/bỏ qua · 2 lỗi cấu hình.
+/// Log: logs/{yyyy-MM-dd}/run-HHmmss.jsonl (mỗi lần chạy một file); --report-only lấy lần mới nhất.
 /// </summary>
 public static class Program
 {
@@ -39,11 +40,26 @@ public static class Program
         var runTime = DateTime.Now;
         var logDir = Path.Combine(opts.LogDir, runTime.ToString("yyyy-MM-dd"));
         Directory.CreateDirectory(logDir);
-        var runLog = Path.Combine(logDir, "run.jsonl");
         var report = Path.Combine(logDir, "report.html");
 
-        if (!opts.ReportOnly)
+        // Mỗi lần chạy một file log riêng (run-HHmmss.jsonl). Bản cũ append vào run.jsonl chung của ngày:
+        // chạy lại lần hai cùng ngày thừa hưởng nguyên dòng lỗi của lần đầu — mã thoát 1 mãi dù đã sửa xong,
+        // và report.html trộn hai lần chạy thành một bảng không ai đọc nổi.
+        string? runLog;
+        if (opts.ReportOnly)
         {
+            runLog = LatestRunLog(logDir);
+            if (runLog is null)
+            {
+                Console.Error.WriteLine("Không có run-*.jsonl (hay run.jsonl) nào trong " + logDir + " để dựng báo cáo.");
+                return 2;
+            }
+
+            Console.WriteLine("Dựng báo cáo từ: " + runLog);
+        }
+        else
+        {
+            runLog = Path.Combine(logDir, "run-" + runTime.ToString("HHmmss") + ".jsonl");
             var launched = job.App.Equals("autocad", StringComparison.OrdinalIgnoreCase)
                 ? RunAutoCad(job, opts, runLog, runTime)
                 : RunRevit(job, opts, runLog);
@@ -70,6 +86,29 @@ public static class Program
         var code = entries.Count == 0 ? 1 : RunLog.ExitCode(entries);
         Console.WriteLine($"Kết thúc, mã thoát {code}: {entries.Count(e => e.Success && !e.Skipped)} OK, {entries.Count(e => !e.Success && !e.Skipped)} lỗi, {entries.Count(e => e.Skipped)} bỏ qua.");
         return code;
+    }
+
+    /// <summary>
+    /// File log của lần chạy mới nhất trong thư mục ngày: <c>run-HHmmss.jsonl</c> lớn nhất theo tên; nếu chỉ
+    /// có <c>run.jsonl</c> kiểu cũ thì dùng nó. Null khi không có gì.
+    /// </summary>
+    internal static string? LatestRunLog(string logDir)
+    {
+        if (!Directory.Exists(logDir))
+        {
+            return null;
+        }
+
+        var latest = Directory.GetFiles(logDir, "run-*.jsonl")
+            .OrderByDescending(Path.GetFileName, StringComparer.Ordinal)
+            .FirstOrDefault();
+        if (latest is not null)
+        {
+            return latest;
+        }
+
+        var legacy = Path.Combine(logDir, "run.jsonl");
+        return File.Exists(legacy) ? legacy : null;
     }
 
     // ── Revit: pending-job + journal → Revit.exe → add-in chạy → batch-done.json ───────────────────────
@@ -111,7 +150,10 @@ public static class Program
         Directory.CreateDirectory(dhcbDir);
         var pending = Path.Combine(dhcbDir, "pending-job.json");
         var done = Path.Combine(dhcbDir, "batch-done.json");
+        var errorFile = Path.Combine(dhcbDir, "batch-error.txt");
         File.Delete(done);
+        // batch-error.txt của lần trước mà còn nằm đó thì chẩn đoán bên dưới ("add-in ĐÃ chạy") nói sai.
+        try { File.Delete(errorFile); } catch (Exception ex) { Console.Error.WriteLine("Không xoá được " + errorFile + " cũ: " + ex.Message); }
         File.WriteAllText(pending, new JObject
         {
             ["jobPath"] = Path.GetFullPath(opts.JobPath),
@@ -172,7 +214,6 @@ public static class Program
             // nhầm hướng mất nhiều thời gian, trong khi add-in đã cài đúng và thủ phạm là một hộp thoại
             // của Revit chặn ngay lúc khởi động (hết hạn license, cập nhật, đăng nhập…).
             var addinLog = Path.ChangeExtension(Path.GetFullPath(runLog), ".addin.log");
-            var errorFile = Path.Combine(dhcbDir, "batch-error.txt");
             var addinRan = File.Exists(addinLog) || File.Exists(errorFile);
 
             Console.Error.WriteLine("Add-in không báo hoàn thành (batch-done.json).");
@@ -286,7 +327,8 @@ public static class Program
 
         var outputFolder = job.ResolveOutputFolder(runTime);
         if (!string.IsNullOrEmpty(outputFolder)) Directory.CreateDirectory(outputFolder);
-        var work = Path.Combine(Path.GetDirectoryName(runLog)!, "acad-steps");
+        // Thư mục step/script riêng cho từng lần chạy, cùng dấu giờ với run-HHmmss.jsonl.
+        var work = Path.Combine(Path.GetDirectoryName(runLog)!, "acad-steps-" + Path.GetFileNameWithoutExtension(runLog).Replace("run-", string.Empty));
         Directory.CreateDirectory(work);
 
         var deadline = runTime.AddMinutes(opts.MaxMinutes);
@@ -326,7 +368,13 @@ public static class Program
                 stepPaths.Add(stepPath);
             }
 
-            string? saveAs = job.SaveMode == SaveMode.SaveAs && !opts.DryRun ? Path.Combine(outputFolder, Path.GetFileName(file.Path)) : null;
+            // Save = SAVEAS về chính file nguồn (QSAVE không có trong core console); SaveAs = bản sao trong
+            // outputFolder. Cả hai đều phải trả lời prompt "replace it?" khi file đích đã có — với Save thì luôn có.
+            string? saveAs = opts.DryRun ? null
+                : job.SaveMode == SaveMode.SaveAs ? Path.Combine(outputFolder, Path.GetFileName(file.Path))
+                : job.SaveMode == SaveMode.Save ? Path.GetFullPath(file.Path)
+                : null;
+            var saveTargetExists = saveAs is not null && File.Exists(saveAs);
 
             // Step đặc biệt "PlotPdf" (mục 7.13): không phải lệnh Core — sinh -PLOT trong script accoreconsole.
             string? plotScript = null;
@@ -341,10 +389,17 @@ public static class Program
             }
 
             var script = Path.Combine(work, $"{index:D3}.scr");
-            File.WriteAllText(script, AcadScriptGen.Build(plugin, stepPaths, saveAs, Path.GetFullPath(runLog), file.Path, plotScript), new UTF8Encoding(false));
+            File.WriteAllText(script, AcadScriptGen.Build(plugin, stepPaths, saveAs, Path.GetFullPath(runLog), file.Path, plotScript, job.DwgVersion, saveTargetExists), new UTF8Encoding(false));
 
             Console.WriteLine($"[{index}/{job.Files.Count}] {file.Path}");
-            var psi = new ProcessStartInfo(console, $"/i \"{file.Path}\" /s \"{script}\" /l en-US") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+            var psi = new ProcessStartInfo(console, AcadScriptGen.Arguments(file.Path, script))
+            {
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+            };
+            var startedAt = DateTime.Now;
             using var p = Process.Start(psi);
             if (p is null)
             {
@@ -353,24 +408,70 @@ public static class Program
                 continue;
             }
 
-            var output = p.StandardOutput.ReadToEnd();
-            p.WaitForExit((int)Math.Max(60_000, (deadline - DateTime.Now).TotalMilliseconds));
-            if (!p.HasExited)
+            // Đọc cả stdout lẫn stderr bất đồng bộ TRƯỚC khi chờ: ReadToEnd() một ống rồi mới WaitForExit
+            // treo chết khi ống kia đầy (accoreconsole in khá nhiều ra stderr), và kill-khi-quá-giờ không
+            // bao giờ tới lượt vì ReadToEnd chặn vô hạn.
+            var stdoutTask = p.StandardOutput.ReadToEndAsync();
+            var stderrTask = p.StandardError.ReadToEndAsync();
+            var timedOut = !p.WaitForExit((int)Math.Max(60_000, (deadline - DateTime.Now).TotalMilliseconds));
+            if (timedOut)
             {
                 try { p.Kill(true); } catch { /* ignore */ }
+                try { p.WaitForExit(10_000); } catch { /* ignore */ }
                 RunLog.Append(runLog, new RunLogEntry { File = file.Path, Command = "*", Success = false, Summary = "accoreconsole quá giờ — đã kết thúc." });
                 anyFailed = true;
             }
 
-            File.WriteAllText(Path.Combine(work, $"{index:D3}.log"), output, new UTF8Encoding(false));
-            if (job.SaveMode == SaveMode.Save && !opts.DryRun)
+            string output, errors;
+            try
             {
-                // accoreconsole với /i mở file gốc; SAVEAS về chính nó tương đương Save.
-                RunLog.Append(runLog, new RunLogEntry { File = file.Path, Command = "Save:Save", Success = true, Summary = "Lưu bằng script (QSAVE không có trong core console; dùng SaveAs cùng đường dẫn nếu cần)." });
+                Task.WaitAll(new Task[] { stdoutTask, stderrTask }, 10_000);
+                output = stdoutTask.IsCompletedSuccessfully ? stdoutTask.Result : string.Empty;
+                errors = stderrTask.IsCompletedSuccessfully ? stderrTask.Result : string.Empty;
             }
+            catch (Exception)
+            {
+                output = string.Empty;
+                errors = string.Empty;
+            }
+
+            File.WriteAllText(Path.Combine(work, $"{index:D3}.log"), output + (errors.Length > 0 ? "\n--- stderr ---\n" + errors : string.Empty), new UTF8Encoding(false));
+
+            var exitCode = timedOut ? -1 : p.ExitCode;
+            if (!timedOut && exitCode != 0)
+            {
+                var tail = Tail(errors.Length > 0 ? errors : output, 5);
+                RunLog.Append(runLog, new RunLogEntry { File = file.Path, Command = "*", Success = false, Summary = $"accoreconsole thoát mã {exitCode}." + (tail.Length > 0 ? " " + tail : string.Empty) });
+                anyFailed = true;
+            }
+
+            if (saveAs is not null)
+            {
+                // Không có kênh nào từ accoreconsole báo "đã lưu": kiểm tra file đích có mới hơn lúc bắt đầu.
+                var saved = exitCode == 0 && File.Exists(saveAs) && File.GetLastWriteTime(saveAs) >= startedAt;
+                RunLog.Append(runLog, new RunLogEntry
+                {
+                    File = file.Path,
+                    Command = "Save:" + job.SaveMode,
+                    Success = saved,
+                    Summary = saved
+                        ? (job.SaveMode == SaveMode.Save ? "Đã lưu (SAVEAS " + job.DwgVersion + " về chính file)." : "Đã lưu bản sao: " + saveAs)
+                        : "Không thấy file được lưu: " + saveAs + " (xem " + Path.Combine(work, $"{index:D3}.log") + ").",
+                });
+                if (!saved) anyFailed = true;
+            }
+
+            if (anyFailed && job.StopOnError) break;
         }
 
         return anyFailed ? 1 : 0;
+    }
+
+    /// <summary>Vài dòng cuối không rỗng của output — đủ để đọc lý do trong report.</summary>
+    private static string Tail(string text, int lines)
+    {
+        var all = text.Split('\n').Select(l => l.TrimEnd('\r').Trim()).Where(l => l.Length > 0).ToList();
+        return string.Join(" | ", all.Skip(Math.Max(0, all.Count - lines)));
     }
 }
 
