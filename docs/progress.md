@@ -206,9 +206,14 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
    chạy tay. Đăng ký Task Scheduler khi có một job cần lặp lại định kỳ thật (ví dụ báo cáo đêm trên bản
    `_upgraded-2024/`), không đáng làm cho một lượt một-lần-cho-biết.
 3. ~~Gom bảng mã lỗi vào một trang tài liệu~~ — xong: [`ma-loi.md`](ma-loi.md), có test đối chiếu với mã nguồn hai chiều.
-4. Rồi tới **9.4 — đưa cho một nhóm kỹ sư dùng thật**; phản hồi của họ quyết định giai đoạn 10/11 đi sâu
+4. ~~Gỡ ma sát từ điển tham số phát hiện ở §21~~ — xong: lệnh **`DictionaryLearn`** soi tên tham số thật
+   của mô hình đang mở và đề xuất/ghi `dictionary.json` thay cho việc kỹ sư mở JSON trong `%APPDATA%`
+   sửa tay mỗi lần vấp `E-PARAM-MISSING`. Tầng thuần `Ai/DictionarySuggester` có test (chỉ đề xuất tên
+   có thật; tham số rỗng toàn dự án và sai kiểu bị hạ điểm; trộn không xoá thứ đã khai; file JSON hỏng
+   thì dừng chứ không ghi đè). ⬜ Còn: chạy thật trên dự án A để xem đề xuất có khớp tên thật không.
+5. Rồi tới **9.4 — đưa cho một nhóm kỹ sư dùng thật**; phản hồi của họ quyết định giai đoạn 10/11 đi sâu
    vào đâu. **Mẫu thu phản hồi đã có**: [`mau-phan-hoi-9-4.md`](mau-phan-hoi-9-4.md) — bảng tick
    *dùng hằng tuần / bấm rồi bỏ / chưa dùng* cho đủ 42 lệnh Revit + 15 lệnh AutoCAD, kèm bốn câu hỏi mở.
    `PhanHoiFormTests` đối chiếu danh sách lệnh trong mẫu với `CommandCatalog` hai chiều nên mẫu không trôi.
    Còn thiếu: phát hành v1.1 và chọn nhóm kỹ sư — cả hai đều là việc của người, không phải của mã.
-5. **Không mở P3** — giữ hướng chiều sâu theo [`roadmap.md`](roadmap.md).
+6. **Không mở P3** — giữ hướng chiều sâu theo [`roadmap.md`](roadmap.md).

@@ -6,6 +6,9 @@
     "— toàn tên của thư viện mét bản tiếng Anh. Trên Revit giao diện tiếng Việt hoặc dự án dùng",
     "thư viện family riêng, các tra cứu đó trả null và lệnh KHÔNG LÀM GÌ mà vẫn báo thành công.",
     "",
+    "Không phải gõ tay: lệnh Revit DictionaryLearn soi tên tham số CÓ THẬT trong mô hình đang mở",
+    "và đề xuất/ghi thẳng vào file này (dryRun mặc định bật, ghi thì trộn chứ không ghi đè).",
+    "",
     "Cách hoạt động: mỗi khoá logic có một danh sách tên; tool thử lần lượt từ trên xuống.",
     "Tên khai ở đây được đặt TRƯỚC tên dựng sẵn trong mã, không thay thế hẳn — dự án dùng",
     "thư viện chuẩn vẫn chạy bình thường mà không cần file này."

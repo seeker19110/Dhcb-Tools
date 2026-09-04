@@ -77,6 +77,12 @@ namespace DhcbTools.Shared.Logic
             {
                 foreach (var property in parameters.Properties())
                 {
+                    if (property.Name.StartsWith("_", StringComparison.Ordinal))
+                    {
+                        // "_comment" trong file mẫu là chú thích cho người đọc, không phải một khoá logic.
+                        continue;
+                    }
+
                     var names = property.Value is JArray array
                         ? array.Select(v => v.ToString()).ToList()
                         : new List<string> { property.Value.ToString() };
@@ -95,6 +101,11 @@ namespace DhcbTools.Shared.Logic
             {
                 foreach (var property in families.Properties())
                 {
+                    if (property.Name.StartsWith("_", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
                     var value = property.Value.ToString().Trim();
                     if (value.Length > 0)
                     {
@@ -120,6 +131,12 @@ namespace DhcbTools.Shared.Logic
                 return BuiltinOnly();
             }
         }
+
+        /// <summary>
+        /// Mọi khoá logic từ điển đang biết — tên dựng sẵn cộng tên khai trong file.
+        /// <see cref="Ai.DictionarySuggester"/> duyệt danh sách này để soi mô hình.
+        /// </summary>
+        public IReadOnlyList<string> Keys => _synonyms.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
 
         /// <summary>Tên family mặc định theo khoá (ví dụ <c>sleeve</c>, <c>hanger</c>) do công ty khai báo.</summary>
         public Dictionary<string, string> Families { get; } =

@@ -475,6 +475,29 @@
       }
     },
     {
+      "name": "Học từ điển tham số của dự án — xem trước, không đụng file thật",
+      "command": "DictionaryLearn",
+      "config": {
+        "outputPath": "{outputFolder}/dictionary.json",
+        "reportPath": "{outputFolder}/dictionary-suggest.csv",
+        "dryRun": true
+      },
+      "//": "outputPath tro vao thu muc ket qua nen ca nay khong bao gio cham file dictionary.json that trong APPDATA cua nguoi dung. Khong chot minAffected: model mau dung thu vien tieng Anh chuan nen phan lon khoa roi vao 'da co', va do moi la ket qua dung.",
+      "expect": {
+        "success": true,
+        "maxMs": 60000,
+        "summaryContains": [
+          "Xem trước"
+        ],
+        "neverContains": [
+          "Exception"
+        ],
+        "filesExist": [
+          "{outputFolder}/dictionary-suggest.csv"
+        ]
+      }
+    },
+    {
       "name": "Sleeve tự động — hiệu năng",
       "command": "SleeveAuto",
       "config": {

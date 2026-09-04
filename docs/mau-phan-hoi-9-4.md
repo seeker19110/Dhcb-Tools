@@ -23,7 +23,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 
 ---
 
-## Revit — 42 lệnh
+## Revit — 43 lệnh
 
 | Lệnh | Việc nó làm | Tuần | Bỏ | Chưa | Nếu bỏ: vì sao |
 |---|---|:--:|:--:|:--:|---|
@@ -69,6 +69,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 | `ClashDetection` | Va chạm giữa hai nhóm category → HTML + 3D view | ☐ | ☐ | ☐ | |
 | `CadLayerMap` | AI offline: gợi ý map layer CAD → Revit type, CSV để duyệt | ☐ | ☐ | ☐ | |
 | `SpecToConfig` | AI offline: trích tầng/cao độ/hệ từ thuyết minh → config | ☐ | ☐ | ☐ | |
+| `DictionaryLearn` | AI offline: soi tên tham số thật của dự án → dictionary.json | ☐ | ☐ | ☐ | |
 
 ## AutoCAD — 15 lệnh
 

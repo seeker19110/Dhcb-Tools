@@ -306,3 +306,12 @@ public sealed class SpecToConfigRibbonCommand : IExternalCommand
     public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         => CommandRunner.Run(commandData, "SpecToConfig");
 }
+
+/// <summary>Soi tên tham số thật của dự án, đề xuất/ghi dictionary.json.</summary>
+[Transaction(TransactionMode.Manual)]
+[Regeneration(RegenerationOption.Manual)]
+public sealed class DictionaryLearnRibbonCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        => CommandRunner.Run(commandData, "DictionaryLearn");
+}

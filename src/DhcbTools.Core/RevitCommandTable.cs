@@ -82,6 +82,7 @@ public static class RevitCommandTable
                 "CLASHDETECTION" => new ClashDetectionCommand().Execute(doc, Deserialize<ClashDetectionConfig>(configJson)),
 
                 "CADLAYERMAP" => new CadLayerMapCommand().Execute(doc, Deserialize<CadLayerMapConfig>(configJson)),
+                "DICTIONARYLEARN" => new DictionaryLearnCommand().Execute(doc, Deserialize<DictionaryLearnConfig>(configJson)),
                 "SPECTOCONFIG" => new SpecToConfigCommand().Execute(doc, Deserialize<SpecToConfigConfig>(configJson)),
                 "RUNTESTS" => new RunTestsCommand().Execute(doc, Deserialize<RunTestsConfig>(configJson)),
 

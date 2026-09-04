@@ -258,6 +258,11 @@ namespace DhcbTools.Shared.Logic.Ai
             new CommandDescriptor("CadLayerMap", Revit, "AI offline: gợi ý map layer CAD → Revit type, ghi CSV để duyệt", false, "LayerMap")
                 .Field("layersCsvPath", "CSV từ LayerExport").Field("outputPath", "CSV mapping").Field("useOllama", "dùng model local nếu có")
                 .Words("map layer", "ánh xạ layer", "layer sang type"),
+            new CommandDescriptor("DictionaryLearn", Revit, "AI offline: soi tên tham số thật của dự án, đề xuất/ghi dictionary.json", false, "HocTuDien")
+                .Field("categories", "category cần soi (rỗng = bộ mặc định)").Field("sampleSize", "số phần tử lấy mẫu mỗi category")
+                .Field("outputPath", "file dictionary.json").Field("reportPath", "CSV để duyệt")
+                .Field("acceptLowConfidence", "nhận cả dòng cần xem").Field("dryRun", "xem trước")
+                .Words("học từ điển", "tên tham số dự án", "map tham số", "dictionary"),
             new CommandDescriptor("SpecToConfig", Revit, "AI offline: trích tầng/cao độ/hệ từ file thuyết minh → config ProjectInit", false)
                 .Field("inputPath", "file .txt/.md thuyết minh").Field("outputPath", "JSON config")
                 .Words("đọc thuyết minh", "spec sang config", "trích cao độ"),
