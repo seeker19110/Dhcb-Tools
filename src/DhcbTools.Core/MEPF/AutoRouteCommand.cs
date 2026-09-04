@@ -144,6 +144,14 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
 
         // Dầm, cột, tường nằm ở model kết cấu/kiến trúc LIÊN KẾT. Không đọc chúng thì A* chạy trong một
         // không gian trống rỗng và luôn "tìm được tuyến" — tuyến xuyên thẳng qua dầm.
+        // Link chưa nạp mà vẫn chạy tiếp thì con số trả ra nói về trạng thái link, không nói về mô hình
+        // — đúng lớp lỗi của bug #14. Dừng ở đây, trước mọi transaction.
+        var linkPre = Checks.RevitPrecondition.LinkedModels(document, CommandName);
+        if (config.IncludeLinkedModels && linkPre.Blocks)
+        {
+            return CommandResult.Fail(linkPre.Message);
+        }
+
         var linkSummary = new List<string>();
         if (config.IncludeLinkedModels)
         {

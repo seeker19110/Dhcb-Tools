@@ -148,7 +148,9 @@ public sealed class App : IExternalApplication
             ("DhcbCadLayerMap", "Map layer CAD", "CadLayerMapRibbonCommand",
                 "Đề xuất map layer bản vẽ CAD sang type Revit (AI offline)."),
             ("DhcbSpecToConfig", "Thuyết minh sang config", "SpecToConfigRibbonCommand",
-                "Trích tham số kỹ thuật từ thuyết minh thành file config (AI offline)."));
+                "Trích tham số kỹ thuật từ thuyết minh thành file config (AI offline)."),
+            ("DhcbDictionaryLearn", "Học từ điển dự án", "DictionaryLearnRibbonCommand",
+                "Soi tên tham số thật của dự án và ghi vào dictionary.json (AI offline)."));
 
         application.ControlledApplication.ApplicationInitialized += (sender, _) =>
         {
@@ -280,6 +282,7 @@ public sealed class App : IExternalApplication
             or "DhcbColorByParameter" or "DhcbStyleTools" or "DhcbStylePurge" or "DhcbFamilyAudit"
             => RibbonIcons.Sheets,
         "DhcbParameterRuleCheck" or "DhcbClashDetection" or "DhcbAiTools" or "DhcbCadLayerMap" or "DhcbSpecToConfig"
+            or "DhcbDictionaryLearn"
             => RibbonIcons.Checks,
         _ => RibbonIcons.Mepf,
     };

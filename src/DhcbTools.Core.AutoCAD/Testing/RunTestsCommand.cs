@@ -78,6 +78,10 @@ public sealed class RunTestsCommand : ICoreCommand<RunTestsConfig>
         // không cần commit file DWG nào vào repo.
         tokens.Extra["sourceFile"] = database.Filename ?? string.Empty;
 
+        // Không tắt thì chính bộ ca kiểm bơm số liệu "lệnh nào dùng thật" lên (xem bản Revit).
+        AcadCommandTable.LogUsage = false;
+        try
+        {
         foreach (var testCase in suite.Cases)
         {
             if (only.Count > 0 && !only.Contains(testCase.Command))
@@ -106,6 +110,12 @@ public sealed class RunTestsCommand : ICoreCommand<RunTestsConfig>
                 observation,
                 path => File.Exists(JobTokens.Expand(path, tokens))));
             outcomes.Add(outcome);
+        }
+
+        }
+        finally
+        {
+            AcadCommandTable.LogUsage = true;
         }
 
         return WriteReports(suite, config, outcomes);

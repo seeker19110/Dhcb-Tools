@@ -29,9 +29,11 @@ public static class AcadCommandTable
 
         // Config hỏng/thiếu trường bắt buộc là lỗi của người gọi, không phải sự cố hệ thống:
         // trả CommandResult.Fail có thông báo đọc được thay vì ném stack trace .NET ra Bridge/agent.
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        CommandResult result;
         try
         {
-            return name switch
+            result = name switch
             {
                 "LAYEREXPORT" => new LayerExportCommand().Execute(db, Deserialize<LayerExportConfig>(configJson)),
                 "LAYERIMPORT" => new LayerImportCommand().Execute(db, Deserialize<LayerImportConfig>(configJson)),
@@ -55,7 +57,50 @@ public static class AcadCommandTable
         }
         catch (ConfigException ex)
         {
-            return CommandResult.Fail(ex.Message);
+            result = CommandResult.Fail(ex.Message);
+        }
+
+        stopwatch.Stop();
+        LogRun(descriptor?.Name ?? command, result, configJson, stopwatch.ElapsedMilliseconds);
+        return result;
+    }
+
+    /// <summary>Tắt ghi số liệu — <c>RunTests</c> bật khi chạy bộ ca kiểm (xem bản Revit).</summary>
+    public static bool LogUsage { get; set; } = true;
+
+    /// <summary>Ghi một dòng số liệu cho mọi lần chạy lệnh; đây là chỗ hội tụ của Ribbon, Bridge và batch.</summary>
+    private static void LogRun(string command, CommandResult result, string configJson, long ms)
+    {
+        if (!LogUsage)
+        {
+            return;
+        }
+
+        try
+        {
+            DhcbLog.Write("AutoCAD", Shared.Logic.Usage.UsageLog.Format(command, result.Success, IsDryRun(configJson), result.AffectedCount, ms));
+        }
+        catch (Exception)
+        {
+            // Ghi số liệu không bao giờ được phép làm hỏng lệnh vừa chạy xong.
+        }
+    }
+
+    private static bool IsDryRun(string configJson)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(configJson) || JToken.Parse(configJson) is not JObject obj)
+            {
+                return false;
+            }
+
+            var property = obj.Properties().FirstOrDefault(p => string.Equals(p.Name, "dryRun", StringComparison.OrdinalIgnoreCase));
+            return property?.Value.Type == JTokenType.Boolean && property.Value.Value<bool>();
+        }
+        catch (Exception)
+        {
+            return false;
         }
     }
 

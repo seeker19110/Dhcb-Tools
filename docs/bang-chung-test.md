@@ -1116,3 +1116,87 @@ check-build.sh xanh (2023/2024/2025); Shared.Logic 574 ca (tại thời điểm 
 Bản vá chỉ thử MỘT nước (cạnh file host) — nếu bố cục dự án khác (link nằm thư mục con, hoặc thật sự
 network không tới được như file 04 ở §20) thì vẫn báo `LinkNotFound` và log nói rõ "(không có file cùng
 tên cạnh file host)". Đủ cho bố cục phổ biến nhất; không cố đoán thêm các bố cục khác khi chưa có ca thật.
+
+---
+
+## 22. Ba nâng cấp tự động hoá — chạy thật trên Revit 2024.3 (2026-09-04 14:12 ICT)
+
+Vòng này kiểm ba việc vừa làm: `DictionaryLearn` (tự soi tên tham số của dự án), `E-PRECOND` (tiền đề
+của lệnh) và `UsageReport` (số liệu sử dụng đọc từ log). Cả ba đều là **tự động hoá phần việc tay còn
+sót lại**, không phải lệnh nghiệp vụ mới.
+
+| Bộ | Model | Kết quả |
+|---|---|---|
+| `smoke` | Snowdon Towers Sample Architectural | **30 đạt / 0 trượt / 1 bỏ qua trên 31 ca** |
+| `mep` | Snowdon Towers Sample HVAC | **20 đạt / 0 trượt trên 20 ca** |
+
+### `DictionaryLearn` — đề xuất đúng thứ mà từ điển dựng sẵn không có
+
+Soi **332 tên tham số** trên 18 category trong 783 ms. Kết quả (`dictionary-suggest.csv`):
+
+| Khoá | Kết luận | Chi tiết |
+|---|---|---|
+| `bottomElevation` | **đề xuất** `Elevation at Bottom` (0,83) | Floors, kiểu Double, **183/191** phần tử có giá trị |
+| `topElevation` | **đề xuất** `Elevation at Top` (0,83) | Floors, kiểu Double, **179/191** phần tử có giá trị |
+| `centreElevation` | **không thấy** (0,44) | gần nhất `Default Elevation` — đúng là không phải cao độ tim, **không đề xuất bừa** |
+| 8 khoá còn lại | đã có sẵn | `Level`, `Mark`, `Comments`, `Width`, `Height`, `Department`, `Occupancy`, `Outside Diameter` |
+
+Hai dòng đề xuất là điểm đáng giá nhất: tên dựng sẵn trong mã là `DHCB_Bottom_Elevation` / `Bottom Elevation`
+— **không tồn tại trong model này**. Trước đây kỹ sư chỉ biết điều đó khi `ElevationTag` báo
+`E-PARAM-MISSING`, rồi phải tự mở `%APPDATA%\DHCB\dictionary.json` gõ tên đúng vào. Nay máy tìm ra tên
+đúng, có thật, kèm bằng chứng "183/191 phần tử có giá trị".
+
+`dryRun` giữ đúng lời hứa: **không có file `dictionary.json` nào được ghi** trong thư mục kết quả.
+
+### `E-PRECOND` — chặn đúng chỗ, không chặn nhầm
+
+Ca chặn (model kiến trúc, gọi `ClashDetection` với `categoriesA: ["Ducts"]` — model không có ống nào):
+
+```
+E-PRECOND: ClashDetection không tìm thấy phần tử nhóm A (Ducts) nào trong mô hình, nên kết quả "0"
+nói về tập đầu vào chứ không nói về chất lượng mô hình. Kiểm lại categoriesA, hoặc mở đúng file có
+nhóm phần tử đó.
+```
+
+Trước bản này, đúng ca đó chạy **xanh** với "0 va chạm" và một file HTML nói không có va chạm nào.
+
+Không chặn nhầm — bốn lệnh được gắn tiền đề vẫn chạy đủ trên model có link đã nạp:
+
+| Lệnh | Kết quả trên bộ `mep` |
+|---|---|
+| `SleeveAuto` | 445 sleeve (tường ở link kiến trúc) |
+| `DevicePlacement` | 551 thiết bị trong 44 phòng (phòng ở link) |
+| `ClashDetection` | 7 va chạm, **cả 7 với model liên kết** |
+| `AutoRoute` | 546 vật cản (30 trong file + **516 từ link**) |
+
+Đường "mọi link chưa nạp" vẫn chưa có ca kiểm tự động — không dựng được trạng thái đó bằng file JSON
+khai báo. Vẫn thuộc phần kiểm tay theo §21.
+
+### `UsageReport` — vòng khép trên log thật
+
+Log của chính máy này sau hai lượt chạy bộ ca kiểm:
+
+```
+14:08:14.998  LỆNH RunTests | ok=true | dryRun=false | affected=29 | ms=10288
+14:10:19.979  LỆNH RunTests | ok=true | dryRun=false | affected=20 | ms=3037
+```
+
+Đúng **hai** dòng cho hai lượt — không phải 49 dòng. Cờ tắt ghi trong `RunTests` hoạt động: bộ ca kiểm
+chạy 49 lệnh bên trong mà không dòng nào lọt vào số liệu "lệnh nào kỹ sư dùng thật". Không có cờ này thì
+chính bộ test là "người dùng" chăm chỉ nhất trong báo cáo.
+
+`UsageReport` đọc lại thư mục log thật trong 31 ms và trả:
+
+```
+2 lần chạy trên 1 ngày, 1 lệnh có người dùng (0 lệnh chỉ xem trước rồi bỏ, 56 lệnh chưa bấm lần nào).
+```
+
+Con số **56 lệnh chưa bấm lần nào** đúng bằng 57 lệnh của catalog trừ đi `RunTests` — nghĩa là phép
+đối chiếu log ↔ catalog khớp. Đây là lần đầu con số của mục 9.4 có thật thay vì nằm trong một bảng tick
+chưa ai điền.
+
+### Cái chưa chứng minh
+
+Ba việc này đều mới chạy trên **model mẫu**. Giá trị thật của `DictionaryLearn` chỉ đo được trên dự án
+thực tế A — nơi §21 đã chỉ ra `ElevationTag`/`HangerAuto` đòi tên riêng của dự án. Số liệu `UsageReport`
+cũng chỉ bắt đầu tích từ bản cài kế tiếp trở đi.

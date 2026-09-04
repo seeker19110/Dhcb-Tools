@@ -336,6 +336,31 @@
       }
     },
     {
+      "name": "Tiền đề: nhóm category rỗng phải CHẶN, không được trả \"0 va chạm\"",
+      "command": "ClashDetection",
+      "config": {
+        "categoriesA": [
+          "Ducts"
+        ],
+        "categoriesB": [
+          "Doors"
+        ],
+        "outputPath": "{outputFolder}/clash-precond.html",
+        "create3dView": false
+      },
+      "//": "Model kien truc mau khong co Ducts. Truoc khi co tien de E-PRECOND, ca nay chay xanh voi '0 va cham' — mot bao cao noi 'khong co va cham' trong khi that ra khong co gi de kiem. Chot chan cho lop loi cua bug #14.",
+      "expect": {
+        "success": false,
+        "maxMs": 60000,
+        "summaryContains": [
+          "E-PRECOND"
+        ],
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
       "name": "Gợi ý map layer CAD → type Revit",
       "command": "CadLayerMap",
       "config": {
@@ -469,6 +494,45 @@
       "expect": {
         "success": null,
         "maxMs": 60000,
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
+      "name": "Học từ điển tham số của dự án — xem trước, không đụng file thật",
+      "command": "DictionaryLearn",
+      "config": {
+        "outputPath": "{outputFolder}/dictionary.json",
+        "reportPath": "{outputFolder}/dictionary-suggest.csv",
+        "dryRun": true
+      },
+      "//": "outputPath tro vao thu muc ket qua nen ca nay khong bao gio cham file dictionary.json that trong APPDATA cua nguoi dung. Khong chot minAffected: model mau dung thu vien tieng Anh chuan nen phan lon khoa roi vao 'da co', va do moi la ket qua dung.",
+      "expect": {
+        "success": true,
+        "maxMs": 60000,
+        "summaryContains": [
+          "Xem trước"
+        ],
+        "neverContains": [
+          "Exception"
+        ],
+        "filesExist": [
+          "{outputFolder}/dictionary-suggest.csv"
+        ]
+      }
+    },
+    {
+      "name": "Số liệu sử dụng — đọc lại log thật của máy này",
+      "command": "UsageReport",
+      "config": {
+        "outputPath": "{outputFolder}/usage.md",
+        "csvPath": "{outputFolder}/usage.csv"
+      },
+      "//": "Doc thu muc log that trong APPDATA (chi doc, khong ghi). success:null vi may chua cai add-in bao gio thi chua co log — do la moi truong, khong phai loi ma. Cai duoc chot o day la lenh khong nem va noi ro 'chua co so lieu' khac 'khong ai dung lenh nao'.",
+      "expect": {
+        "success": null,
+        "maxMs": 30000,
         "neverContains": [
           "Exception"
         ]

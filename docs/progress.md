@@ -147,6 +147,7 @@ Core/vỏ (kể cả vỏ core-only) trên Linux với API Revit 2025 + AutoCAD 
 | **Bộ tìm đường `AutoRoute`** | 2026-09-03 | **4049 ms → 10 ms**, 58.720 → 5.783 ô mở rộng trên 550 vật cản (đo bản cũ cạnh bản mới); trên Snowdon HVAC **0,3 s → 82 ms** (bước 500 mm) và **17,9 s → 815 ms** (bước 100 mm); thất bại nay chứng minh được tuyến KHÔNG tồn tại thay vì chỉ báo hết giờ; bộ `mep` **20/20** — §19 |
 | **Đêm batch thật đầu tiên — dự án thực tế A** | 2026-09-04 | **8/9 file `.rvt` thật** (00–03 kiến trúc, 05–08 MEP, 139–176 MB/file) chạy trọn 10 bước chỉ đọc, không đụng file gốc; lộ TaskDialog nâng cấp phiên bản treo batch 43 phút — sửa bằng `DialogBoxShowing`, chạy lại qua đúng chỗ đó trong 86 giây; file 04 lỗi mạng tới central model (máy chủ `<server-A>`), không phải lỗi mã nguồn; tạo bản sao Revit 2024 cho 8/9 file để lần sau mở tức thì — §20 |
 | **Đóng vai kỹ sư dùng thử trên dự án thực tế A** | 2026-09-04 | `ApplySizing` 113/113, `HangerAuto` nhận đúng family thật của dự án, `RemoveUnusedViews` xem trước khớp thật tuyệt đối; lộ friction thật (`ElevationTag`/`HangerAuto` cần tên tham số/family riêng dự án — đúng thiết kế báo lỗi 9.2, không phải bug) và **một lỗi ngầm nguy hiểm**: bản sao mất trạng thái nạp link khiến `ClashDetection` báo sai **0** thay vì **479** va chạm — sửa bằng nạp lại link + thử file cạnh host, đo lại đúng 479 — §21 |
+| **Ba nâng cấp tự động hoá — `DictionaryLearn`, `E-PRECOND`, `UsageReport`** | 2026-09-04 | **30/31 (smoke) + 20/20 (mep)** trên Revit 2024.3 thật. `DictionaryLearn` soi 332 tên tham số, tìm ra `Elevation at Bottom`/`Elevation at Top` (tên dựng sẵn không tồn tại trong model) và **từ chối đề xuất** cho `centreElevation` thay vì đoán bừa; `E-PRECOND` chặn đúng ca "0 va chạm giả" mà không chặn nhầm bốn lệnh đọc link (445 sleeve · 551 thiết bị · 7 va chạm với link · 516 vật cản từ link); `UsageReport` đọc log thật ra đúng 2 dòng cho 2 lượt chạy — cờ tắt ghi trong `RunTests` giữ 49 lệnh của bộ test khỏi lọt vào số liệu — §22 |
 | **Lệnh chạy nền + `/progress/<id>`** | 2026-09-03 | 202 → `running` → `done`, hỏi lại kết quả không mất; 404/401 đúng — §13 |
 | **Đường ghi cho nhóm lệnh tạo phần tử mới** | 2026-09-03 | **11/11 (kiến trúc) + 4/4 (HVAC)**; `HangerAuto` 1120 → 0 sau khi bổ sung chống trùng; lộ lỗi chặn "batch treo ở hộp thoại cảnh báo lúc mở model" — §12 |
 
@@ -206,9 +207,32 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
    chạy tay. Đăng ký Task Scheduler khi có một job cần lặp lại định kỳ thật (ví dụ báo cáo đêm trên bản
    `_upgraded-2024/`), không đáng làm cho một lượt một-lần-cho-biết.
 3. ~~Gom bảng mã lỗi vào một trang tài liệu~~ — xong: [`ma-loi.md`](ma-loi.md), có test đối chiếu với mã nguồn hai chiều.
-4. Rồi tới **9.4 — đưa cho một nhóm kỹ sư dùng thật**; phản hồi của họ quyết định giai đoạn 10/11 đi sâu
+4. ~~Gỡ ma sát từ điển tham số phát hiện ở §21~~ — xong: lệnh **`DictionaryLearn`** soi tên tham số thật
+   của mô hình đang mở và đề xuất/ghi `dictionary.json` thay cho việc kỹ sư mở JSON trong `%APPDATA%`
+   sửa tay mỗi lần vấp `E-PARAM-MISSING`. Tầng thuần `Ai/DictionarySuggester` có test (chỉ đề xuất tên
+   có thật; tham số rỗng toàn dự án và sai kiểu bị hạ điểm; trộn không xoá thứ đã khai; file JSON hỏng
+   thì dừng chứ không ghi đè). ⬜ Còn: chạy thật trên dự án A để xem đề xuất có khớp tên thật không.
+5. ~~Chặn **lớp lỗi** của bug #14, không chỉ nguyên nhân của nó~~ — xong: mã lỗi **`E-PRECOND`** và
+   lớp tiền đề `Shared.Logic/Checks/Precondition` (thuần, có test) + `Core/Checks/RevitPrecondition`.
+   Chỗ vá cũ của #14 nằm trong `BatchJobRunner.Open()`, nhưng **đường Ribbon và Bridge không đi qua đó**
+   — kỹ sư tự mở một bản sao có link chưa nạp rồi bấm `ClashDetection` vẫn nhận đúng con số 0 giả như cũ.
+   Nay `ClashDetection`, `SleeveAuto`, `DevicePlacement`, `AutoRoute` dừng ngay trước mọi transaction khi
+   **mọi** link đều chưa nạp (nạp một phần = cảnh báo, có thể là cố ý), và `ClashDetection` cũng dừng khi
+   một trong hai nhóm category rỗng — "0 va chạm" khi không có gì để kiểm là câu nói về đầu vào chứ không
+   về mô hình. Ca kiểm `revit-smoke` chốt đường chặn bằng nhóm category rỗng (đường link chưa nạp không
+   dựng được bằng file JSON khai báo — kiểm tay theo §21).
+6. ~~Thu số liệu 9.4 bằng máy thay vì chờ người điền form~~ — xong: **`UsageReport`** (công cụ nội bộ
+   như `RunTests`, không lên Ribbon). Phát hiện khi làm: log **chỉ ghi khi lệnh ném exception**, lần chạy
+   thành công không để lại dấu vết nào — nên câu hỏi quyết định giai đoạn 10/11 không có dữ liệu nào trả
+   lời được. Nay mọi lần chạy đều ghi một dòng ở đúng chỗ hội tụ của cả bốn đường vào
+   (`RevitCommandTable.Dispatch` / `AcadCommandTable.Dispatch`), và `UsageReport` đọc lại thành *lệnh nào
+   dùng bao nhiêu **ngày**, lệnh nào bấm rồi bỏ (xem trước mà chưa bao giờ chạy thật), lệnh nào lỗi nhiều
+   nhất, lệnh nào chưa ai bấm*. `RunTests` tắt cờ ghi trong lúc chạy bộ ca kiểm, nếu không chính bộ test
+   bơm số liệu lên. Tầng thuần `Usage/UsageLog` có test, gồm vòng tròn `Format` → `Parse` (định dạng dòng
+   log là hợp đồng giữa hai thời điểm cách nhau 30 ngày). ⬜ Số liệu chỉ bắt đầu tích từ bản cài kế tiếp.
+7. Rồi tới **9.4 — đưa cho một nhóm kỹ sư dùng thật**; phản hồi của họ quyết định giai đoạn 10/11 đi sâu
    vào đâu. **Mẫu thu phản hồi đã có**: [`mau-phan-hoi-9-4.md`](mau-phan-hoi-9-4.md) — bảng tick
    *dùng hằng tuần / bấm rồi bỏ / chưa dùng* cho đủ 42 lệnh Revit + 15 lệnh AutoCAD, kèm bốn câu hỏi mở.
    `PhanHoiFormTests` đối chiếu danh sách lệnh trong mẫu với `CommandCatalog` hai chiều nên mẫu không trôi.
    Còn thiếu: phát hành v1.1 và chọn nhóm kỹ sư — cả hai đều là việc của người, không phải của mã.
-5. **Không mở P3** — giữ hướng chiều sâu theo [`roadmap.md`](roadmap.md).
+8. **Không mở P3** — giữ hướng chiều sâu theo [`roadmap.md`](roadmap.md).

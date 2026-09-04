@@ -54,7 +54,7 @@ src/
 │   │                              #   RouteFromLines (A), DevicePlacement (B), Sizing, SystemColor/Name, FlowNumbering
 │   ├── Checks/                    # ParameterRuleCheck, ClashDetection
 │   ├── Updaters/                  # ElevationUpdater (IUpdater, tắt mặc định)
-│   ├── Ai/                        # CadLayerMap, SpecToConfig
+│   ├── Ai/                        # CadLayerMap, SpecToConfig, DictionaryLearn
 │   └── Batch/                     # BatchJobRunner (mở → chạy step → lưu → đóng)
 ├── DhcbTools.Revit/               # Vỏ Revit: Ribbon 6 panel phủ đủ 42 lệnh, Bridge 8765, hook batch
 │                                  #   (pending-job.json), ElevationUpdater, WPF AutoNumbering
@@ -91,7 +91,7 @@ Ribbon/dòng lệnh, HTTP Bridge, batch runner, lớp AI. Danh mục đầy đ�
 | MEPF | `SleeveAuto`, `ElevationTag`, `HangerAuto`, `PipeSplitter`, `RouteFromLines`, `DevicePlacement`, `SizingProposal` / `ApplySizing`, `SystemColor`, `SystemName` | — |
 | Hồ sơ & style (giai đoạn 7) | `SheetRename`, `RevisionOnSheets`, `StylePurge`, `ColorByParameter`, `FamilyAudit`, `WarningsExport`, `ScheduleExport`, `ViewportCopy` | `LayerTranslate`, `DrawingCompare`, `BlockQuantity`, `AttributeIncrement` |
 | MEPF nâng cao (P2) | `SlopePipes`, `PipeKick`, `SystemBom`, `AutoRoute` (mức C → mức A) | — |
-| AI offline | `CadLayerMap`, `SpecToConfig`, nút *Ra lệnh tiếng Việt* | `CadLayerMap` (`DHCB_LAYER_MAP`); ra lệnh tiếng Việt qua Bridge `POST /chat` |
+| AI offline | `CadLayerMap`, `SpecToConfig`, `DictionaryLearn`, nút *Ra lệnh tiếng Việt* | `CadLayerMap` (`DHCB_LAYER_MAP`); ra lệnh tiếng Việt qua Bridge `POST /chat` |
 
 Lệnh AutoCAD trên dòng lệnh — đúng các `[CommandMethod]` có trong `src/DhcbTools.AutoCAD`:
 `DHCB_LAYER_EXPORT`, `DHCB_LAYER_IMPORT`, `DHCB_CLEANUP`, `DHCB_AUTONUMBER`, `DHCB_ATTR_EXPORT`,
