@@ -70,6 +70,18 @@ namespace DhcbTools.Shared.Logic.Batch
         [JsonProperty("outputFolder")]
         public string OutputFolder { get; set; } = string.Empty;
 
+        /// <summary>
+        /// Vẫn lưu (Save/SaveAs) dù có step lỗi trên file đó. Mặc định false: một step lỗi giữa chừng có thể
+        /// để model ở trạng thái nửa vời (transaction đã rollback nhưng step trước đã ghi), lưu đè lên file
+        /// gốc lúc đó là mất đường lui. Bật khi cố ý muốn giữ phần đã làm được.
+        /// </summary>
+        [JsonProperty("saveOnError")]
+        public bool SaveOnError { get; set; }
+
+        /// <summary>Phiên bản DWG khi SAVEAS trong accoreconsole (2000/2004/2007/2010/2013/2018). Mặc định 2018.</summary>
+        [JsonProperty("dwgVersion")]
+        public string DwgVersion { get; set; } = "2018";
+
         [JsonProperty("files")]
         public List<BatchJobFile> Files { get; set; } = new List<BatchJobFile>();
 

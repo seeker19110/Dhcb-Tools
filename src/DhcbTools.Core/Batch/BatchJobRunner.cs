@@ -55,6 +55,10 @@ public sealed class BatchJobRunner
 
             Document? doc = null;
             var swOpen = Stopwatch.StartNew();
+            // Bắt đầu file mới: xoá cảnh báo/hộp thoại còn sót của file trước. Từ đây tới hết file, KHÔNG
+            // xoá nữa mà chỉ chuyển dần vào từng dòng log — hộp thoại lúc mở (nâng cấp phiên bản…) rơi vào
+            // step đầu tiên thay vì bị xoá mất như bản cũ (Clear() ngay trước Dispatch).
+            CoreContext.SuppressedWarnings.Clear();
             try
             {
                 doc = Open(file);
@@ -63,6 +67,7 @@ public sealed class BatchJobRunner
             catch (Exception ex)
             {
                 var entry = new RunLogEntry { File = file.Path, Command = "Open", Success = false, Summary = "Không mở được file: " + ex.Message, ElapsedMs = swOpen.ElapsedMilliseconds };
+                entry.Messages.AddRange(TakeSuppressedWarnings());
                 RunLog.Append(runLogPath, entry);
                 entries.Add(entry);
                 if (job.StopOnError) stop = true;
@@ -70,6 +75,7 @@ public sealed class BatchJobRunner
             }
 
             var previousFailed = false;
+            var anyStepFailed = false;
             try
             {
                 foreach (var step in job.StepsFor(file))
@@ -93,17 +99,13 @@ public sealed class BatchJobRunner
                     try
                     {
                         using var _ = CoreContext.Use(FailurePolicy.Silent);
-                        CoreContext.SuppressedWarnings.Clear();
                         result = RevitCommandTable.Dispatch(doc, step.Command, configJson);
-                        foreach (var warning in CoreContext.SuppressedWarnings)
-                        {
-                            result.Messages.Add("[Cảnh báo Revit bỏ qua] " + warning);
-                        }
                     }
                     catch (Exception ex)
                     {
                         result = CommandResult.Fail("Exception: " + ex.Message);
                     }
+                    result.Messages.AddRange(TakeSuppressedWarnings());
                     sw.Stop();
 
                     var entry = new RunLogEntry
@@ -121,6 +123,7 @@ public sealed class BatchJobRunner
                     entries.Add(entry);
                     Log?.Invoke($"  {(result.Success ? "OK " : "ERR")} {step.Command}: {result.Summary}");
                     previousFailed = !result.Success;
+                    anyStepFailed |= !result.Success;
                     if (!result.Success && job.StopOnError)
                     {
                         stop = true;
@@ -128,7 +131,7 @@ public sealed class BatchJobRunner
                     }
                 }
 
-                Save(doc, job, file, outputFolder, runLogPath, entries, forceDryRun);
+                Save(doc, job, file, outputFolder, runLogPath, entries, forceDryRun, anyStepFailed);
             }
             finally
             {
@@ -247,10 +250,38 @@ public sealed class BatchJobRunner
         return linkType.LoadFrom(ModelPathUtils.ConvertUserVisiblePathToModelPath(candidate), new WorksetConfiguration(WorksetConfigurationOption.OpenAllWorksets));
     }
 
-    private void Save(Document doc, BatchJob job, BatchJobFile file, string outputFolder, string runLogPath, List<RunLogEntry> entries, bool forceDryRun)
+    /// <summary>Lấy và xoá cảnh báo/hộp thoại Revit đã nuốt kể từ lần lấy trước (cùng luồng với Revit).</summary>
+    private static List<string> TakeSuppressedWarnings()
+    {
+        var taken = CoreContext.SuppressedWarnings.Select(w => "[Cảnh báo Revit bỏ qua] " + w).ToList();
+        CoreContext.SuppressedWarnings.Clear();
+        return taken;
+    }
+
+    private void Save(Document doc, BatchJob job, BatchJobFile file, string outputFolder, string runLogPath, List<RunLogEntry> entries, bool forceDryRun, bool anyStepFailed)
     {
         if (forceDryRun || job.SaveMode == SaveMode.None)
         {
+            return;
+        }
+
+        if (anyStepFailed && !job.SaveOnError)
+        {
+            // Có step lỗi thì không lưu: transaction lỗi đã rollback nhưng step trước có thể đã ghi — lưu đè
+            // (Save) là mất đường lui, lưu bản sao (SaveAs) là để lại một file nửa vời trông như hoàn chỉnh.
+            // Muốn giữ phần đã làm được thì đặt "saveOnError": true trong job.
+            var skipped = new RunLogEntry
+            {
+                File = file.Path,
+                Command = "Save:" + job.SaveMode,
+                Skipped = true,
+                Success = false,
+                Summary = "Không lưu vì có step lỗi (đặt saveOnError=true nếu vẫn muốn lưu).",
+            };
+            skipped.Messages.AddRange(TakeSuppressedWarnings());
+            RunLog.Append(runLogPath, skipped);
+            entries.Add(skipped);
+            Log?.Invoke("  SKIP Save: có step lỗi, không lưu " + file.Path);
             return;
         }
 
@@ -289,6 +320,7 @@ public sealed class BatchJobRunner
             entry.Summary = "Lưu thất bại: " + ex.Message;
         }
         entry.ElapsedMs = sw.ElapsedMilliseconds;
+        entry.Messages.AddRange(TakeSuppressedWarnings());
         RunLog.Append(runLogPath, entry);
         entries.Add(entry);
     }

@@ -16,7 +16,18 @@ namespace DhcbTools.Shared.Logic.Batch
         /// Một dòng script cho mỗi step. JSON được ghi ra file riêng (đường dẫn truyền vào lệnh) vì dòng lệnh
         /// AutoCAD không chịu dấu nháy/kí tự đặc biệt tốt; DHCB_RUN đọc file đó.
         /// </summary>
-        public static string Build(string pluginDllPath, IReadOnlyList<string> stepJsonPaths, string? saveAsPath, string runLogPath, string sourceFile, string? plotScript = null)
+        /// <param name="pluginDllPath">DLL NETLOAD (ưu tiên DhcbTools.AutoCAD.Core.dll).</param>
+        /// <param name="stepJsonPaths">File JSON từng step cho DHCB_RUN.</param>
+        /// <param name="saveAsPath">Đường dẫn lưu; null = đóng không lưu. Với saveMode=Save truyền chính file nguồn
+        /// (QSAVE không có trong core console — SAVEAS về cùng đường dẫn tương đương).</param>
+        /// <param name="runLogPath">run.jsonl mà DHCB_RUN ghi vào.</param>
+        /// <param name="sourceFile">File DWG nguồn (ghi vào cột file của log).</param>
+        /// <param name="plotScript">Chuỗi -PLOT (từ <see cref="PlotPdf"/>) chèn trước SAVEAS, hoặc null.</param>
+        /// <param name="dwgVersion">Từ khoá phiên bản DWG cho SAVEAS (2000/2004/2007/2010/2013/2018), mặc định 2018.</param>
+        /// <param name="saveTargetExists">File đích đã tồn tại → AutoCAD hỏi "replace it?"; thêm dòng <c>Y</c> để trả lời.
+        /// Không có dòng này thì prompt nuốt luôn lệnh kế tiếp và bản vẽ không được lưu. Với saveMode=Save luôn là true.</param>
+        public static string Build(string pluginDllPath, IReadOnlyList<string> stepJsonPaths, string? saveAsPath, string runLogPath, string sourceFile,
+            string? plotScript = null, string? dwgVersion = null, bool saveTargetExists = false)
         {
             if (string.IsNullOrWhiteSpace(pluginDllPath))
             {
@@ -25,6 +36,11 @@ namespace DhcbTools.Shared.Logic.Batch
 
             var sb = new StringBuilder();
             sb.Append("FILEDIA 0\n");
+            // SECURELOAD 0 để NETLOAD nạp được DLL nằm ngoài TRUSTEDPATHS mà không có hộp thoại (core console
+            // không có ai bấm "Always Load"). Chấp nhận được vì script này chỉ nạp đúng một DLL do runner chỉ
+            // định, trong một tiến trình accoreconsole chạy riêng cho batch rồi thoát. Cách chặt hơn (SECURELOAD 1 +
+            // ghi thư mục DLL vào TRUSTEDPATHS) đòi ghi đè biến hệ thống lưu theo profile của user — ảnh hưởng cả
+            // AutoCAD tương tác — nên không làm ở đây.
             sb.Append("SECURELOAD 0\n");
             sb.Append("NETLOAD \"").Append(Escape(pluginDllPath)).Append("\"\n");
             foreach (var stepPath in stepJsonPaths)
@@ -49,7 +65,11 @@ namespace DhcbTools.Shared.Logic.Batch
 
             if (!string.IsNullOrEmpty(saveAsPath))
             {
-                sb.Append("SAVEAS 2018 \"").Append(Escape(saveAsPath!)).Append("\"\n");
+                sb.Append("SAVEAS ").Append(NormalizeDwgVersion(dwgVersion)).Append(" \"").Append(Escape(saveAsPath!)).Append("\"\n");
+                if (saveTargetExists)
+                {
+                    sb.Append("Y\n"); // "A drawing with this name already exists. Do you want to replace it?"
+                }
             }
 
             sb.Append("FILEDIA 1\n");
@@ -102,10 +122,50 @@ namespace DhcbTools.Shared.Logic.Batch
             return sb.ToString();
         }
 
-        /// <summary>Dòng lệnh accoreconsole cho một file.</summary>
+        /// <summary>Từ khoá phiên bản DWG hợp lệ cho SAVEAS; sai/trống → 2018.</summary>
+        public static string NormalizeDwgVersion(string? version)
+        {
+            var v = (version ?? string.Empty).Trim();
+            switch (v)
+            {
+                case "2000":
+                case "2004":
+                case "2007":
+                case "2010":
+                case "2013":
+                case "2018":
+                    return v;
+                default:
+                    return "2018";
+            }
+        }
+
+        /// <summary>Dòng lệnh accoreconsole cho một file (exe + tham số).</summary>
         public static string CommandLine(string accoreconsolePath, string dwgPath, string scriptPath, string? locale = "en-US")
         {
-            return "\"" + accoreconsolePath + "\" /i \"" + dwgPath + "\" /s \"" + scriptPath + "\"" + (string.IsNullOrEmpty(locale) ? string.Empty : " /l " + locale);
+            return "\"" + Escape(accoreconsolePath) + "\" " + Arguments(dwgPath, scriptPath, locale);
+        }
+
+        /// <summary>
+        /// Phần tham số cho <c>ProcessStartInfo.Arguments</c>: <c>/i "dwg" /s "scr" /l en-US</c>. Bọc nháy cả hai
+        /// đường dẫn (có dấu cách là thường) và bỏ ký tự phá dòng lệnh; locale chỉ nhận chữ, số, gạch nối.
+        /// </summary>
+        public static string Arguments(string dwgPath, string scriptPath, string? locale = "en-US")
+        {
+            var sb = new StringBuilder();
+            sb.Append("/i \"").Append(Escape(dwgPath)).Append("\" /s \"").Append(Escape(scriptPath)).Append('"');
+            if (!string.IsNullOrEmpty(locale))
+            {
+                var clean = new StringBuilder();
+                foreach (var c in locale!)
+                {
+                    if (char.IsLetterOrDigit(c) || c == '-' || c == '_') clean.Append(c);
+                }
+
+                if (clean.Length > 0) sb.Append(" /l ").Append(clean);
+            }
+
+            return sb.ToString();
         }
 
         /// <summary>Nội dung file JSON mô tả một step cho DHCB_RUN: {"command":..., "config":{...}}.</summary>
@@ -114,6 +174,11 @@ namespace DhcbTools.Shared.Logic.Batch
             return "{\"command\":" + JsonConvert.ToString(command) + ",\"config\":" + (string.IsNullOrWhiteSpace(configJson) ? "{}" : configJson) + "}";
         }
 
-        private static string Escape(string path) => path.Replace("\"", string.Empty);
+        /// <summary>
+        /// Bỏ dấu nháy và ký tự xuống dòng khỏi mọi giá trị chèn vào script: một <c>\n</c> lọt vào tên layout
+        /// hay đường dẫn là một lần Enter thừa — dòng còn lại của giá trị thành lệnh mới cho AutoCAD.
+        /// </summary>
+        private static string Escape(string value) =>
+            (value ?? string.Empty).Replace("\"", string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
     }
 }

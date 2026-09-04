@@ -21,8 +21,14 @@ namespace DhcbTools.Shared.Hosting
         /// <summary>
         /// Lấy token đang hiệu lực: biến môi trường → file → sinh mới rồi ghi file.
         /// Ném <see cref="IOException"/> nếu không ghi được file (Bridge phải từ chối khởi động thay vì chạy không token).
+        /// <para>
+        /// Ghi qua file tạm rồi đổi tên vào chỗ: file token không bao giờ tồn tại ở trạng thái ghi dở, và
+        /// ACL được thu về chủ sở hữu TRƯỚC khi file mang tên thật — không có khoảnh khắc nào file token
+        /// nằm đúng chỗ với quyền kế thừa rộng. Thu ACL hỏng chỉ ghi cảnh báo (<paramref name="log"/>),
+        /// không chặn khởi động: %APPDATA% vốn đã là thư mục riêng của user.
+        /// </para>
         /// </summary>
-        public static string LoadOrCreate(string? path = null)
+        public static string LoadOrCreate(string? path = null, Action<string>? log = null)
         {
             var fromEnv = Environment.GetEnvironmentVariable(EnvironmentVariable);
             if (!string.IsNullOrWhiteSpace(fromEnv))
@@ -47,22 +53,42 @@ namespace DhcbTools.Shared.Hosting
                 Directory.CreateDirectory(dir);
             }
 
-            File.WriteAllText(file, token);
-            TryRestrictToOwner(file);
+            var temp = file + "." + Guid.NewGuid().ToString("N").Substring(0, 8) + ".tmp";
+            try
+            {
+                File.WriteAllText(temp, token);
+                if (!TryRestrictToOwner(temp))
+                {
+                    log?.Invoke("[DHCB Bridge] CẢNH BÁO: không thu được quyền file token về chủ sở hữu (" + file
+                                + ") — file vẫn dùng được, quyền theo thư mục cha.");
+                }
+
+                if (File.Exists(file))
+                {
+                    File.Delete(file);
+                }
+
+                File.Move(temp, file);
+            }
+            finally
+            {
+                try { if (File.Exists(temp)) File.Delete(temp); } catch { /* dọn file tạm, không quan trọng */ }
+            }
+
             return token;
         }
 
         /// <summary>
-        /// Thu quyền file về chủ sở hữu (Windows: xoá kế thừa ACL, chỉ giữ user hiện tại). Bỏ qua im lặng trên
-        /// nền tảng không hỗ trợ — thư mục %APPDATA% vốn đã là của riêng user.
+        /// Thu quyền file về chủ sở hữu (Windows: xoá kế thừa ACL, chỉ giữ user hiện tại). Trả <c>true</c>
+        /// khi đã thu xong hoặc nền tảng không cần (không phải Windows); <c>false</c> khi icacls lỗi.
         /// </summary>
-        private static void TryRestrictToOwner(string file)
+        private static bool TryRestrictToOwner(string file)
         {
             try
             {
                 if (Environment.OSVersion.Platform != PlatformID.Win32NT)
                 {
-                    return;
+                    return true;
                 }
 
                 // Dùng icacls để không phải tham chiếu System.Security.AccessControl (không có trong netstandard2.0 đầy đủ).
@@ -75,12 +101,23 @@ namespace DhcbTools.Shared.Hosting
                 };
                 using (var p = System.Diagnostics.Process.Start(psi))
                 {
-                    p?.WaitForExit(5000);
+                    if (p == null)
+                    {
+                        return false;
+                    }
+
+                    if (!p.WaitForExit(5000))
+                    {
+                        try { p.Kill(); } catch { /* đang thoát */ }
+                        return false;
+                    }
+
+                    return p.ExitCode == 0;
                 }
             }
             catch
             {
-                // không chặn khởi động vì lý do ACL
+                return false;
             }
         }
     }
