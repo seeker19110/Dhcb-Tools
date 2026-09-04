@@ -238,16 +238,17 @@ public sealed class App : IExternalApplication
     }
 
     /// <summary>
-    /// Gắn icon sinh tại chỗ: một cỡ duy nhất (32) dùng cho cả ô lớn lẫn ô nhỏ. Icon là vector nên
-    /// Revit thu nhỏ vẫn sắc, và mọi nút — nút trên panel hay mục trong nút xổ xuống — trông cùng
-    /// một bộ thay vì hai cỡ vẽ khác nhau. Không đóng gói file ảnh nào, add-in vẫn chỉ là một DLL.
+    /// Gắn icon sinh tại chỗ, cùng một cách vẽ cho mọi nút nên cả tab trông một bộ. Mỗi ô được render
+    /// đúng số pixel của nó (32 cho nút trên panel, 16 cho mục trong nút xổ xuống) thay vì để Revit
+    /// co giãn một ảnh — co giãn thì icon méo và cắt mất chữ. Không đóng gói file ảnh nào.
     /// </summary>
     private static void Decorate(ButtonData data, string id)
     {
 #if !DHCB_NO_WPF
-        var icon = RibbonIcons.Create(Glyph(id), ColorOf(id));
-        data.LargeImage = icon;
-        data.Image = icon;
+        var glyph = Glyph(id);
+        var color = ColorOf(id);
+        data.LargeImage = RibbonIcons.Create(glyph, color, RibbonIcons.Large);
+        data.Image = RibbonIcons.Create(glyph, color, RibbonIcons.Small);
 #endif
     }
 

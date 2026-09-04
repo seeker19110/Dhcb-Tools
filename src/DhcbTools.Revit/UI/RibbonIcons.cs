@@ -1,14 +1,18 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace DhcbTools.Revit.UI;
 
 /// <summary>
-/// Sinh icon phẳng (flat, bo góc, chữ đầu) ngay lúc chạy thay vì đóng gói file ảnh: giữ add-in chỉ
-/// một DLL, và icon luôn sắc nét ở mọi mức DPI vì là vector chứ không phải bitmap phóng to.
+/// Sinh icon phẳng (bo góc, chữ đầu) ngay lúc chạy thay vì đóng gói file ảnh: add-in vẫn chỉ một DLL.
 /// Bảng màu theo nhóm chức năng để mắt nhận ra panel trước khi kịp đọc chữ — dùng chung tông với
 /// Ribbon bên AutoCAD (<c>DhcbTools.AutoCAD.Ribbon.RibbonIcons</c>) để hai add-in trông cùng một bộ.
+///
+/// Render ra <see cref="RenderTargetBitmap"/> ĐÚNG số pixel Ribbon cần, không trả DrawingImage:
+/// biên của DrawingImage lấy theo nội dung đã vẽ, nên khi Ribbon co giãn vào ô nhỏ thì icon bị méo
+/// và cắt mất chữ (đã gặp thật). Bitmap đúng cỡ thì vẽ sao hiện vậy.
 /// </summary>
 internal static class RibbonIcons
 {
@@ -19,43 +23,46 @@ internal static class RibbonIcons
     public static readonly Color Sheets = Color.FromRgb(0x6A, 0x1B, 0x9A);   // tím — hồ sơ & style
     public static readonly Color Checks = Color.FromRgb(0x15, 0x65, 0xC0);   // xanh dương — kiểm tra & AI
 
-    /// <summary>Cỡ vẽ chuẩn duy nhất cho mọi icon — vector nên thu nhỏ vẫn sắc.</summary>
-    private const int Size = 32;
+    /// <summary>Ô icon nhỏ của Revit (mục trong nút xổ xuống).</summary>
+    public const int Small = 16;
 
-    /// <param name="glyph">1–2 ký tự hiện giữa icon.</param>
-    public static ImageSource Create(string glyph, Color color)
+    /// <summary>Ô icon lớn của Revit (nút trên panel).</summary>
+    public const int Large = 32;
+
+    public static ImageSource Create(string glyph, Color color, int size)
     {
-        const int size = Size;
-
-        var drawing = new DrawingGroup();
-        using (var dc = drawing.Open())
+        var visual = new DrawingVisual();
+        using (var dc = visual.RenderOpen())
         {
-            // Chừa lề: icon vẽ kín khung trông nặng và to hơn hẳn icon gốc của Revit bên cạnh.
-            var margin = size * 0.16;
+            // Chừa lề: icon vẽ kín ô trông nặng và to hơn hẳn icon gốc của Revit bên cạnh.
+            var margin = size * 0.09;
             var box = size - (margin * 2);
             var rect = new Rect(margin, margin, box, box);
-            var radius = box * 0.26;
 
             var background = new LinearGradientBrush(
                 Lighten(color, 0.18), Darken(color, 0.10),
                 new Point(0, 0), new Point(1, 1));
-            dc.DrawRoundedRectangle(background, null, rect, radius, radius);
+            dc.DrawRoundedRectangle(background, null, rect, box * 0.24, box * 0.24);
 
             var text = new FormattedText(
                 glyph,
                 CultureInfo.InvariantCulture,
                 FlowDirection.LeftToRight,
-                new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
-                box * (glyph.Length > 1 ? 0.46 : 0.60),
+                new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
+                box * (glyph.Length > 1 ? 0.62 : 0.78),
                 Brushes.White,
                 pixelsPerDip: 1.0);
 
-            dc.DrawText(text, new Point((size - text.Width) / 2, (size - text.Height) / 2));
+            // Căn giữa theo chính ô đã vẽ, không theo cả canvas — chữ hai ký tự mới không lệch.
+            dc.DrawText(text, new Point(
+                rect.X + ((box - text.Width) / 2),
+                rect.Y + ((box - text.Height) / 2)));
         }
 
-        var image = new DrawingImage(drawing);
-        image.Freeze();
-        return image;
+        var bitmap = new RenderTargetBitmap(size, size, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(visual);
+        bitmap.Freeze();
+        return bitmap;
     }
 
     private static Color Lighten(Color c, double amount) => Mix(c, Colors.White, amount);

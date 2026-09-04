@@ -150,7 +150,7 @@ internal static class RibbonBuilder
             Text = text,
             ShowText = true,
             ShowImage = true,
-            Image = RibbonIcons.Create(glyph, color),
+            Image = RibbonIcons.Create(glyph, color, RibbonIcons.Small),
             Orientation = Orientation.Horizontal,
             Size = RibbonItemSize.Standard,
             ToolTip = tip,
