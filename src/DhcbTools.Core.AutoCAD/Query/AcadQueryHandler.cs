@@ -19,7 +19,7 @@ public static class AcadQueryHandler
     /// biết truy vấn đó tồn tại (<c>QueryCatalogTests</c> chốt cho khỏi lệch).
     /// </summary>
     public const string ValidQueries =
-        "drawing_info, layers, blocks, inserts, entities, text, xrefs, layouts, stats, entity_geometry, attributes_of";
+        "drawing_info, layers, blocks, inserts, entities, text, xrefs, layouts, stats, entity_geometry, attributes_of, snapshot";
 
     public static object Handle(Database db, QueryRequest req)
     {
@@ -37,6 +37,8 @@ public static class AcadQueryHandler
             // Giai đoạn 10.1 — đủ để agent nhìn và kiểm được đúng đối tượng vừa đụng tới.
             "ENTITY_GEOMETRY" => GetEntityGeometry(db, req.Params),
             "ATTRIBUTES_OF"   => GetAttributesOf(db, req.Params),
+            // Tầng Core của snapshot: ảnh xem trước lưu trong DWG. Vỏ AutoCAD chặn trước để render sống.
+            "SNAPSHOT"        => AcadSnapshot.Thumbnail(db),
             _ => new { error = $"Query không xác định: \"{req.Query}\". Hợp lệ: {ValidQueries}." }
         };
     }

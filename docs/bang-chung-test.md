@@ -1359,3 +1359,48 @@ cũng bị gắn cờ đỏ. Ghi lại để quyết định khi có người d�
 
 Chỉ số của mục 11.5 — *`--verify-log` mã thoát 0 trên log thật **sau 30 ngày*** — theo định nghĩa vẫn phải
 chờ 30 ngày. Log 30 dòng ở đây là model mẫu Snowdon Towers, chưa phải log của dự án thật như §20.
+
+---
+
+## 25. `snapshot` phía AutoCAD — agent nhìn thấy bản vẽ, trên AutoCAD 2026.1 thật (2026-09-05 06:26 ICT)
+
+Mảnh ⬜ cuối của giai đoạn 10. `agent-khep-vong.md` từng ghi *"AutoCAD không có API tương đương
+`Document.ExportImage`; `PNGOUT` là lệnh tương tác — chưa có đường nào sạch"*. Vòng này thử đường khác:
+**GraphicsSystem** render vào thiết bị off-screen.
+
+### Cách chạy
+
+Build vỏ AutoCAD `net10.0-windows` (AcadVersion=2026) chép vào bundle tự nạp `%APPDATA%\Autodesk\ApplicationPlugins\DhcbTools.bundle` (đã sao lưu bản cũ), mở `acad.exe` với bản vẽ mẫu `Data Extraction and Multileaders Sample.dwg`
+kèm AutoCAD 2026, Bridge tự chạy trong `Initialize()`, rồi gọi qua `dhcb_agent.py autocad query snapshot`:
+
+| Gọi | `source` trả về | Cỡ | PNG | Ghi chú |
+|---|---|---|---|---|
+| `source=live imageWidth=1200` | **`live`** | **1200 × 900** | 22.753 B | Không rơi mức nào (`fallbackFrom` rỗng) |
+| `source=thumbnail` | **`thumbnail`** | 256 × 171 | 3.462 B | Kèm câu *"ảnh lúc SAVE gần nhất — không phản ánh thay đổi chưa lưu"* |
+| `source=live imageWidth=99999` | `live` | **4000 × 3000** | 127.281 B | Kẹp cỡ đúng ngưỡng trên |
+
+### Mở ảnh ra xem — hai ảnh tự giải thích vì sao phải ghi `source`
+
+**`live`**: toàn bộ **model space** — mặt bằng khu đất, đường bao công trình, lưới trục, hai mặt bằng tầng, ba
+bảng chú thích — nền trắng, `ZoomExtents` ôm trọn. **`thumbnail`**: một **tab layout** nền đen với bốn ô chi tiết
+và khung tên — vì lần save cuối, bản vẽ đang mở ở layout đó. Cùng một file, hai ảnh khác hẳn nhau, cả hai đều đúng
+theo nghĩa của mình. Nếu kết quả không ghi rõ mình là loại nào, agent sẽ tưởng bản vẽ đã đổi.
+
+### Điều rút ra về API (để khỏi tra lại)
+
+- `GraphicsSystem.Manager` nằm ở **AcCoreMgd**, không phải AcMgd; `View/Device/Model` ở AcDbMgd. XML doc của
+  package không liệt kê `Manager` — phải đọc metadata DLL mới thấy.
+- Từ AutoCAD 2015, `CreateAutoCADOffScreenDevice`/`CreateAutoCADModel` đòi **`GraphicsKernel`**, xin bằng
+  `KernelDescriptor.addRequirement(UniqueString.Intern("3D Drawing"))` — `addRequirement` nhận `ulong`, và
+  `UniqueString` ở namespace `Autodesk.AutoCAD` (không phải `.Runtime` như mẫu ADN cũ). Xin xong phải
+  `ReleaseGraphicsKernel`.
+- `Database.ThumbnailBitmap` trả `System.Drawing.Bitmap`; AutoCAD.NET **không khai** dependency
+  `System.Drawing.Common` — net8 cần bản 8.0, **net10 cần bản 10.0** (AcDbMgd 25.1 tham chiếu 10.0.0.0, bản 8.0
+  ra CS1705). net48 tham chiếu `System.Drawing` trong hộp.
+- Cùng một mã nguồn biên dịch cho cả ba thế hệ (net48 / net8 / net10), kể cả kiểu CI (`UseWPF=false`).
+
+### Cái chưa chứng minh
+
+Mức rơi **`screen`** (chụp khung nhìn đang mở khi off-screen hỏng) chưa từng được kích hoạt — off-screen chạy ngay.
+Chỉ chạy trên AutoCAD **2026.1**; 2024/2025 mới ở mức biên dịch. Bản vẽ mẫu có extents đáng tin; nhánh "extents
+là số rác ±1e20 → ôm theo khung nhìn hiện tại" chưa gặp trên dữ liệu thật.

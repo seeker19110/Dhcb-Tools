@@ -145,6 +145,7 @@ ElementId. `HandleText` nhận cả `1A3`, `0x1A3`, `(1A3)` — agent copy từ 
 | `selection` | Vỏ (cần `Editor`) | entity đang chọn; kèm `handles` thì **đặt** lựa chọn |
 | `show_entities` | Vỏ | zoom ôm trọn + chọn; không có entity hợp lệ thì **giữ nguyên khung nhìn** |
 | `active_layout` | Vỏ | Model hay layout nào, khổ giấy, tâm/kích thước khung nhìn, layer hiện hành |
+| `snapshot` | Vỏ **và** Core | PNG (base64 + `path`) để agent **nhìn thấy** bản vẽ, cùng hình dạng với `snapshot` bên Revit. Kết quả luôn ghi `source`: **`live`** = vỏ render model space bằng thiết bị off-screen của GraphicsSystem, đúng cỡ `imageWidth` (kẹp 200–4000), ôm trọn extents, **không đụng** khung nhìn kỹ sư đang xem; **`screen`** = chụp khung nhìn đang mở khi off-screen hỏng; **`thumbnail`** = ảnh xem trước lưu trong DWG lúc save (tầng Core, chạy được trong accoreconsole; gọi `source="thumbnail"` để ép). Rơi mức nào thì `reasons` nói vì sao |
 
 Handle sai định dạng hoặc không có trong bản vẽ luôn được **nói ra** trong `notFound` — im lặng trả rỗng
 nghĩa là agent tưởng lệnh không đụng tới gì.
@@ -152,9 +153,12 @@ nghĩa là agent tưởng lệnh không đụng tới gì.
 Core cố ý **không** biết tới `Editor`: đó là điều kiện để mọi thứ ở Core còn chạy được trong
 `accoreconsole` (batch đêm không có giao diện). `QueryCatalogTests` chốt ranh giới đó.
 
-**Chưa có**: `snapshot` phía AutoCAD — AutoCAD không có API tương đương `Document.ExportImage` của
-Revit; `PNGOUT` là lệnh tương tác, gọi từ Bridge sẽ chiếm dòng lệnh của kỹ sư. Để mở.
+**`snapshot` phía AutoCAD — đã có (2026-09-05).** Nhận định cũ "không có API tương đương `Document.ExportImage`"
+đúng một nửa: không có lệnh xuất ảnh headless, nhưng **GraphicsSystem** (`Manager.CreateAutoCADOffScreenDevice` +
+`View.GetSnapshot`, cần một `GraphicsKernel` xin qua `KernelDescriptor("3D Drawing")`) render được model space vào
+thiết bị off-screen mà không chiếm dòng lệnh, không đổi khung nhìn. Ảnh `live` là **model space** kể cả khi kỹ sư
+đang ở tab layout — đó là chủ ý (agent kiểm mô hình, không kiểm khung in). Bằng chứng: `bang-chung-test.md` §25.
 
 ## Còn lại của giai đoạn 10
 
-- `snapshot` cho AutoCAD (xem trên) — chưa có đường nào sạch.
+- ~~`snapshot` cho AutoCAD~~ — xong 2026-09-05, xem trên.

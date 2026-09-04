@@ -5,6 +5,7 @@ using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
+using Autodesk.AutoCAD.GraphicsSystem;
 using DhcbTools.Core.AutoCAD.Query;
 using DhcbTools.Shared.Logic.Cad;
 
@@ -33,6 +34,7 @@ internal static class AcadUiQueryHandler
             "SELECTION" => Selection(document, request.Params),
             "SHOW_ENTITIES" => ShowEntities(document, request.Params),
             "ACTIVE_LAYOUT" => ActiveLayout(document),
+            "SNAPSHOT" => Snapshot(document, request.Params),
             _ => AcadQueryHandler.Handle(document.Database, request),
         };
     }
@@ -169,6 +171,127 @@ internal static class AcadUiQueryHandler
 
         tr.Abort();
         return result;
+    }
+
+    /// <summary>
+    /// Ảnh để agent <b>nhìn thấy</b> bản vẽ — mảnh cuối của giai đoạn 10.1 phía AutoCAD. Không có API
+    /// xuất ảnh headless như <c>Document.ExportImage</c> của Revit, nên đi ba mức, mức nào hỏng thì rơi
+    /// xuống mức sau và <b>nói rõ trong kết quả</b> ảnh thuộc mức nào:
+    /// <list type="number">
+    ///   <item><c>live</c> — render lại model space bằng thiết bị off-screen của GraphicsSystem, đúng cỡ
+    ///   <c>imageWidth</c> agent xin, ôm trọn extents. Không đụng khung nhìn kỹ sư đang xem.</item>
+    ///   <item><c>screen</c> — chụp thẳng khung nhìn hiện tại (<see cref="Manager.GetCurrentAcGsView"/>):
+    ///   đúng thứ kỹ sư đang thấy, nhưng cỡ ảnh là cỡ cửa sổ, không phải cỡ agent xin.</item>
+    ///   <item><c>thumbnail</c> — ảnh xem trước lưu trong DWG lúc save (tầng Core, dùng chung với
+    ///   accoreconsole).</item>
+    /// </list>
+    /// <c>source="thumbnail"</c> thì bỏ qua hai mức đầu — để kiểm được tầng Core ngay trong GUI.
+    /// </summary>
+    private static object Snapshot(Document document, AcadQueryParams p)
+    {
+        if (string.Equals(p.Source, "thumbnail", StringComparison.OrdinalIgnoreCase))
+        {
+            return AcadSnapshot.Thumbnail(document.Database);
+        }
+
+        var reasons = new List<string>();
+        var width = Math.Max(200, Math.Min(p.ImageWidth, 4000));
+
+        try
+        {
+            using var bitmap = RenderOffScreen(document, width);
+            return AcadSnapshot.Package(bitmap, source: "live", note: null);
+        }
+        catch (System.Exception ex)
+        {
+            reasons.Add("off-screen: " + ex.Message);
+        }
+
+        try
+        {
+            using var bitmap = SnapshotCurrentView(document, width);
+            return AcadSnapshot.Package(bitmap, source: "screen",
+                note: "Không render off-screen được (" + reasons[0] + ") — đây là ảnh chụp khung nhìn đang mở, cỡ theo cửa sổ.");
+        }
+        catch (System.Exception ex)
+        {
+            reasons.Add("khung nhìn hiện tại: " + ex.Message);
+        }
+
+        var fallback = AcadSnapshot.Thumbnail(document.Database);
+        // Thumbnail trả object ẩn danh; ghép lý do rơi xuống vào để agent biết vì sao không có ảnh sống.
+        return new { fallbackFrom = "live", reasons, result = fallback };
+    }
+
+    /// <summary>
+    /// Render model space vào thiết bị off-screen, khung hình 4:3 theo <paramref name="width"/>.
+    /// Extents của DWG chưa từng zoom là số rác (±1e20) — khi đó lấy theo khung nhìn hiện tại.
+    /// </summary>
+    private static System.Drawing.Bitmap RenderOffScreen(Document document, int width)
+    {
+        var database = document.Database;
+        var height = width * 3 / 4;
+        var manager = document.GraphicsManager;
+
+        // Từ AutoCAD 2015 mọi device/model off-screen phải gắn với một GraphicsKernel; "3D Drawing" là
+        // kernel dựng hình chuẩn của AutoCAD (đúng chuỗi trong mẫu ADN). Xin rồi phải trả — kernel là
+        // tài nguyên đếm tham chiếu của GS, rò một cái là mỗi lần agent "nhìn" tốn thêm một.
+        var descriptor = new KernelDescriptor();
+        descriptor.addRequirement(Autodesk.AutoCAD.UniqueString.Intern("3D Drawing"));
+        var kernel = Manager.AcquireGraphicsKernel(descriptor);
+        try
+        {
+            using var device = manager.CreateAutoCADOffScreenDevice(kernel);
+            device.OnSize(new System.Drawing.Size(width, height));
+
+            using var view = new View();
+            using var model = manager.CreateAutoCADModel(kernel);
+            using var tr = database.TransactionManager.StartTransaction();
+            var modelSpace = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(database), OpenMode.ForRead);
+
+            view.Add(modelSpace, model);
+            device.Add(view);
+
+            var (min, max) = UsableExtents(document);
+            view.ZoomExtents(min, max);
+            device.Update();
+
+            var bitmap = view.GetSnapshot(new System.Drawing.Rectangle(0, 0, width, height));
+            device.Erase(view);
+            tr.Abort();
+            return bitmap;
+        }
+        finally
+        {
+            Manager.ReleaseGraphicsKernel(kernel);
+        }
+    }
+
+    /// <summary>Chụp khung nhìn số 0 (model) đúng như đang hiện trên màn hình.</summary>
+    private static System.Drawing.Bitmap SnapshotCurrentView(Document document, int width)
+    {
+        using var view = document.GraphicsManager.GetCurrentAcGsView(0);
+        var height = width * 3 / 4;
+        return view.GetSnapshot(new System.Drawing.Rectangle(0, 0, width, height));
+    }
+
+    private static (Point3d min, Point3d max) UsableExtents(Document document)
+    {
+        var db = document.Database;
+        var min = db.Extmin;
+        var max = db.Extmax;
+        var sane = Math.Abs(min.X) < 1e15 && Math.Abs(max.X) < 1e15 && max.X > min.X && max.Y > min.Y;
+        if (sane)
+        {
+            return (min, max);
+        }
+
+        // Chưa có extents đáng tin: ôm theo khung nhìn kỹ sư đang mở.
+        var v = document.Editor.GetCurrentView();
+        var hw = v.Width / 2;
+        var hh = v.Height / 2;
+        return (new Point3d(v.CenterPoint.X - hw, v.CenterPoint.Y - hh, 0),
+                new Point3d(v.CenterPoint.X + hw, v.CenterPoint.Y + hh, 0));
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
