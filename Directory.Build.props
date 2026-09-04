@@ -51,10 +51,16 @@
     <TargetFramework Condition="'$(AcadVersion)' != '' And $(AcadVersion) &gt;= 2026">net10.0-windows</TargetFramework>
   </PropertyGroup>
 
-  <!-- Revit 2021-2024 chạy trên .NET Framework 4.8; Revit 2025+ chạy trên .NET 8. -->
+  <!--
+    Revit 2021-2024 chạy trên .NET Framework 4.8; 2025/2026 chạy .NET 8; 2027+ chạy .NET 10.
+    Điều kiện của nhánh net8 phải CÓ CẬN TRÊN: trước đây là "&gt;= 2025" không chặn trên, nên
+    -p:RevitVersion=2027 vẫn ra net8.0-windows — sai âm thầm, không lỗi biên dịch nào bắt được.
+    Microsoft ngừng hỗ trợ .NET 8 ngày 10/11/2026, nên nhánh này phải sẵn trước khi Revit 2027 ra.
+  -->
   <PropertyGroup Condition="'$(DhcbIsAcadProject)' != 'true'">
     <TargetFramework Condition="'$(RevitVersion)'=='' Or $(RevitVersion) &lt; 2025">net48</TargetFramework>
-    <TargetFramework Condition="'$(RevitVersion)' != '' And $(RevitVersion) &gt;= 2025">net8.0-windows</TargetFramework>
+    <TargetFramework Condition="'$(RevitVersion)' != '' And $(RevitVersion) &gt;= 2025 And $(RevitVersion) &lt; 2027">net8.0-windows</TargetFramework>
+    <TargetFramework Condition="'$(RevitVersion)' != '' And $(RevitVersion) &gt;= 2027">net10.0-windows</TargetFramework>
   </PropertyGroup>
 
   <!-- Hằng biên dịch theo phiên bản: CreateContainsRule bỏ tham số caseSensitive từ 2023. -->

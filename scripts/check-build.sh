@@ -4,6 +4,11 @@
 #   - Core Revit / Core AutoCAD / hai vỏ: biên dịch với API package NuGet (RevitVersion=2025 → net8.0-windows),
 #     UseWPF=false để bỏ thư mục UI (WPF) của vỏ Revit. Đây là lưới bắt lỗi biên dịch trước khi lên máy Windows;
 #     kiểm thử chức năng thật vẫn theo docs/dac-ta-kiem-thu.md §4.
+#   Phiên bản chọn bằng biến môi trường; TFM do Directory.Build.props quyết định:
+#     REVIT_VERSION=2024            → net48          ACAD_VERSION=2024 → net48
+#     REVIT_VERSION=2025|2026       → net8.0-windows ACAD_VERSION=2025 → net8.0-windows
+#     REVIT_VERSION=2027            → net10.0-windows ACAD_VERSION=2026 → net10.0-windows (cần SDK 10)
+#   Ví dụ đường .NET 10 của AutoCAD:  ACAD_VERSION=2026 ./scripts/check-build.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

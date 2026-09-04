@@ -16,9 +16,9 @@ hiện trạng ở [`docs/progress.md`](docs/progress.md).
 | Thành phần | Bản | Bắt buộc khi |
 |---|---|---|
 | Windows | 10/11 x64 | Chạy add-in (chỉ để build/test thuần thì Linux/macOS cũng được) |
-| .NET SDK | 8.0.x | Luôn — build cả net48 lẫn net8.0-windows |
-| Revit | 2023–2025 | Dùng add-in Revit |
-| AutoCAD | 2024–2026 | Dùng plugin AutoCAD (2026.1+ dùng .NET 10, chưa kiểm) |
+| .NET SDK | 8.0.x **+ 10.0.x** | SDK 8 build net48/net8.0-windows; SDK 10 cho AutoCAD ≥ 2026 và Revit ≥ 2027 (net10.0-windows) |
+| Revit | 2023–2025 (2026/2027 build được, chưa chạy thật) | Dùng add-in Revit |
+| AutoCAD | 2024–2026 | Dùng plugin AutoCAD (2026.1 dùng .NET 10 — đã chạy thật qua accoreconsole) |
 | Python | 3.9+ | Dùng `scripts/*.py` (client Bridge, MCP server, AI offline) |
 | Node/npx | bất kỳ LTS | **Chỉ** khi đóng gói `.mcpb` bằng `scripts/pack-mcpb.ps1` |
 | Hermes CLI | — | **Chỉ** cho panel web AutoCAD (`tools/autocad-mcp-server`) |
@@ -192,8 +192,9 @@ Chi tiết: [`docs/kiem-thu-trong-revit.md`](docs/kiem-thu-trong-revit.md), bằ
 [`docs/bang-chung-test.md`](docs/bang-chung-test.md), [`docs/bang-chung-test-autocad-live.md`](docs/bang-chung-test-autocad-live.md).
 
 Packages: Revit `Nice3point.Revit.Api.RevitAPI/RevitAPIUI`, AutoCAD `AutoCAD.NET` (vỏ đầy đủ) và `AutoCAD.NET.Core/.Model`
-(Core + vỏ core-only). Revit 2021–2024 và AutoCAD ≤2024 dùng net48, 2025 dùng net8.0-windows; AutoCAD 2026.1+ (package
-25.1.x) đã sang .NET 10 — `Directory.Build.props` map `-p:AcadVersion` → phiên bản package.
+(Core + vỏ core-only). Revit 2021–2024 và AutoCAD ≤2024 dùng net48; Revit 2025–2026 và AutoCAD 2025 dùng net8.0-windows;
+AutoCAD ≥ 2026 (package 25.1.x) và Revit ≥ 2027 dùng **net10.0-windows** — `Directory.Build.props` là nơi duy nhất quyết
+định TFM theo `-p:RevitVersion` / `-p:AcadVersion`; `release.yml` hỏi lại MSBuild thay vì tự tính.
 
 ## CI/CD
 
@@ -255,11 +256,11 @@ Tra không ra thì lệnh **báo lỗi `E-PARAM-MISSING` kèm danh sách tên đ
 Toàn bộ giai đoạn 0–6 của [`docs/dac-ta-tinh-nang.md`](docs/dac-ta-tinh-nang.md) và cả P1 lẫn P2 giai đoạn 7
 ([`docs/nghien-cuu-tool-thi-truong-va-ke-hoach.md`](docs/nghien-cuu-tool-thi-truong-va-ke-hoach.md) — khoảng trống so với
 pyRevit, DiRoots, Ideate, Colour Splasher, LAYTRANS, Drawing Compare, RevitBatchProcessor) đã có mã nguồn và biên dịch xanh
-với API Revit 2023/2024/2025 + AutoCAD 2024/2025; số test thuần xem output CI (`tests.yml` → artifact `test-results`).
+với API Revit/AutoCAD 2023–2027 (ma trận CI, gồm cả đường .NET 10); số test thuần xem output CI (`tests.yml` → artifact `test-results`).
 
 **Đã chạy trên phần mềm thật:** 42/42 lệnh Revit có ít nhất một ca kiểm chạy bên trong Revit 2024.3 và 15/15 lệnh
 AutoCAD có ca kiểm qua `accoreconsole`, cộng một đêm batch trên **dự án thật** — bằng chứng và số liệu từng vòng:
 [`docs/bang-chung-test.md`](docs/bang-chung-test.md), NETLOAD trên AutoCAD thật:
 [`docs/bang-chung-test-autocad-live.md`](docs/bang-chung-test-autocad-live.md). Phần **chưa** khép: chất lượng tuyến của `AutoRoute` (còn nhãn
-*thử nghiệm*), AutoCAD 2026.1+/.NET 10, và 9.4 — đưa cho một nhóm kỹ sư dùng thật. Chi tiết và lỗi còn mở:
+*thử nghiệm*), chạy thật trên Revit 2026/2027 (máy chỉ có 2024.3), và 9.4 — đưa cho một nhóm kỹ sư dùng thật. Chi tiết và lỗi còn mở:
 [`docs/progress.md`](docs/progress.md) · lộ trình: [`docs/roadmap.md`](docs/roadmap.md).

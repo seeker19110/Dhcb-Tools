@@ -38,16 +38,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Đúng bộ phiên bản mà release.yml đóng gói. 2025 = net8.0-windows, 2024/2023 = net48.
+        # 2023/2024 = net48 · 2025 = net8.0-windows · 2026 = Revit net8.0-windows nhưng AutoCAD net10.0-windows.
         # Trước đây CI chỉ build 2025, nên lỗi chỉ xảy ra trên net48 (Dictionary.GetValueOrDefault)
         # hoặc chỉ trên Revit ≤ 2023 (ElementId.Value) lọt tới tận bước phát hành.
-        version: ['2025', '2024', '2023']
+        # 2026/2027 thêm vào để đường .NET 10 có CI — trước đó nhánh TFM net10 trong Directory.Build.props
+        # chưa từng được build ở đâu ngoài máy có cài AutoCAD 2026. 2027 = cả Revit lẫn AutoCAD đều
+        # net10.0-windows (gói Nice3point.Revit.Api.RevitAPI 2027.2.0 đã có trên NuGet). Microsoft ngừng
+        # hỗ trợ .NET 8 ngày 10/11/2026. release.yml chưa đóng gói 2026/2027: chưa chạy thật trên phần mềm đó.
+        version: ['2027', '2026', '2025', '2024', '2023']
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          # Cần cả hai: netstandard2.0/net8.0 build bằng SDK 8; AutoCAD 2026 (net10.0-windows) cần SDK 10.
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
       - name: Build BatchRunner
         run: dotnet build src/DhcbTools.BatchRunner/DhcbTools.BatchRunner.csproj -c Release
@@ -87,13 +94,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        revit: ['2025', '2024', '2023']
+        # 2027 là bản WPF đầu tiên trên net10.0-windows — đúng chỗ SDK đổi implicit usings khi bật WPF.
+        revit: ['2027', '2026', '2025', '2024', '2023']
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
       - name: Build đầy đủ vỏ Revit (WPF, Revit ${{ matrix.revit }})
         run: dotnet build src/DhcbTools.Revit/DhcbTools.Revit.csproj -c Release -p:RevitVersion=${{ matrix.revit }}
