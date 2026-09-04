@@ -21,7 +21,8 @@
 > trọn; file còn lại lỗi mạng tới central model) — §20; và một vòng đóng vai kỹ sư dùng thử — §21.
 >
 > **Nhật ký batch có chuỗi băm (11.5):** mỗi dòng `run-*.jsonl` mang `prevHash`/`hash`, kiểm lại bằng
-> `BatchRunner --verify-log`. Bốn cách sửa log đều bị bắt, chỉ ra đúng số dòng — §23.
+> `BatchRunner --verify-log`. Bốn cách sửa log đều bị bắt, chỉ ra đúng số dòng — §23. Đã chạy thật trên
+> log đêm batch **30 dòng / 351 KB** và log AutoCAD nối qua **4 tiến trình accoreconsole** — §24.
 >
 > **Còn lại:** chưa có job nào chạy **tự động qua Task Scheduler** (hai lượt ở §20/§21 đều chạy tay); chất
 > lượng tuyến `AutoRoute` vẫn chưa chứng minh được; và 9.4 — đưa cho một nhóm kỹ sư dùng thật.
@@ -39,7 +40,7 @@
 | MEPF routing A (theo line), B (rải thiết bị theo phòng) | ✅ Core + Ribbon + Bridge; chờ kiểm thử trên model mẫu |
 | MEPF sizing (đề xuất → CSV → áp), màu/tên hệ, đánh số theo dòng chảy | ✅ |
 | Batch runner chạy đêm (Revit + AutoCAD accoreconsole) | ✅ [`batch-runner.md`](batch-runner.md) |
-| Chuỗi băm nhật ký batch (NĐ 207/2026, điều kiện ①) | ✅ `Shared.Logic/Evidence/HashChain` gắn ở `RunLog.Append`; kiểm bằng `BatchRunner --verify-log` — §23 |
+| Chuỗi băm nhật ký batch (NĐ 207/2026, điều kiện ①) | ✅ `Shared.Logic/Evidence/HashChain` gắn ở `RunLog.Append`; kiểm bằng `BatchRunner --verify-log` — §23, và chạy thật cả hai đường Revit/AutoCAD ở §24 |
 | `IUpdater` cao độ theo sự kiện | ✅ Mặc định tắt, tự tắt khi > 200 ms |
 | Checker tham số/đặt tên, clash nội bộ | ✅ HTML + 3D view, `clash-accepted.json` |
 | Lớp AI (offline) | ✅ [`ai-offline.md`](ai-offline.md) — heuristic mặc định, Ollama local tuỳ chọn |
@@ -190,6 +191,11 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
   xem mục trên), `TransferStandards` (LineStyles/ObjectStyles không copy được qua API — đã ghi rõ trong Messages),
   `ProjectFromTemplate` (worksharing cần môi trường mạng), `StylePurge` (phân tích tham chiếu có thể thiếu trường hợp —
   luôn xem trước), `SlopePipes` trên ống đã nối fitting hai đầu (Revit có thể từ chối dịch điểm cuối).
+- **`ScheduleExport` trả `success: true` khi mất một phần đầu ra.** §24: thư mục đầu ra dài 218 ký tự làm một
+  schedule vượt MAX_PATH (263 > 260) nên không ghi được. Lệnh báo **đúng và đủ** trong `errors` (tên schedule +
+  nguyên nhân) và summary ghi "35/36", nhưng `Success` vẫn là true nên `report.html` hiện *OK* và mã thoát không
+  phản ánh. Khác với ca "0 kết quả" mà `E-PRECOND`/`ElevationTag` đã chặn: đây là thành công **một phần** thật,
+  đổi thành thất bại thì 35 file xuất được cũng bị gắn cờ đỏ. Để ngỏ tới khi có người dùng thật quyết định.
 - `RvtFileInfo` nhận phiên bản bằng cách quét chuỗi trong 2 MB đầu file thay vì parse OLE — đủ cho batch, nhưng file mã hoá/
   bất thường sẽ rơi về `revitVersion` của job.
 - `AcadScriptGen.PlotPdf` theo thứ tự prompt `-PLOT` của AutoCAD 2018+ tiếng Anh; bản địa hoá hoặc phiên bản khác có thể lệch
@@ -239,10 +245,14 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
    *dùng hằng tuần / bấm rồi bỏ / chưa dùng* cho đủ 42 lệnh Revit + 15 lệnh AutoCAD, kèm bốn câu hỏi mở.
    `PhanHoiFormTests` đối chiếu danh sách lệnh trong mẫu với `CommandCatalog` hai chiều nên mẫu không trôi.
    Còn thiếu: phát hành v1.1 và chọn nhóm kỹ sư — cả hai đều là việc của người, không phải của mã.
-8. ~~Chuỗi băm cho nhật ký batch (11.5)~~ — xong: `prevHash`/`hash` gắn ở `RunLog.Append`, kiểm bằng
+8. ~~Chuỗi băm cho nhật ký batch (11.5)~~ — xong, **đã chạy thật cả hai đường (§24)**: đêm batch Revit
+   3 model × 10 step (30 dòng, 351 KB, dòng dài nhất 123.357 ký tự) và đêm batch AutoCAD 4 bản vẽ × 3 step
+   nối qua **4 tiến trình `accoreconsole` riêng** — chuỗi liền ở cả hai, sửa/xoá dòng đều bị bắt đúng số
+   dòng, và log ghi trước khi có tính năng bị báo *chưa mang chuỗi băm* thay vì cho qua. `prevHash`/`hash`
+   gắn ở `RunLog.Append`, kiểm bằng
    `BatchRunner --verify-log`. Làm được ngay mà không cần chờ 9.4 vì tầng thuần chiếm gần hết và nó đến
    từ **NĐ 207/2026** chứ không từ ý thích. Không làm thành lệnh Core như tên `EvidenceVerify` ban đầu
    gợi ý: kiểm log không cần `Document` nào, mà thêm lệnh Core thì vướng nguyên tắc 6 — đổi lại được thứ
-   chạy trên CI. ⬜ Còn: chạy trên log của một đêm batch thật (log ở §23 chỉ ba dòng), và chỉ số 30 ngày
-   theo định nghĩa phải chờ 30 ngày.
+   chạy trên CI. ⬜ Còn: chỉ số 30 ngày (theo định nghĩa phải chờ 30 ngày) và log của **dự án thật** như
+   §20 — §24 mới chạy trên model mẫu Snowdon Towers.
 9. **Không mở P3** — giữ hướng chiều sâu theo [`roadmap.md`](roadmap.md).

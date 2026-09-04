@@ -1264,3 +1264,98 @@ cơ chế nhưng không chứng minh nó chịu được log 90 dòng có `messa
 Giới hạn không phải là thiếu sót mà là bản chất: chuỗi băm chứng minh **toàn vẹn nội bộ**, không chứng minh
 log do ai ghi. Người có quyền ghi file vẫn dựng lại được cả chuỗi. Đó là điều kiện ① trong ba điều kiện của
 NĐ 207/2026; ② (chữ ký số của các bên) và ③ (sao lưu độc lập) nằm ngoài add-in.
+
+---
+
+## 24. Bản build mới, vòng chạy thật trọn cả hai phần mềm — và chuỗi băm trên log thật (2026-09-05 00:05 ICT)
+
+§23 chứng minh cơ chế chuỗi băm trên một log ba dòng dựng nhanh. Vòng này chạy **bản build mới** qua
+đúng đường một kỹ sư đi: cài add-in → ba bộ ca kiểm trong Revit → bộ AutoCAD → **hai đêm batch thật** →
+rồi mới kiểm `--verify-log` trên chính những log đó.
+
+### Không hồi quy
+
+| Bộ | Phần mềm | Model / bản vẽ | Kết quả |
+|---|---|---|---|
+| `smoke` | Revit 2024.3 | Snowdon Towers Architectural | **30 đạt / 0 trượt / 1 bỏ qua** trên 31 ca |
+| `mep` | Revit 2024.3 | Snowdon Towers HVAC | **20 đạt / 0 trượt** trên 20 ca |
+| `plumbing` | Revit 2024.3 | Snowdon Towers Plumbing | **8 đạt / 0 trượt** trên 8 ca |
+| `autocad-smoke` | AutoCAD 2026.1 (accoreconsole) | Data Extraction and Multileaders Sample | **18 đạt / 0 trượt** trên 18 ca |
+
+**58 đạt / 0 trượt / 1 bỏ qua trên 59 ca** phía Revit — đúng con số §22, nên chuỗi băm không làm hỏng gì.
+
+### Hai đêm batch thật
+
+| Đêm batch | Quy mô | Log | Mã thoát |
+|---|---|---|---|
+| Revit | 3 model × 10 step chỉ-đọc, `saveMode: None` | **30 dòng, 351 KB, dòng dài nhất 123.357 ký tự** | 1 (25 OK / 5 lỗi) |
+| AutoCAD | 4 bản vẽ × 3 step, **mỗi bản vẽ một tiến trình `accoreconsole` riêng** | 12 dòng | 0 (12 OK) |
+
+Đêm batch AutoCAD là ca cấu trúc mạnh nhất: bốn tiến trình khác nhau nối tiếp vào cùng một file log, nên
+`prevHash` của tiến trình sau **phải đọc lại từ đĩa** băm mà tiến trình trước vừa ghi. Chuỗi liền.
+
+Thêm một phép kiểm chéo runtime: log đó do **accoreconsole chạy .NET 10** ghi, còn `--verify-log` chạy trên
+**BatchRunner .NET 8** — hai runtime khác nhau ra cùng một băm. Cộng với phép kiểm chéo bằng `hashlib` của
+Python ở §23, định dạng băm đã được ba bản cài đặt độc lập xác nhận.
+
+### `--verify-log` trên log thật
+
+| Log | Dòng | Kết luận | Mã thoát |
+|---|---|---|---|
+| `smoke` / `mep` / `plumbing` (Revit) | 1 mỗi log | *Chuỗi băm nguyên vẹn* | 0 |
+| `autocad-smoke` (accoreconsole) | 1 | *Chuỗi băm nguyên vẹn* | 0 |
+| Đêm batch Revit | 30 | *Chuỗi băm nguyên vẹn: 30 dòng* | 0 |
+| Đêm batch AutoCAD | 12 | *Chuỗi băm nguyên vẹn: 12 dòng* | 0 |
+| Sửa `affected` ở **dòng 15** của log 30 dòng | 30 | *Dòng 15 đã bị sửa* | 1 |
+| Xoá **dòng 20** của log 30 dòng | 29 | *Chuỗi đứt tại dòng 20* | 1 |
+| Sửa dòng 5 của log AutoCAD (do tiến trình thứ 2 ghi) | 12 | *Dòng 5 đã bị sửa* | 1 |
+| **Log thật ghi TRƯỚC khi có tính năng** (lượt `smoke` 17:33 cùng ngày) | 1 | *Dòng 1 chưa mang chuỗi băm* | 1 |
+
+Dòng cuối là ca tương thích ngược trên dữ liệu thật chứ không phải dựng ra: log của bản cài trước bị báo
+**chưa mang dấu vết** thay vì được cho qua im lặng.
+
+Dòng dài **123.357 ký tự** cũng trả lời một câu bỏ ngỏ khi viết mã: `RunLog.LastHash` đọc cả file thay vì
+đọc đuôi theo byte. Nếu đọc đuôi 64 KB thì đúng dòng này đã bị cắt đôi và chuỗi gãy oan — chọn cách chậm
+hơn mà đúng hoá ra không phải là cẩn thận thừa.
+
+### Năm lỗi của đêm batch Revit — không lỗi nào là lỗi mã nguồn
+
+| Dòng | Lệnh | Báo gì | Xét lại |
+|---|---|---|---|
+| 9, 19, 29 | `SleeveAuto` | `E-CONFIG-MISSING: thiếu trường bắt buộc "sleeveFamilyName"` | **Lỗi của file job** vòng này viết, thiếu trường mà job mẫu có. Lệnh dừng ngay 0–1 ms thay vì chạy rồi báo "0 phần tử" |
+| 8 | `ClashDetection` | `E-PRECOND`: không có Ducts/Pipes trong model kiến trúc | **Đúng thiết kế** — chính là ca mục 5 `progress.md` dựng `E-PRECOND` để chặn |
+| 10 | `ElevationTag` | "Không có phần tử MEP nào phù hợp", `Success=false` | **Đúng thiết kế** — mục 9.2 đổi từ "Đã gán cao độ cho 0/N" sang trả `Success=false` |
+
+Ba cơ chế báo lỗi làm gần đây (`E-CONFIG-MISSING`, `E-PRECOND`, `ElevationTag` trả false) cùng chạy đúng
+trên một đêm batch ba model mà không hẹn trước.
+
+### Một con số đáng ngờ đã truy đến cùng — và hoá ra không phải lỗi
+
+`ScheduleExport` trên model kiến trúc ra **35/36**, trong khi bộ `smoke` cùng model cùng ngày ra 36/36.
+Đối chiếu hai thư mục kết quả: cái mất là `Bleachers Schedule - Option Middle Stair`.
+
+```
+MẤT   263 ký tự  Bleachers Schedule - Option Middle Stair.csv
+XUẤT  259 ký tự  Bleachers Schedule - Option no Stair.csv
+```
+
+MAX_PATH của Windows là 260 — hai file cách nhau **bốn ký tự**, một cái qua một cái không. Nguyên nhân là
+thư mục đầu ra của vòng này dài 218 ký tự, không phải mã nguồn.
+
+Đáng ghi lại là **cách phát hiện sai của chính vòng kiểm này**: đọc `messages` thấy đúng 35 dòng rồi kết
+luận "trượt im lặng". Sai — `errors` có đúng một mục, đủ tên và đủ nguyên nhân:
+
+```
+Bleachers Schedule - Option Middle Stair: The specified path, file name, or both are too long.
+The fully qualified file name must be less than 260 characters...
+```
+
+Còn lại một điểm **để ngỏ, không phải lỗi**: step vẫn trả `success: true` dù mất một file, nên cột trạng
+thái trong `report.html` hiện *OK* và mã thoát không phản ánh. Khác với ca "0 kết quả" mà `E-PRECOND` và
+`ElevationTag` đã chặn, đây là thành công **một phần** thật — đổi thành thất bại thì 35 file xuất được
+cũng bị gắn cờ đỏ. Ghi lại để quyết định khi có người dùng thật, không tự đổi.
+
+### Cái chưa chứng minh
+
+Chỉ số của mục 11.5 — *`--verify-log` mã thoát 0 trên log thật **sau 30 ngày*** — theo định nghĩa vẫn phải
+chờ 30 ngày. Log 30 dòng ở đây là model mẫu Snowdon Towers, chưa phải log của dự án thật như §20.
