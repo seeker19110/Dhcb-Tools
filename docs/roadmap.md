@@ -91,25 +91,55 @@ catalog, MCP — thiếu đúng phần làm agent *nhìn, chỉ, kiểm* đượ
 
 ---
 
-## Giai đoạn 11 — Gói tuân thủ BIM theo Nghị định 217/2026/NĐ-CP ⬜ (tuần 9–10, mở tiếp theo phản hồi)
+## Giai đoạn 11 — Gói tuân thủ BIM và hồ sơ hoàn công theo NĐ 217/2026 + NĐ 207/2026 ⬜ (tuần 9–10, mở tiếp theo phản hồi)
 
-> ⚠️ **Phải viết lại trước khi code (phát hiện 2026-09-04).** Mục này soạn khi **NĐ 06/2021/NĐ-CP** còn hiệu lực.
-> Nghị định đó **đã bị NĐ 207/2026/NĐ-CP thay thế từ 01/7/2026**: mẫu dấu hoàn công, danh mục hồ sơ hoàn thành
-> công trình (nay ở Phụ lục VII) và điều kiện chấp nhận **nhật ký thi công điện tử** (dấu thời gian không thể
-> chỉnh sửa ngược · xác nhận của các bên · sao lưu độc lập) đều phải tra lại theo văn bản mới. Phân tích và đề
-> xuất kèm theo: [`nghien-cuu-chuoi-den-hoan-cong.md`](nghien-cuu-chuoi-den-hoan-cong.md) §2 và §4 đợt C.
+> ✅ **Đã viết lại theo văn bản mới (2026-09-04).** Bản trước căn cứ vào **NĐ 06/2021/NĐ-CP**, nghị định
+> đó đã bị **NĐ 207/2026/NĐ-CP thay thế từ 01/7/2026**. Mục này giữ đúng ba đề xuất **C1/C2/C3** của
+> [`nghien-cuu-chuoi-den-hoan-cong.md`](nghien-cuu-chuoi-den-hoan-cong.md) §2 và §4 đợt C — hai tài liệu
+> không được phát biểu khác nhau về cùng một điều luật.
 
-Từ 01/07/2026 công trình **cấp II trở lên** bắt buộc áp dụng BIM từ bước nghiên cứu khả thi; hoàn công phải cập nhật
-mô hình theo chuẩn và nộp vào cơ sở dữ liệu quốc gia. Batch runner đêm + `ParameterRuleCheck` + `HealthReport` +
-`BatchExport` IFC đã là phần lớn của một "máy kiểm mô hình"; thiếu bộ quy tắc theo chuẩn Việt Nam và báo cáo mà chủ
-đầu tư, tư vấn thẩm tra đọc được.
+**Hai nghị định cùng hiệu lực 01/7/2026 chi phối giai đoạn này:**
+
+| Văn bản | Chỗ chạm vào DHCB |
+|---|---|
+| **NĐ 217/2026/NĐ-CP** — quản lý hoạt động xây dựng (thay NĐ 175/2024) | BIM bắt buộc với công trình mới **từ cấp II trở lên**, từ bước báo cáo nghiên cứu khả thi. Chủ đầu tư phải **cung cấp dữ liệu BIM cho cơ quan chuyên môn**; mô hình phải **cập nhật sau hoàn công** rồi chuyển cho đơn vị vận hành. CDE chỉ bắt buộc với **cấp I** — hạ tầng, không phải add-in |
+| **NĐ 207/2026/NĐ-CP** ngày 15/6/2026 — quản lý chất lượng, thi công xây dựng và bảo trì công trình, quy định chi tiết **Luật Xây dựng số 135/2025/QH15** (thay **NĐ 06/2021**), **11 phụ lục** | Bốn địa chỉ phải bám khi code — bảng ngay dưới |
+
+**Bốn địa chỉ trong NĐ 207/2026 mà giai đoạn 11 phải bám:**
+
+| Nội dung | Vị trí | Điều DHCB phải làm đúng |
+|---|---|---|
+| **Nhật ký thi công xây dựng** và **bản vẽ hoàn công** | **Phụ lục II** — nghĩa vụ của *nhà thầu thi công xây dựng* (Điều 15) | Nhật ký ghi **đồng thời với sự kiện, không ghi bù**. Nhật ký **điện tử** được chấp nhận khi có đủ ba điều kiện: ① dấu thời gian **không thể chỉnh sửa ngược** · ② **cơ chế xác nhận của các bên** · ③ **sao lưu độc lập** |
+| **Mẫu dấu bản vẽ hoàn công** | **Phụ lục IIb** — **hai mẫu**: Mẫu 1 cho hợp đồng thường; **Mẫu 2** cho hợp đồng **thầu chính/thầu phụ, EPC, chìa khoá trao tay** | Dấu gồm tên nhà thầu thi công · dòng "BẢN VẼ HOÀN CÔNG" · ngày tháng năm · người lập · chỉ huy trưởng công trình hoặc giám đốc dự án · tư vấn giám sát trưởng (Mẫu 2 tách thêm dòng của **tổng thầu**). Nếu kích thước thực tế **không vượt dung sai** thì photocopy bản vẽ thi công rồi các bên đóng dấu, ký xác nhận; vẽ lại thì khung tên phải tương tự mẫu ở Phụ lục IIb |
+| **Hồ sơ hoàn thành công trình** | **Điều 28 + Phụ lục VII** — **chủ đầu tư** tổ chức lập, chịu trách nhiệm về tính chính xác và trung thực; mỗi nhà thầu chịu trách nhiệm phần mình lập | Danh mục ba nhóm: ① chuẩn bị đầu tư xây dựng và hợp đồng · ② khảo sát, thiết kế xây dựng · ③ quản lý chất lượng thi công xây dựng. Điều 28 **tách khỏi** điều kiện đưa công trình vào khai thác, sử dụng (Điều 29) — hai nhóm điều kiện song song, không còn tuần tự như NĐ 06/2021 |
+| **Hồ sơ điện tử** | **Điều 11** | Lập theo pháp luật về **giao dịch điện tử**. Khi cơ quan nhà nước có thẩm quyền yêu cầu, hồ sơ điện tử phải **trích xuất, in ra giấy và được chủ đầu tư xác nhận** — ràng buộc trực tiếp lên đầu ra của 11.3 |
+
+> ⚠️ **Trước khi code từng mục, mở lại bản gốc trên Công báo Chính phủ.** Số hiệu điều và phụ lục ở trên
+> đã đối chiếu chéo nhiều nguồn, nhưng **nội dung từng dòng của Phụ lục IIb và Phụ lục VII phải đọc từ văn
+> bản gốc** rồi mới dựng family dấu và danh mục hồ sơ. Đây là lộ trình, không phải bản trích lục pháp lý.
+
+Batch runner đêm + `ParameterRuleCheck` + `HealthReport` + `BatchExport` IFC đã là phần lớn của một "máy kiểm
+mô hình". Ba thứ còn thiếu, và cả ba đến từ luật chứ không từ ý thích: bộ quy tắc **đọc được bằng máy** mà bên
+ngoài kiểm lại cũng ra cùng kết quả, đường **hồ sơ hoàn công** (dấu + danh mục), và **bằng chứng không sửa
+ngược** cho nhật ký điện tử.
 
 | # | Việc | Chi tiết |
 |---|---|---|
-| 11.1 | **Checkset theo giai đoạn** (khả thi → thiết kế → thi công → hoàn công) | Tham số bắt buộc theo category, đặt tên file/view/sheet theo BEP, LOD tối thiểu, worksets, link, ngưỡng warning/dung lượng. Quy tắc ở JSON ngoài repo (`configs/checksets/`), mỗi công ty tự chỉnh — phần đánh giá thuần trong `Shared.Logic/Checks`, có test |
-| 11.2 | **Kiểm IFC trước nộp** | Mapping export chuẩn, `IfcClassification`, Pset bắt buộc; đọc lại file IFC vừa xuất bằng parser thuần (STEP) trong `Shared.Logic` để kiểm số phần tử, thuộc tính thiếu — có test với file IFC mẫu |
-| 11.3 | **Gói bàn giao tự động** | Một job đêm sinh: IFC, PDF, danh mục bản vẽ, báo cáo tuân thủ HTML/PDF có dấu thời gian và version add-in. Chạy trên 2 dự án thật trước khi công bố |
-| 11.4 | Quyết định đi sâu IFC (validate theo IDS) hay không | Dựa trên phản hồi chủ đầu tư/thẩm tra sau 11.3 |
+| 11.1 | **Checkset theo giai đoạn** (khả thi → thiết kế → thi công → hoàn công), nền là **IDS** chứ không phải JSON tự nghĩ | Đọc file **IDS 1.0** (buildingSMART, chuẩn chính thức từ 01/6/2024): chủ đầu tư/tư vấn thẩm tra khai yêu cầu **một lần**, kiểm được bằng cả DHCB lẫn IfcTester/Solibri và nhận **cùng một kết quả** — đúng điều IDS được lập ra để bảo đảm. Kiểm **thẳng trên mô hình Revit**, không vòng qua IFC: kỹ sư sửa ngay tại chỗ. Phần đánh giá thuần ở `Shared.Logic/Ids` (`IdsSpec` + `IdsEvaluator`, 6 loại facet), có test. `ParameterRuleCheck` và `configs/checksets/` **giữ nguyên** cho quy tắc nội bộ công ty mà IDS không mô tả: đặt tên file/view/sheet theo BEP, worksets, link, ngưỡng warning/dung lượng. = đề xuất **C3** |
+| 11.2 | **Kiểm IFC trước nộp** | Mapping export chuẩn, `IfcClassification`, Pset bắt buộc; đọc lại file IFC vừa xuất bằng parser thuần (STEP) trong `Shared.Logic` để kiểm số phần tử, thuộc tính thiếu — có test với file IFC mẫu. Căn cứ đổi: NĐ 217/2026 bắt **nộp dữ liệu BIM** cho cơ quan chuyên môn, nên "xuất được" chưa đủ — phải "xuất rồi tự đọc lại thấy đúng" |
+| 11.3 | **Gói bàn giao tự động** | Một job đêm sinh: IFC, PDF, danh mục bản vẽ, báo cáo tuân thủ HTML/PDF có dấu thời gian và version add-in. **Thêm theo Điều 11 NĐ 207/2026:** mọi đầu ra điện tử phải **trích xuất được ra PDF/giấy** kèm chỗ **chủ đầu tư xác nhận** — không được chỉ tồn tại dưới dạng dữ liệu trong máy. Chạy trên 2 dự án thật trước khi công bố |
+| 11.4 | Quyết định **mức sâu của kiểm IDS** | 11.1 đã chốt IDS là nền nên câu hỏi còn lại hẹp hơn bản cũ: có mở `IdsValidate` sang kiểm **trên file IFC** (đối chiếu kết quả với IfcTester để chứng minh cùng kết luận) hay dừng ở kiểm trên mô hình Revit. Dựa trên phản hồi chủ đầu tư/thẩm tra sau 11.3 |
+| 11.5 | **`EvidenceLog` + `EvidenceVerify`** — chuỗi băm cho nhật ký điện tử | Batch runner đã ghi `run-HHmmss.jsonl` mỗi lượt. Nâng: mỗi dòng mang thêm `prevHash` và `hash` = SHA-256(nội dung dòng + `prevHash`); sửa một dòng cũ là gãy chuỗi từ dòng đó trở đi, `EvidenceVerify` chỉ ra **đúng dòng bị sửa**. `Shared.Logic/Evidence/HashChain` — **thuần tuyệt đối**, không chạm Revit API. ⚠️ **Phải nói thật trong tài liệu sản phẩm:** chuỗi băm chứng minh **tính toàn vẹn nội bộ** của log, *không* thay chữ ký số hay dấu thời gian của một CA. Nó phủ **điều kiện ①** trong ba điều kiện của NĐ 207/2026, và tạo điều kiện cho ② (xác nhận của các bên — cần chữ ký số) và ③ (sao lưu độc lập — cần hạ tầng của chủ đầu tư); hứa quá là tự tạo rủi ro cho khách hàng. = đề xuất **C1** |
+| 11.6 | **`AsBuiltStamp` + `DossierIndex`** — dấu hoàn công và danh mục hồ sơ | DHCB cung cấp **family mẫu dấu theo Phụ lục IIb — dựng cả hai mẫu** — cùng cơ chế điền (tên nhà thầu, ngày, người ký, số hợp đồng lấy từ config); **doanh nghiệp chịu trách nhiệm nội dung**. Phần tự động: gán dấu lên loạt sheet, đặt revision "Hoàn công", xuất PDF theo danh mục — `RevisionOnSheets` + `BatchExport` đã làm được một nửa. `DossierIndex` (`Shared.Logic/AsBuilt`) sinh danh mục theo **Phụ lục VII** rồi **đối chiếu với file thật trong thư mục** và báo thiếu mục nào — cùng cách playbook xuất PDF theo revision đã dùng. = đề xuất **C2** |
+
+**Thứ tự bên trong giai đoạn 11** (theo [`nghien-cuu-chuoi-den-hoan-cong.md`](nghien-cuu-chuoi-den-hoan-cong.md) §5):
+**11.5 làm được ngay** — thuần gần hết, không phụ thuộc template hay thư viện của dự án, giá trị không phụ thuộc
+kết quả 9.4. **11.1 rồi 11.6 chờ số liệu 9.4/`UsageReport`**: mẫu dấu và danh mục hồ sơ phụ thuộc thói quen từng
+công ty; làm trước khi biết kỹ sư thật cần gì là lặp lại đúng sai lầm "bề rộng trước" mà mục cuối tài liệu này đã
+ghi lại. Ràng buộc không đổi: **nguyên tắc 6** — không thêm lệnh Core khi chưa có ca kiểm chạy trong Revit.
+
+**Chỉ số:** báo cáo tuân thủ đêm chạy trên **2 dự án thật** trước khi công bố; `EvidenceVerify` xanh trên log
+thật của một đêm batch **kiểm lại sau 30 ngày**.
 
 ---
 
@@ -137,7 +167,8 @@ mới, kiểm `Shared.*` (netstandard2.0) nạp được. Không đổi logic. L
 | Số lệnh Revit có test chạy trong Revit (8.3) | 42/42 trước v1.0 |
 | Số kỹ sư dùng hằng tuần không cần hỏi (9.4) | ≥ 5 sau v1.1 |
 | Thời gian agent hoàn thành kịch bản 20 warning (10) | < 15 phút, 0 thao tác tay ngoài xác nhận |
-| Số dự án chạy báo cáo tuân thủ đêm (11) | 2 dự án thật trước khi công bố |
+| Số dự án chạy báo cáo tuân thủ đêm (11.3) | 2 dự án thật trước khi công bố |
+| Chuỗi băm nhật ký batch kiểm lại được sau 30 ngày (11.5) | `EvidenceVerify` xanh trên log thật của một đêm batch |
 
 ---
 
@@ -156,6 +187,7 @@ Ghi lại để không lặp lại cách làm "bề rộng trước".
 - Revit 2027 MCP Public Server: chỉ đọc, chỉ 2027, cấu hình từng người dùng. AutoCAD 2027 Assistant: kiểm chuẩn, chọn theo ngôn ngữ tự nhiên, MCP.
 - ≥ 5 dự án revit-mcp mã mở (MIT), lớn nhất 124–138 tool, Revit 2023–2027.
 - Nghị định 217/2026/NĐ-CP: BIM bắt buộc cấp II trở lên từ 01/07/2026, hoàn công nộp cơ sở dữ liệu quốc gia.
+- Nghị định 207/2026/NĐ-CP (cùng hiệu lực 01/07/2026, thay NĐ 06/2021): nhật ký thi công điện tử được chấp nhận **có điều kiện**, hồ sơ hoàn thành công trình ở Điều 28 + Phụ lục VII, mẫu dấu bản vẽ hoàn công ở Phụ lục IIb. Đây là chỗ luật đi trước sản phẩm — xem giai đoạn 11.
 - Đối thủ nội địa (BimSpeed, HQL) bán UI + đào tạo; DHCB không thắng bằng thêm nút.
 
 Nguồn: [Revit Public MCP Server](https://www.autodesk.com/blogs/aec/2026/06/17/revit-public-mcp-server/) ·
@@ -164,4 +196,6 @@ Nguồn: [Revit Public MCP Server](https://www.autodesk.com/blogs/aec/2026/06/17
 [LuDattilo/revit-mcp-server](https://github.com/LuDattilo/revit-mcp-server) ·
 [IbrahimFahdah/revit-claude-mcp](https://github.com/IbrahimFahdah/revit-claude-mcp) ·
 [Nghị định 217/2026/NĐ-CP](https://luatvietnam.vn/tin-van-ban-moi/tu-01-7-2026-bat-buoc-ap-dung-bim-doi-voi-cong-trinh-xay-dung-moi-tu-cap-ii-tro-len-186-109713-article.html) ·
+[Nghị định 207/2026/NĐ-CP — Công báo Chính phủ](https://congbao.chinhphu.vn/van-ban/nghi-dinh-so-207-2026-nd-cp-469769.htm) ·
+[Toàn bộ 11 phụ lục NĐ 207/2026](https://thuvienphapluat.vn/chinh-sach-phap-luat-moi/vn/ho-tro-phap-luat/chinh-sach-moi/114944/toan-bo-phu-luc-nghi-dinh-207-2026-nd-cp-quan-ly-cong-trinh-xay-dung-tu-01-7-2026) ·
 [BimSpeed](https://www.bimspeed.net/)
