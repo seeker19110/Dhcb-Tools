@@ -5,6 +5,9 @@ using DhcbTools.Core.Updaters;
 using DhcbTools.Revit.Batch;
 using DhcbTools.Revit.Bridge;
 using DhcbTools.Shared.Hosting;
+#if !DHCB_NO_WPF
+using DhcbTools.Revit.UI;
+#endif
 
 namespace DhcbTools.Revit;
 
@@ -210,17 +213,75 @@ public sealed class App : IExternalApplication
     }
 
     private static void Add(RibbonPanel panel, string path, string id, string text, string className, string tip)
-        => panel.AddItem(new PushButtonData(id, text, path, Ns + className) { ToolTip = tip });
+        => panel.AddItem(Push(path, id, text, className, tip));
 
     /// <summary>Nhóm nhiều lệnh vào một nút xổ xuống — panel Revit không chứa nổi 16 nút phẳng.</summary>
     private static void Group(
         RibbonPanel panel, string path, string id, string text, string tip,
         params (string Id, string Text, string ClassName, string Tip)[] items)
     {
-        var pulldown = (PulldownButton)panel.AddItem(new PulldownButtonData(id, text) { ToolTip = tip });
+        var data = new PulldownButtonData(id, text) { ToolTip = tip };
+        Decorate(data, id);
+        var pulldown = (PulldownButton)panel.AddItem(data);
+
         foreach (var item in items)
         {
-            pulldown.AddPushButton(new PushButtonData(item.Id, item.Text, path, Ns + item.ClassName) { ToolTip = item.Tip });
+            pulldown.AddPushButton(Push(path, item.Id, item.Text, item.ClassName, item.Tip));
         }
     }
+
+    private static PushButtonData Push(string path, string id, string text, string className, string tip)
+    {
+        var data = new PushButtonData(id, text, path, Ns + className) { ToolTip = tip };
+        Decorate(data, id);
+        return data;
+    }
+
+    /// <summary>
+    /// Gắn icon sinh tại chỗ, cùng một cách vẽ cho mọi nút nên cả tab trông một bộ. Mỗi ô được render
+    /// đúng số pixel của nó (32 cho nút trên panel, 16 cho mục trong nút xổ xuống) thay vì để Revit
+    /// co giãn một ảnh — co giãn thì icon méo và cắt mất chữ. Không đóng gói file ảnh nào.
+    /// </summary>
+    private static void Decorate(ButtonData data, string id)
+    {
+#if !DHCB_NO_WPF
+        var glyph = Glyph(id);
+        var color = ColorOf(id);
+        data.LargeImage = RibbonIcons.Create(glyph, color, RibbonIcons.Large);
+        data.Image = RibbonIcons.Create(glyph, color, RibbonIcons.Small);
+#endif
+    }
+
+#if !DHCB_NO_WPF
+    private static string Glyph(string id)
+    {
+        // net48 (Revit ≤2024) không có System.Index/Range nên dùng Substring thay cho toán tử [..].
+        var name = id.StartsWith("Dhcb", StringComparison.Ordinal) ? id.Substring(4) : id;
+        var upper = new string(name.Where(char.IsUpper).ToArray());
+        if (upper.Length >= 2)
+        {
+            return upper.Substring(0, 2);
+        }
+
+        return name.Length >= 2 ? name.Substring(0, 2).ToUpperInvariant() : name.ToUpperInvariant();
+    }
+
+    private static System.Windows.Media.Color ColorOf(string id) => id switch
+    {
+        "DhcbParameterExport" or "DhcbParameterImport" or "DhcbCleanupViews" or "DhcbAutoNumbering"
+            => RibbonIcons.Core,
+        "DhcbBatchExport" or "DhcbHealthReport" or "DhcbExportMore" or "DhcbWarningsExport" or "DhcbScheduleExport"
+            => RibbonIcons.Export,
+        "DhcbProjectInit" or "DhcbInitParts" or "DhcbInitTemplate" or "DhcbLevelSetup" or "DhcbGridSetup"
+            or "DhcbGridFromCsv" or "DhcbFamilyLoader" or "DhcbProjectInfo" or "DhcbProjectFromTemplate"
+            or "DhcbTransferStandards" or "DhcbSheetBatchCreate"
+            => RibbonIcons.Init,
+        "DhcbSheetTools" or "DhcbSheetRename" or "DhcbRevisionOnSheets" or "DhcbViewportCopy"
+            or "DhcbColorByParameter" or "DhcbStyleTools" or "DhcbStylePurge" or "DhcbFamilyAudit"
+            => RibbonIcons.Sheets,
+        "DhcbParameterRuleCheck" or "DhcbClashDetection" or "DhcbAiTools" or "DhcbCadLayerMap" or "DhcbSpecToConfig"
+            => RibbonIcons.Checks,
+        _ => RibbonIcons.Mepf,
+    };
+#endif
 }
