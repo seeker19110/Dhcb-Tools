@@ -34,20 +34,25 @@ windows-latest: build Release thật (có WPF) cho Revit 2023/2024/2025 và Auto
 đóng gói zip kèm `jobs/`, `configs/`, `scripts/`, dựng installer Inno Setup rồi tạo GitHub Release.
 Không chạy trên PR nên **không phải chờ nó** khi merge.
 
-## Merge PR — thử auto-merge, không được thì tự theo dõi
+## Merge PR — theo dõi check rồi merge tay, không dùng auto-merge
 
-Quy ước lấy từ `donghanh` (mục 11 `CLAUDE.md`):
+Quy ước gốc lấy từ `donghanh` (mục 11 `CLAUDE.md`) là "thử bật auto-merge rồi chờ". **Trên repo này
+không làm thế**: `main` chưa có branch protection (không có required status check), nên
+`gh pr merge --auto` **merge ngay lập tức** thay vì chờ `tests.yml` — ngày 2026-09-05 PR #64 ở trạng
+thái *merged* khi 2/11 job còn đang chạy. Auto-merge chỉ có nghĩa khi Settings → Branches có rule đòi
+check xanh; chừng nào chưa bật rule đó thì đường an toàn là:
 
-1. **Tạo PR ở trạng thái sẵn sàng** (không để nháp) rồi **thử bật auto-merge (squash) ngay**,
-   một lần, không hỏi lại.
-2. Auto-merge thất bại nếu repo chưa bật "Allow auto-merge" ở Settings → General → Pull Requests —
-   đó không phải lỗi cần chẩn đoán, cứ đi thẳng sang bước tiếp theo.
-3. **Chờ check xanh.** Poll trạng thái PR mỗi ~2,5 phút. `tests.yml` chạy trên mọi PR nên luôn có
-   check để chờ: **toàn bộ job của `tests.yml` xanh + không xung đột → merge (squash)**. Còn job
-   đang chạy → tiếp tục poll. Có job đỏ → dừng, mở log của job đó, sửa và push lại, **không merge**.
-4. **Không merge tay để đi tắt khi có check đang đỏ hoặc đang chạy.**
+1. **Tạo PR ở trạng thái sẵn sàng** (không để nháp).
+2. **Chờ check xanh** bằng `gh pr checks <n> --watch --fail-fast` (hoặc poll mỗi ~2,5 phút).
+   `tests.yml` chạy trên mọi PR nên luôn có check để chờ.
+3. **Toàn bộ job của `tests.yml` xanh + không xung đột → `gh pr merge <n> --squash`.** Còn job đang
+   chạy → tiếp tục chờ. Có job đỏ → dừng, mở log của job đó, sửa và push lại, **không merge**.
+4. **Không merge khi có check đang đỏ hoặc đang chạy** — kể cả gián tiếp qua `--auto`.
 5. Nếu `main` tiến lên gây xung đột (`mergeable_state: dirty`) trong lúc chờ, merge `main` vào
-   nhánh, giải xung đột, rồi mới tiếp tục từ bước 3.
+   nhánh, giải xung đột, rồi mới tiếp tục từ bước 2.
+
+Muốn quay lại dùng auto-merge thì trước hết bật branch protection cho `main` với required checks là
+đủ 11 job của `tests.yml` — khi đó `--auto` mới thật sự chờ.
 
 ## Commit message — Conventional Commits
 
