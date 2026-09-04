@@ -2,10 +2,15 @@
 
 Ảnh chụp tại thời điểm cập nhật gần nhất. Kế hoạch phía trước xem [`roadmap.md`](roadmap.md).
 
-> Cập nhật lần cuối: 2026-09-04 · Nhánh `main`, sau đêm batch đầu tiên trên **dự án thật** (§20) và vòng
+> Cập nhật lần cuối: 2026-09-05 · sau khi thêm **`SetoutExport`** (đề xuất A1 — toạ độ định vị cho máy toàn đạc,
+> [`toa-do-dinh-vi.md`](toa-do-dinh-vi.md)); trước đó là đêm batch đầu tiên trên **dự án thật** (§20) và vòng
 > đóng vai kỹ sư dùng thử (§21).
 >
-> **Đã kiểm trên Revit thật:** 42/42 lệnh Revit có ít nhất một ca kiểm chạy trong Revit, chia ba bộ theo
+> **Lệnh mới nhất chưa chạy thật:** `SetoutExport` có tầng thuần (50 ca test), lệnh Core, nút Ribbon và 4 ca
+> kiểm trong `tests/suites/`, nhưng **chưa chạy lần nào trong Revit** — mang nhãn *thử nghiệm* theo nguyên
+> tắc 6. Con số "đã chạy thật" dưới đây vì thế là **43/44**.
+>
+> **Đã kiểm trên Revit thật:** 43/43 lệnh Revit *của vòng đó* có ít nhất một ca kiểm chạy trong Revit, chia ba bộ theo
 > model mẫu (kiến trúc / HVAC / cấp thoát nước) — xem [Kiểm thử](#kiểm-thử) và
 > [`bang-chung-test.md`](bang-chung-test.md) §8. Vòng này lộ ra **7 lỗi** mà bộ test thuần (481 ca *tại thời
 > điểm đó*) không bắt được, tất cả đã sửa kèm test chốt chặn.
@@ -35,6 +40,7 @@
 | Lệnh nền tảng (Revit + AutoCAD) | ✅ |
 | HTTP Bridge cho agent AI | ✅ Token, khoá khi dò token, bind 127.0.0.1, timeout huỷ lệnh, `/tools`, `/chat` |
 | Batch export + Health report | ✅ |
+| Toạ độ định vị ra máy toàn đạc (đề xuất A1) | ✅ mã nguồn 🧪 chưa chạy thật — `SetoutExport`: CSV theo thứ tự cột máy (`PNEZD`/`PENZD`…) + DXF điểm, hệ Survey tự kiểm chiều transform, giao trục, tên điểm ≤ 16 ký tự không trùng — [`toa-do-dinh-vi.md`](toa-do-dinh-vi.md) |
 | Khởi tạo dự án | ✅ Grid/Level/Family/Project info + **file từ template, transfer standards, trục/level từ CSV (CAD/Excel), sheet hàng loạt** |
 | MEPF nền tảng (sleeve, cao độ, hanger, chia ống, connector) | ✅ Core + Bridge + batch + Ribbon; đã chạy thật trên model HVAC và cấp thoát nước mẫu |
 | MEPF routing A (theo line), B (rải thiết bị theo phòng) | ✅ Core + Ribbon + Bridge; chờ kiểm thử trên model mẫu |
@@ -49,12 +55,13 @@
 | Giai đoạn 7 P1 — khoảng trống so với tool thị trường ([`nghien-cuu-tool-thi-truong-va-ke-hoach.md`](nghien-cuu-tool-thi-truong-va-ke-hoach.md)) | ✅ Mã nguồn (PR #11): SheetRename, RevisionOnSheets, StylePurge, ColorByParameter, FamilyAudit, WarningsExport, checkset ngưỡng; batch autodetect phiên bản Revit + PlotPdf; AI structured outputs + ≤ 8 ứng viên; MCP read-only/nhóm. ⬜ Phần AutoCAD (LayerTranslate, DrawingCompare, BlockQuantity, AttributeIncrement, purge text/dim/regapp) **chưa có mã nguồn** |
 | Giai đoạn 7 P2 | ✅ Mã nguồn (PR #12): SlopePipes, PipeKick, SystemBom, AutoRoute, ScheduleExport, ViewportCopy; vỏ `DhcbTools.AutoCAD.Core` (chỉ AcDbMgd/AcCoreMgd) cho accoreconsole; map năm AutoCAD → package (2026.1+ là .NET 10) |
 | Hướng dẫn cài đặt & kiểm thử thủ công | ✅ (PR #13) [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md) — checklist R1–R48, C1–C17, B1–B12, M1–M4 |
-| Kiểm thử tự động | ✅ Bộ test xUnit (`Shared.Logic` + `Shared.Hosting`), gồm bốn bộ đối chiếu mã nguồn với nhau: `RibbonCoverageTests` (vỏ Revit ↔ bảng lệnh), `CatalogFieldTests` (catalog ↔ property config thật), `SuiteCoverageTests` (42/42 lệnh có ca kiểm chạy trong Revit), `VietnameseMessageTests` (không còn thông báo tiếng Anh trong Core) |
+| Kiểm thử tự động | ✅ Bộ test xUnit (`Shared.Logic` + `Shared.Hosting`), gồm bốn bộ đối chiếu mã nguồn với nhau: `RibbonCoverageTests` (vỏ Revit ↔ bảng lệnh), `CatalogFieldTests` (catalog ↔ property config thật), `SuiteCoverageTests` (44/44 lệnh có ca kiểm chạy trong Revit), `VietnameseMessageTests` (không còn thông báo tiếng Anh trong Core) |
 | CI | ✅ `tests.yml` (test + check-build bằng API package, ubuntu) — xanh |
 | CD | ✅ đóng gói Release thật (Revit 2023/2024/2025, AutoCAD 2024/2025) + GitHub Release khi đẩy tag (`release.yml`, windows-latest) |
 
-Toàn bộ 57 lệnh đã có mã nguồn và biên dịch xanh với API package. **42/42 lệnh Revit đã chạy thật ít nhất
-một lần trong Revit 2024.3** và **15/15 lệnh AutoCAD** đã có ca kiểm tự động qua `accoreconsole` (§10).
+Toàn bộ 59 lệnh đã có mã nguồn và biên dịch xanh với API package. **43/44 lệnh Revit đã chạy thật ít nhất
+một lần trong Revit 2024.3** (`SetoutExport` là cái chưa) và **15/15 lệnh AutoCAD** đã có ca kiểm tự động qua
+`accoreconsole` (§10).
 Việc có giá trị nhất lúc này là **9.4 — đưa cho một nhóm kỹ sư dùng thật**; phản hồi của họ quyết định
 giai đoạn 10/11 đi sâu vào đâu.
 
@@ -67,7 +74,7 @@ nhưng file không có trong repo — CI bắt được vì bảng lệnh và ca
 
 | Nhóm | Tài liệu nói | Thực tế trong repo |
 |---|---|---|
-| Vỏ Revit (Ribbon) | 6 panel, đủ lệnh MEPF, đăng ký `ElevationUpdater`, hook batch `pending-job.json` | ✅ `App.cs` có **6 panel**, phủ đủ **42/42** lệnh (nút phẳng + nút xổ xuống), có `BatchStartupHook` và đăng ký `ElevationUpdater` (mặc định tắt). ⬜ AI chat WPF vẫn chưa có — lớp AI dùng qua Bridge `/chat` và `dhcb_agent.py` |
+| Vỏ Revit (Ribbon) | 6 panel, đủ lệnh MEPF, đăng ký `ElevationUpdater`, hook batch `pending-job.json` | ✅ `App.cs` có **6 panel**, phủ đủ **44/44** lệnh (nút phẳng + nút xổ xuống), có `BatchStartupHook` và đăng ký `ElevationUpdater` (mặc định tắt). ⬜ AI chat WPF vẫn chưa có — lớp AI dùng qua Bridge `/chat` và `dhcb_agent.py` |
 
 ### Lệnh AutoCAD — nay đã đủ 15 lệnh có mã nguồn
 
@@ -123,7 +130,7 @@ giản hoá so với đặc tả gốc.
 
 ### Ribbon Revit
 6 panel, đúng tên trong `src/DhcbTools.Revit/App.cs`: **Nền tảng · Xuất & Báo cáo · Khởi tạo dự án · MEPF ·
-Hồ sơ & Style · Kiểm tra & AI** — phủ đủ 42 lệnh (nút phẳng + nút xổ xuống). `CommandRunner` đọc config JSON ở
+Hồ sơ & Style · Kiểm tra & AI** — phủ đủ 44 lệnh (nút phẳng + nút xổ xuống). `CommandRunner` đọc config JSON ở
 `%APPDATA%\DHCB\configs\revit\<Lệnh>.json` → chạy xem trước (`dryRun`) → hỏi xác nhận → chạy thật.
 Còn thiếu: **AI chat dạng WPF** — lớp AI hiện dùng qua Bridge `/chat` và `dhcb_agent.py`.
 
@@ -244,7 +251,7 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
    log là hợp đồng giữa hai thời điểm cách nhau 30 ngày). ⬜ Số liệu chỉ bắt đầu tích từ bản cài kế tiếp.
 7. Rồi tới **9.4 — đưa cho một nhóm kỹ sư dùng thật**; phản hồi của họ quyết định giai đoạn 10/11 đi sâu
    vào đâu. **Mẫu thu phản hồi đã có**: [`mau-phan-hoi-9-4.md`](mau-phan-hoi-9-4.md) — bảng tick
-   *dùng hằng tuần / bấm rồi bỏ / chưa dùng* cho đủ 42 lệnh Revit + 15 lệnh AutoCAD, kèm bốn câu hỏi mở.
+   *dùng hằng tuần / bấm rồi bỏ / chưa dùng* cho đủ 44 lệnh Revit + 15 lệnh AutoCAD, kèm bốn câu hỏi mở.
    `PhanHoiFormTests` đối chiếu danh sách lệnh trong mẫu với `CommandCatalog` hai chiều nên mẫu không trôi.
    Còn thiếu: phát hành v1.1 và chọn nhóm kỹ sư — cả hai đều là việc của người, không phải của mã.
 8. ~~Chuỗi băm cho nhật ký batch (11.5)~~ — xong, **đã chạy thật cả hai đường (§24)**: đêm batch Revit
@@ -257,4 +264,10 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
    gợi ý: kiểm log không cần `Document` nào, mà thêm lệnh Core thì vướng nguyên tắc 6 — đổi lại được thứ
    chạy trên CI. ⬜ Còn: chỉ số 30 ngày (theo định nghĩa phải chờ 30 ngày) và log của **dự án thật** như
    §20 — §24 mới chạy trên model mẫu Snowdon Towers.
-9. **Không mở P3** — giữ hướng chiều sâu theo [`roadmap.md`](roadmap.md).
+9. **`SetoutExport` (đề xuất A1) — chạy thật trong Revit.** Mã nguồn, tầng thuần (50 ca test), nút Ribbon và
+   4 ca kiểm đã có; việc còn lại đúng một vòng `run-in-revit-tests.ps1 -Suite smoke` rồi `-Suite mep`, cộng
+   **đối chiếu một điểm bằng Spot Coordinate** trên model có khai toạ độ chung thật — bước duy nhất bắt được
+   sai hệ toạ độ, và cũng là thứ quyết định gỡ hay giữ nhãn *thử nghiệm*. Chi tiết: [`toa-do-dinh-vi.md`](toa-do-dinh-vi.md).
+   Lý do làm A1 trước các đề xuất còn lại: chỉ đọc, không transaction, tầng thuần chiếm phần lớn, và nó mở thêm
+   **một nhóm người dùng khác** (tổ trắc đạc) cho chính vòng 9.4.
+10. **Không mở P3** — giữ hướng chiều sâu theo [`roadmap.md`](roadmap.md).

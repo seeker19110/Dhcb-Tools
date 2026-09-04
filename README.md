@@ -46,11 +46,12 @@ src/
 │   ├── Geometry/   GridClustering, GridNaming (trục từ bản CAD/Excel)
 │   ├── Mep/        RouteGraph, DevicePattern, DuctSizing, PipeSizing, SystemNaming, FlowNumbering, PathFinder3D
 │   ├── Checks/     RuleChecker, ClashAcceptance
+│   ├── Setout/     SetoutPlanner, SetoutCsv, SetoutDxf (toạ độ định vị) · Geometry/GridIntersections
 │   └── Ai/         CommandCatalog, CommandIntentParser, LayerMappingSuggester, SpecTextExtractor, WarningAnalyzer, OllamaClient
 ├── DhcbTools.Shared.Hosting/      # CommandResult, ICoreCommand<TConfig,TDocument>, HttpBridgeServer (token, khoá, timeout)
 ├── DhcbTools.Core/                # Core Revit — logic thuần, KHÔNG TaskDialog/WPF
 │   ├── RevitCommandTable.cs       # dispatch theo tên lệnh — dùng chung Bridge/batch/Ribbon/AI
-│   ├── ParameterSync, ModelCleanup, AutoNumbering, Export, Health, Query
+│   ├── ParameterSync, ModelCleanup, AutoNumbering, Export (BatchExport, SetoutExport), Health, Query
 │   ├── ProjectInit/               # Level, Grid, Family, ProjectInfo, ProjectFromTemplate, TransferStandards, GridFromCsv, SheetBatchCreate
 │   ├── MEPF/                      # Sleeve, ElevationTag, Hanger, PipeSplitter, ConnectorChecker,
 │   │                              #   RouteFromLines (A), DevicePlacement (B), Sizing, SystemColor/Name, FlowNumbering
@@ -58,7 +59,7 @@ src/
 │   ├── Updaters/                  # ElevationUpdater (IUpdater, tắt mặc định)
 │   ├── Ai/                        # CadLayerMap, SpecToConfig, DictionaryLearn
 │   └── Batch/                     # BatchJobRunner (mở → chạy step → lưu → đóng)
-├── DhcbTools.Revit/               # Vỏ Revit: Ribbon 6 panel phủ đủ 42 lệnh, Bridge 8765, hook batch
+├── DhcbTools.Revit/               # Vỏ Revit: Ribbon 6 panel phủ đủ 44 lệnh, Bridge 8765, hook batch
 │                                  #   (pending-job.json), ElevationUpdater, WPF AutoNumbering
 ├── DhcbTools.Core.AutoCAD/        # Core AutoCAD: AcadCommandTable, LayerSync, DrawingCleanup, AutoNumbering, Attributes,
 │                                  #   Text (TextReplace), Standards (LayerStandardCheck, GridExtract, XrefAudit, CadLayerMap), Query
@@ -87,7 +88,7 @@ Ribbon/dòng lệnh, HTTP Bridge, batch runner, lớp AI. Danh mục đầy đ�
 | Dữ liệu ↔ CSV | `ParameterExport` / `ParameterImport` | `LayerExport` / `LayerImport`, `AttributeExport` / `AttributeImport` |
 | Dọn dẹp | `RemoveUnusedViews` | `DrawingCleanup` (an toàn: CLAYER, linetype của layer, xref) |
 | Đánh số | `AutoNumbering` (theo vị trí), `FlowNumbering` (theo dòng chảy) | `AutoNumbering` (block attribute) |
-| Xuất & báo cáo | `BatchExport` (PDF/DWG/IFC/NWC), `HealthReport` | `XrefAudit` |
+| Xuất & báo cáo | `BatchExport` (PDF/DWG/IFC/NWC), `HealthReport`, `SetoutExport` (toạ độ định vị cho máy toàn đạc — *thử nghiệm*, [`docs/toa-do-dinh-vi.md`](docs/toa-do-dinh-vi.md)) | `XrefAudit` |
 | Kiểm tra | `ParameterRuleCheck`, `ClashDetection` (+ `clash-accepted.json`), `ConnectorChecker` | `LayerStandardCheck`, `TextReplace` |
 | Dự án & hồ sơ | `ProjectFromTemplate`, `TransferStandards`, `LevelSetup`, `GridSetup`, `GridFromCsv`, `FamilyLoader`, `ProjectInfo`, `SheetBatchCreate` | `GridExtract` (layer AXIS → CSV cho `GridFromCsv`) |
 | MEPF | `SleeveAuto`, `ElevationTag`, `HangerAuto`, `PipeSplitter`, `RouteFromLines`, `DevicePlacement`, `SizingProposal` / `ApplySizing`, `SystemColor`, `SystemName` | — |
@@ -258,9 +259,10 @@ Toàn bộ giai đoạn 0–6 của [`docs/dac-ta-tinh-nang.md`](docs/dac-ta-tin
 pyRevit, DiRoots, Ideate, Colour Splasher, LAYTRANS, Drawing Compare, RevitBatchProcessor) đã có mã nguồn và biên dịch xanh
 với API Revit/AutoCAD 2023–2027 (ma trận CI, gồm cả đường .NET 10); số test thuần xem output CI (`tests.yml` → artifact `test-results`).
 
-**Đã chạy trên phần mềm thật:** 42/42 lệnh Revit có ít nhất một ca kiểm chạy bên trong Revit 2024.3 và 15/15 lệnh
-AutoCAD có ca kiểm qua `accoreconsole`, cộng một đêm batch trên **dự án thật** — bằng chứng và số liệu từng vòng:
+**Đã chạy trên phần mềm thật:** 43/43 lệnh Revit *của vòng 2026-09-04* có ít nhất một ca kiểm chạy bên trong Revit 2024.3
+và 15/15 lệnh AutoCAD có ca kiểm qua `accoreconsole`, cộng một đêm batch trên **dự án thật** — bằng chứng và số liệu từng vòng:
 [`docs/bang-chung-test.md`](docs/bang-chung-test.md), NETLOAD trên AutoCAD thật:
 [`docs/bang-chung-test-autocad-live.md`](docs/bang-chung-test-autocad-live.md). Phần **chưa** khép: chất lượng tuyến của `AutoRoute` (còn nhãn
-*thử nghiệm*), chạy thật trên Revit 2026/2027 (máy chỉ có 2024.3), và 9.4 — đưa cho một nhóm kỹ sư dùng thật. Chi tiết và lỗi còn mở:
+*thử nghiệm*), `SetoutExport` mới thêm 2026-09-05 (có ca kiểm, **chưa chạy thật** — [`docs/toa-do-dinh-vi.md`](docs/toa-do-dinh-vi.md)),
+chạy thật trên Revit 2026/2027 (máy chỉ có 2024.3), và 9.4 — đưa cho một nhóm kỹ sư dùng thật. Chi tiết và lỗi còn mở:
 [`docs/progress.md`](docs/progress.md) · lộ trình: [`docs/roadmap.md`](docs/roadmap.md).

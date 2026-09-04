@@ -68,12 +68,16 @@ Tầng thuần là bắt buộc theo nguyên tắc 5 của `roadmap.md`.
 
 | # | Lệnh | Việc tay thay thế | Tầng thuần | Rủi ro | Cỡ |
 |---|---|---|---|---|---|
-| A1 | **`SetoutExport`** | Trắc đạc đọc bản vẽ, **gõ tay** toạ độ tim cột / lỗ mở / giá đỡ vào máy toàn đạc | `Setout/PointFormatter` (mẫu cột theo máy, đơn vị, làm tròn, tên điểm qua `NamePattern` đã có) | **Thấp nhất cả danh sách** — chỉ đọc, không transaction | 2–3 ngày |
+| A1 ✅ 🧪 | **`SetoutExport`** — mã nguồn 2026-09-05, chờ chạy thật | Trắc đạc đọc bản vẽ, **gõ tay** toạ độ tim cột / lỗ mở / giá đỡ vào máy toàn đạc | `Setout/SetoutPlanner` + `SetoutCsv` + `SetoutDxf` + `Geometry/GridIntersections` (thứ tự cột theo máy `PNEZD`/`PENZD`, đơn vị, làm tròn, tên điểm qua `NamePattern` đã có, chống trùng, giao trục) — 50 ca test | **Thấp nhất cả danh sách** — chỉ đọc, không transaction | 2–3 ngày |
 | A2 | **`OpeningReport`** + ghi kích thước tới trục | Lập bảng lỗ mở gửi kết cấu duyệt; ghi dim từ sleeve tới hai trục gần nhất | `Grid/GridProximity` (chọn 2 trục gần nhất, khoảng cách có dấu) — dùng lại `GridClustering`/`GridNaming` | Thấp cho phần bảng; trung bình cho phần dim | 3–4 ngày |
 | A3 | **`AssemblySpool`** | Gom cụm → cắt view → lập sheet → đánh số cho từng spool | `SheetLayoutPlanner` (tách phần tính toạ độ viewport đang nằm trong `SheetBatchCreate`) | Trung bình — phụ thuộc template view/sheet từng dự án | ~1 tuần |
 | A4 | **`TagAll`** | Gắn tag ống/thiết bị/phòng trên hàng chục view, rồi **kéo tay từng cái cho hết chồng** | `Tag/TagPlacement` (tránh chồng nhãn 2D) | Trung bình | 3–4 ngày |
 
-**A1 — `SetoutExport` (toạ độ định vị ra máy toàn đạc).** Chọn category + bộ lọc → lấy điểm đặc trưng (tâm
+**A1 — `SetoutExport` (toạ độ định vị ra máy toàn đạc).** ✅ **Đã có mã nguồn 2026-09-05** — xem
+[`toa-do-dinh-vi.md`](toa-do-dinh-vi.md); hai điều chỉnh so với đề xuất gốc: không có "bảng mẫu máy" nào
+để bảo trì mà kỹ sư gõ thẳng **thứ tự cột** máy nhận (`PNEZD`, `PENZD`…), và chiều của
+`GetTotalTransform()` được **tự kiểm** bằng `GetProjectPosition` tại hai điểm thay vì tin tài liệu API.
+🧪 Chưa chạy thật trong Revit. Đề xuất gốc: chọn category + bộ lọc → lấy điểm đặc trưng (tâm
 sleeve, tim cột, đầu/cuối giá đỡ, điểm nối thiết bị) → đổi sang toạ độ Survey → CSV theo mẫu máy
 (`Tên,N,E,Z,Mô tả`) và DXF điểm cho máy đời cũ. API: `Document.ActiveProjectLocation.GetTotalTransform()`
 (dùng `.Inverse` để đưa về hệ toạ độ chung); `BasePoint` có `IsShared = true` là survey point. Đây là mục
@@ -169,7 +173,7 @@ Revit cho lệnh đó**; và [`progress.md`](progress.md) nói việc có giá t
 
 | Đợt | Làm gì | Vì sao đúng thời điểm |
 |---|---|---|
-| **Ngay, không cần chờ số liệu** | **A1 `SetoutExport`** · **B1 `ConstructionStatus`/`ProgressReport`** · ~~**C1** chuỗi băm nhật ký~~ ✅ **xong 2026-09-04** | Cả ba **chỉ đọc hoặc ghi tham số**, tầng thuần chiếm phần lớn công sức, không phụ thuộc thư viện/template của dự án. Giá trị không phụ thuộc kết quả 9.4 — trắc đạc, chỉ huy trưởng và bộ phận hồ sơ là ba nhóm người **khác** với nhóm đang dùng 43 lệnh hiện có, nên mở thêm được tệp người dùng cho chính vòng 9.4 |
+| **Ngay, không cần chờ số liệu** | ~~**A1 `SetoutExport`**~~ ✅ mã nguồn **2026-09-05** (🧪 chờ chạy thật) · **B1 `ConstructionStatus`/`ProgressReport`** · ~~**C1** chuỗi băm nhật ký~~ ✅ **xong 2026-09-04** | Cả ba **chỉ đọc hoặc ghi tham số**, tầng thuần chiếm phần lớn công sức, không phụ thuộc thư viện/template của dự án. Giá trị không phụ thuộc kết quả 9.4 — trắc đạc, chỉ huy trưởng và bộ phận hồ sơ là ba nhóm người **khác** với nhóm đang dùng 43 lệnh hiện có, nên mở thêm được tệp người dùng cho chính vòng 9.4 |
 | **Song song, rẻ** | **B3 `BcfExport`** · **C4 `ModelLinesFromCad`** | Thuần gần hết; B3 chỉ thêm đầu ra cho lệnh đã chạy thật, C4 nối hai lệnh đã có |
 | **Sau khi có số liệu 9.4/`UsageReport`** | **A2** → **A4** → **A3** → **B2** → **C3** → **C2** | Sáu mục này đắt hoặc phụ thuộc thói quen từng công ty (template view/sheet, thư viện tag, bảng mã định mức, mẫu dấu). Làm trước khi biết kỹ sư thật cần gì là lặp lại đúng sai lầm "bề rộng trước" mà `roadmap.md` đã ghi lại |
 

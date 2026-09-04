@@ -1,0 +1,300 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Text;
+
+namespace DhcbTools.Shared.Logic.Setout
+{
+    /// <summary>Tuỳ chọn đặt tên/mô tả cho <see cref="SetoutPlanner"/>.</summary>
+    public sealed class SetoutPlanOptions
+    {
+        /// <summary>Mẫu tên điểm của phần tử — token <c>{Code}</c>, <c>{Category}</c>, <c>{Family}</c>, <c>{Type}</c>, <c>{Level}</c>, <c>{Mark}</c>, <c>{Id}</c>, <c>{Kind}</c>, bộ đếm <c>{n:000}</c> (đếm riêng theo mã).</summary>
+        public string NamePattern { get; set; } = "{Code}{n:000}";
+
+        /// <summary>Mẫu tên cho điểm giao trục — mặc định chính cặp trục (<c>A-1</c>).</summary>
+        public string GridNamePattern { get; set; } = "{Grid}";
+
+        public string DescriptionPattern { get; set; } = "{Category} {Level}";
+
+        /// <summary>Giới hạn tên điểm của máy toàn đạc (Leica/Trimble: 16). 0 = không cắt.</summary>
+        public int MaxNameLength { get; set; } = 16;
+
+        public int CounterStart { get; set; } = 1;
+    }
+
+    /// <summary>Kết quả đặt tên: danh sách điểm theo thứ tự ghi ra file, kèm ghi chú cho kỹ sư.</summary>
+    public sealed class SetoutPlan
+    {
+        public List<SetoutPoint> Points { get; } = new List<SetoutPoint>();
+
+        public List<string> Notes { get; } = new List<string>();
+
+        /// <summary>Số tên bị cắt vì dài quá <see cref="SetoutPlanOptions.MaxNameLength"/>.</summary>
+        public int Truncated { get; set; }
+
+        /// <summary>Số tên phải thêm hậu tố vì trùng.</summary>
+        public int Renamed { get; set; }
+
+        public Dictionary<string, int> CountByCode { get; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Sắp xếp điểm (tầng → mã → phần tử → vị trí trên phần tử), đặt tên theo mẫu, làm sạch tên cho máy
+    /// toàn đạc và bảo đảm <b>không có hai điểm cùng tên</b> — trên máy, hai điểm cùng tên là chọn nhầm
+    /// điểm mà không ai biết. Thuần chuỗi/số, test được không cần Revit.
+    /// </summary>
+    public static class SetoutPlanner
+    {
+        public static SetoutPlan Plan(IReadOnlyList<SetoutSource> sources, SetoutPlanOptions? options = null)
+        {
+            options = options ?? new SetoutPlanOptions();
+            var plan = new SetoutPlan();
+            if (sources == null || sources.Count == 0)
+            {
+                return plan;
+            }
+
+            var ordered = sources
+                .Select((source, index) => new { Source = source, Index = index })
+                .OrderBy(t => t.Source.Level, NaturalComparer.Instance)
+                .ThenBy(t => CodeOf(t.Source), StringComparer.OrdinalIgnoreCase)
+                .ThenBy(t => t.Source.ElementId)
+                .ThenBy(t => KindRank(t.Source.Kind))
+                .ThenBy(t => t.Index)
+                .Select(t => t.Source)
+                .ToList();
+
+            var namePattern = new NamePattern(options.NamePattern) { CounterStart = options.CounterStart };
+            var gridPattern = new NamePattern(options.GridNamePattern) { CounterStart = options.CounterStart };
+            var descriptionPattern = new NamePattern(options.DescriptionPattern);
+
+            var counters = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var source in ordered)
+            {
+                var code = CodeOf(source);
+                counters.TryGetValue(code, out var index);
+                counters[code] = index + 1;
+
+                var values = TokenValues(source, code);
+                var pattern = source.Grid.Length > 0 ? gridPattern : namePattern;
+                var name = Sanitize(pattern.Apply(index, values));
+                if (name.Length == 0)
+                {
+                    // Mẫu chỉ toàn token rỗng (ví dụ {Mark} mà phần tử không có Mark) — vẫn phải có tên.
+                    name = code + (index + options.CounterStart).ToString("000", CultureInfo.InvariantCulture);
+                }
+
+                if (options.MaxNameLength > 0 && name.Length > options.MaxNameLength)
+                {
+                    name = name.Substring(0, options.MaxNameLength);
+                    plan.Truncated++;
+                }
+
+                var unique = Unique(name, used, options.MaxNameLength);
+                if (!string.Equals(unique, name, StringComparison.Ordinal))
+                {
+                    plan.Renamed++;
+                }
+
+                used.Add(unique);
+
+                plan.Points.Add(new SetoutPoint(unique, source.EastMm, source.NorthMm, source.ElevationMm)
+                {
+                    Description = Collapse(descriptionPattern.Apply(index, values)),
+                    Code = code,
+                    Category = source.Category,
+                    Level = source.Level,
+                    Kind = source.Kind,
+                    ElementId = source.ElementId,
+                });
+
+                plan.CountByCode.TryGetValue(code, out var count);
+                plan.CountByCode[code] = count + 1;
+            }
+
+            if (plan.Truncated > 0)
+            {
+                plan.Notes.Add(plan.Truncated + " tên điểm bị cắt còn " + options.MaxNameLength + " ký tự (giới hạn tên điểm của máy toàn đạc) — rút ngắn namePattern nếu cần phân biệt.");
+            }
+
+            if (plan.Renamed > 0)
+            {
+                plan.Notes.Add(plan.Renamed + " tên điểm trùng nhau đã thêm hậu tố _2, _3… — trên máy hai điểm cùng tên là chọn nhầm mà không ai biết.");
+            }
+
+            return plan;
+        }
+
+        /// <summary>Mã ngắn của điểm: khai sẵn ở nguồn, hoặc theo category.</summary>
+        public static string CodeOf(SetoutSource source) =>
+            source.Code.Length > 0 ? source.Code : SetoutCodes.For(source.Category);
+
+        /// <summary>
+        /// Làm sạch tên cho máy toàn đạc: bỏ dấu tiếng Việt, khoảng trắng → <c>_</c>, giữ chữ/số và
+        /// <c>_ - . +</c>. Dấu phẩy hay nháy kép trong tên là hỏng cả dòng CSV trên máy không hiểu RFC 4180.
+        /// </summary>
+        public static string Sanitize(string? raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return string.Empty;
+            }
+
+            var sb = new StringBuilder(raw!.Length);
+            var pendingUnderscore = false;
+            foreach (var ch in StripDiacritics(raw.Trim()))
+            {
+                if (char.IsWhiteSpace(ch))
+                {
+                    pendingUnderscore = sb.Length > 0;
+                    continue;
+                }
+
+                if (char.IsLetterOrDigit(ch) && ch < 128 || ch == '_' || ch == '-' || ch == '.' || ch == '+')
+                {
+                    if (pendingUnderscore)
+                    {
+                        sb.Append('_');
+                        pendingUnderscore = false;
+                    }
+
+                    sb.Append(ch);
+                }
+            }
+
+            return sb.ToString();
+        }
+
+        /// <summary>Bỏ dấu: <c>Cột trục A</c> → <c>Cot truc A</c>. Đ/đ không phải dấu tổ hợp nên xử riêng.</summary>
+        public static string StripDiacritics(string text)
+        {
+            var normalized = text.Replace('đ', 'd').Replace('Đ', 'D').Normalize(NormalizationForm.FormD);
+            var sb = new StringBuilder(normalized.Length);
+            foreach (var ch in normalized)
+            {
+                if (CharUnicodeInfo.GetUnicodeCategory(ch) != UnicodeCategory.NonSpacingMark)
+                {
+                    sb.Append(ch);
+                }
+            }
+
+            return sb.ToString().Normalize(NormalizationForm.FormC);
+        }
+
+        /// <summary>Mô tả: một dòng, không dấu phẩy/nháy — phần mềm máy thường tách cột bằng dấu phẩy mà không hiểu nháy kép.</summary>
+        public static string Collapse(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return string.Empty;
+            }
+
+            var parts = text!.Replace(',', ';').Replace('"', '\'')
+                .Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            return string.Join(" ", parts);
+        }
+
+        private static string Unique(string name, HashSet<string> used, int maxLength)
+        {
+            if (!used.Contains(name))
+            {
+                return name;
+            }
+
+            for (var k = 2; ; k++)
+            {
+                var suffix = "_" + k.ToString(CultureInfo.InvariantCulture);
+                var stem = name;
+                if (maxLength > 0 && stem.Length + suffix.Length > maxLength)
+                {
+                    stem = stem.Substring(0, Math.Max(1, maxLength - suffix.Length));
+                }
+
+                var candidate = stem + suffix;
+                if (!used.Contains(candidate))
+                {
+                    return candidate;
+                }
+            }
+        }
+
+        private static Dictionary<string, string> TokenValues(SetoutSource source, string code) =>
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "Code", code },
+                { "Category", source.Category },
+                { "Family", source.Family },
+                { "Type", source.TypeName },
+                { "Level", source.Level },
+                { "Mark", source.Mark },
+                { "Id", source.ElementId == 0 ? string.Empty : source.ElementId.ToString(CultureInfo.InvariantCulture) },
+                { "Kind", source.Kind },
+                { "Grid", source.Grid },
+            };
+
+        private static int KindRank(string kind)
+        {
+            switch ((kind ?? string.Empty).Trim().ToLowerInvariant())
+            {
+                case "tim": return 0;
+                case "đầu": return 1;
+                case "giữa": return 2;
+                case "cuối": return 3;
+                case "tâm hộp bao": return 4;
+                case "giao trục": return 5;
+                default: return 9;
+            }
+        }
+
+        /// <summary>So sánh "tự nhiên": <c>Level 2</c> đứng trước <c>Level 10</c>. Không phân biệt hoa thường.</summary>
+        public sealed class NaturalComparer : IComparer<string>
+        {
+            public static readonly NaturalComparer Instance = new NaturalComparer();
+
+            public int Compare(string? x, string? y)
+            {
+                x = x ?? string.Empty;
+                y = y ?? string.Empty;
+                int i = 0, j = 0;
+                while (i < x.Length && j < y.Length)
+                {
+                    if (char.IsDigit(x[i]) && char.IsDigit(y[j]))
+                    {
+                        var si = i;
+                        var sj = j;
+                        while (i < x.Length && char.IsDigit(x[i])) i++;
+                        while (j < y.Length && char.IsDigit(y[j])) j++;
+                        var nx = x.Substring(si, i - si).TrimStart('0');
+                        var ny = y.Substring(sj, j - sj).TrimStart('0');
+                        if (nx.Length != ny.Length)
+                        {
+                            return nx.Length.CompareTo(ny.Length);
+                        }
+
+                        var c = string.CompareOrdinal(nx, ny);
+                        if (c != 0)
+                        {
+                            return c;
+                        }
+                    }
+                    else
+                    {
+                        var c = char.ToUpperInvariant(x[i]).CompareTo(char.ToUpperInvariant(y[j]));
+                        if (c != 0)
+                        {
+                            return c;
+                        }
+
+                        i++;
+                        j++;
+                    }
+                }
+
+                return (x.Length - i).CompareTo(y.Length - j);
+            }
+        }
+    }
+}

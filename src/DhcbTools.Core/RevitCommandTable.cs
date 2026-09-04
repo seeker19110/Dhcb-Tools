@@ -79,6 +79,7 @@ public static class RevitCommandTable
                 "AUTOROUTE" => new AutoRouteCommand().Execute(doc, Deserialize<AutoRouteConfig>(configJson)),
                 "SCHEDULEEXPORT" => new ScheduleExportCommand().Execute(doc, Deserialize<ScheduleExportConfig>(configJson)),
                 "VIEWPORTCOPY" => new ViewportCopyCommand().Execute(doc, Deserialize<ViewportCopyConfig>(configJson)),
+                "SETOUTEXPORT" => new SetoutExportCommand().Execute(doc, Deserialize<SetoutExportConfig>(configJson)),
 
                 "PARAMETERRULECHECK" => new ParameterRuleCheckCommand().Execute(doc, Deserialize<ParameterRuleCheckConfig>(configJson)),
                 "CLASHDETECTION" => new ClashDetectionCommand().Execute(doc, Deserialize<ClashDetectionConfig>(configJson)),

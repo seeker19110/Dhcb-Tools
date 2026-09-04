@@ -28,7 +28,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 
 ---
 
-## Revit — 43 lệnh
+## Revit — 44 lệnh
 
 | Lệnh | Việc nó làm | Tuần | Bỏ | Chưa | Nếu bỏ: vì sao |
 |---|---|:--:|:--:|:--:|---|
@@ -70,6 +70,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 | `AutoRoute` | Routing mức C: A* né chướng ngại giữa 2 điểm *(thử nghiệm)* | ☐ | ☐ | ☐ | |
 | `ScheduleExport` | Xuất schedule ra CSV đúng cột/hàng đang hiển thị | ☐ | ☐ | ☐ | |
 | `ViewportCopy` | Copy legend/schedule sang nhiều sheet, cùng vị trí, ghim lại | ☐ | ☐ | ☐ | |
+| `SetoutExport` | Xuất toạ độ định vị (tim cột, tâm thiết bị, giao trục) ra CSV cho máy toàn đạc + DXF *(thử nghiệm)* | ☐ | ☐ | ☐ | |
 | `ParameterRuleCheck` | Kiểm tra tham số thiếu / sai quy tắc đặt tên → HTML | ☐ | ☐ | ☐ | |
 | `ClashDetection` | Va chạm giữa hai nhóm category → HTML + 3D view | ☐ | ☐ | ☐ | |
 | `CadLayerMap` | AI offline: gợi ý map layer CAD → Revit type, CSV để duyệt | ☐ | ☐ | ☐ | |

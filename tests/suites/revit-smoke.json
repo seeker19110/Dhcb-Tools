@@ -539,6 +539,48 @@
       }
     },
     {
+      "name": "Toạ độ định vị — tim cột + giao trục ra CSV/DXF cho máy toàn đạc",
+      "command": "SetoutExport",
+      "config": {
+        "categories": ["Structural Columns", "Columns"],
+        "includeGridIntersections": true,
+        "outputPath": "{outputFolder}/setout.csv",
+        "dxfPath": "{outputFolder}/setout.dxf"
+      },
+      "//": "De xuat A1 (nghien-cuu-chuoi-den-hoan-cong.md). Chi doc, khong transaction. Model kien truc chac chan co truc nen ca nay thanh cong ke ca khi khong co cot; minAffected chot 'khong no-op'. Thong bao phai noi ro goc Survey (E/N/Z, goc True North) de tro trac dac doi chieu.",
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxMs": 60000,
+        "messagesContain": [
+          "True North"
+        ],
+        "filesExist": [
+          "{outputFolder}/setout.csv",
+          "{outputFolder}/setout.dxf"
+        ]
+      }
+    },
+    {
+      "name": "Toạ độ định vị — báo lỗi rõ khi thứ tự cột có chữ máy không hiểu",
+      "command": "SetoutExport",
+      "config": {
+        "columns": "PNEQ",
+        "outputPath": "{outputFolder}/setout-sai.csv"
+      },
+      "//": "Sai mot chu cot la bao ro, khong doan. Duong loi phai duoc chot nhu duong thanh cong.",
+      "expect": {
+        "success": false,
+        "maxMs": 10000,
+        "summaryContains": [
+          "không hợp lệ"
+        ],
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
       "name": "Sleeve tự động — hiệu năng",
       "command": "SleeveAuto",
       "config": {

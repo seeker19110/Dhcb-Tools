@@ -371,6 +371,49 @@
           "Exception"
         ]
       }
+    },
+    {
+      "name": "Toạ độ định vị — tâm thiết bị cơ, miệng gió, cột PENZDI theo mm",
+      "command": "SetoutExport",
+      "config": {
+        "categories": ["Mechanical Equipment", "Air Terminals"],
+        "columns": "PENZDI",
+        "unit": "mm",
+        "includeHeader": false,
+        "namePattern": "{Code}-{n:000}",
+        "outputPath": "{outputFolder}/setout-mep.csv"
+      },
+      "//": "Thu tu cot khac (E truoc N), don vi mm, khong tieu de — dung file ma may Topcon/Sokkia nhan. Cot I (ElementId) de agent doi chieu lai bang element_geometry.",
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxMs": 60000,
+        "summaryContains": [
+          "PENZDI"
+        ],
+        "filesExist": [
+          "{outputFolder}/setout-mep.csv"
+        ]
+      }
+    },
+    {
+      "name": "Toạ độ định vị — E-PRECOND khi không Id nào có trong mô hình",
+      "command": "SetoutExport",
+      "config": {
+        "elementIds": [999999999],
+        "outputPath": "{outputFolder}/setout-rong.csv"
+      },
+      "//": "File rong khong duoc ghi ra roi bao thanh cong: 0 diem la cau noi ve dau vao, khong phai ve mo hinh.",
+      "expect": {
+        "success": false,
+        "maxMs": 10000,
+        "summaryContains": [
+          "E-PRECOND"
+        ],
+        "neverContains": [
+          "Exception"
+        ]
+      }
     }
   ]
 }
