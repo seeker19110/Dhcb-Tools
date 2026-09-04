@@ -581,6 +581,85 @@
       }
     },
     {
+      "name": "Báo cáo tiến độ — mẫu số gồm cả cấu kiện chưa ai ghi nhận",
+      "command": "ProgressReport",
+      "config": {
+        "categories": ["Doors"],
+        "groupBy": "Level",
+        "statusParameter": "Comments",
+        "outputPath": "{outputFolder}/tien-do.html",
+        "csvPath": "{outputFolder}/tien-do.csv"
+      },
+      "//": "De xuat B1. Model kien truc mau khong co tham so trang thai rieng nen ca nay muon tam Comments — thu co that o moi cua — de chay duoc duong thanh cong. Ket qua dung la 0% voi ghi chu 'chua ai ghi nhan': do moi la cau tra loi that, khong phai loi.",
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxMs": 60000,
+        "messagesContain": [
+          "chưa ai ghi nhận"
+        ],
+        "filesExist": [
+          "{outputFolder}/tien-do.html",
+          "{outputFolder}/tien-do.csv"
+        ]
+      }
+    },
+    {
+      "name": "Báo cáo tiến độ — E-PARAM-MISSING khi không phần tử nào mang tham số trạng thái",
+      "command": "ProgressReport",
+      "config": {
+        "categories": ["Doors"],
+        "statusParameter": "DHCB_ThamSoKhongTonTai",
+        "outputPath": "{outputFolder}/tien-do-sai.html"
+      },
+      "//": "0% cho moi nhom vi tra sai ten tham so la con so noi ve tham so, khong noi ve cong truong — phai chan thay vi ghi ra bao cao toan 0.",
+      "expect": {
+        "success": false,
+        "maxMs": 30000,
+        "summaryContains": [
+          "E-PARAM-MISSING"
+        ],
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
+      "name": "Trạng thái thi công — E-PATH-MISSING khi không có file CSV",
+      "command": "ConstructionStatus",
+      "config": {
+        "inputPath": "{outputFolder}/khong-co-file-nay.csv"
+      },
+      "expect": {
+        "success": false,
+        "maxMs": 10000,
+        "summaryContains": [
+          "E-PATH-MISSING"
+        ],
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
+      "name": "Trạng thái thi công — E-PRECOND khi không mã nào khớp phần tử của model này",
+      "command": "ConstructionStatus",
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/trang-thai-thi-cong.csv"
+      },
+      "//": "File CSV cua mo hinh khac (ma co y khong ton tai). Tra 0 va bao thanh cong o day la no-op im lang: bao cao tien do sau do van 0% ma khong ai biet vi sao.",
+      "expect": {
+        "success": false,
+        "maxMs": 30000,
+        "summaryContains": [
+          "E-PRECOND"
+        ],
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
       "name": "Sleeve tự động — hiệu năng",
       "command": "SleeveAuto",
       "config": {

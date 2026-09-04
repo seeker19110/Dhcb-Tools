@@ -52,13 +52,13 @@ Có sẵn hai bộ:
 
 | Bộ | Model mẫu | Phủ |
 |---|---|---|
-| [`revit-smoke.json`](../tests/suites/revit-smoke.json) | Snowdon Towers Sample Architectural | Health, tham số, cảnh báo, family, view/sheet, style, schedule, xuất bản vẽ, toạ độ định vị (cột + giao trục), khởi tạo dự án, kiểm tra, AI offline |
-| [`revit-mep.json`](../tests/suites/revit-mep.json) | Snowdon Towers Sample HVAC | Connector, sleeve, cao độ, hanger, chia ống, routing, sizing, BOM, kick, clash, toạ độ định vị thiết bị (`PENZDI`, mm) |
+| [`revit-smoke.json`](../tests/suites/revit-smoke.json) | Snowdon Towers Sample Architectural | Health, tham số, cảnh báo, family, view/sheet, style, schedule, xuất bản vẽ, toạ độ định vị (cột + giao trục), tiến độ thi công, khởi tạo dự án, kiểm tra, AI offline |
+| [`revit-mep.json`](../tests/suites/revit-mep.json) | Snowdon Towers Sample HVAC | Connector, sleeve, cao độ, hanger, chia ống, routing, sizing, BOM, kick, clash, toạ độ định vị thiết bị (`PENZDI`, mm), tiến độ theo hệ (% theo chiều dài) |
 | [`revit-plumbing.json`](../tests/suites/revit-plumbing.json) | Snowdon Towers Sample Plumbing | Dốc ống, sizing ống, BOM ống, chia ống, cao độ ống |
 | [`autocad-smoke.json`](../tests/suites/autocad-smoke.json) | Data Extraction and Multileaders Sample (kèm AutoCAD) | Đủ **15/15 lệnh AutoCAD**: layer, attribute, text, chuẩn layer, trục, xref, block, so bản vẽ, dọn dẹp, map layer |
 | [`revit-write.json`](../tests/suites/revit-write.json) · [`autocad-write.json`](../tests/suites/autocad-write.json) | Bản chép của model/bản vẽ mẫu | **Đường ghi thật** — xem mục dưới |
 
-Các bộ cộng lại phủ **đủ 44/44 lệnh Revit** có ca kiểm (43 đã chạy thật; `SetoutExport` thêm 2026-09-05 chờ lượt chạy đầu) — `SuiteCoverageTests` (chạy trên CI, không cần Revit) đỏ ngay
+Các bộ cộng lại phủ **đủ 46/46 lệnh Revit** có ca kiểm (43 đã chạy thật; `SetoutExport`, `ConstructionStatus`, `ProgressReport` thêm 2026-09-05 chờ lượt chạy đầu) — `SuiteCoverageTests` (chạy trên CI, không cần Revit) đỏ ngay
 khi thêm lệnh mới mà quên ca kiểm, nên con số này không trôi khỏi tài liệu được nữa.
 
 Cả ba model đều đi kèm Revit (`C:\Program Files\Autodesk\Revit 2024\Samples`), nên không cần chuẩn bị gì thêm.

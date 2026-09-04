@@ -113,7 +113,7 @@ public sealed class SetoutExportCommand : ICoreCommand<SetoutExportConfig>
             if (level == null)
             {
                 var names = new FilteredElementCollector(document).OfClass(typeof(Level)).Cast<Level>()
-                    .Select(l => l.Name).OrderBy(n => n, SetoutPlanner.NaturalComparer.Instance).ToList();
+                    .Select(l => l.Name).OrderBy(n => n, NaturalComparer.Instance).ToList();
                 return CommandResult.Fail($"Không có tầng tên \"{config.LevelName}\". Tầng có thật: {string.Join(", ", names)}.");
             }
         }

@@ -47,6 +47,7 @@ src/
 │   ├── Mep/        RouteGraph, DevicePattern, DuctSizing, PipeSizing, SystemNaming, FlowNumbering, PathFinder3D
 │   ├── Checks/     RuleChecker, ClashAcceptance
 │   ├── Setout/     SetoutPlanner, SetoutCsv, SetoutDxf (toạ độ định vị) · Geometry/GridIntersections
+│   ├── Progress/   ConstructionStatusValue, StatusRoll, WeeklyProgress, ProgressCsv (tiến độ thi công)
 │   └── Ai/         CommandCatalog, CommandIntentParser, LayerMappingSuggester, SpecTextExtractor, WarningAnalyzer, OllamaClient
 ├── DhcbTools.Shared.Hosting/      # CommandResult, ICoreCommand<TConfig,TDocument>, HttpBridgeServer (token, khoá, timeout)
 ├── DhcbTools.Core/                # Core Revit — logic thuần, KHÔNG TaskDialog/WPF
@@ -56,10 +57,11 @@ src/
 │   ├── MEPF/                      # Sleeve, ElevationTag, Hanger, PipeSplitter, ConnectorChecker,
 │   │                              #   RouteFromLines (A), DevicePlacement (B), Sizing, SystemColor/Name, FlowNumbering
 │   ├── Checks/                    # ParameterRuleCheck, ClashDetection
+│   ├── Progress/                  # ConstructionStatus (ghi trạng thái), ProgressReport (HTML + CSV)
 │   ├── Updaters/                  # ElevationUpdater (IUpdater, tắt mặc định)
 │   ├── Ai/                        # CadLayerMap, SpecToConfig, DictionaryLearn
 │   └── Batch/                     # BatchJobRunner (mở → chạy step → lưu → đóng)
-├── DhcbTools.Revit/               # Vỏ Revit: Ribbon 6 panel phủ đủ 44 lệnh, Bridge 8765, hook batch
+├── DhcbTools.Revit/               # Vỏ Revit: Ribbon 6 panel phủ đủ 46 lệnh, Bridge 8765, hook batch
 │                                  #   (pending-job.json), ElevationUpdater, WPF AutoNumbering
 ├── DhcbTools.Core.AutoCAD/        # Core AutoCAD: AcadCommandTable, LayerSync, DrawingCleanup, AutoNumbering, Attributes,
 │                                  #   Text (TextReplace), Standards (LayerStandardCheck, GridExtract, XrefAudit, CadLayerMap), Query
@@ -94,6 +96,7 @@ Ribbon/dòng lệnh, HTTP Bridge, batch runner, lớp AI. Danh mục đầy đ�
 | MEPF | `SleeveAuto`, `ElevationTag`, `HangerAuto`, `PipeSplitter`, `RouteFromLines`, `DevicePlacement`, `SizingProposal` / `ApplySizing`, `SystemColor`, `SystemName` | — |
 | Hồ sơ & style (giai đoạn 7) | `SheetRename`, `RevisionOnSheets`, `StylePurge`, `ColorByParameter`, `FamilyAudit`, `WarningsExport`, `ScheduleExport`, `ViewportCopy` | `LayerTranslate`, `DrawingCompare`, `BlockQuantity`, `AttributeIncrement` |
 | MEPF nâng cao (P2) | `SlopePipes`, `PipeKick`, `SystemBom`, `AutoRoute` (mức C → mức A) | — |
+| Thi công & hoàn công | `ConstructionStatus`, `ProgressReport` (tiến độ theo tầng/hệ, % theo số lượng và chiều dài — *thử nghiệm*, [`docs/tien-do-thi-cong.md`](docs/tien-do-thi-cong.md)) | — |
 | AI offline | `CadLayerMap`, `SpecToConfig`, `DictionaryLearn`, nút *Ra lệnh tiếng Việt* | `CadLayerMap` (`DHCB_LAYER_MAP`); ra lệnh tiếng Việt qua Bridge `POST /chat` |
 
 Lệnh AutoCAD trên dòng lệnh — đúng các `[CommandMethod]` có trong `src/DhcbTools.AutoCAD`:
@@ -263,6 +266,7 @@ với API Revit/AutoCAD 2023–2027 (ma trận CI, gồm cả đường .NET 10)
 và 15/15 lệnh AutoCAD có ca kiểm qua `accoreconsole`, cộng một đêm batch trên **dự án thật** — bằng chứng và số liệu từng vòng:
 [`docs/bang-chung-test.md`](docs/bang-chung-test.md), NETLOAD trên AutoCAD thật:
 [`docs/bang-chung-test-autocad-live.md`](docs/bang-chung-test-autocad-live.md). Phần **chưa** khép: chất lượng tuyến của `AutoRoute` (còn nhãn
-*thử nghiệm*), `SetoutExport` mới thêm 2026-09-05 (có ca kiểm, **chưa chạy thật** — [`docs/toa-do-dinh-vi.md`](docs/toa-do-dinh-vi.md)),
+*thử nghiệm*), ba lệnh chặng thi công mới thêm 2026-09-05 (`SetoutExport` — [`docs/toa-do-dinh-vi.md`](docs/toa-do-dinh-vi.md);
+`ConstructionStatus` và `ProgressReport` — [`docs/tien-do-thi-cong.md`](docs/tien-do-thi-cong.md); đều có ca kiểm, **chưa chạy thật**),
 chạy thật trên Revit 2026/2027 (máy chỉ có 2024.3), và 9.4 — đưa cho một nhóm kỹ sư dùng thật. Chi tiết và lỗi còn mở:
 [`docs/progress.md`](docs/progress.md) · lộ trình: [`docs/roadmap.md`](docs/roadmap.md).

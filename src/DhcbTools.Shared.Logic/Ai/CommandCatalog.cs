@@ -266,6 +266,25 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("utf8Bom", "ghi BOM UTF-8 để Excel đọc tiếng Việt (để máy đọc: tắt)", FieldKind.Bool)
                 .Words("toạ độ định vị", "setout", "stake out", "máy toàn đạc", "trắc đạc", "toạ độ tim cột", "xuất toạ độ", "cắm mốc"),
 
+            new CommandDescriptor("ConstructionStatus", Revit, "Ghi trạng thái thi công (chưa lắp / đang lắp / đã lắp / đã nghiệm thu) từ CSV hiện trường vào mô hình (thử nghiệm)", true, "TrangThaiThiCong", "InstallStatus")
+                .Field("inputPath", "CSV hiện trường: mã cấu kiện + trạng thái, tuỳ chọn ngày / người xác nhận / ghi chú")
+                .Field("statusParameter", "tham số trạng thái (rỗng = từ điển constructionStatus)")
+                .Field("dateParameter", "tham số ngày (rỗng = từ điển constructionDate)")
+                .Field("personParameter", "tham số người xác nhận (rỗng = từ điển constructionBy)")
+                .Field("noteParameter", "tham số ghi chú (rỗng = từ điển comments)")
+                .Field("dateFormat", "dạng ngày ghi vào tham số Text, mặc định dd/MM/yyyy")
+                .Field("allowDowngrade", "cho phép lùi trạng thái (mặc định tắt — lùi thường là nhập đè file cũ)", FieldKind.Bool)
+                .Field("dryRun", "xem trước")
+                .Words("trạng thái thi công", "cập nhật hiện trường", "đã lắp", "nghiệm thu", "nhập tiến độ"),
+            new CommandDescriptor("ProgressReport", Revit, "Báo cáo tiến độ thi công: % theo số lượng và theo chiều dài, gộp theo tầng/hệ/category, luỹ kế theo tuần → HTML + CSV (thử nghiệm)", false, "TienDo", "Progress")
+                .Field("outputPath", "file HTML").Field("csvPath", "CSV cùng nội dung (tuỳ chọn)")
+                .Field("categories", "category cần tính (rỗng = nhóm MEP + thiết bị mặc định)")
+                .Field("groupBy", "Level (tầng) | System (hệ) | Category", FieldKind.Text)
+                .Field("statusParameter", "tham số trạng thái (rỗng = từ điển constructionStatus)")
+                .Field("dateParameter", "tham số ngày cho chuỗi theo tuần (rỗng = từ điển constructionDate)")
+                .Field("levelName", "chỉ tầng này").Field("systemContains", "lọc hệ chứa chuỗi")
+                .Words("tiến độ", "báo cáo tiến độ", "phần trăm hoàn thành", "progress report", "tiến độ lắp đặt"),
+
             // ── Revit — kiểm tra (cấp 2) ────────────────────────────────────
             new CommandDescriptor("ParameterRuleCheck", Revit, "Kiểm tra tham số thiếu / sai quy tắc đặt tên → HTML", false, "RuleCheck")
                 .Field("rulesPath", "file JSON quy tắc").Field("outputPath", "file HTML").Field("create3dView", "true = GHI một 3D view isolate phần tử vi phạm (chỉ khi dryRun=false)").Field("dryRun", "xem trước: không tạo view")

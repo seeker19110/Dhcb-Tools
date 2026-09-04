@@ -197,7 +197,7 @@ public class SetoutTests
     [InlineData("L1", "L1", 0)]
     [InlineData("", "L1", -1)]
     public void SoSanhTuNhien(string a, string b, int expectedSign) =>
-        Assert.Equal(expectedSign, Math.Sign(SetoutPlanner.NaturalComparer.Instance.Compare(a, b)));
+        Assert.Equal(expectedSign, Math.Sign(NaturalComparer.Instance.Compare(a, b)));
 
     [Theory]
     [InlineData("Cột trục A", "Cot truc A")]

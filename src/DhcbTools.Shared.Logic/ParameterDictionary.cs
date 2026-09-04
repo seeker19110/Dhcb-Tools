@@ -38,6 +38,12 @@ namespace DhcbTools.Shared.Logic
                 ["bottomElevation"] = new[] { "DHCB_Bottom_Elevation", "Bottom Elevation", "Cao độ đáy" },
                 ["topElevation"] = new[] { "DHCB_Top_Elevation", "Top Elevation", "Cao độ đỉnh" },
                 ["centreElevation"] = new[] { "DHCB_Center_Elevation", "Center Elevation", "Cao độ tim" },
+
+                // Trạng thái thi công (B1) — tham số do dự án tự đặt, nên tên dựng sẵn chỉ là phỏng đoán
+                // hay gặp; DictionaryLearn soi tên thật của mô hình và ghi đè lên đầu danh sách.
+                ["constructionStatus"] = new[] { "DHCB_Trang_Thai", "Trạng thái thi công", "Trạng thái", "Construction Status", "Status" },
+                ["constructionDate"] = new[] { "DHCB_Ngay_Lap", "Ngày lắp đặt", "Ngày lắp", "Install Date", "Construction Date" },
+                ["constructionBy"] = new[] { "DHCB_Nguoi_Xac_Nhan", "Người xác nhận", "Người lắp đặt", "Installed By", "Verified By" },
             };
 
         private readonly Dictionary<string, List<string>> _synonyms =

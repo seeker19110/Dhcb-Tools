@@ -414,6 +414,47 @@
           "Exception"
         ]
       }
+    },
+    {
+      "name": "Báo cáo tiến độ theo hệ — % theo chiều dài của ống/duct",
+      "command": "ProgressReport",
+      "config": {
+        "groupBy": "System",
+        "statusParameter": "Comments",
+        "outputPath": "{outputFolder}/tien-do-he.html",
+        "csvPath": "{outputFolder}/tien-do-he.csv"
+      },
+      "//": "Model HVAC co duct nen cot '% theo chieu dai' moi co nghia — day la nua thu hai cua B1 ma bang Excel go tay khong lam duoc.",
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxMs": 90000,
+        "summaryContains": [
+          "đã lắp trở lên"
+        ],
+        "filesExist": [
+          "{outputFolder}/tien-do-he.html",
+          "{outputFolder}/tien-do-he.csv"
+        ]
+      }
+    },
+    {
+      "name": "Báo cáo tiến độ — báo lỗi rõ khi groupBy sai",
+      "command": "ProgressReport",
+      "config": {
+        "groupBy": "Tang",
+        "outputPath": "{outputFolder}/tien-do-groupby-sai.html"
+      },
+      "expect": {
+        "success": false,
+        "maxMs": 10000,
+        "summaryContains": [
+          "không hợp lệ"
+        ],
+        "neverContains": [
+          "Exception"
+        ]
+      }
     }
   ]
 }
