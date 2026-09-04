@@ -523,6 +523,22 @@
       }
     },
     {
+      "name": "Số liệu sử dụng — đọc lại log thật của máy này",
+      "command": "UsageReport",
+      "config": {
+        "outputPath": "{outputFolder}/usage.md",
+        "csvPath": "{outputFolder}/usage.csv"
+      },
+      "//": "Doc thu muc log that trong APPDATA (chi doc, khong ghi). success:null vi may chua cai add-in bao gio thi chua co log — do la moi truong, khong phai loi ma. Cai duoc chot o day la lenh khong nem va noi ro 'chua co so lieu' khac 'khong ai dung lenh nao'.",
+      "expect": {
+        "success": null,
+        "maxMs": 30000,
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
       "name": "Sleeve tự động — hiệu năng",
       "command": "SleeveAuto",
       "config": {
