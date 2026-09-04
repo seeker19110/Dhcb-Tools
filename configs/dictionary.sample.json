@@ -1,5 +1,5 @@
 {
-  "//": [
+  "_comment": [
     "Từ điển tên tham số và family của dự án — chép vào %APPDATA%\\DHCB\\dictionary.json rồi sửa.",
     "",
     "Vì sao cần: Core từng gọi thẳng LookupParameter(\"Level\"), \"Outer Diameter\", \"Nominal Width\"",
@@ -29,7 +29,7 @@
   },
 
   "families": {
-    "//": "Tên family mặc định của công ty, dạng \"Family: Type\" hoặc chỉ tên family.",
+    "_comment": "Tên family mặc định của công ty, dạng \"Family: Type\" hoặc chỉ tên family.",
     "sleeve": "DHCB_Sleeve: Tròn",
     "hanger": "DHCB_Hanger: Ty treo đơn",
     "elevationTag": "DHCB_Tag_CaoDo"

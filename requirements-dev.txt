@@ -1,0 +1,4 @@
+# Công cụ kiểm tra phần Python (scripts/, tools/autocad-mcp-server/). Không cần để CHẠY script.
+#   pip install -r requirements-dev.txt -r tools/autocad-mcp-server/requirements.txt
+pytest>=8,<10
+pyflakes>=3,<4

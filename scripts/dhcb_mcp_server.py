@@ -6,15 +6,15 @@ Không dependency ngoài, chạy offline. Cho Claude Desktop / Claude Code / b�
   tools/list  — sinh từ GET /tools của Bridge (chính bảng CommandCatalog) + tool `query` và `chat`
   tools/call  — POST /execute (luôn ép dryRun:true trừ khi tham số confirm=true), /query, /chat
 
-Cấu hình Claude Desktop (claude_desktop_config.json):
-  "mcpServers": { "dhcb-revit": { "command": "python", "args": ["C:/Dhcb-Tools/scripts/dhcb_mcp_server.py", "revit"] } }
+Cấu hình Claude Desktop: xem docs/ai-offline.md, mục "MCP với Claude Desktop / Claude Code"
+(hoặc dùng gói .mcpb dựng bằng scripts/pack-mcpb.ps1 — không phải sửa file cấu hình nào).
 """
 
 import json
 import os
 import sys
 
-sys.path.insert(0, __file__.rsplit("/", 1)[0] if "/" in __file__ else ".")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 try:
     import dhcb_agent  # cùng thư mục
 except ImportError:  # pragma: no cover
@@ -44,6 +44,10 @@ GROUPS = {
     "ai": ("CadLayerMap", "SpecToConfig", "ColorByParameter", "AutoNumbering", "AttributeIncrement", "TextReplace"),
 }
 
+# Giữ 2024-11-05: server chỉ có capability `tools` (không resources/prompts/logging, không
+# tools/list_changed), là tập con hợp lệ của phiên bản này; phiên bản 2025-xx đưa thêm yêu cầu
+# (ví dụ header MCP-Protocol-Version với transport HTTP, elicitation) mà mã ở đây chưa hiện thực.
+# Client mới vẫn thương lượng được vì server trả phiên bản nó hỗ trợ trong `initialize`.
 PROTOCOL_VERSION = "2024-11-05"
 
 # Claude Desktop gọi tools/list ngay khi khởi động, thường là lúc Revit chưa mở — trước đây lúc đó
@@ -121,8 +125,15 @@ def call_tool(name: str, arguments: dict) -> dict:
         return dhcb_agent.request(APP, "POST", "/chat", {"text": arguments.get("text", "")})
     if READ_ONLY:
         # Chỉ chấp nhận lệnh đọc; lệnh ghi bị từ chối ngay tại server (không phụ thuộc client).
-        catalog = dhcb_agent.request(APP, "GET", "/tools")
-        writes = {t["name"].lower() for t in catalog.get("tools", []) if t.get("writesModel")}
+        # Dùng _load_catalog (có cache) chứ không gọi thẳng /tools: Bridge trục trặc nhất thời làm
+        # catalog rỗng thì `writes` rỗng theo và lệnh ghi lọt qua — đúng lỗ hổng cần bịt.
+        catalog, _live = _load_catalog()
+        tools = catalog.get("tools") or []
+        if not tools:
+            return {"success": False,
+                    "summary": f"Server đang chạy --read-only nhưng chưa có danh mục lệnh để xác minh '{name}' "
+                               "là lệnh đọc (Bridge chưa mở và chưa có cache) — từ chối cho an toàn."}
+        writes = {t["name"].lower() for t in tools if t.get("writesModel")}
         if name.lower() in writes:
             return {"success": False, "summary": f"Server đang chạy --read-only; lệnh ghi '{name}' bị chặn."}
     config = dict(arguments)

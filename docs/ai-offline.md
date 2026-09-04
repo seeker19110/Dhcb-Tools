@@ -32,6 +32,8 @@ CI đỏ (đúng yêu cầu §2.6 của đặc tả kiểm thử).
 - **≤ 8 ứng viên một lượt:** `CommandIntentParser.Candidates()` lọc bằng heuristic rồi `OllamaClient.ChooseCommand()` chỉ
   cho model chọn trong danh sách đó; kết quả ngoài whitelist → null.
 - **Model mặc định `qwen3:8b`** (ổn nhất về tool-calling/JSON trong benchmark 2026; gemma3 không hỗ trợ tool).
+  Cùng một giá trị ở ba chỗ: `OllamaClient.Settings.Model`, [`configs/ai.sample.json`](../configs/ai.sample.json),
+  và `scripts/dhcb_ai.py` (`DEFAULT_MODEL`).
 - **MCP server:** `--read-only` chỉ lộ tool đọc (tương đồng Revit 2027 MCP Server tech preview), `--group <query|data|sheets|cleanup|check|mep|project|ai>`
   lộ một nhóm để agent local chọn đúng hơn.
 
@@ -48,12 +50,20 @@ model được sinh code hay gọi API Revit/AutoCAD trực tiếp.
 
 ## MCP với Claude Desktop / Claude Code
 
+**Đây là chỗ duy nhất trong repo giữ đoạn cấu hình này** — các trang khác chỉ liên kết về đây.
+
+Cách gọn nhất là gói `.mcpb`: `.\scripts\pack-mcpb.ps1` rồi mở file `.mcpb` bằng Claude Desktop, không phải sửa
+file cấu hình nào (xem [`../tools/mcpb/README.md`](../tools/mcpb/README.md)). Muốn khai tay thì thêm vào
+`claude_desktop_config.json` (thay `<repo>` bằng đường dẫn repo trên máy bạn):
+
 ```json
 "mcpServers": {
-  "dhcb-revit":   { "command": "python", "args": ["C:/Dhcb-Tools/scripts/dhcb_mcp_server.py", "revit"] },
-  "dhcb-autocad": { "command": "python", "args": ["C:/Dhcb-Tools/scripts/dhcb_mcp_server.py", "autocad"] }
+  "dhcb-revit":   { "command": "python", "args": ["<repo>/scripts/dhcb_mcp_server.py", "revit"] },
+  "dhcb-autocad": { "command": "python", "args": ["<repo>/scripts/dhcb_mcp_server.py", "autocad"] }
 }
 ```
+
+Thêm `"--read-only"` hoặc `"--group", "<nhóm>"` vào `args` để thu hẹp bộ tool.
 
 Token Bridge đọc từ `%APPDATA%\DHCB\bridge-token.txt` hoặc `DHCB_BRIDGE_TOKEN`. Mọi tool sửa mô hình chạy xem trước
 trước; truyền `confirm: true` để chạy thật.

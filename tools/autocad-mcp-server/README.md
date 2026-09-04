@@ -6,8 +6,10 @@ Cung cấp 5 tools điều khiển AutoCAD từ Hermes Agent, kết nối qua HT
 
 ### 1. Cài dependencies
 
+Cần **Python 3.10+** (fastmcp 4.x). `panel_api.py` và bộ test chỉ dùng thư viện chuẩn.
+
 ```bash
-pip install fastmcp
+pip install -r <repo>/tools/autocad-mcp-server/requirements.txt
 ```
 
 ### 2. Đăng ký vào Hermes
@@ -15,16 +17,14 @@ pip install fastmcp
 ```bash
 hermes mcp add autocad-tools \
   --command python \
-  --args "C:/Users/liend/AppData/Local/hermes/mcp-servers/autocad-tools/server.py"
+  --args "<repo>/tools/autocad-mcp-server/server.py"
 # → Bấm Y để bật tất cả 5 tools
 ```
 
-### 3. Load add-in vào AutoCAD
+### 3. Nạp plugin vào AutoCAD
 
-Mở AutoCAD → gõ lệnh `NETLOAD` → chọn file:
-```
-C:\Users\liend\Dhcb Tools\build_v2\DhcbTools.AutoCAD.dll
-```
+Cài bằng [installer](../../installer/dhcb-tools.iss) thì plugin tự nạp khi AutoCAD khởi động. Bản build tay:
+`NETLOAD` → chọn `<repo>\src\DhcbTools.AutoCAD\bin\<Cấu hình>\<TFM>\DhcbTools.AutoCAD.dll`.
 
 ---
 
@@ -45,19 +45,21 @@ Sau khi mở session mới, agent có thêm 5 tools:
 - *"mở bảng điều khiển autocad"*
 - *"kiểm tra autocad có đang chạy không"*
 - *"đọc danh sách layers của bản vẽ"*
-- *"đánh số block Dau Cat với prefix DC, dryRun trước"*
+- *"đánh số block Dau Cat với prefix DC, dryRun trước"* (chạy thật cần chuỗi xác nhận — xem bảng bên dưới)
 - *"dọn dẹp drawing, xem trước rồi mới xoá"*
 
 ---
 
 ## Cấu trúc file
 
-```
-mcp-servers/autocad-tools/
-├── server.py      # MCP server (FastMCP), tự khởi động panel gateway
-├── panel_api.py   # CORS proxy + Hermes AI thật tại localhost:8767
-├── panel.html     # Bảng điều khiển HTML (widget chat)
-└── README.md      # File này
+```text
+tools/autocad-mcp-server/
+├── server.py           # MCP server (FastMCP); khởi động panel gateway ở LẦN ĐẦU mở panel
+├── panel_api.py        # CORS proxy + Hermes AI thật tại 127.0.0.1:8767
+├── panel.html          # Bảng điều khiển HTML (widget chat)
+├── requirements.txt    # fastmcp (ghim phiên bản)
+├── test_panel_api.py   # test: python3 -m pytest tools/autocad-mcp-server -q
+└── README.md           # File này
 ```
 
 ## Luồng kết nối panel
@@ -70,11 +72,25 @@ panel_api.py
     └── /ai/chat → Hermes CLI/model đang cấu hình → truy vấn AutoCAD có kiểm soát
 ```
 
-`server.py` tự khởi động `panel_api.py` nếu port 8767 chưa chạy. Gateway
-đọc `DHCB_BRIDGE_TOKEN` hoặc `%APPDATA%\DHCB\bridge-token.txt` để tương thích
-Bridge có Bearer authentication. AI Chat dùng provider/model hiện hành của Hermes.
-Các thao tác ghi/xóa không được AI Chat chạy trực tiếp — người dùng thực hiện
-trong tab AutoNumber hoặc Cleanup, mặc định DryRun để an toàn.
+`server.py` khởi động `panel_api.py` **ở lần đầu gọi `autocad_open_panel`**, không phải lúc import — nạp MCP
+server không còn chiếm port 8767. Nếu port đang bị **chương trình khác** chiếm (thăm dò `/alive` không nhận
+đúng `{"panelApi":"ok"}`), server **không** spawn thêm mà báo lỗi; tiến trình do nó spawn được `atexit` tắt
+theo. Gateway đọc `DHCB_BRIDGE_TOKEN` hoặc `%APPDATA%\DHCB\bridge-token.txt` để tương thích Bridge có Bearer
+authentication. AI Chat dùng provider/model hiện hành của Hermes.
+
+**Lệnh ghi cần xác nhận rõ ràng.** Cả panel lẫn tool `autocad_execute` đi qua cùng một bộ kiểm
+(`panel_api.validate_proxy_payload`): `dryRun=false` chỉ được chấp nhận khi kèm đúng chuỗi xác nhận của lệnh —
+`DrawingCleanup` → `DELETE_UNUSED`, `AutoNumbering` → `WRITE_AUTONUMBER`, `LayerImport` → `IMPORT_LAYERS`.
+Thiếu hoặc sai chuỗi thì lệnh bị từ chối kèm hướng dẫn, không có đường nào chạy thật mà không xác nhận.
+Đường dẫn CSV bắt buộc nằm trong thư mục tạm; tên file trần được ghim vào đó.
+
+## Vì sao token nằm trong HTML
+
+`GET /panel` nhúng token phiên vào trang thay vì phát qua một endpoint riêng: bất kỳ thứ gì đọc được `/panel`
+thì cũng đọc được endpoint đó, nên tách ra không thêm an toàn. Cái thật sự bảo vệ token là ba lớp khác —
+gateway chỉ bind `127.0.0.1`; **header `Host` phải là `127.0.0.1:8767` hoặc `localhost:8767`**, sai thì trả
+`421` (chặn DNS rebinding: trang web ngoài trỏ tên miền của nó về loopback, request điều hướng không có
+`Origin` nên chỉ `Host` chặn được); và mọi XHR còn phải qua whitelist `Origin` + header `X-Panel-Token`.
 
 ## Dữ liệu đi đâu
 
@@ -92,7 +108,8 @@ Những gì đã siết để giảm rủi ro:
 | Không nạp ngữ cảnh riêng tư | `--ignore-rules` chặn AGENTS.md/SOUL.md/memory của người dùng lọt vào prompt chứa dữ liệu bản vẽ. |
 | Chống prompt injection | Nội dung DWG được bọc trong khối `<du_lieu>` kèm chỉ thị coi đó là dữ liệu, không phải mệnh lệnh — text/attribute trong bản vẽ nhận từ bên ngoài không điều khiển được model. |
 | Chỉ đọc | AI Chat không chạy được lệnh ghi/xóa; whitelist `ALLOWED_QUERIES` chặn ở gateway, không tin vào model. |
-| Cắt khối lượng | Tối đa 24.000 ký tự kết quả truy vấn vào prompt. |
+| Cắt khối lượng | Trần **24.000 ký tự cho cả prompt** — đo *sau* khi ghép header + lịch sử + dữ liệu, nên lịch sử dài không đẩy tổng vượt trần. |
+| Không lộ qua argv | Prompt đi qua **stdin**, không phải dòng lệnh: `ps`/Task Manager đọc được argv của mọi tiến trình cùng user. |
 
 **Muốn hoàn toàn offline:** trỏ Hermes vào model local (`hermes model` → Ollama).
 Với bản vẽ thuộc diện bảo mật, dùng `DHCB_AI` trong AutoCAD thay cho tab AI Chat.

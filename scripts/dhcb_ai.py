@@ -9,7 +9,8 @@ dhcb_ai.py — lớp AI OFFLINE từ terminal (mục 5). Mọi thứ chạy trê
   ollama-check                                     kiểm tra Ollama local (http://127.0.0.1:11434) và model trong ai.json
 
 Cấu hình model local (tuỳ chọn) — %APPDATA%\\DHCB\\ai.json:
-  { "enabled": true, "endpoint": "http://127.0.0.1:11434", "model": "qwen2.5:7b", "timeoutSeconds": 120 }
+  { "enabled": true, "endpoint": "http://127.0.0.1:11434", "model": "qwen3:8b", "timeoutSeconds": 120 }
+  (model mặc định qwen3:8b — cùng giá trị với OllamaClient trong add-in và configs/ai.sample.json)
 """
 
 import argparse
@@ -18,7 +19,12 @@ import os
 import shutil
 import subprocess
 import sys
+import urllib.error
+import urllib.parse
 import urllib.request
+
+DEFAULT_MODEL = "qwen3:8b"
+LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 
 def appdata_dhcb() -> str:
@@ -28,7 +34,12 @@ def appdata_dhcb() -> str:
 
 def pdf_to_text(pdf: str, out: str) -> bool:
     if shutil.which("pdftotext"):
-        subprocess.run(["pdftotext", "-layout", pdf, out], check=True)
+        try:
+            subprocess.run(["pdftotext", "-layout", pdf, out], check=True)
+        except (subprocess.CalledProcessError, OSError) as ex:
+            print(f"pdftotext lỗi ({ex}). Kiểm tra file PDF có mở được không, hoặc `pip install pypdf` để dùng đường dự phòng.",
+                  file=sys.stderr)
+            return False
         return True
     try:
         from pypdf import PdfReader  # type: ignore
@@ -55,10 +66,17 @@ def cmd_spec(args):
     cfg_out = args.config_out or os.path.join(appdata_dhcb(), "configs", "revit", "project-init-from-spec.json")
     try:
         import dhcb_agent
+    except ImportError as ex:
+        print(f"Thiếu dhcb_agent.py cạnh script này ({ex}).", file=sys.stderr)
+        sys.exit(1)
+    # dhcb_agent.send tự đổi lỗi HTTP/kết nối thành dict {success: False}; chỉ lỗi I/O hoặc JSON hỏng mới ném ra.
+    try:
         result = dhcb_agent.send("revit", "SpecToConfig", {"inputPath": os.path.abspath(text_path), "outputPath": cfg_out})
-        dhcb_agent.print_result(result)
-    except Exception as ex:  # noqa: BLE001
+    except (OSError, ValueError) as ex:
         print(f"Không gửi được cho Revit ({ex}). Mở Revit và bấm nút 'Thuyết minh → config', hoặc chạy lại.", file=sys.stderr)
+        sys.exit(1)
+    dhcb_agent.print_result(result)
+    if not result.get("success"):
         sys.exit(1)
 
 
@@ -94,14 +112,25 @@ def cmd_warnings(args):
             print(f"    - {m[:160]}")
 
 
+def is_loopback(endpoint: str) -> bool:
+    """Chỉ nhận http(s) tới 127.0.0.1 / localhost / ::1 — so theo hostname đã parse, không so tiền tố chuỗi
+    (tiền tố "http://127.0.0.1" cũng khớp "http://127.0.0.1.evil.example")."""
+    try:
+        parsed = urllib.parse.urlsplit(endpoint)
+        host = parsed.hostname
+    except ValueError:
+        return False
+    return parsed.scheme in ("http", "https") and host is not None and host.lower() in LOOPBACK_HOSTS
+
+
 def cmd_ollama_check(_args):
     path = os.path.join(appdata_dhcb(), "ai.json")
-    settings = {"enabled": False, "endpoint": "http://127.0.0.1:11434", "model": "qwen2.5:7b"}
+    settings = {"enabled": False, "endpoint": "http://127.0.0.1:11434", "model": DEFAULT_MODEL}
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
             settings.update(json.load(f))
     print(f"ai.json: {path} → {json.dumps(settings, ensure_ascii=False)}")
-    if not settings["endpoint"].startswith(("http://127.0.0.1", "http://localhost", "http://[::1]")):
+    if not is_loopback(settings["endpoint"]):
         print("✗ endpoint không phải loopback — add-in sẽ từ chối (offline bắt buộc).")
         sys.exit(1)
     try:
@@ -111,7 +140,7 @@ def cmd_ollama_check(_args):
         print(f"✓ Ollama đang chạy, model có sẵn: {', '.join(names) or '(chưa pull model nào)'}")
         if settings["model"] not in names and not any(n.startswith(settings["model"].split(":")[0]) for n in names):
             print(f"! Model '{settings['model']}' chưa có — chạy: ollama pull {settings['model']}")
-    except Exception as ex:  # noqa: BLE001
+    except (urllib.error.URLError, OSError, ValueError) as ex:
         print(f"✗ Không kết nối được Ollama ({ex}). Không bắt buộc: mọi tính năng AI đều có đường heuristic offline.")
         sys.exit(1)
 
