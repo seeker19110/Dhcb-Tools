@@ -178,14 +178,16 @@ dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.cspr
 ./scripts/check-build.sh
 ```
 
-**Kiểm thử chạy bên trong Revit** (phần chạm Revit API, không test được trên CI):
+**Kiểm thử chạy bên trong Revit/AutoCAD** (phần chạm API thật, không test được trên CI):
 
 ```powershell
-DhcbTools.BatchRunner.exe --job jobs\in-revit-tests.json --log-dir D:\DHCB\logs
+.\scripts\run-in-revit-tests.ps1 -Suite smoke|mep|plumbing   # tự build, cài add-in, mở/chạy/đóng Revit
+.\scripts\run-in-autocad-tests.ps1 -Suite smoke              # tự build, chạy qua accoreconsole
 ```
 
 Bộ ca kiểm JSON ở [`tests/suites/`](tests/suites/), báo cáo ra TRX + Markdown, mã thoát khác 0 khi có ca trượt.
-Chi tiết: [`docs/kiem-thu-trong-revit.md`](docs/kiem-thu-trong-revit.md).
+Chi tiết: [`docs/kiem-thu-trong-revit.md`](docs/kiem-thu-trong-revit.md), bằng chứng đã chạy:
+[`docs/bang-chung-test.md`](docs/bang-chung-test.md), [`docs/bang-chung-test-autocad-live.md`](docs/bang-chung-test-autocad-live.md).
 
 Packages: Revit `Nice3point.Revit.Api.RevitAPI/RevitAPIUI`, AutoCAD `AutoCAD.NET` (vỏ đầy đủ) và `AutoCAD.NET.Core/.Model`
 (Core + vỏ core-only). Revit 2021–2024 và AutoCAD ≤2024 dùng net48, 2025 dùng net8.0-windows; AutoCAD 2026.1+ (package
@@ -255,6 +257,7 @@ với API Revit 2023/2024/2025 + AutoCAD 2024/2025; số test thuần xem output
 
 **Đã chạy trên phần mềm thật:** 42/42 lệnh Revit có ít nhất một ca kiểm chạy bên trong Revit 2024.3 và 15/15 lệnh
 AutoCAD có ca kiểm qua `accoreconsole`, cộng một đêm batch trên **dự án thật** — bằng chứng và số liệu từng vòng:
-[`docs/bang-chung-test.md`](docs/bang-chung-test.md). Phần **chưa** khép: chất lượng tuyến của `AutoRoute` (còn nhãn
+[`docs/bang-chung-test.md`](docs/bang-chung-test.md), NETLOAD trên AutoCAD thật:
+[`docs/bang-chung-test-autocad-live.md`](docs/bang-chung-test-autocad-live.md). Phần **chưa** khép: chất lượng tuyến của `AutoRoute` (còn nhãn
 *thử nghiệm*), AutoCAD 2026.1+/.NET 10, và 9.4 — đưa cho một nhóm kỹ sư dùng thật. Chi tiết và lỗi còn mở:
 [`docs/progress.md`](docs/progress.md) · lộ trình: [`docs/roadmap.md`](docs/roadmap.md).
