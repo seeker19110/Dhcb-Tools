@@ -90,6 +90,12 @@ trong lỗ, chèn thêm khi thiếu phủ, phòng hẹp một thiết bị, phò
 ASHRAE ductulator và bảng SCH40), `SystemNaming`, `FlowNumbering` (nhánh phân cấp 1.1, 1.2.1, chu trình không lặp),
 `PathFinder3D` (đi thẳng, vòng tường ít rẽ nhất, khoảng hở, bị chặn, giới hạn ô).
 
+### 2.9 Kiểm tra và AI (đã có)
+
+`RuleChecker`, `ClashAcceptance` (khoá ổn định theo cặp id + vị trí làm tròn), `LayerMappingSuggester` (tường 200 đúng
+type, tiếng Việt có/không dấu, loại type bịa), `SpecTextExtractor` (m/mm, tầng hầm âm, tên chuẩn hoá, dòng gốc, cảnh
+báo), `WarningAnalyzer`, `CommandIntentParser` (chỉ trả lệnh trong whitelist, luôn `dryRun:true`).
+
 ### 2.10 Giai đoạn 7 (đã có — `Phase7Tests`)
 
 `NamePattern` (token, bộ đếm `{n:00}`, định dạng upper/left, regex tìm/thay, chống trùng trong lô và với tên đã có),
@@ -104,12 +110,6 @@ chuỗi build cũ, không nhận ra → null), `AcadScriptGen.PlotPdf` (thứ t�
 `SlopeMath` (bảng dốc tối thiểu theo DN, độ hạ, kiểm dốc đạt/không đạt/ngược, kick 45°/90°, chiều dài tối thiểu cho kick,
 cao độ dọc tuyến), `BomAggregator` (gom theo spool/hệ/type/size, tổng chiều dài, số cây có hao hụt, CSV, tổng theo hệ),
 `PolylineSimplifier` (bỏ điểm thẳng hàng/trùng, không gộp đoạn quay đầu, chiều dài).
-
-### 2.9 Kiểm tra và AI (đã có)
-
-`RuleChecker`, `ClashAcceptance` (khoá ổn định theo cặp id + vị trí làm tròn), `LayerMappingSuggester` (tường 200 đúng
-type, tiếng Việt có/không dấu, loại type bịa), `SpecTextExtractor` (m/mm, tầng hầm âm, tên chuẩn hoá, dòng gốc, cảnh
-báo), `WarningAnalyzer`, `CommandIntentParser` (chỉ trả lệnh trong whitelist, luôn `dryRun:true`).
 
 ## 3. Ngưỡng chất lượng
 

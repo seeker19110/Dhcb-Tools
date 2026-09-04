@@ -70,7 +70,7 @@ python scripts/dhcb_agent.py revit query parameters_of \
 
 # 2. Xem trước
 python scripts/dhcb_agent.py revit exec AutoNumbering \
-  --config '{"category":"Doors","parameterName":"Mark","prefix":"D3-","digits":3}'
+  --config '{"category":"Doors","parameterName":"Mark","prefix":"D3-","padWidth":3}'
 
 # 3. Chạy thật (agent phải truyền confirm qua MCP) — kết quả có changedIds
 

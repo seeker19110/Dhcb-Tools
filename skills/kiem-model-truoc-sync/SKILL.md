@@ -29,6 +29,9 @@ exec HealthReport   { "outputPath": "<Documents>/health-<tên model>.html" }
 
 Đọc `Messages` để lấy các con số: dung lượng file, số view chưa đặt lên sheet, family in-place, import CAD.
 
+`HealthReport` và `WarningsExport` (bước 3) **ghi file báo cáo** ra `outputPath` nhưng **không sửa mô hình** —
+trong catalog chúng là lệnh đọc (không có `dryRun`), nên chạy trong vòng kiểm này là an toàn.
+
 ### 3. Cảnh báo — nhóm theo loại, không liệt kê từng cái
 
 ```
@@ -76,6 +79,7 @@ Mỗi mục kèm số lượng và ElementId đại diện để kỹ sư bấm 
 
 ## Không được làm
 
-- Không chạy lệnh ghi (`confirm: true`) trong quy trình này. Đây là vòng **kiểm**, mọi thứ đều `dryRun`.
+- Không chạy lệnh ghi (`confirm: true`) trong quy trình này. Đây là vòng **kiểm**: lệnh nào có `dryRun` thì để
+  `dryRun`; `HealthReport`/`WarningsExport`/`ParameterRuleCheck`/`ClashDetection` chỉ ghi file báo cáo, không đụng mô hình.
 - Không tự sửa cảnh báo. Nêu ra và để kỹ sư quyết định.
 - Không báo "model sạch" chỉ vì lệnh chạy xong không lỗi — phải đọc thực sự các con số trong `Messages`.

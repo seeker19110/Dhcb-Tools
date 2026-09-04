@@ -1,7 +1,7 @@
 # Bằng chứng Test Live — AutoCAD Bridge
 **Ngày:** 2026-09-02 09:10 ICT  
 **AutoCAD:** Autodesk AutoCAD 2026 (Education)  
-**Drawing:** SDG.MEP.MVAC.013.R0-BVTC hệ thống thông gió tầng mái - Tháp A.dwg  
+**Drawing:** bản vẽ thông gió tầng mái của một dự án thực tế (đặt tên `<bản vẽ MVAC>.dwg` trong tài liệu này)  
 **Bridge:** `http://localhost:8766` — load bằng NETLOAD vào AutoCAD 2026  
 
 ---
@@ -10,7 +10,7 @@
 
 ```
 AutoCAD → gõ lệnh: NETLOAD
-→ Chọn file: C:\Users\liend\Dhcb Tools\src\DhcbTools.AutoCAD\bin\Debug\net48\DhcbTools.AutoCAD.dll
+→ Chọn file: C:\Users\<user>\Dhcb Tools\src\DhcbTools.AutoCAD\bin\Debug\net48\DhcbTools.AutoCAD.dll
 ```
 
 ---
@@ -36,7 +36,7 @@ AutoCAD → gõ lệnh: NETLOAD
 **Response (trích):**
 ```json
 {
-  "filename": "D:\\Z-Nháp\\SDG.MEP.MVAC.013.R0-BVTC hệ thống thông gió tầng mái - Tháp A.dwg",
+  "filename": "D:\\<thư mục làm việc>\\<bản vẽ MVAC>.dwg",
   "dwgVersion": "MC0To0",
   "unitsName": "Millimeters"
 }
@@ -140,14 +140,14 @@ AutoCAD → gõ lệnh: NETLOAD
 ```json
 {
   "command": "LayerExport",
-  "config": {"outputPath": "C:/Users/liend/AppData/Local/Temp/dhcb_layers_test.csv"}
+  "config": {"outputPath": "C:/Users/<user>/AppData/Local/Temp/dhcb_layers_test.csv"}
 }
 ```
 **Response:**
 ```json
 {
   "success": true,
-  "summary": "Đã xuất 171 layer ra \"C:/Users/liend/AppData/Local/Temp/dhcb_layers_test.csv\".",
+  "summary": "Đã xuất 171 layer ra \"C:/Users/<user>/AppData/Local/Temp/dhcb_layers_test.csv\".",
   "affectedCount": 171
 }
 ```
@@ -219,9 +219,9 @@ API tương thích ngược giữa AutoCAD 2024 → 2026.
 **Ngày:** 2026-09-02 · **AutoCAD 2026 (Education)** · plugin build **net10.0-windows**, nạp tự động
 qua `%APPDATA%\Autodesk\ApplicationPlugins\DhcbTools.bundle`, điều khiển qua Bridge `localhost:8766`.
 
-**Bản vẽ 1** — `SDG.MEP.FPS.002.R3 BVTC he thong chua chay-Tang 5-29 -TA.dwg` (49,2 MB):
+**Bản vẽ 1** — `<bản vẽ PCCC>.dwg`, hệ thống chữa cháy tầng 5–29 (49,2 MB):
 77.118 entity · 87 layer · 2.117 block định nghĩa · 2.273 block reference · 782 text.
-**Bản vẽ 2** — `SDG.MEP.MVAC.013.R0 …tầng mái - Tháp A.dwg`: 841 insert, 31 block có attribute.
+**Bản vẽ 2** — `<bản vẽ MVAC>.dwg`, thông gió tầng mái: 841 insert, 31 block có attribute.
 
 > Điều kiện tiên quyết: trước PR này **không thể** nạp plugin vào AutoCAD 2025/2026 — TFM chỉ nhìn
 > `RevitVersion` nên vỏ AutoCAD luôn ra `net48`, trong khi AutoCAD 2026 chạy .NET 10

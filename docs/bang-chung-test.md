@@ -1,7 +1,11 @@
 # DHCB Tools — Bằng chứng Build & Test
 
-**Ngày:** 2026-09-02 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
-**Nhánh:** `fix/toan-bo-danh-gia` ([PR #21](https://github.com/seeker19110/Dhcb-Tools/pull/21))
+**Khoảng thời gian:** 2026-09-02 → 2026-09-04 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
+**Nguồn:** nhiều PR liên tiếp trên `main` (bắt đầu từ `fix/toan-bo-danh-gia`,
+[PR #21](https://github.com/seeker19110/Dhcb-Tools/pull/21)); mỗi mục dưới đây ghi ngày giờ riêng của lần đo đó.
+
+> Con số trong từng mục là số **tại thời điểm chạy mục đó**, không cập nhật về sau. Số ca test thuần hiện tại
+> xem output CI (`tests.yml` → artifact `test-results`).
 
 > ⚠️ **Đính chính bản trước.** Bản ghi ngày 09:00 ICT báo *"28/28 unit test PASS"* dựa trên project
 > `src/DhcbTools.Tests`. Project đó **không hề tham chiếu `DhcbTools.Shared.Logic`** — nó khai báo lại
@@ -22,7 +26,7 @@
 
 | Bộ test | Số lượng | Kết quả |
 |---|---|---|
-| `tests/DhcbTools.Shared.Logic.Tests` (xUnit, .NET 8) | 569 | ✅ 569 passed / 0 failed |
+| `tests/DhcbTools.Shared.Logic.Tests` (xUnit, .NET 8) | 569 *(tại thời điểm đó)* | ✅ 569 passed / 0 failed |
 | `tools/autocad-mcp-server/test_panel_api.py` (unittest) | 29 | ✅ 29 passed / 0 failed |
 
 ```
@@ -253,7 +257,7 @@ Vài số đo đáng ghi: `HealthReport` 1.958 ms · `ScheduleExport` 36/36 sche
 `SlopePipes` kiểm 1.794 ống 47 ms · `SystemBom` 6.348 phần tử 897 ms · `SleeveAuto` quét
 1.053 phần tử MEP × tường/sàn 223 ms (ngưỡng 30 s).
 
-### Bảy lỗi, không lỗi nào bị 481 test thuần bắt được
+### Bảy lỗi, không lỗi nào bị bộ test thuần bắt được (481 ca *tại thời điểm đó*)
 
 | # | Lỗi | Hậu quả thật | Đã sửa |
 |---|---|---|---|
@@ -858,7 +862,7 @@ một ô so với cách cũ thì tuyến xuyên dầm. Còn lại: heuristic kh�
 báo đúng là bịt kín, hết ngân sách báo đúng là hết ngân sách, lưới quá lớn từ chối dưới 1 giây, và quy mô
 550 vật cản xong trong vài giây.
 
-Bộ `Shared.Logic`: **569 đạt / 0 trượt** (562 → 569), cả bộ chạy trong 0,2 s. `check-build.sh` xanh.
+Bộ `Shared.Logic`: **569 đạt / 0 trượt** (562 → 569 *tại thời điểm đó*), cả bộ chạy trong 0,2 s. `check-build.sh` xanh.
 
 ### Cái này vẫn KHÔNG chứng minh
 
@@ -918,7 +922,7 @@ kín") coi như đã chứng minh xong: không phải giới hạn của bộ t�
 kỹ thuật — việc của người có nghề, hoặc của một lớp chọn điểm mà bộ công cụ chưa có. Nhãn *thử nghiệm*
 giữ nguyên vì lý do đó, không còn vì chậm.
 
-## 20. Đêm batch thật đầu tiên trên dự án thật — GOLDVIEW TTTM, và hộp thoại thứ hai chưa ai bắt được (2026-09-04 00:35 ICT)
+## 20. Đêm batch thật đầu tiên trên dự án thật — dự án thực tế A, và hộp thoại thứ hai chưa ai bắt được (2026-09-04 00:35 ICT)
 
 Việc #2 còn treo từ đầu roadmap: "một đêm batch thật trên dự án thật (không phải file mẫu)". Có đường dẫn
 thật — 9 file `.rvt` Revit 2019 (R19) của một trung tâm thương mại, 4 file kiến trúc (00 GRL + 01–04, mỗi
@@ -961,7 +965,7 @@ nhằm thoát màn hình chờ — phiên batch luôn `doc.Close(false)` hoặc 
 thoại "chọn sai" làm hỏng. Ghi lại vào `CoreContext.SuppressedWarnings` (chỗ cũ) nên vẫn hiện trong
 `CommandResult` của lệnh chạy kế tiếp — không biến mất lặng lẽ.
 
-`src/DhcbTools.Revit/Batch/BatchStartupHook.cs`, xanh cả `check-build.sh` (2023/2024/2025) lẫn 574 test
+`src/DhcbTools.Revit/Batch/BatchStartupHook.cs`, xanh cả `check-build.sh` (2023/2024/2025) lẫn bộ test thuần (574 ca tại thời điểm đó)
 `Shared.Logic`.
 
 ### Chạy lại — qua đúng chỗ đứng trong 86 giây thay vì 43 phút
@@ -990,12 +994,12 @@ việc của người phụ trách dự án, không phải lỗi mã nguồn.
 
 ### File 04 thất bại — lỗi hạ tầng, không phải lỗi mã nguồn
 
-`04.GOLDVIEW_DD_ARC_LEVEL 04_R19.rvt`: `Open` trả `"Opening was canceled."`. Journal cho thấy central
-model của file này nằm ở `\192.168.1.11\03.The Goldview\...` — **khác** `\192.168.1.101\mep-project\...`
+`04.<dự án A>_DD_ARC_LEVEL 04_R19.rvt`: `Open` trả `"Opening was canceled."`. Journal cho thấy central
+model của file này nằm ở `\\<server-A>\<thư mục dự án>\...` — **khác** `\\<server-B>\<thư mục dự án>\...`
 mà các file khác dùng. Revit thử `fileExists` qua mạng, hết 42 giây, và sau vài lần bật lại đúng cái
 TaskDialog nâng cấp (bị đóng đúng như thiết kế, log ghi rõ `TaskDialog API event result : 8` mỗi lần) rồi
 tự huỷ việc mở. Chạy lại job SaveAs bên dưới **lặp lại đúng lỗi này** — xác nhận đây không liên quan gì
-tới bản vá hộp thoại, mà là máy chủ `192.168.1.11` không với tới được từ máy chạy batch.
+tới bản vá hộp thoại, mà là máy chủ `<server-A>` không với tới được từ máy chạy batch.
 
 ### Việc phát sinh: mỗi lần mở file cũ đều trả phí nâng cấp — tạo bản sao 2024 một lần
 
@@ -1028,7 +1032,7 @@ lặp lại định kỳ (ví dụ chạy `HealthReport`/`WarningsExport`/`Clash
 
 ## 21. Đóng vai kỹ sư dùng thử — và một lỗi ngầm nguy hiểm hơn cả lỗi crash (2026-09-04 06:35 ICT)
 
-Chưa có kỹ sư thật nào ngồi dùng (9.4 còn ở phía trước). Vòng này đóng vai kỹ sư mới nhận dự án GOLDVIEW,
+Chưa có kỹ sư thật nào ngồi dùng (9.4 còn ở phía trước). Vòng này đóng vai kỹ sư mới nhận dự án thực tế A,
 đóng bộ, tự bấm thử — trên bản `_upgraded-2024/` từ §20 (mở nhanh: 2–10 giây thay vì 90 giây–14 phút),
 `saveMode: "None"` nên **không có gì lưu lại**, kể cả các bước bật `dryRun: false` chạy ghi thật trong bộ
 nhớ rồi đóng không lưu — kiểm đúng luồng ghi mà không đụng gì tới bất kỳ file nào trên đĩa.
@@ -1083,7 +1087,7 @@ Cả ba link của file (`00 GRL`, `02 ARC L02`, `07 MEP L03`) đều **"chưa n
 
 **Nguyên nhân, đúng bài học §14 lặp lại ở một chỗ khác:** `SaveAs` sau `DetachFromCentral` không giữ lại
 đường dẫn có thể giải được của link — link vẫn ghi đường dẫn network central cũ
-(`\192.168.1.101\mep-project\...`), không tự trỏ sang file cùng tên vừa được lưu cạnh nó trong
+(`\\<server-B>\<thư mục dự án>\...`), không tự trỏ sang file cùng tên vừa được lưu cạnh nó trong
 `_upgraded-2024/`.
 
 ### Sửa: nạp lại link lúc mở file, thử cả đường dẫn cạnh file host khi đường ghi sẵn hỏng
@@ -1104,7 +1108,7 @@ nạp từng link không làm chết việc mở file — bắt riêng từng li
 | Trạng thái 3 link | `LinkNotFound` (cả 3) | `LinkNotFound → thử lại cạnh file host: LinkLoaded` (cả 3) |
 | `ClashDetection` | **0 va chạm** (sai) | **479 va chạm** — khớp đúng file gốc |
 
-check-build.sh xanh (2023/2024/2025); Shared.Logic 574 test, 0 trượt — không có test mới, `RevitLinkType`/
+check-build.sh xanh (2023/2024/2025); Shared.Logic 574 ca (tại thời điểm đó), 0 trượt — không có test mới, `RevitLinkType`/
 `Document.PathName`/`File.Exists` đều cần Revit thật, không thuần hoá được, đúng như bản vá §20.
 
 ### Việc phát sinh, chưa làm ở vòng này

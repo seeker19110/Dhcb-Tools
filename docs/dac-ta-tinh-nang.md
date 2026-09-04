@@ -1,6 +1,12 @@
-# Đặc tả chi tiết — các tính năng còn lại
+# Đặc tả chi tiết — giai đoạn 0–6 (tài liệu lịch sử)
 
-Tài liệu này đặc tả **những gì chưa làm**, đủ chi tiết để một người khác cầm lên viết code mà không
+> ⚠️ **Đây là bản đặc tả LỊCH SỬ của giai đoạn 0–6, và toàn bộ giai đoạn đó nay đã **làm xong**
+> (kể cả P1/P2 của giai đoạn 7). Giữ lại vì nó ghi rõ *vì sao* từng tính năng được thiết kế như vậy,
+> nhưng **không phải nguồn sự thật về hành vi hiện tại**: chỗ nào lệch thì tin mã nguồn,
+> [`progress.md`](progress.md) (hiện trạng) và [`roadmap.md`](roadmap.md) (nguyên tắc + việc phía trước).
+> Việc còn lại của dự án nằm ở `roadmap.md`, không phải ở đây.
+
+Tài liệu này đặc tả những gì **khi viết ra thì chưa làm**, đủ chi tiết để một người khác cầm lên viết code mà không
 phải hỏi lại. Hiện trạng nằm ở [`progress.md`](progress.md), thứ tự ưu tiên ở
 [`roadmap.md`](roadmap.md), cơ sở kỹ thuật ở [`nghien-cuu-dhcb-revit-tools.md`](nghien-cuu-dhcb-revit-tools.md).
 Kế hoạch kiểm thử ở [`dac-ta-kiem-thu.md`](dac-ta-kiem-thu.md).
@@ -9,9 +15,12 @@ Kế hoạch kiểm thử ở [`dac-ta-kiem-thu.md`](dac-ta-kiem-thu.md).
 
 1. **Chữ ký lệnh:** `CommandResult Execute(Document doc, TConfig config)` — không TaskDialog, không
    Selection, không WPF trong Core.
-2. **`DryRun` mặc định `true`** với mọi lệnh có ghi vào mô hình; ở chế độ này lệnh phải liệt kê đầy
-   đủ dự định trong `Messages` và không mở transaction ghi.
-3. **Một lệnh = một transaction**, luôn `SetFailuresPreprocessor(new SilentFailuresPreprocessor())`.
+2. **`DryRun` mặc định `true`** với mọi lệnh có ghi vào mô hình (kể cả `ParameterImport` và `BatchExport`);
+   ở chế độ này lệnh phải liệt kê đầy đủ dự định trong `Messages` và không mở transaction ghi.
+3. **Một lệnh = một transaction.** `SetFailuresPreprocessor(new SilentFailuresPreprocessor())` **chỉ dùng cho
+   batch** (`BatchJobRunner`); lệnh chạy tương tác (Ribbon, Bridge) phải để kỹ sư **thấy** cảnh báo của Revit —
+   xem nguyên tắc 3 trong [`roadmap.md`](roadmap.md). Nuốt cảnh báo ở đường tương tác chính là nhóm lỗi mà
+   giai đoạn 8.1 đi dọn.
 4. **Không nuốt cảnh báo.** Mọi phần tử bị bỏ qua phải có một dòng trong `Messages` nêu rõ lý do;
    `CommandResult` trả về phải giữ nguyên `Messages` đã gom (đây chính là lỗi #2 trong `progress.md`).
 5. **Số và văn bản:** ghi/đọc số qua `DhcbTools.Shared.Logic.NumericText`, CSV qua `CsvText`
@@ -153,6 +162,8 @@ DhcbTools.BatchRunner.exe --job jobs/nightly.json [--dry-run] [--log-dir logs] [
   "revitVersion": 2024,
   "stopOnError": false,          // false: một file lỗi không chặn các file sau
   "saveMode": "SaveAs",          // None | Save | SaveAs (SaveAs ghi ra outputFolder, không đụng bản gốc)
+  "saveOnError": false,          // false: không lưu file có bước lỗi
+  "dwgVersion": "2018",          // chỉ dùng cho job AutoCAD: phiên bản SAVEAS
   "outputFolder": "D:/DHCB/nightly/{yyyy-MM-dd}",
   "files": [
     { "path": "P:/Landmark/ARC.rvt", "worksets": ["Shared Levels and Grids"] },
@@ -161,7 +172,7 @@ DhcbTools.BatchRunner.exe --job jobs/nightly.json [--dry-run] [--log-dir logs] [
   "steps": [
     { "command": "HealthReport",  "config": { "outputPath": "{outputFolder}/{fileName}-health.html" } },
     { "command": "BatchExport",   "config": { "outputFolder": "{outputFolder}/pdf", "formats": ["Pdf"] } },
-    { "command": "ConnectorCheck","config": { "createView": false } },
+    { "command": "ConnectorChecker","config": { "create3dView": false } },   // create3dView mặc định false
     { "command": "SleeveAuto",    "config": { "dryRun": true } }
   ]
 }
@@ -186,7 +197,7 @@ DhcbTools.BatchRunner.exe --job jobs/nightly.json [--dry-run] [--log-dir logs] [
 
 ## 1.4 Log và báo cáo tổng hợp
 
-- **Log dòng-JSON** (`logs/{yyyy-MM-dd}/run.jsonl`), mỗi dòng một step:
+- **Log dòng-JSON** (`logs/{yyyy-MM-dd}/run-HHmmss.jsonl` — mỗi lượt chạy một file), mỗi dòng một step:
   `{"time","file","command","success","affected","summary","messages":[],"errors":[],"elapsedMs"}`.
 - **Báo cáo HTML tổng hợp** sau mỗi lần chạy: bảng file × step, ô xanh/đỏ, bấm vào mở chi tiết
   `Messages`. Dùng lại `HtmlText.Escape`.
@@ -372,6 +383,10 @@ category → `Shared.Logic.RuleChecker`.
 Quét cặp category (ví dụ Duct × Structural Framing) bằng `ElementIntersectsSolidFilter`, lọc thô
 bằng `MepLayout.BoundingBoxesIntersect` trước. Kết quả: báo cáo HTML + tuỳ chọn tạo 3D view khoanh
 vùng cho từng va chạm (dùng lại cơ chế của `ConnectorCheckerCommand`).
+
+> Hành vi hiện tại (khác bản đặc tả gốc ở trên): `ConnectorChecker` **mặc định không tạo 3D view**
+> (`create3dView` mặc định `false`, và lệnh có `dryRun`); `ClashDetection` cùng `ParameterRuleCheck` chỉ tạo
+> view khi **chạy thật**, không tạo ở lần xem trước.
 Bỏ qua cặp đã được đánh dấu "chấp nhận" trong file `clash-accepted.json` (khoá là cặp ElementId +
 hash vị trí, để cặp cũ không quay lại báo sau mỗi lần chạy đêm).
 
@@ -403,7 +418,7 @@ project info). Bắt buộc validate bằng JSON Schema trước khi cho chạy;
 
 ## 5.3 Phân tích báo cáo clash/warning chạy đêm
 
-Đầu vào là log `run.jsonl` của batch runner (§1.4). Chạy theo lô, xuất bản tóm tắt tiếng Việt:
+Đầu vào là log JSONL của batch runner (`logs/{yyyy-MM-dd}/run-HHmmss.jsonl`, §1.4). Chạy theo lô, xuất bản tóm tắt tiếng Việt:
 nhóm warning theo nguyên nhân, đề xuất thứ tự xử lý. Chỉ đọc, không sửa mô hình.
 
 ## 5.4 Ra lệnh bằng tiếng Việt (tool use)

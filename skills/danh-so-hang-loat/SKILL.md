@@ -37,7 +37,7 @@ exec AutoNumbering {
   "category": "Doors",
   "parameterName": "Mark",
   "prefix": "D3-",
-  "digits": 3,
+  "padWidth": 3,
   "levelName": "Tầng 3"
 }
 ```
