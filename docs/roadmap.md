@@ -153,12 +153,23 @@ log thật của một đêm batch, **kiểm lại sau 30 ngày**.
 | Thông điệp "AI offline hoàn toàn" | Bỏ khỏi thông điệp chính | Giữ Ollama như tuỳ chọn; giai đoạn 10 dùng Claude qua MCP mạnh hơn nhiều so với model 8B |
 | Routing A/B, sizing | Giữ, gắn nhãn *thử nghiệm* đến khi qua 8.3 | Phụ thuộc family/routing preference từng dự án |
 
-## Nền tảng — .NET 10 ⬜
+## Nền tảng — .NET 10 🟡
 
-Microsoft ngừng hỗ trợ .NET 8 ngày 10/11/2026; Autodesk đang preview di trú Revit 2025/2026 lên .NET 10, AutoCAD 2026.1
-(package `AutoCAD.NET 25.1.x`) đã ở .NET 10. Khi SDK và phần mềm sẵn: thêm nhánh TFM `net10.0-windows` trong
-`Directory.Build.props` (điều kiện `RevitVersion >= 2027` / `AcadVersion >= 2026`), chạy `check-build.sh` với tham số
-mới, kiểm `Shared.*` (netstandard2.0) nạp được. Không đổi logic. Làm song song giai đoạn 9–10, không chặn.
+Microsoft ngừng hỗ trợ .NET 8 ngày **10/11/2026**. AutoCAD 2026.1 (package `AutoCAD.NET 25.1.x`) đã ở .NET 10;
+Revit 2027 cũng vậy — gói `Nice3point.Revit.Api.RevitAPI` **2027.2.0** đã có trên NuGet, tức Revit 2027 đã phát
+hành chứ không còn "preview".
+
+| Việc | Trạng thái |
+|---|---|
+| Nhánh TFM `net10.0-windows` cho **AutoCAD ≥ 2026** | ✅ có từ trước trong `Directory.Build.props`, nhưng **chưa từng có CI** — chỉ build được trên máy có cài AutoCAD 2026 |
+| Nhánh TFM `net10.0-windows` cho **Revit ≥ 2027** | ✅ 2026-09-05. Bản cũ điều kiện `>= 2025 → net8` **không có cận trên**, nên `-p:RevitVersion=2027` ra net8.0-windows sai âm thầm; nay `2025–2026 → net8`, `≥ 2027 → net10` |
+| `check-build.sh` chạy được đường .NET 10 | ✅ `REVIT_VERSION=2027 ACAD_VERSION=2027 ./scripts/check-build.sh` xanh; header ghi bảng phiên bản → TFM |
+| CI phủ .NET 10 | ✅ `tests.yml`: ma trận `check-build` **2023–2027**, `build-wpf-windows` **2023–2027** (2027 là bản WPF đầu tiên trên net10 — đúng chỗ SDK đổi implicit usings khi bật WPF), cài cả SDK 8 lẫn 10 |
+| `release.yml` không đóng gói nhầm thư mục | ✅ bỏ hai chỗ hardcode `-ge 2025 → net8`; TFM nay **hỏi MSBuild** (`-getProperty:TargetFramework`) — một nguồn sự thật trong `Directory.Build.props` |
+| `Shared.*` (netstandard2.0) nạp được trong net10 | ✅ ở mức biên dịch/liên kết: `deps.json` của vỏ Revit net10 tham chiếu đủ `Shared.Logic`/`Shared.Hosting`; AutoCAD 2026.1 thật đã NETLOAD và chạy 18/18 + 12/12 qua accoreconsole ([`bang-chung-test.md`](bang-chung-test.md) §24) |
+| Chạy thật trên **Revit 2027** | ⬜ máy chỉ có Revit 2024.3. Vì thế `release.yml` **chưa** đóng gói 2026/2027 — không phát hành thứ chưa chạy |
+
+Không đổi logic. Không chặn giai đoạn 9–11.
 
 ## Chỉ số để biết đang đúng hướng
 

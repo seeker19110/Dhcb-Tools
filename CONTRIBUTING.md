@@ -23,8 +23,8 @@ Hai workflow trong [`.github/workflows/`](.github/workflows/):
 | Job | Máy | Làm gì |
 |---|---|---|
 | `logic-tests` | ubuntu-latest | `dotnet restore/build/test` bộ `DhcbTools.Shared.Logic.Tests` (Release), tải kết quả `.trx` lên artifact `test-results` |
-| `check-build` | ubuntu-latest, ma trận `2025` / `2024` / `2023` | Build `BatchRunner` + biên dịch Core và cả bốn vỏ (Revit, AutoCAD, AutoCAD core-only) bằng API package NuGet với `UseWPF=false`. Riêng nhánh `2025` còn chạy `py_compile` cho `scripts/*.py` + `tools/autocad-mcp-server/*.py`, `unittest discover` cho gateway panel, và một bước kiểm cú pháp JavaScript trong `panel.html` |
-| `build-wpf-windows` | windows-latest, ma trận Revit `2025` / `2024` / `2023` | Build **thật có WPF** vỏ Revit — bật WPF thì SDK bỏ `System.IO` khỏi implicit usings, nên job Linux ở trên không bắt được lỗi đó |
+| `check-build` | ubuntu-latest, ma trận `2027` / `2026` / `2025` / `2024` / `2023` | Build `BatchRunner` + biên dịch Core và cả bốn vỏ (Revit, AutoCAD, AutoCAD core-only) bằng API package NuGet với `UseWPF=false`. `2026`/`2027` là đường **.NET 10** (AutoCAD ≥ 2026, Revit ≥ 2027), cần cả SDK 8 lẫn 10. Riêng nhánh `2025` còn chạy `py_compile` cho `scripts/*.py` + `tools/autocad-mcp-server/*.py`, `unittest discover` cho gateway panel, và một bước kiểm cú pháp JavaScript trong `panel.html` |
+| `build-wpf-windows` | windows-latest, ma trận Revit `2027` / `2026` / `2025` / `2024` / `2023` | Build **thật có WPF** vỏ Revit — bật WPF thì SDK bỏ `System.IO` khỏi implicit usings, nên job Linux ở trên không bắt được lỗi đó. `2027` là bản WPF đầu tiên trên net10.0-windows |
 
 Ma trận ba phiên bản là cố ý: lỗi chỉ xảy ra trên net48 (`Dictionary.GetValueOrDefault`) hoặc chỉ trên
 Revit ≤ 2023 (`ElementId.Value`) từng lọt tới tận bước phát hành khi CI chỉ build 2025.

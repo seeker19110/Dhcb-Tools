@@ -200,7 +200,9 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
   bất thường sẽ rơi về `revitVersion` của job.
 - `AcadScriptGen.PlotPdf` theo thứ tự prompt `-PLOT` của AutoCAD 2018+ tiếng Anh; bản địa hoá hoặc phiên bản khác có thể lệch
   prompt — kiểm B11 trước khi dùng thật.
-- AutoCAD 2026.1+ (package `AutoCAD.NET 25.1.x`) dùng .NET 10 — chưa build/kiểm; Revit 2027 cũng đang di trú .NET 10.
+- .NET 10: AutoCAD 2026.1 (net10) **đã build và chạy thật** qua accoreconsole (§24); Revit 2027 (gói API 2027.2.0)
+  **đã build** cả bản WPF trên net10 và có CI, nhưng **chưa chạy thật** vì máy chỉ có Revit 2024.3 — nên
+  `release.yml` chưa đóng gói 2026/2027. Xem "Nền tảng — .NET 10" trong [`roadmap.md`](roadmap.md).
 - `ParameterImport` vẫn đọc CSV theo dòng nên chưa đọc ô có xuống dòng bên trong nháy (nợ cũ).
 - Batch Revit thoát bằng `Environment.Exit` sau khi ghi `batch-done.json` — đủ dùng cho Task Scheduler nhưng không "đẹp";
   Revit không có API thoát cho add-in.

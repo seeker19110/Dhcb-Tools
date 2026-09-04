@@ -53,7 +53,11 @@ jobs:
       - name: Đóng gói
         shell: pwsh
         run: |
-          $tfm = if (${{ matrix.revit }} -ge 2025) { "net8.0-windows" } else { "net48" }
+          # Hỏi MSBuild thay vì tự tính lại: Directory.Build.props là nơi duy nhất quyết định TFM
+          # (net48 / net8.0-windows / net10.0-windows). Bản cũ hardcode "-ge 2025 → net8" nên thêm
+          # 2027 vào ma trận là đóng gói NHẦM thư mục mà không có bước nào đỏ.
+          $tfm = (dotnet msbuild src/DhcbTools.Revit/DhcbTools.Revit.csproj -p:RevitVersion=${{ matrix.revit }} -getProperty:TargetFramework -nologo).Trim()
+          if (-not $tfm) { throw "Không đọc được TargetFramework từ MSBuild." }
           $out = "src/DhcbTools.Revit/bin/Release/$tfm"
           $pkg = "dist/DhcbTools.Revit-${{ matrix.revit }}-${{ needs.version.outputs.version }}"
           New-Item -ItemType Directory -Force -Path $pkg | Out-Null
@@ -91,7 +95,9 @@ jobs:
       - name: Đóng gói
         shell: pwsh
         run: |
-          $tfm = if (${{ matrix.acad }} -ge 2025) { "net8.0-windows" } else { "net48" }
+          # Cùng lý do với job Revit: AutoCAD 2026+ là net10.0-windows, hardcode "-ge 2025 → net8" đóng gói nhầm.
+          $tfm = (dotnet msbuild src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj -p:AcadVersion=${{ matrix.acad }} -getProperty:TargetFramework -nologo).Trim()
+          if (-not $tfm) { throw "Không đọc được TargetFramework từ MSBuild." }
           $pkg = "dist/DhcbTools.AutoCAD-${{ matrix.acad }}-${{ needs.version.outputs.version }}"
           New-Item -ItemType Directory -Force -Path $pkg | Out-Null
           $full = "src/DhcbTools.AutoCAD/bin/Release/$tfm"
