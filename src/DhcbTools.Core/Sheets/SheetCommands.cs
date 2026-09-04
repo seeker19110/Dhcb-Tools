@@ -159,7 +159,7 @@ public sealed class SheetRenameCommand : ICoreCommand<SheetRenameConfig>
     private static string LevelName(Document doc, View v)
     {
         if (v.GenLevel != null) return v.GenLevel.Name;
-        var p = v.LookupParameter("Level") ?? v.get_Parameter(BuiltInParameter.VIEW_DISCIPLINE);
+        var p = RevitCompat.LookupInstance(v, "level") ?? v.get_Parameter(BuiltInParameter.VIEW_DISCIPLINE);
         return p?.AsValueString() ?? string.Empty;
     }
 

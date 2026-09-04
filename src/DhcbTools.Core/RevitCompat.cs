@@ -74,7 +74,15 @@ public static class RevitCompat
             .FirstOrDefault(v => v.IsTemplate && string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase));
     }
 
-    /// <summary>Tìm ElementType theo "Family: Type" hoặc chỉ "Type" trong một class.</summary>
+    /// <summary>
+    /// Tìm ElementType theo "Family: Type", đúng tên type, đúng tên family, rồi mới tới "chứa chuỗi".
+    /// <para>
+    /// Thứ tự là có chủ ý: trước đây khớp "chứa chuỗi" chạy TRƯỚC khớp "Family: Type", nên gõ
+    /// "M_Sleeve: 100" có thể vớ phải "M_Sleeve: 1000". Khớp "chứa chuỗi" nay chỉ được nhận khi
+    /// DUY NHẤT một ứng viên; nhiều ứng viên → ném <see cref="ConfigException"/> liệt kê để người
+    /// dùng chọn đúng thay vì lệnh lặng lẽ dùng type đầu tiên.
+    /// </para>
+    /// </summary>
     public static T? FindType<T>(Document doc, string? name) where T : ElementType
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -83,33 +91,52 @@ public static class RevitCompat
         }
 
         var types = new FilteredElementCollector(doc).OfClass(typeof(T)).Cast<T>().ToList();
-        var exact = types.FirstOrDefault(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
-        if (exact != null)
-        {
-            return exact;
-        }
+        return PickType(types, name!.Trim(), t => t.Name, t => t.FamilyName);
+    }
 
-        var colon = name!.IndexOf(':');
+    /// <summary>Khớp tên chung cho <see cref="FindType{T}"/> và <see cref="FindFamilySymbol"/>.</summary>
+    private static T? PickType<T>(List<T> types, string name, Func<T, string> typeName, Func<T, string> familyName) where T : Element
+    {
+        var cmp = StringComparison.OrdinalIgnoreCase;
+        string Full(T t) => familyName(t) + ": " + typeName(t);
+
+        // 1. "Family: Type" đầy đủ.
+        var exact = types.FirstOrDefault(t => string.Equals(Full(t), name, cmp));
+        if (exact != null) return exact;
+
+        var colon = name.IndexOf(':');
         if (colon > 0)
         {
             var family = name.Substring(0, colon).Trim();
             var type = name.Substring(colon + 1).Trim();
-            return types.FirstOrDefault(t =>
-                string.Equals(t.Name, type, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(t.FamilyName, family, StringComparison.OrdinalIgnoreCase));
+            exact = types.FirstOrDefault(t => string.Equals(typeName(t), type, cmp) && string.Equals(familyName(t), family, cmp));
+            if (exact != null) return exact;
         }
 
-        var byTypeName = types.FirstOrDefault(t => t.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0);
-        if (byTypeName != null)
-        {
-            return byTypeName;
-        }
+        // 2. Đúng tên type. 3. Đúng tên family (lấy type đầu — người dùng nói "family sleeve" chứ không nói type).
+        exact = types.FirstOrDefault(t => string.Equals(typeName(t), name, cmp));
+        if (exact != null) return exact;
 
-        // Người dùng (và agent) hay gõ TÊN FAMILY chứ không phải tên type — "HeatRecoveryUnit" thay vì
-        // "HeatRecoveryUnit: 1200x600". HangerAuto/SleeveAuto nhận được vì dùng FindFamilySymbol, còn
-        // DevicePlacement thì không: cùng một sản phẩm mà hai lệnh hiểu tên khác nhau là bẫy cho người
-        // dùng. Khớp theo tên family là bước cuối, sau khi đã thử đúng tên type.
-        return types.FirstOrDefault(t => t.FamilyName.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0);
+        exact = types.FirstOrDefault(t => string.Equals(familyName(t), name, cmp));
+        if (exact != null) return exact;
+
+        // 4. Chứa chuỗi — chỉ khi duy nhất.
+        var partial = types.Where(t => typeName(t).IndexOf(name, cmp) >= 0 || familyName(t).IndexOf(name, cmp) >= 0).ToList();
+        if (partial.Count == 1) return partial[0];
+        if (partial.Count == 0) return null;
+
+        var candidates = partial.Select(Full).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(n => n, StringComparer.OrdinalIgnoreCase).Take(20).ToList();
+        throw new ConfigException(
+            $"Tên \"{name}\" khớp {partial.Count} type, không rõ chọn cái nào. Ghi đúng dạng \"Family: Type\", ví dụ: "
+            + string.Join("; ", candidates) + (partial.Count > candidates.Count ? "; …" : "") + ".");
+    }
+
+    /// <summary>Tạo thư mục cha của một file đầu ra (không làm gì nếu đường dẫn không có thư mục).</summary>
+    public static void EnsureParentDirectory(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+        var dir = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
     }
 
     /// <summary>
@@ -189,12 +216,7 @@ public static class RevitCompat
         }
 
         var symbols = new FilteredElementCollector(doc).OfClass(typeof(FamilySymbol)).Cast<FamilySymbol>().ToList();
-
-        return symbols.FirstOrDefault(s => string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase))
-               ?? symbols.FirstOrDefault(s => string.Equals(s.FamilyName + ": " + s.Name, name, StringComparison.OrdinalIgnoreCase))
-               // Tên family: lấy type đầu tiên của family đó — người dùng nói "family sleeve", không
-               // phải "type sleeve", nên đây là cách hiểu đúng thay vì trả về null.
-               ?? symbols.FirstOrDefault(s => string.Equals(s.FamilyName, name, StringComparison.OrdinalIgnoreCase));
+        return PickType(symbols, name!.Trim(), s => s.Name, s => s.FamilyName);
     }
 
     /// <summary>
@@ -295,6 +317,29 @@ public static class RevitCompat
                 {
                     return parameter;
                 }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Như <see cref="Lookup"/> nhưng CHỈ tra ở instance — dùng khi sắp GHI: ghi vào tham số type sẽ đổi
+    /// mọi instance cùng type, không phải điều người dùng muốn khi đánh số/nhập CSV từng phần tử.
+    /// </summary>
+    public static Parameter? LookupInstance(Element element, string key, string? preferred = null)
+    {
+        if (element is null)
+        {
+            return null;
+        }
+
+        foreach (var name in Dictionary.NamesFor(key, preferred))
+        {
+            var parameter = element.LookupParameter(name);
+            if (parameter != null)
+            {
+                return parameter;
             }
         }
 

@@ -87,6 +87,7 @@ public sealed class CadLayerMapCommand : ICoreCommand<CadLayerMapConfig>
             }
         }
 
+        RevitCompat.EnsureParentDirectory(config.OutputPath);
         File.WriteAllText(config.OutputPath, LayerMappingSuggester.ToCsv(mappings), CsvText.Utf8WithBom);
         var review = mappings.Count(m => m.NeedsReview);
         result.Summary = $"Đã gợi ý map {mappings.Count} layer → type ({review} cần kỹ sư xem, nguồn: {source}) → \"{config.OutputPath}\".";

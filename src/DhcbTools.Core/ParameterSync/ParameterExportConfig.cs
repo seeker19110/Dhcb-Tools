@@ -22,6 +22,6 @@ public sealed class ParameterImportConfig
     /// <summary>Đường dẫn file CSV đầu vào (đúng định dạng do lệnh xuất tạo ra).</summary>
     public required string InputPath { get; init; }
 
-    /// <summary>Chỉ ghi thử, không commit — dùng để kỹ sư xem trước thay đổi.</summary>
-    public bool DryRun { get; init; }
+    /// <summary>Chỉ ghi thử, không commit — dùng để kỹ sư xem trước thay đổi. Mặc định bật như mọi lệnh ghi.</summary>
+    public bool DryRun { get; init; } = true;
 }

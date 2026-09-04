@@ -13,6 +13,7 @@ using DhcbTools.Core.Styles;
 using DhcbTools.Core.Testing;
 using DhcbTools.Shared.Logic.Ai;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace DhcbTools.Core;
 
@@ -93,11 +94,34 @@ public static class RevitCommandTable
         }
     }
 
+    /// <summary>
+    /// Trường lạ là LỖI, không bỏ qua im lặng: gõ sai "sheetNumber" thành "sheetNumbers" thì lệnh
+    /// chạy với mặc định và vẫn báo thành công — đúng loại lỗi im lặng mà giai đoạn 8.1 đi dọn.
+    /// </summary>
+    private static readonly JsonSerializerSettings Strict = new JsonSerializerSettings
+    {
+        MissingMemberHandling = MissingMemberHandling.Error,
+    };
+
     private static T Deserialize<T>(string json)
     {
         try
         {
-            var result = JsonConvert.DeserializeObject<T>(string.IsNullOrWhiteSpace(json) ? "{}" : json);
+            var text = string.IsNullOrWhiteSpace(json) ? "{}" : json;
+
+            // "dryRun" là khoá chung mọi vỏ (form, CommandRunner, RunTests, Bridge) đều gắn vào cho MỌI
+            // lệnh; lệnh chỉ đọc không có property DryRun thì bỏ khoá này trước khi kiểm nghiêm.
+            if (typeof(T).GetProperty("DryRun") == null && JToken.Parse(text) is JObject obj)
+            {
+                var dryRun = obj.Properties().FirstOrDefault(p => string.Equals(p.Name, "dryRun", StringComparison.OrdinalIgnoreCase));
+                if (dryRun != null)
+                {
+                    dryRun.Remove();
+                    text = obj.ToString();
+                }
+            }
+
+            var result = JsonConvert.DeserializeObject<T>(text, Strict);
             if (result is null)
             {
                 throw new ConfigException($"Không thể deserialize config thành {typeof(T).Name}.");
@@ -107,6 +131,20 @@ public static class RevitCommandTable
             // trường thì property là null và lệnh nổ NullReferenceException trần trụi. Chặn ở đây.
             RequiredConfig.ThrowIfIncomplete(result, typeof(T).Name);
             return result;
+        }
+        catch (JsonSerializationException ex) when (ex.Message.StartsWith("Could not find member", StringComparison.Ordinal))
+        {
+            // Dạng thông báo của Newtonsoft: Could not find member 'xyz' on object of type 'Foo'. Path '...'.
+            var start = ex.Message.IndexOf('\'');
+            var end = start >= 0 ? ex.Message.IndexOf('\'', start + 1) : -1;
+            var unknown = start >= 0 && end > start ? ex.Message.Substring(start + 1, end - start - 1) : "?";
+            var valid = typeof(T).GetProperties()
+                .Where(p => p.CanWrite || p.SetMethod != null)
+                .Select(p => char.ToLowerInvariant(p.Name[0]) + p.Name.Substring(1))
+                .OrderBy(n => n, StringComparer.Ordinal);
+            throw new ConfigException(
+                $"Config cho {typeof(T).Name} có trường không tồn tại \"{unknown}\". "
+                + "Trường hợp lệ: " + string.Join(", ", valid) + ".", ex);
         }
         catch (JsonException ex)
         {

@@ -21,18 +21,23 @@ public static class ModelChoices
         _ => Array.Empty<string>(),
     };
 
-    /// <summary>Category có phần tử thật trong mô hình — không liệt kê cả trăm category rỗng.</summary>
+    /// <summary>
+    /// Category model + annotation có thể gán tham số (đúng tập mà các lệnh nhận). Đọc từ
+    /// <c>Settings.Categories</c> thay vì quét mọi phần tử — trên model 300 nghìn phần tử cách cũ
+    /// làm form mở chậm vài giây.
+    /// </summary>
     public static IReadOnlyList<string> Categories(Document document)
     {
         var names = new SortedSet<string>(StringComparer.CurrentCultureIgnoreCase);
         try
         {
-            foreach (var element in new FilteredElementCollector(document).WhereElementIsNotElementType())
+            foreach (Category category in document.Settings.Categories)
             {
-                var name = element.Category?.Name;
-                if (!string.IsNullOrWhiteSpace(name))
+                if (category == null || !category.AllowsBoundParameters) continue;
+                if (category.CategoryType != CategoryType.Model && category.CategoryType != CategoryType.Annotation) continue;
+                if (!string.IsNullOrWhiteSpace(category.Name))
                 {
-                    names.Add(name!);
+                    names.Add(category.Name);
                 }
             }
         }

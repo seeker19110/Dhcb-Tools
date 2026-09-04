@@ -76,7 +76,8 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
         var result = CommandResult.Ok(string.Empty);
         foreach (var (element, value) in plan)
         {
-            var parameter = element.LookupParameter(config.ParameterName);
+            // Chỉ instance (ghi vào type là đổi cả loạt) nhưng qua từ điển để nhận tên đồng nghĩa tiếng Việt.
+            var parameter = RevitCompat.LookupInstance(element, config.ParameterName, config.ParameterName);
             if (parameter is null || parameter.IsReadOnly || parameter.StorageType != StorageType.String)
             {
                 result.Messages.Add($"Bỏ qua phần tử {element.Id}: tham số \"{config.ParameterName}\" không ghi được.");

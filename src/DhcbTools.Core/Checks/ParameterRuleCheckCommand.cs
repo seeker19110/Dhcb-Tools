@@ -11,10 +11,13 @@ public sealed class ParameterRuleCheckConfig
 
     public required string OutputPath { get; init; }
 
-    /// <summary>Tạo 3D view tô sáng phần tử vi phạm.</summary>
+    /// <summary>Tạo 3D view tô sáng phần tử vi phạm — thao tác GHI duy nhất của lệnh, chỉ chạy khi <see cref="DryRun"/> = false.</summary>
     public bool Create3dView { get; init; } = false;
 
     public string ViewName { get; init; } = "DHCB - Rule Violations";
+
+    /// <summary>Xem trước: kiểm và ghi báo cáo như thường, nhưng không tạo 3D view trong mô hình.</summary>
+    public bool DryRun { get; init; } = true;
 }
 
 public sealed class ParameterRuleCheckCommand : ICoreCommand<ParameterRuleCheckConfig>
@@ -90,7 +93,11 @@ public sealed class ParameterRuleCheckCommand : ICoreCommand<ParameterRuleCheckC
         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
         File.WriteAllText(config.OutputPath, html, System.Text.Encoding.UTF8);
 
-        if (config.Create3dView && violatingIds.Count > 0)
+        if (config.Create3dView && violatingIds.Count > 0 && config.DryRun)
+        {
+            result.Messages.Add($"[Xem trước] Sẽ tạo/ghi đè 3D view \"{config.ViewName}\" isolate {violatingIds.Count} phần tử vi phạm.");
+        }
+        else if (config.Create3dView && violatingIds.Count > 0)
         {
             try
             {

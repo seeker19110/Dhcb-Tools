@@ -21,9 +21,8 @@ public sealed class ExportConfig
     /// <summary>Lọc theo số bản vẽ. Để trống = xuất tất cả.</summary>
     public List<string> SheetNumbers { get; init; } = new List<string>();
 
-    public bool ExportLinkedFiles { get; init; } = false;
-
-    public bool DryRun { get; init; } = false;
+    /// <summary>Xem trước (mặc định bật, như mọi lệnh khác): liệt kê sheet sẽ xuất, không ghi file.</summary>
+    public bool DryRun { get; init; } = true;
 
     // DWG specific
     public string DwgVersion { get; init; } = "AcadRelease2018";

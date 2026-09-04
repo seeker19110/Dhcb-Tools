@@ -33,32 +33,90 @@ namespace DhcbTools.Shared.Hosting
         /// </summary>
         public static IReadOnlyList<string> MissingMembers(object? config)
         {
-            if (config == null)
+            var missing = new List<string>();
+            Collect(config, string.Empty, missing, 0);
+            return missing;
+        }
+
+        /// <summary>
+        /// Đệ quy vào object lồng và từng phần tử của danh sách (ví dụ <c>levels[0].name</c>): trước đây
+        /// chỉ kiểm lớp ngoài cùng, nên <c>{"levels":[{"elevationMm":0}]}</c> qua kiểm rồi nổ NRE ở
+        /// <c>LevelDefinition.Name</c>.
+        /// </summary>
+        private static void Collect(object? value, string prefix, List<string> missing, int depth)
+        {
+            if (value == null || depth > 4)
             {
-                return new List<string>();
+                return;
             }
 
-            var missing = new List<string>();
-            foreach (var property in config.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            var type = value.GetType();
+            if (type.IsPrimitive || type.IsEnum || value is string || value is decimal || value is DateTime)
             {
-                if (!property.CanRead || !IsRequired(property))
+                return;
+            }
+
+            if (value is System.Collections.IDictionary)
+            {
+                return;
+            }
+
+            if (value is System.Collections.IEnumerable list)
+            {
+                var i = 0;
+                foreach (var item in list)
+                {
+                    Collect(item, prefix + "[" + i + "].", missing, depth + 1);
+                    i++;
+                }
+                return;
+            }
+
+            foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (!property.CanRead || property.GetIndexParameters().Length > 0)
+                {
+                    continue;
+                }
+
+                object? propertyValue;
+                try
+                {
+                    propertyValue = property.GetValue(value);
+                }
+                catch (Exception)
                 {
                     continue;
                 }
 
                 // Kiểu giá trị (int, bool…) không bao giờ null — thiếu thì nhận mặc định, không nổ.
-                if (property.PropertyType.IsValueType)
+                if (IsRequired(property) && !property.PropertyType.IsValueType && propertyValue == null)
                 {
+                    missing.Add(prefix + JsonName(property.Name));
                     continue;
                 }
 
-                if (property.GetValue(config) == null)
+                // Chỉ lặn vào kiểu của repo (config lồng, danh sách định nghĩa) — không lặn vào kiểu Revit/.NET.
+                if (propertyValue != null && IsOwnType(property.PropertyType))
                 {
-                    missing.Add(JsonName(property.Name));
+                    Collect(propertyValue, prefix + JsonName(property.Name) + ".", missing, depth + 1);
                 }
             }
+        }
 
-            return missing;
+        private static bool IsOwnType(Type type)
+        {
+            if (type.IsArray)
+            {
+                return IsOwnType(type.GetElementType()!);
+            }
+
+            if (type.IsGenericType)
+            {
+                return type.GetGenericArguments().Any(IsOwnType);
+            }
+
+            return (type.Namespace ?? string.Empty).StartsWith("DhcbTools", StringComparison.Ordinal);
         }
 
         /// <summary>Ném <see cref="ConfigException"/> có thông báo tiếng Việt nếu thiếu trường bắt buộc.</summary>

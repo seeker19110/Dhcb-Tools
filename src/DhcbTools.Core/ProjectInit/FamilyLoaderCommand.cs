@@ -11,6 +11,30 @@ namespace DhcbTools.Core.ProjectInit
     {
         public string CommandName => "FamilyLoader";
 
+        /// <summary>
+        /// Trả lời sẵn hộp thoại "Family đã có trong dự án — ghi đè?": không có lớp này thì
+        /// <c>LoadFamily</c> hiện TaskDialog và treo Bridge/batch chờ người bấm.
+        /// </summary>
+        private sealed class LoadOptions : IFamilyLoadOptions
+        {
+            private readonly bool _overwrite;
+
+            public LoadOptions(bool overwrite) => _overwrite = overwrite;
+
+            public bool OnFamilyFound(bool familyInUse, out bool overwriteParameterValues)
+            {
+                overwriteParameterValues = _overwrite;
+                return true;
+            }
+
+            public bool OnSharedFamilyFound(Family sharedFamily, bool familyInUse, out FamilySource source, out bool overwriteParameterValues)
+            {
+                source = FamilySource.Family;
+                overwriteParameterValues = _overwrite;
+                return true;
+            }
+        }
+
         public CommandResult Execute(Document doc, FamilyLoaderConfig config)
         {
             if (!Directory.Exists(config.FamilyFolder))
@@ -48,7 +72,7 @@ namespace DhcbTools.Core.ProjectInit
                     try
                     {
                         Family outFam;
-                        bool ok = doc.LoadFamily(rfaPath, out outFam);
+                        bool ok = doc.LoadFamily(rfaPath, new LoadOptions(config.OverwriteExisting), out outFam);
                         if (ok || outFam != null) { loaded++; existingFamilies.Add(famName); messages.AppendLine("[OK] " + famName); }
                         else { messages.AppendLine("[Cảnh báo] Revit trả về false khi nạp: " + famName); }
                         tx.Commit();

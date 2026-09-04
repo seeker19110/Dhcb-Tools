@@ -78,18 +78,27 @@ public static class RevitQueryHandler
             ? ParameterSync.ParameterExportCommand.ResolveCategoryIds(doc, p.Categories, out _)
             : null;
 
-        var collector = new FilteredElementCollector(doc)
-            .WhereElementIsNotElementType()
-            .Where(e => e.Category is not null)
-            .Where(e => categoryIds is null || categoryIds.Contains(e.Category!.Id));
+        var base_ = new FilteredElementCollector(doc).WhereElementIsNotElementType();
+        if (categoryIds is { Count: > 0 })
+        {
+            // Lọc ở tầng Revit (nhanh, không phải dựng Element cho cả model) thay vì Where trên .NET.
+            base_ = base_.WherePasses(new ElementMulticategoryFilter(categoryIds.ToList()));
+        }
+        else if (categoryIds is { Count: 0 })
+        {
+            return new { count = 0, elements = new List<object>(), note = "Không có category nào khớp: " + string.Join(", ", p.Categories) + "." };
+        }
+
+        IEnumerable<Element> collector = base_.Where(e => e.Category is not null);
 
         if (p.Level is { Length: > 0 })
         {
             collector = collector.Where(e => BelongsToLevel(doc, e, p.Level));
         }
 
+        // Take TRƯỚC khi ToList: limit=50 trên model 300 nghìn phần tử không được dựng 300 nghìn object.
+        if (p.Limit > 0) collector = collector.Take(p.Limit);
         var list = collector.ToList();
-        if (p.Limit > 0) list = list.Take(p.Limit).ToList();
 
         var rows = list.Select(e =>
         {
@@ -106,9 +115,8 @@ public static class RevitQueryHandler
                 category     = e.Category!.Name,
                 name         = e.Name,
                 levelId      = GetLevelId(e),
-                locationX    = location?.X,
-                locationY    = location?.Y,
-                locationZ    = location?.Z,
+                // mm như element_geometry (boundingBoxMm/curveMm) — agent không phải biết Revit dùng feet.
+                locationMm   = location is null ? null : new { x = Mm(location.X), y = Mm(location.Y), z = Mm(location.Z) },
                 parameters   = paramValues.Count > 0 ? paramValues : null,
             };
         }).ToList();
@@ -239,9 +247,7 @@ public static class RevitQueryHandler
             perimeterM   = Math.Round(r.Perimeter * 0.3048, 3),    // ft → m
             department   = SafeGet(() => RevitCompat.Lookup(r, "department")?.AsString()),
             occupancy    = SafeGet(() => RevitCompat.Lookup(r, "occupancy")?.AsString()),
-            locationX    = (r.Location as LocationPoint)?.Point.X,
-            locationY    = (r.Location as LocationPoint)?.Point.Y,
-            locationZ    = (r.Location as LocationPoint)?.Point.Z,
+            locationMm   = (r.Location as LocationPoint)?.Point is { } pt ? new { x = Mm(pt.X), y = Mm(pt.Y), z = Mm(pt.Z) } : null,
         }).ToList();
 
         if (p.Limit > 0) list = list.Take(p.Limit).ToList();
@@ -384,4 +390,7 @@ public static class RevitQueryHandler
         try { return fn(); }
         catch { return default; }
     }
+
+    /// <summary>Feet → mm làm tròn 0,1 mm — cùng quy ước với <c>GeometryQueries</c>.</summary>
+    private static double Mm(double feet) => Math.Round(RevitCompat.FtToMm(feet), 1);
 }

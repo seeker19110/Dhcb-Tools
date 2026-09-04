@@ -71,7 +71,7 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
                 }
 
                 var name = parameterColumns[col];
-                var parameter = element.LookupParameter(name);
+                var parameter = RevitCompat.LookupInstance(element, name, name);
 
                 if (parameter is null)
                 {
