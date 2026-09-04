@@ -65,6 +65,9 @@ jobs:
       - name: Kiểm tra script Python
         if: matrix.version == '2025'   # không phụ thuộc TFM, chạy một lần là đủ
         run: |
+          # test_panel_api.py nhập server.py để kiểm cổng xác nhận của MCP, mà server.py cần fastmcp.
+          # Không cài thì bộ test không chạy nổi một ca nào (ImportError) — CI đỏ đúng vì lý do đó.
+          python3 -m pip install --quiet -r tools/autocad-mcp-server/requirements.txt
           python3 -m py_compile scripts/dhcb_agent.py scripts/dhcb_mcp_server.py scripts/dhcb_ai.py \
             tools/autocad-mcp-server/server.py tools/autocad-mcp-server/panel_api.py
           python3 -m unittest discover -s tools/autocad-mcp-server -p 'test_*.py'

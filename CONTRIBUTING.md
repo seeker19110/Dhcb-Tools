@@ -77,7 +77,7 @@ dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.cspr
 Có sửa phần Python (`scripts/`, `tools/autocad-mcp-server/`) thì chạy thêm — CI cũng chạy hai việc này:
 
 ```bash
-pip install -r requirements-dev.txt          # pytest + pyflakes
+pip install -r requirements-dev.txt          # pytest + pyflakes + fastmcp
 python3 -m pytest tools/autocad-mcp-server -q
 python3 -m pyflakes scripts/*.py tools/autocad-mcp-server/*.py
 ```
