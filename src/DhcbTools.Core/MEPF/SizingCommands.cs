@@ -133,6 +133,8 @@ public sealed class SizingProposalCommand : ICoreCommand<SizingProposalConfig>
             rows++;
         }
 
+        var outputDir = Path.GetDirectoryName(config.OutputPath);
+        if (!string.IsNullOrEmpty(outputDir)) Directory.CreateDirectory(outputDir);
         File.WriteAllText(config.OutputPath, sb.ToString(), CsvText.Utf8WithBom);
         result.Summary = $"Đã đề xuất kích thước cho {rows} đoạn ({changes} khác hiện tại) → \"{config.OutputPath}\". Duyệt trong Excel rồi chạy ApplySizing.";
         result.AffectedCount = rows;

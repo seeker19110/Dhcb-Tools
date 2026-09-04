@@ -50,6 +50,10 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         // do SAI ("không có giao cắt nào"), trong khi thật ra giao cắt vẫn còn nguyên và đã có sleeve rồi.
         var skippedExisting = 0;
 
+        // Số giao cắt không tính được bằng solid lẫn hộp bao — phải rơi về trung điểm tuyến MEP (kém chính
+        // xác). Báo trong Messages thay vì im lặng.
+        var midpointFallback = 0;
+
         // Lỗi hiệu năng đã sửa: trước đây FilteredElementCollector toàn model (Walls+Floors) được dựng lại
         // BÊN TRONG vòng lặp cho từng phần tử MEP — O(n·m) trên model lớn, vượt timeout Bridge 30 s.
         // Thu thập một lần ở đây, lọc bbox trong bộ nhớ cho từng phần tử MEP.
@@ -106,7 +110,6 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
             // Find candidate host elements using bounding box first — lọc trong danh sách đã thu thập một lần
             // ở ngoài vòng lặp (hostCandidatesAll), không dựng FilteredElementCollector mới cho mỗi phần tử MEP.
             var outline = new Outline(bb.Min - new XYZ(0.1, 0.1, 0.1), bb.Max + new XYZ(0.1, 0.1, 0.1));
-            var bbFilter = new BoundingBoxIntersectsFilter(outline);
 
             // Host trong link nằm ở toạ độ của link — phải đưa hộp bao về toạ độ file chủ rồi mới so.
             var candidates = hostCandidatesAll.Where(c => PassesBox(c, outline)).ToList();
@@ -159,8 +162,9 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
                     if (!matched) continue;
                 }
 
-                var intersectionPt = FindIntersectionPoint(curve, candidate);
+                var intersectionPt = FindIntersectionPoint(curve, candidate, out var usedMidpoint);
                 if (intersectionPt == null) continue;
+                if (usedMidpoint) midpointFallback++;
 
                 // Check duplicate
                 if (IsNearExistingSleeve(intersectionPt, existingSleeveLocations))
@@ -195,6 +199,7 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
 
             var preview = CommandResult.Ok(previewSummary, placements.Count);
             AddUnknownSizeWarning(preview, unknownSize, config);
+            AddMidpointFallbackNote(preview, midpointFallback);
             AddHostSourceNote(preview, hostCandidatesAll, linkSummary, placements.Count, mepElements.Count, config);
             foreach (var p in placements)
             {
@@ -218,11 +223,14 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
             symbol.Activate();
 
         var placedOnLink = 0;
-        foreach (var (point, _, hostWall, hostFloor, widthFt, heightFt, _, linkName) in placements)
+        var failedPlacements = 0;
+        var failureReasons = new List<string>();
+        foreach (var (point, _, hostWall, hostFloor, widthFt, heightFt, mepElement, linkName) in placements)
         {
             try
             {
                 FamilyInstance? inst = null;
+                var mepDir = MepDirection(mepElement);
 
                 if (linkName != null)
                 {
@@ -236,7 +244,8 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
                 else if (hostWall != null)
                 {
                     // Place on wall face
-                    var face = GetNearestFace(hostWall, point);
+                    // Tường: ưu tiên mặt có pháp tuyến song song hướng tuyến MEP (mặt bên), tránh mặt đỉnh tường.
+                    var face = GetNearestFace(hostWall, point, mepDir);
                     if (face != null)
                     {
                         inst = document.Create.NewFamilyInstance(face, point, XYZ.BasisX, symbol);
@@ -249,7 +258,8 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
                 }
                 else if (hostFloor != null)
                 {
-                    var face = GetNearestFace(hostFloor, point);
+                    // Sàn: ưu tiên mặt có pháp tuyến thẳng đứng (mặt trên/dưới), tránh mặt cạnh sàn.
+                    var face = GetNearestFace(hostFloor, point, XYZ.BasisZ);
                     if (face != null)
                     {
                         inst = document.Create.NewFamilyInstance(face, point, XYZ.BasisX, symbol);
@@ -263,22 +273,34 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
 
                 if (inst != null)
                 {
-                    SetParameterDouble(inst, config.WidthParamName, RevitCompat.FtToMm(widthFt));
-                    SetParameterDouble(inst, config.HeightParamName, RevitCompat.FtToMm(heightFt));
+                    SetParameterDouble(inst, "width", config.WidthParamName, RevitCompat.FtToMm(widthFt));
+                    SetParameterDouble(inst, "height", config.HeightParamName, RevitCompat.FtToMm(heightFt));
                     placed++;
                     placedIds.Add(RevitCompat.IdValue(inst.Id));
+                }
+                else
+                {
+                    failedPlacements++;
+                    AddDistinct(failureReasons, "NewFamilyInstance trả về null");
                 }
             }
             catch (System.Exception ex)
             {
-                // Log and continue — don't abort the whole batch for one failure
-                _ = ex;
+                // Không huỷ cả lô vì một cái lỗi — nhưng PHẢI ghi lý do, trước đây nuốt im lặng nên
+                // "0 sleeve" bị đổ oan cho "không có giao cắt".
+                failedPlacements++;
+                AddDistinct(failureReasons, ex.Message);
             }
         }
 
         tx.Commit();
         var summary = $"Đã đặt {placed} sleeve tại giao cắt MEP × Tường/Sàn.";
-        if (placed == 0)
+        if (failedPlacements > 0)
+        {
+            summary += $" {failedPlacements}/{placements.Count} vị trí đặt lỗi (xem chi tiết trong thông báo).";
+        }
+
+        if (placed == 0 && failedPlacements == 0)
         {
             // Con số 0 trơ trọi khiến người dùng tưởng model không có giao cắt. Nói ngay trong Summary
             // vì báo cáo batch chỉ in Summary — Messages không lọt tới mắt người đọc báo cáo.
@@ -295,7 +317,13 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         }
 
         var result = CommandResult.Ok(summary, placed).WithChanged(placedIds);
+        if (failedPlacements > 0)
+        {
+            result.Messages.Add($"{failedPlacements} vị trí không đặt được sleeve. Lý do (tối đa {MaxFailureReasons} loại): "
+                                + string.Join(" | ", failureReasons));
+        }
         AddUnknownSizeWarning(result, unknownSize, config);
+        AddMidpointFallbackNote(result, midpointFallback);
         AddHostSourceNote(result, hostCandidatesAll, linkSummary, placed, mepElements.Count, config);
         return result;
     }
@@ -540,25 +568,140 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         return null;
     }
 
-    private static XYZ FindIntersectionPoint(Curve mepCurve, HostCandidate candidate)
-    {
-        // Use midpoint strategy: project midpoint of MEP curve onto host bounding box centre Z
-        var mid = mepCurve.Evaluate(0.5, true);
-        var host = candidate.Host;
-        if (!candidate.HasBox) return mid;
+    private const int MaxFailureReasons = 5;
 
-        // For walls: keep XY of intersection with wall, Z from MEP
-        // Simple: return MEP midpoint adjusted to host centreplane
-        var hostCentreZ = (candidate.MinZ + candidate.MaxZ) * 0.5;
-        if (host is Wall)
+    private static void AddDistinct(List<string> reasons, string message)
+    {
+        if (reasons.Count < MaxFailureReasons && !reasons.Contains(message))
         {
-            // Return point at MEP curve location with host's Z-centre if curve is horizontal
-            return new XYZ(mid.X, mid.Y, mid.Z);
+            reasons.Add(message);
         }
-        else // Floor
+    }
+
+    private static void AddMidpointFallbackNote(CommandResult result, int midpointFallback)
+    {
+        if (midpointFallback > 0)
         {
-            return new XYZ(mid.X, mid.Y, hostCentreZ);
+            result.Messages.Add($"{midpointFallback} giao cắt không tính được bằng solid lẫn hộp bao của host — "
+                                + "dùng tạm trung điểm tuyến MEP, vị trí sleeve có thể lệch, kiểm lại.");
         }
+    }
+
+    /// <summary>Hướng tuyến MEP (đơn vị), null nếu không có LocationCurve.</summary>
+    private static XYZ? MepDirection(Element mepElement)
+    {
+        if (!(mepElement.Location is LocationCurve lc)) return null;
+        var d = lc.Curve.GetEndPoint(1) - lc.Curve.GetEndPoint(0);
+        return d.GetLength() < 1e-9 ? null : d.Normalize();
+    }
+
+    /// <summary>
+    /// Điểm giao thật giữa tuyến MEP và host (toạ độ file chủ). Thứ tự: (1) solid của host ×
+    /// tuyến — <see cref="Solid.IntersectWithCurve"/>, lấy trung điểm đoạn nằm trong host;
+    /// (2) cắt tuyến với hộp bao host (Liang–Barsky) khi host không có solid; (3) bất đắc dĩ mới
+    /// dùng trung điểm tuyến MEP và báo qua <paramref name="usedMidpoint"/>.
+    /// Bản trước luôn trả trung điểm tuyến, nên ống dài xuyên nhiều tường thì mọi sleeve dồn về một chỗ.
+    /// </summary>
+    private static XYZ? FindIntersectionPoint(Curve mepCurve, HostCandidate candidate, out bool usedMidpoint)
+    {
+        usedMidpoint = false;
+
+        // Host trong link: đưa tuyến về toạ độ của link trước khi giao với solid của host.
+        var transform = candidate.Transform;
+        Curve localCurve = mepCurve;
+        if (transform != null)
+        {
+            try { localCurve = mepCurve.CreateTransformed(transform.Inverse); }
+            catch (System.Exception) { localCurve = mepCurve; }
+        }
+
+        // 1. Solid × curve
+        var hostSolid = GetFirstSolid(candidate.Host);
+        if (hostSolid != null)
+        {
+            try
+            {
+                var options = new SolidCurveIntersectionOptions { ResultType = SolidCurveIntersectionMode.CurveSegmentsInside };
+                var intersection = hostSolid.IntersectWithCurve(localCurve, options);
+                if (intersection != null && intersection.SegmentCount > 0)
+                {
+                    Curve? longest = null;
+                    for (var i = 0; i < intersection.SegmentCount; i++)
+                    {
+                        var seg = intersection.GetCurveSegment(i);
+                        if (seg != null && (longest == null || seg.Length > longest.Length)) longest = seg;
+                    }
+
+                    if (longest != null)
+                    {
+                        var localMid = longest.Evaluate(0.5, true);
+                        return transform != null ? transform.OfPoint(localMid) : localMid;
+                    }
+                }
+            }
+            catch (System.Exception)
+            {
+                // Rơi xuống bước hộp bao.
+            }
+        }
+
+        // 2. Cắt tuyến với hộp bao host — hộp bao của HostCandidate đã ở toạ độ file chủ, nên dùng
+        // tuyến gốc (file chủ). Chỉ áp dụng cho tuyến thẳng.
+        if (candidate.HasBox && mepCurve is Line)
+        {
+            var p0 = mepCurve.GetEndPoint(0);
+            var p1 = mepCurve.GetEndPoint(1);
+            if (ClipLineToBox(p0, p1,
+                    candidate.MinX, candidate.MinY, candidate.MinZ,
+                    candidate.MaxX, candidate.MaxY, candidate.MaxZ,
+                    out var t0, out var t1))
+            {
+                var tm = (t0 + t1) * 0.5;
+                return p0 + (p1 - p0) * tm;
+            }
+        }
+
+        // 3. Bất đắc dĩ: trung điểm tuyến.
+        usedMidpoint = true;
+        var mid = mepCurve.Evaluate(0.5, true);
+        if (candidate.HasBox && candidate.Host is Floor)
+        {
+            return new XYZ(mid.X, mid.Y, (candidate.MinZ + candidate.MaxZ) * 0.5);
+        }
+
+        return mid;
+    }
+
+    /// <summary>Liang–Barsky: khoảng tham số [t0, t1] ⊂ [0, 1] của đoạn p0→p1 nằm trong hộp; false nếu không cắt.</summary>
+    private static bool ClipLineToBox(XYZ p0, XYZ p1,
+        double minX, double minY, double minZ, double maxX, double maxY, double maxZ,
+        out double t0, out double t1)
+    {
+        t0 = 0.0;
+        t1 = 1.0;
+        var d = p1 - p0;
+        var starts = new[] { p0.X, p0.Y, p0.Z };
+        var deltas = new[] { d.X, d.Y, d.Z };
+        var mins = new[] { minX, minY, minZ };
+        var maxs = new[] { maxX, maxY, maxZ };
+
+        for (var axis = 0; axis < 3; axis++)
+        {
+            if (Math.Abs(deltas[axis]) < 1e-12)
+            {
+                if (starts[axis] < mins[axis] || starts[axis] > maxs[axis]) return false;
+                continue;
+            }
+
+            var tA = (mins[axis] - starts[axis]) / deltas[axis];
+            var tB = (maxs[axis] - starts[axis]) / deltas[axis];
+            if (tA > tB) { var tmp = tA; tA = tB; tB = tmp; }
+            t0 = Math.Max(t0, tA);
+            t1 = Math.Min(t1, tB);
+            if (t0 > t1) return false;
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -619,7 +762,12 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         return found;
     }
 
-    private static Face? GetNearestFace(Element host, XYZ point)
+    /// <summary>
+    /// Mặt host gần điểm nhất, ƯU TIÊN mặt phẳng có pháp tuyến gần song song <paramref name="preferredNormal"/>
+    /// (tường: hướng tuyến MEP → mặt bên; sàn: thẳng đứng → mặt trên/dưới). Không ưu tiên thì điểm giao
+    /// nằm giữa bề dày tường thường gần mặt đỉnh tường hơn, sleeve bị đặt lên nóc tường.
+    /// </summary>
+    private static Face? GetNearestFace(Element host, XYZ point, XYZ? preferredNormal)
     {
         try
         {
@@ -629,6 +777,9 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
 
             Face? nearest = null;
             double minDist = double.MaxValue;
+            Face? nearestPreferred = null;
+            double minDistPreferred = double.MaxValue;
+            const double parallelDot = 0.7;
 
             foreach (GeometryObject obj in geom)
             {
@@ -652,9 +803,17 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
                         minDist = dist;
                         nearest = face;
                     }
+
+                    if (preferredNormal != null && face is PlanarFace pf
+                        && Math.Abs(pf.FaceNormal.DotProduct(preferredNormal)) >= parallelDot
+                        && dist < minDistPreferred)
+                    {
+                        minDistPreferred = dist;
+                        nearestPreferred = face;
+                    }
                 }
             }
-            return nearest!;
+            return (nearestPreferred ?? nearest)!;
         }
         catch (System.Exception)
         {
@@ -670,10 +829,16 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         return type?.Name ?? string.Empty;
     }
 
-    private static void SetParameterDouble(FamilyInstance inst, string paramName, double valueMm)
+    /// <summary>
+    /// Ghi kích thước lên sleeve: tra qua từ điển tên tham số (tên trong config đứng đầu, rồi tên đồng
+    /// nghĩa) thay vì LookupParameter với một chuỗi cứng. Chỉ ghi tham số INSTANCE — Lookup có thể trả
+    /// tham số ở type, ghi vào đó là đổi cả loạt sleeve khác.
+    /// </summary>
+    private static void SetParameterDouble(FamilyInstance inst, string key, string preferredName, double valueMm)
     {
-        var param = inst.LookupParameter(paramName);
+        var param = RevitCompat.Lookup(inst, key, preferredName);
         if (param == null || param.IsReadOnly) return;
+        if (param.Element == null || param.Element.Id != inst.Id) return;
         if (param.StorageType == StorageType.Double)
             param.Set(RevitCompat.MmToFt(valueMm));
         else if (param.StorageType == StorageType.String)
