@@ -244,10 +244,17 @@ internal abstract class FieldEditorBase : IFieldEditor
     /// <summary>Nhãn "tênTrường — mô tả", đủ để kỹ sư biết trường này là gì mà không phải mở tài liệu.</summary>
     protected TextBlock Label() => new()
     {
-        Text = Field.Name + " — " + Field.Description,
+        Text = Field.Name + " — " + Field.Description + (Field.IsList ? "  (nhiều giá trị ngăn bằng dấu ; hoặc xuống dòng)" : string.Empty),
         Margin = new Thickness(0, 0, 0, 4),
         TextWrapping = TextWrapping.Wrap,
     };
+
+    /// <summary>Ngăn cách danh sách bằng ";" hoặc xuống dòng — dấu phẩy có trong tên category ("Pipe Fittings, Bends") và tên type.</summary>
+    protected static IEnumerable<string> SplitList(string text) =>
+        text.Split(new[] { ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(p => p.Trim()).Where(p => p.Length > 0);
+
+    /// <summary>Hiển thị lại danh sách đã lưu theo đúng dấu ngăn mà <see cref="SplitList"/> đọc.</summary>
+    protected static string JoinList(JToken value) => string.Join("; ", value.Select(v => v.ToString()));
 
     protected static StackPanel Row(params UIElement[] children)
     {
@@ -267,7 +274,12 @@ internal sealed class TextEditor : FieldEditorBase
 
     public TextEditor(FieldSpec field, JToken? value) : base(field)
     {
-        _box.Text = value?.Type == JTokenType.Array ? string.Join(", ", value.Select(v => v.ToString())) : value?.ToString() ?? string.Empty;
+        _box.Text = value?.Type == JTokenType.Array ? JoinList(value) : value?.ToString() ?? string.Empty;
+        if (Field.IsList)
+        {
+            _box.AcceptsReturn = true;
+            _box.TextWrapping = TextWrapping.Wrap;
+        }
     }
 
     public override UIElement Build() => Row(Label(), _box);
@@ -284,7 +296,7 @@ internal sealed class TextEditor : FieldEditorBase
 
             if (Field.IsList)
             {
-                return new JArray(text.Split(',').Select(p => p.Trim()).Where(p => p.Length > 0));
+                return new JArray(SplitList(text));
             }
 
             // Trường nhận object/mảng JSON thô (levels, grids, colors, roomFilter): giữ nguyên cấu trúc.
@@ -344,12 +356,18 @@ internal sealed class BoolEditor : FieldEditorBase
     public BoolEditor(FieldSpec field, JToken? value) : base(field)
     {
         _box.Content = Field.Name + " — " + Field.Description;
-        _box.IsChecked = value?.Type == JTokenType.Boolean && value.Value<bool>();
+        // Giá trị đã lưu > mặc định của lớp Config thật (catalog) > false. Trước đây trường mặc định
+        // true (includeLinkedModels, skipExisting…) hiện KHÔNG tick, và bỏ tick thì không ghi gì vào
+        // JSON nên lệnh vẫn chạy với true — không có cách nào tắt từ form.
+        _box.IsChecked = value?.Type == JTokenType.Boolean
+            ? value.Value<bool>()
+            : CommandCatalog.DefaultBool(Field.Name);
     }
 
     public override UIElement Build() => Row(_box);
 
-    public override JToken? Value => _box.IsChecked == true ? JToken.FromObject(true) : null;
+    /// <summary>Luôn ghi rõ true/false — false phải tới được lệnh để tắt mặc định true.</summary>
+    public override JToken? Value => JToken.FromObject(_box.IsChecked == true);
 }
 
 internal sealed class PathEditor : FieldEditorBase
@@ -475,7 +493,7 @@ internal sealed class ChoiceEditor : FieldEditorBase
         }
 
         _box.Text = value?.Type == JTokenType.Array
-            ? string.Join(", ", value.Select(v => v.ToString()))
+            ? JoinList(value)
             : value?.ToString() ?? string.Empty;
     }
 
@@ -488,7 +506,7 @@ internal sealed class ChoiceEditor : FieldEditorBase
         }
         else if (Field.IsList)
         {
-            label.Text += "  (chọn hoặc gõ nhiều giá trị, ngăn bằng dấu phẩy)";
+            label.Text += "  (chọn hoặc gõ nhiều giá trị)";
         }
 
         return Row(label, _box);
@@ -505,7 +523,7 @@ internal sealed class ChoiceEditor : FieldEditorBase
             }
 
             return Field.IsList
-                ? new JArray(text.Split(',').Select(p => p.Trim()).Where(p => p.Length > 0))
+                ? new JArray(SplitList(text))
                 : text;
         }
     }

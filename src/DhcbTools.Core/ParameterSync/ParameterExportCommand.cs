@@ -51,6 +51,7 @@ public sealed class ParameterExportCommand : ICoreCommand<ParameterExportConfig>
         }
 
         // UTF-8 CÓ BOM: thiếu BOM thì Excel trên Windows đọc theo code page hệ thống và hiện sai tiếng Việt.
+        RevitCompat.EnsureParentDirectory(config.OutputPath);
         File.WriteAllText(config.OutputPath, sb.ToString(), CsvText.Utf8WithBom);
 
         var result = CommandResult.Ok(
@@ -96,7 +97,8 @@ public sealed class ParameterExportCommand : ICoreCommand<ParameterExportConfig>
 
     internal static string ReadParameterAsString(Element element, string parameterName)
     {
-        var parameter = element.LookupParameter(parameterName);
+        // Tra qua từ điển (tên đồng nghĩa tiếng Việt/Anh) trước khi kết luận "không có".
+        var parameter = RevitCompat.LookupInstance(element, parameterName, parameterName);
         if (parameter is null)
         {
             // Không tìm thấy ở instance — thử tra ở Type (ví dụ tham số kiểu như "Fire Rating").

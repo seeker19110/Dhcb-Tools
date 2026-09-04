@@ -30,9 +30,16 @@ public sealed class ClashDetectionConfig
     /// <summary>Dung sai lọc thô bounding box (mm).</summary>
     public double BoundingBoxToleranceMm { get; init; } = 0;
 
-    public bool Create3dView { get; init; } = true;
+    /// <summary>
+    /// Tạo/ghi đè 3D view "ViewName" và isolate các phần tử va chạm — đây là thao tác GHI duy nhất của
+    /// lệnh, nên mặc định tắt và chỉ chạy khi <see cref="DryRun"/> = false.
+    /// </summary>
+    public bool Create3dView { get; init; } = false;
 
     public string ViewName { get; init; } = "DHCB - Clashes";
+
+    /// <summary>Xem trước: quét và ghi báo cáo như thường, nhưng không tạo 3D view trong mô hình.</summary>
+    public bool DryRun { get; init; } = true;
 
     /// <summary>Giới hạn số va chạm báo (0 = không giới hạn).</summary>
     public int MaxResults { get; init; } = 2000;
@@ -43,10 +50,10 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
 {
     public string CommandName => "ClashDetection";
 
-    private sealed record Clash(Element A, Element B, XYZ Centre, string Key, string? LinkName);
+    private sealed record Clash(Element A, Element B, XYZ Centre, string Key, string? LinkName, ElementId? LinkInstanceId);
 
     /// <summary>Phần tử nhóm B kèm hộp bao ĐÃ ĐƯA VỀ toạ độ file chủ (link thì khác toạ độ).</summary>
-    private sealed record Candidate(Element Element, XYZ Min, XYZ Max, Transform? Transform, string? LinkName);
+    private sealed record Candidate(Element Element, XYZ Min, XYZ Max, Transform? Transform, string? LinkName, ElementId? LinkInstanceId);
 
     public CommandResult Execute(Document document, ClashDetectionConfig config)
     {
@@ -60,7 +67,7 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
         var result = CommandResult.Ok(string.Empty);
         var elementsA = new FilteredElementCollector(document).WhereElementIsNotElementType().WherePasses(new ElementMulticategoryFilter(idsA.ToList())).ToElements();
         var elementsB = new FilteredElementCollector(document).WhereElementIsNotElementType().WherePasses(new ElementMulticategoryFilter(idsB.ToList())).ToElements()
-            .Select(e => Describe(e, null, null)).Where(c => c != null).Select(c => c!).ToList();
+            .Select(e => Describe(e, null, null, null)).Where(c => c != null).Select(c => c!).ToList();
 
         // Nhóm B ở model liên kết. Không có nhánh này thì "Ducts × Structural Framing" trên file MEP
         // luôn ra 0 va chạm — dầm nằm bên link kết cấu (đo được trên Snowdon HVAC, 2026-09-03).
@@ -95,7 +102,7 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
                 foreach (var e in new FilteredElementCollector(linkDoc).WhereElementIsNotElementType()
                              .WherePasses(new ElementMulticategoryFilter(idsLink.ToList())).ToElements())
                 {
-                    var candidate = Describe(e, transform, linkInstance.Name);
+                    var candidate = Describe(e, transform, linkInstance.Name, linkInstance.Id);
                     if (candidate == null) continue;
                     elementsB.Add(candidate);
                     added++;
@@ -129,6 +136,12 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
                     (Math.Max(boxA.Min.Y, b.Min.Y) + Math.Min(boxA.Max.Y, b.Max.Y)) / 2,
                     (Math.Max(boxA.Min.Z, b.Min.Z) + Math.Min(boxA.Max.Z, b.Max.Z)) / 2);
                 var key = ClashAcceptance.MakeKey(RevitCompat.IdValue(a.Id), RevitCompat.IdValue(b.Element.Id), RevitCompat.FtToMm(centre.X), RevitCompat.FtToMm(centre.Y), RevitCompat.FtToMm(centre.Z));
+                // ElementId của link là id TRONG document link, có thể trùng với id ở file chủ hoặc link khác
+                // → khoá phải mang thêm id của link instance, nếu không hai va chạm khác nhau gộp làm một.
+                if (b.LinkInstanceId != null)
+                {
+                    key += "#link" + RevitCompat.IdValue(b.LinkInstanceId);
+                }
                 if (!seen.Add(key)) continue;
                 if (accepted.Contains(key))
                 {
@@ -136,7 +149,7 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
                     continue;
                 }
 
-                clashes.Add(new Clash(a, b.Element, centre, key, b.LinkName));
+                clashes.Add(new Clash(a, b.Element, centre, key, b.LinkName, b.LinkInstanceId));
                 if (config.MaxResults > 0 && clashes.Count >= config.MaxResults)
                 {
                     result.Messages.Add($"Đạt giới hạn {config.MaxResults} va chạm — dừng quét.");
@@ -150,22 +163,39 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
 
         if (config.Create3dView && clashes.Count > 0)
         {
-            try
+            // IsolateElementsTemporary chỉ nhận id của CHÍNH document này: id phần tử trong link ném
+            // ArgumentException. Với cặp link chỉ isolate phần tử phía file chủ, phần tử link nêu trong Messages.
+            var hostIds = clashes.Select(c => c.A.Id)
+                .Concat(clashes.Where(c => c.LinkInstanceId == null).Select(c => c.B.Id))
+                .Distinct().ToList();
+            var fromLinks = clashes.Count(c => c.LinkInstanceId != null);
+
+            if (config.DryRun)
             {
-                using var tx = RevitCompat.StartTransaction(document, "DHCB - View va chạm");
-                var vft = new FilteredElementCollector(document).OfClass(typeof(ViewFamilyType)).Cast<ViewFamilyType>().FirstOrDefault(v => v.ViewFamily == ViewFamily.ThreeDimensional);
-                var view = new FilteredElementCollector(document).OfClass(typeof(View3D)).Cast<View3D>().FirstOrDefault(v => !v.IsTemplate && v.Name == config.ViewName)
-                           ?? (vft != null ? View3D.CreateIsometric(document, vft.Id) : null);
-                if (view != null)
-                {
-                    try { view.Name = config.ViewName; } catch { /* trùng tên */ }
-                    view.IsolateElementsTemporary(clashes.SelectMany(c => new[] { c.A.Id, c.B.Id }).Distinct().ToList());
-                }
-                tx.Commit();
+                result.Messages.Add($"[Xem trước] Sẽ tạo/ghi đè 3D view \"{config.ViewName}\" và isolate {hostIds.Count} phần tử phía file chủ"
+                                    + (fromLinks > 0 ? $" ({fromLinks} phần tử phía link không isolate được, xem danh sách)." : "."));
             }
-            catch (Exception ex)
+            else
             {
-                result.Messages.Add("Không tạo được 3D view: " + ex.Message);
+                try
+                {
+                    using var tx = RevitCompat.StartTransaction(document, "DHCB - View va chạm");
+                    var vft = new FilteredElementCollector(document).OfClass(typeof(ViewFamilyType)).Cast<ViewFamilyType>().FirstOrDefault(v => v.ViewFamily == ViewFamily.ThreeDimensional);
+                    var view = new FilteredElementCollector(document).OfClass(typeof(View3D)).Cast<View3D>().FirstOrDefault(v => !v.IsTemplate && v.Name == config.ViewName)
+                               ?? (vft != null ? View3D.CreateIsometric(document, vft.Id) : null);
+                    if (view != null)
+                    {
+                        try { view.Name = config.ViewName; } catch { /* trùng tên */ }
+                        view.IsolateElementsTemporary(hostIds);
+                        result.Messages.Add($"Đã tạo 3D view \"{view.Name}\" isolate {hostIds.Count} phần tử phía file chủ"
+                                            + (fromLinks > 0 ? $"; {fromLinks} phần tử phía link không isolate được (khác document)." : "."));
+                    }
+                    tx.Commit();
+                }
+                catch (Exception ex)
+                {
+                    result.Messages.Add("Không tạo được 3D view: " + ex.Message);
+                }
             }
         }
 
@@ -209,14 +239,14 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
     /// Phần tử nhóm B kèm hộp bao ở toạ độ file chủ. Link xoay thì hộp bao dựng lại từ tám đỉnh —
     /// lấy hai điểm min/max qua phép biến đổi là sai khi có xoay.
     /// </summary>
-    private static Candidate? Describe(Element element, Transform? transform, string? linkName)
+    private static Candidate? Describe(Element element, Transform? transform, string? linkName, ElementId? linkInstanceId)
     {
         var box = element.get_BoundingBox(null);
         if (box == null) return null;
 
         if (transform == null)
         {
-            return new Candidate(element, box.Min, box.Max, null, null);
+            return new Candidate(element, box.Min, box.Max, null, null, null);
         }
 
         double minX = double.MaxValue, minY = double.MaxValue, minZ = double.MaxValue;
@@ -232,7 +262,7 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
             minZ = Math.Min(minZ, corner.Z); maxZ = Math.Max(maxZ, corner.Z);
         }
 
-        return new Candidate(element, new XYZ(minX, minY, minZ), new XYZ(maxX, maxY, maxZ), transform, linkName);
+        return new Candidate(element, new XYZ(minX, minY, minZ), new XYZ(maxX, maxY, maxZ), transform, linkName, linkInstanceId);
     }
 
     /// <summary>

@@ -29,7 +29,7 @@ namespace DhcbTools.Core.ProjectInit
 
                     foreach (var kvp in config.ExtraParameters)
                     {
-                        var param = pi.LookupParameter(kvp.Key);
+                        var param = RevitCompat.LookupInstance(pi, kvp.Key, kvp.Key);
                         if (param == null)
                         {
                             // Trước đây bỏ qua im lặng: kỹ sư khai một tham số sai tên vẫn nhận "thành công".

@@ -1,50 +1,18 @@
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
-using DhcbTools.Core.ParameterSync;
 
 namespace DhcbTools.Revit.Commands;
 
 /// <summary>
-/// Vỏ desktop cho <see cref="ParameterExportCommand"/> (Core): hỏi đường dẫn lưu file bằng SaveFileDialog,
-/// gọi Core xử lý, hiển thị kết quả bằng TaskDialog. Không chứa logic nghiệp vụ.
+/// Vỏ desktop cho <see cref="Core.ParameterSync.ParameterExportCommand"/>: form động cho chọn
+/// category (combo từ mô hình), tham số và nơi lưu CSV. Trước đây vỏ này cố định 4 category và 3 tham
+/// số — kỹ sư không đổi được gì ngoài đường dẫn.
 /// </summary>
 [Transaction(TransactionMode.Manual)]
 [Regeneration(RegenerationOption.Manual)]
 public sealed class ParameterExportCommand : IExternalCommand
 {
     public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
-    {
-#if DHCB_SKIP_WPF
-        return CommandRunner.Run(commandData, "ParameterExport");
-#else
-        var document = commandData.Application.ActiveUIDocument.Document;
-
-        var dialog = new Microsoft.Win32.SaveFileDialog
-        {
-            Title = "DHCB Tools - Chọn nơi lưu file CSV",
-            Filter = "CSV (*.csv)|*.csv",
-            FileName = $"{document.Title}_parameters.csv",
-        };
-        if (dialog.ShowDialog() != true)
-        {
-            return Result.Cancelled;
-        }
-
-        // Cấu hình mặc định cho lệnh nền tảng: category/tham số phổ biến nhất.
-        // TODO: thay bằng cửa sổ WPF cho phép kỹ sư chọn category + tham số (giai đoạn kế tiếp).
-        var config = new ParameterExportConfig
-        {
-            Categories = new List<string> { "Doors", "Windows", "Rooms", "Walls" },
-            ParameterNames = new List<string> { "Mark", "Comments", "Level" },
-            OutputPath = dialog.FileName,
-        };
-
-        var command = new Core.ParameterSync.ParameterExportCommand();
-        var result = command.Execute(document, config);
-
-        Feedback.Show("Xuất tham số ra CSV", result);
-        return result.Success ? Result.Succeeded : Result.Failed;
-#endif
-    }
+        => CommandRunner.Run(commandData, "ParameterExport");
 }

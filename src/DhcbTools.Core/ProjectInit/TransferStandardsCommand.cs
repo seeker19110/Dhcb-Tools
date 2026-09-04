@@ -7,7 +7,11 @@ public sealed class TransferStandardsConfig
 {
     public required string SourcePath { get; init; }
 
-    /// <summary>ViewTemplates, Filters, LineStyles, ObjectStyles, Materials, TextTypes, DimensionTypes, FillPatterns, BrowserOrganization.</summary>
+    /// <summary>
+    /// ViewTemplates, Filters, LineStyles, Materials, TextTypes, DimensionTypes, FillPatterns, BrowserOrganization.
+    /// LineStyles chuyển qua phần tử GraphicsStyle của subcategory Lines; ObjectStyles không chuyển được qua
+    /// CopyElements — dùng Transfer Project Standards thủ công.
+    /// </summary>
     public List<string> Categories { get; init; } = new List<string> { "ViewTemplates", "Filters", "LineStyles", "Materials", "TextTypes", "DimensionTypes" };
 
     /// <summary>Chỉ chuyển phần tử có tên chứa chuỗi này (rỗng = tất cả).</summary>
@@ -51,7 +55,10 @@ public sealed class TransferStandardsCommand : ICoreCommand<TransferStandardsCon
         Document? source = null;
         try
         {
-            source = document.Application.OpenDocumentFile(config.SourcePath);
+            // Mở tách khỏi central (giữ workset): file chuẩn thường là file workshare, mở thường sẽ
+            // chiếm central/hiện hộp thoại và có thể ghi lại local cache.
+            var openOptions = new OpenOptions { DetachFromCentralOption = DetachFromCentralOption.DetachAndPreserveWorksets };
+            source = document.Application.OpenDocumentFile(ModelPathUtils.ConvertUserVisiblePathToModelPath(config.SourcePath), openOptions);
             var groups = new Dictionary<string, List<ElementId>>(StringComparer.OrdinalIgnoreCase);
             foreach (var cat in config.Categories)
             {
@@ -152,15 +159,19 @@ public sealed class TransferStandardsCommand : ICoreCommand<TransferStandardsCon
                 elements = new FilteredElementCollector(src).OfClass(typeof(ParameterFilterElement));
                 break;
             case "LINESTYLES":
+                // Category.Id của subcategory KHÔNG phải id phần tử (GetElement luôn trả null) — line style
+                // là phần tử GraphicsStyle, lấy qua Category.GetGraphicsStyle.
                 var linesCat = src.Settings.Categories.get_Item(BuiltInCategory.OST_Lines);
-                elements = linesCat.SubCategories.Cast<Category>().Select(c => src.GetElement(c.Id)).Where(e => e != null)!;
+                elements = linesCat.SubCategories.Cast<Category>()
+                    .Select(c => (Element?)c.GetGraphicsStyle(GraphicsStyleType.Projection))
+                    .Where(e => e != null)!;
                 if (!elements.Any())
                 {
-                    note = "LineStyles: API không cho copy trực tiếp subcategory ở phiên bản này — dùng Transfer Project Standards tay.";
+                    note = "LineStyles: không lấy được GraphicsStyle nào từ file chuẩn — dùng Transfer Project Standards thủ công.";
                 }
                 break;
             case "OBJECTSTYLES":
-                note = "ObjectStyles: không copy được qua CopyElements — dùng Transfer Project Standards tay.";
+                note = "ObjectStyles: không chuyển được qua CopyElements — dùng Transfer Project Standards thủ công.";
                 elements = Enumerable.Empty<Element>();
                 break;
             case "MATERIALS":
