@@ -141,6 +141,17 @@ ghi lại. Ràng buộc không đổi: **nguyên tắc 6** — không thêm lệ
 **Chỉ số:** báo cáo tuân thủ đêm chạy trên **2 dự án thật** trước khi công bố; `BatchRunner --verify-log` mã thoát 0 trên
 log thật của một đêm batch, **kiểm lại sau 30 ngày**.
 
+### Chặng thi công — đợt A/B của [`nghien-cuu-chuoi-den-hoan-cong.md`](nghien-cuu-chuoi-den-hoan-cong.md) §5 🟡
+
+Ba việc "làm ngay, không cần chờ số liệu 9.4" vì chỉ đọc hoặc chỉ ghi tham số, tầng thuần chiếm phần lớn, và mở
+thêm **tệp người dùng khác** (trắc đạc, chỉ huy trưởng) cho chính vòng 9.4:
+
+| # | Việc | Trạng thái |
+|---|---|---|
+| A1 | **`SetoutExport`** — toạ độ định vị (tim cột, tâm thiết bị/sleeve, giao trục) ra CSV theo thứ tự cột máy toàn đạc (`PNEZD`/`PENZD`…) + DXF điểm, hệ Survey tự kiểm chiều transform, tên điểm ≤ 16 ký tự không trùng | ✅ mã nguồn 2026-09-05: tầng thuần `Shared.Logic/Setout` + `Geometry/GridIntersections` (50 ca test), lệnh Core, Ribbon, 4 ca kiểm trong `revit-smoke`/`revit-mep`, playbook `skills/xuat-toa-do-dinh-vi`. 🧪 **Chưa chạy thật trong Revit** — giữ nhãn *thử nghiệm* theo nguyên tắc 6. Tài liệu: [`toa-do-dinh-vi.md`](toa-do-dinh-vi.md) |
+| B1 | **`ConstructionStatus`** + **`ProgressReport`** — trạng thái lắp đặt/nghiệm thu từ CSV hiện trường (từ vựng Việt/Anh, có hay không dấu đều nhận), % theo **số lượng và chiều dài**, gộp theo tầng/hệ/category, luỹ kế theo tuần → HTML + CSV | ✅ mã nguồn 2026-09-05: tầng thuần `Shared.Logic/Progress` (41 ca test), hai lệnh Core, nút Ribbon, 6 ca kiểm, playbook `skills/theo-doi-tien-do-thi-cong`. 🧪 **Chưa chạy thật**; đường ghi của `ConstructionStatus` chưa có ca kiểm tự động (mã cấu kiện là ElementId của đúng file đang mở nên không viết sẵn vào fixture được). Tài liệu: [`tien-do-thi-cong.md`](tien-do-thi-cong.md) |
+| C4 · B3 | `ModelLinesFromCad` · `BcfExport` (song song, rẻ) | ⬜ |
+
 ---
 
 ## Hạ ưu tiên / dừng

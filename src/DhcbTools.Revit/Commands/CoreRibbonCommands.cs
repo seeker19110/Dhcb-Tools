@@ -315,3 +315,30 @@ public sealed class DictionaryLearnRibbonCommand : IExternalCommand
     public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         => CommandRunner.Run(commandData, "DictionaryLearn");
 }
+
+/// <summary>Xuất toạ độ định vị (tim cột, tâm thiết bị, giao trục) ra CSV cho máy toàn đạc + DXF điểm.</summary>
+[Transaction(TransactionMode.Manual)]
+[Regeneration(RegenerationOption.Manual)]
+public sealed class SetoutExportRibbonCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        => CommandRunner.Run(commandData, "SetoutExport");
+}
+
+/// <summary>Ghi trạng thái thi công từ CSV hiện trường vào mô hình.</summary>
+[Transaction(TransactionMode.Manual)]
+[Regeneration(RegenerationOption.Manual)]
+public sealed class ConstructionStatusRibbonCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        => CommandRunner.Run(commandData, "ConstructionStatus");
+}
+
+/// <summary>Báo cáo tiến độ thi công theo tầng/hệ, % theo số lượng và chiều dài, luỹ kế theo tuần.</summary>
+[Transaction(TransactionMode.Manual)]
+[Regeneration(RegenerationOption.Manual)]
+public sealed class ProgressReportRibbonCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        => CommandRunner.Run(commandData, "ProgressReport");
+}

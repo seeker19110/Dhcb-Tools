@@ -51,11 +51,18 @@ public sealed class App : IExternalApplication
             "Xuất tất cả sheet ra PDF + DWG vào thư mục chọn.");
         Add(export, path, "DhcbHealthReport", "Health\nReport", "HealthReportCommand",
             "Báo cáo HTML: warning, view thừa, connector hở, in-place family.");
-        Group(export, path, "DhcbExportMore", "Xuất\nkhác", "Xuất warning và schedule ra file.",
+        Group(export, path, "DhcbExportMore", "Xuất\nkhác", "Xuất warning, schedule và toạ độ định vị ra file.",
             ("DhcbWarningsExport", "Xuất warning", "WarningsExportRibbonCommand",
                 "Xuất toàn bộ warning của mô hình ra file để phân tích."),
             ("DhcbScheduleExport", "Xuất schedule", "ScheduleExportRibbonCommand",
-                "Xuất các schedule ra CSV/Excel."));
+                "Xuất các schedule ra CSV/Excel."),
+            ("DhcbSetoutExport", "Toạ độ định vị (thử nghiệm)", "SetoutExportRibbonCommand",
+                "Xuất toạ độ tim cột / thiết bị / giao trục ra CSV cho máy toàn đạc và DXF điểm, theo hệ Survey."));
+        Group(export, path, "DhcbSiteProgress", "Tiến độ\nthi công", "Trạng thái lắp đặt từ hiện trường và báo cáo tiến độ.",
+            ("DhcbConstructionStatus", "Nhập trạng thái thi công (thử nghiệm)", "ConstructionStatusRibbonCommand",
+                "Đọc CSV hiện trường (mã cấu kiện → trạng thái/ngày/người) và ghi vào mô hình."),
+            ("DhcbProgressReport", "Báo cáo tiến độ (thử nghiệm)", "ProgressReportRibbonCommand",
+                "% đã lắp theo số lượng và chiều dài, gộp theo tầng/hệ, luỹ kế theo tuần."));
 
         // ── Panel 3: Khởi tạo dự án ───────────────────────────────
         var init = application.CreateRibbonPanel(TabName, "Khởi tạo dự án");
@@ -273,6 +280,7 @@ public sealed class App : IExternalApplication
         "DhcbParameterExport" or "DhcbParameterImport" or "DhcbCleanupViews" or "DhcbAutoNumbering"
             => RibbonIcons.Core,
         "DhcbBatchExport" or "DhcbHealthReport" or "DhcbExportMore" or "DhcbWarningsExport" or "DhcbScheduleExport"
+            or "DhcbSetoutExport" or "DhcbSiteProgress" or "DhcbConstructionStatus" or "DhcbProgressReport"
             => RibbonIcons.Export,
         "DhcbProjectInit" or "DhcbInitParts" or "DhcbInitTemplate" or "DhcbLevelSetup" or "DhcbGridSetup"
             or "DhcbGridFromCsv" or "DhcbFamilyLoader" or "DhcbProjectInfo" or "DhcbProjectFromTemplate"

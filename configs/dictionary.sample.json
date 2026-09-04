@@ -28,7 +28,11 @@
     "centreElevation": ["Cao độ tim"],
 
     "department": ["Bộ phận"],
-    "occupancy": ["Công năng"]
+    "occupancy": ["Công năng"],
+
+    "constructionStatus": ["Trạng thái thi công"],
+    "constructionDate": ["Ngày lắp đặt"],
+    "constructionBy": ["Người xác nhận"]
   },
 
   "families": {
