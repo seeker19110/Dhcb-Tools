@@ -56,12 +56,14 @@ public sealed class GridFromCsvCommand : ICoreCommand<GridFromCsvConfig>
         if (!string.IsNullOrEmpty(config.LevelCsvPath))
         {
             if (!File.Exists(config.LevelCsvPath)) return CommandResult.Fail($"Không tìm thấy \"{config.LevelCsvPath}\".");
-            var lines = File.ReadAllLines(config.LevelCsvPath, CsvText.Utf8WithBom);
-            for (var i = 1; i < lines.Length; i++)
+            // Đọc theo RFC 4180 (CsvText.ReadRecords): ô có nháy được phép chứa dấu phẩy và xuống dòng —
+            // ReadAllLines + SplitLine cắt nhầm đúng những ô mà CsvText.Escape ghi ra.
+            var rows = CsvText.ReadRecords(config.LevelCsvPath).ToList();
+            for (var i = 1; i < rows.Count; i++)
             {
-                if (string.IsNullOrWhiteSpace(lines[i])) continue;
-                var cells = CsvText.SplitLine(lines[i]);
-                if (cells.Count < 2 || !NumericText.TryParseDouble(cells[1], out var mm))
+                var cells = rows[i];
+                if (cells.All(string.IsNullOrWhiteSpace)) continue;
+                if (cells.Length < 2 || !NumericText.TryParseDouble(cells[1], out var mm))
                 {
                     result.Messages.Add($"Level CSV dòng {i + 1}: cần Name,Elevation — bỏ qua.");
                     continue;

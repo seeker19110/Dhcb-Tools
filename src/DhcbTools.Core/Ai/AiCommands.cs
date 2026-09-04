@@ -98,13 +98,14 @@ public sealed class CadLayerMapCommand : ICoreCommand<CadLayerMapConfig>
 
     internal static List<string> ReadLayers(string path)
     {
-        var lines = File.ReadAllLines(path, CsvText.Utf8WithBom).Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
-        if (lines.Count == 0) return new List<string>();
+        // RFC 4180 qua CsvText.ReadRecords — tên layer có dấu phẩy trong ô nháy không còn bị cắt.
+        var rows = CsvText.ReadRecords(path).Where(r => r.Any(c => !string.IsNullOrWhiteSpace(c))).ToList();
+        if (rows.Count == 0) return new List<string>();
 
-        var first = CsvText.SplitLine(lines[0]);
-        var isCsv = first.Count > 1;
+        var first = rows[0];
+        var isCsv = first.Length > 1;
         var start = isCsv && first[0].Equals("Name", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
-        return lines.Skip(start).Select(l => CsvText.SplitLine(l)[0].Trim()).Where(l => l.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        return rows.Skip(start).Select(r => r[0].Trim()).Where(l => l.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 }
 
