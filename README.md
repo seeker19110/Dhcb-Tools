@@ -5,6 +5,8 @@ và **AutoCAD desktop**, có **batch chạy đêm**, **HTTP Bridge/MCP cho agent
 Ollama local — không dữ liệu nào rời máy). Ngoại lệ duy nhất: **panel web AutoCAD** (`tools/autocad-mcp-server`) gọi
 Hermes CLI nên prompt kèm nội dung bản vẽ **được gửi tới provider inference đang cấu hình** — xem
 [`tools/autocad-mcp-server/README.md`](tools/autocad-mcp-server/README.md#dữ-liệu-đi-đâu). Nghiên cứu và lộ trình ở [`docs/nghien-cuu-dhcb-revit-tools.md`](docs/nghien-cuu-dhcb-revit-tools.md),
+khoảng trống theo chặng công việc (thiết kế → BIM → shop → thi công → hoàn công) ở
+[`docs/nghien-cuu-chuoi-den-hoan-cong.md`](docs/nghien-cuu-chuoi-den-hoan-cong.md),
 hiện trạng ở [`docs/progress.md`](docs/progress.md).
 
 ## Bắt đầu nhanh (10 phút)
