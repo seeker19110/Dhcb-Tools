@@ -211,9 +211,18 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
    sửa tay mỗi lần vấp `E-PARAM-MISSING`. Tầng thuần `Ai/DictionarySuggester` có test (chỉ đề xuất tên
    có thật; tham số rỗng toàn dự án và sai kiểu bị hạ điểm; trộn không xoá thứ đã khai; file JSON hỏng
    thì dừng chứ không ghi đè). ⬜ Còn: chạy thật trên dự án A để xem đề xuất có khớp tên thật không.
-5. Rồi tới **9.4 — đưa cho một nhóm kỹ sư dùng thật**; phản hồi của họ quyết định giai đoạn 10/11 đi sâu
+5. ~~Chặn **lớp lỗi** của bug #14, không chỉ nguyên nhân của nó~~ — xong: mã lỗi **`E-PRECOND`** và
+   lớp tiền đề `Shared.Logic/Checks/Precondition` (thuần, có test) + `Core/Checks/RevitPrecondition`.
+   Chỗ vá cũ của #14 nằm trong `BatchJobRunner.Open()`, nhưng **đường Ribbon và Bridge không đi qua đó**
+   — kỹ sư tự mở một bản sao có link chưa nạp rồi bấm `ClashDetection` vẫn nhận đúng con số 0 giả như cũ.
+   Nay `ClashDetection`, `SleeveAuto`, `DevicePlacement`, `AutoRoute` dừng ngay trước mọi transaction khi
+   **mọi** link đều chưa nạp (nạp một phần = cảnh báo, có thể là cố ý), và `ClashDetection` cũng dừng khi
+   một trong hai nhóm category rỗng — "0 va chạm" khi không có gì để kiểm là câu nói về đầu vào chứ không
+   về mô hình. Ca kiểm `revit-smoke` chốt đường chặn bằng nhóm category rỗng (đường link chưa nạp không
+   dựng được bằng file JSON khai báo — kiểm tay theo §21).
+6. Rồi tới **9.4 — đưa cho một nhóm kỹ sư dùng thật**; phản hồi của họ quyết định giai đoạn 10/11 đi sâu
    vào đâu. **Mẫu thu phản hồi đã có**: [`mau-phan-hoi-9-4.md`](mau-phan-hoi-9-4.md) — bảng tick
    *dùng hằng tuần / bấm rồi bỏ / chưa dùng* cho đủ 42 lệnh Revit + 15 lệnh AutoCAD, kèm bốn câu hỏi mở.
    `PhanHoiFormTests` đối chiếu danh sách lệnh trong mẫu với `CommandCatalog` hai chiều nên mẫu không trôi.
    Còn thiếu: phát hành v1.1 và chọn nhóm kỹ sư — cả hai đều là việc của người, không phải của mã.
-6. **Không mở P3** — giữ hướng chiều sâu theo [`roadmap.md`](roadmap.md).
+7. **Không mở P3** — giữ hướng chiều sâu theo [`roadmap.md`](roadmap.md).

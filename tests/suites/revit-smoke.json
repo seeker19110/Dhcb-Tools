@@ -336,6 +336,31 @@
       }
     },
     {
+      "name": "Tiền đề: nhóm category rỗng phải CHẶN, không được trả \"0 va chạm\"",
+      "command": "ClashDetection",
+      "config": {
+        "categoriesA": [
+          "Ducts"
+        ],
+        "categoriesB": [
+          "Doors"
+        ],
+        "outputPath": "{outputFolder}/clash-precond.html",
+        "create3dView": false
+      },
+      "//": "Model kien truc mau khong co Ducts. Truoc khi co tien de E-PRECOND, ca nay chay xanh voi '0 va cham' — mot bao cao noi 'khong co va cham' trong khi that ra khong co gi de kiem. Chot chan cho lop loi cua bug #14.",
+      "expect": {
+        "success": false,
+        "maxMs": 60000,
+        "summaryContains": [
+          "E-PRECOND"
+        ],
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
       "name": "Gợi ý map layer CAD → type Revit",
       "command": "CadLayerMap",
       "config": {

@@ -65,6 +65,16 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
         }
 
         var result = CommandResult.Ok(string.Empty);
+
+        // Bug #14: bản sao model làm mất trạng thái nạp link → lệnh này báo 0 va chạm thay vì 479, và
+        // im lặng vì "0 va chạm" trông y hệt kết quả sạch. Chỗ vá cũ chỉ nằm ở BatchJobRunner.Open();
+        // đường Ribbon/Bridge không đi qua đó, nên tiền đề phải nằm ngay trong lệnh.
+        if (config.IncludeLinkedModels
+            && RevitPrecondition.Blocks(RevitPrecondition.LinkedModels(document, CommandName), result))
+        {
+            return result;
+        }
+
         var elementsA = new FilteredElementCollector(document).WhereElementIsNotElementType().WherePasses(new ElementMulticategoryFilter(idsA.ToList())).ToElements();
         var elementsB = new FilteredElementCollector(document).WhereElementIsNotElementType().WherePasses(new ElementMulticategoryFilter(idsB.ToList())).ToElements()
             .Select(e => Describe(e, null, null, null)).Where(c => c != null).Select(c => c!).ToList();
@@ -109,6 +119,22 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
                 }
                 linkSummary.Add($"{linkInstance.Name}: {added} phần tử nhóm B");
             }
+        }
+
+        // "0 va chạm" khi một trong hai nhóm rỗng là câu nói về TẬP ĐẦU VÀO, không phải về mô hình.
+        var inputPre = Shared.Logic.Checks.Precondition.First(
+            Shared.Logic.Checks.Precondition.NonEmptyInput(
+                CommandName, $"phần tử nhóm A ({string.Join(", ", config.CategoriesA)})", elementsA.Count,
+                "Kiểm lại categoriesA, hoặc mở đúng file có nhóm phần tử đó."),
+            Shared.Logic.Checks.Precondition.NonEmptyInput(
+                CommandName, $"phần tử nhóm B ({string.Join(", ", config.CategoriesB)})", elementsB.Count,
+                config.IncludeLinkedModels
+                    ? "Kiểm lại categoriesB; nếu nhóm B nằm ở file liên kết thì kiểm cả bộ lọc linkNameContains."
+                    : "Kiểm lại categoriesB; nhóm B thường nằm ở file liên kết — thử bật includeLinkedModels."));
+        if (RevitPrecondition.Blocks(inputPre, result))
+        {
+            result.Messages.AddRange(linkSummary.Select(l => "Link: " + l));
+            return result;
         }
 
         var accepted = ClashAcceptance.LoadKeys(config.AcceptedPath);

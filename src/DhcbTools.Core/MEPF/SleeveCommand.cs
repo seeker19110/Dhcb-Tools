@@ -64,6 +64,14 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         // Tường/sàn của dự án Việt Nam gần như luôn nằm ở MODEL LIÊN KẾT: file MEP link file kiến trúc.
         // Bản trước chỉ quét tường/sàn trong chính file đang mở, nên trên đúng cấu hình phổ biến nhất
         // lệnh trả "Đã đặt 0 sleeve" và trông như thành công — kiểu lỗi im lặng tệ nhất.
+        // Link chưa nạp mà vẫn chạy tiếp thì con số trả ra nói về trạng thái link, không nói về mô hình
+        // — đúng lớp lỗi của bug #14. Dừng ở đây, trước mọi transaction.
+        var linkPre = Checks.RevitPrecondition.LinkedModels(document, CommandName);
+        if (config.IncludeLinkedModels && linkPre.Blocks)
+        {
+            return CommandResult.Fail(linkPre.Message);
+        }
+
         var linkSummary = new List<string>();
         if (config.IncludeLinkedModels)
         {

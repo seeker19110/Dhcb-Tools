@@ -20,9 +20,10 @@ thêm mã mà quên ghi vào đây (hoặc ngược lại) là test đỏ.
 | `E-PARAM-MISSING` | Không tìm thấy tham số trong model | Tên tham số khác giữa các dự án (Việt/Anh), hoặc category không có tham số đó | Tra tham số có thật bằng query `parameters_of`; thêm bí danh vào từ điển `%APPDATA%\DHCB\dictionary.json` — thông báo có liệt kê những tên đã thử |
 | `E-PARAM-READONLY` | Tham số có thật nhưng chỉ đọc | Ghi vào tham số Revit tự tính (diện tích, thể tích, tham số của type dùng chung) | Không ghi được bằng API — chọn tham số khác hoặc sửa ở nguồn sinh ra giá trị |
 | `E-CONFIG-UNKNOWN` | Config có trường không tồn tại trong lớp config của lệnh | Gõ sai tên trường (`outputPatch` thay vì `outputPath`), hoặc dùng lại config của phiên bản cũ sau khi trường bị đổi tên | Thông báo liệt kê đủ tên trường hợp lệ của lệnh — sửa đúng tên. Trước đây trường lạ bị bỏ qua im lặng nên lệnh chạy với giá trị mặc định mà không ai biết |
+| `E-PRECOND` | Tiền đề của lệnh không thoả — con số lệnh sắp trả ra sẽ nói về trạng thái mô hình/đầu vào chứ không về chất lượng công trình | Mọi model liên kết đều chưa nạp (hay gặp nhất: bản sao sau `SaveAs`/`DetachFromCentral` không giữ trạng thái đã nạp), hoặc category trong config không khớp phần tử nào | Thông báo nói rõ đường đi tiếp: nạp lại link (Manage → Manage Links → Reload) rồi chạy lại, hoặc đặt `includeLinkedModels: false` nếu cố ý chỉ kiểm trong file này; với đầu vào rỗng thì kiểm lại `categories*`. **Không có mã này thì lệnh trả "0" và trông y hệt kết quả sạch** — xem bug #14 trong [`progress.md`](progress.md) |
 | `E-CONFIG-AMBIGUOUS` | Tên type/family trong config khớp nhiều ứng viên trong mô hình | Ghi tên rút gọn (`"Pipe"`) trong dự án có nhiều type cùng chứa chuỗi đó | Ghi đủ dạng `"Family: Type"`; thông báo có liệt kê tối đa 20 ứng viên đang khớp |
 
-## Vì sao chỉ có sáu mã
+## Vì sao chỉ có bảy mã
 
 Mã lỗi chỉ đặt cho tình trạng **người dùng xử lý được và lặp lại nhiều lệnh**. Lỗi chỉ xảy ra ở một
 lệnh, hoặc lỗi mà người dùng không làm gì được (Revit từ chối dịch điểm cuối ống đã nối hai đầu), thì
