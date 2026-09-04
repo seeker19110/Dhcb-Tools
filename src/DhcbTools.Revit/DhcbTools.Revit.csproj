@@ -5,6 +5,7 @@
     <RootNamespace>DhcbTools.Revit</RootNamespace>
     <AssemblyName>DhcbTools.Revit</AssemblyName>
     <UseWPF>true</UseWPF>
+    <DefineConstants Condition="'$(DhcbSkipWpf)'=='true'">$(DefineConstants);DHCB_NO_WPF</DefineConstants>
     <!-- Add-in Revit không được tự copy dependency vào GAC/thư mục Revit; giữ mọi thứ local. -->
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
@@ -27,7 +28,8 @@
   <ItemGroup>
     <Using Include="DhcbTools.Shared.Hosting" />
     <Compile Include="..\DhcbTools.Shared.Hosting\Polyfills.cs" Link="Polyfills.cs" Condition="'$(TargetFramework)'=='net48'" />
-    <!-- Build kiểm tra không WPF (Linux/CI): bỏ cửa sổ WPF, mọi thứ khác vẫn phải biên dịch. -->
+    <!-- Build kiểm tra không WPF (Linux/CI): bỏ cửa sổ WPF, mọi thứ khác vẫn phải biên dịch.
+         Icon Ribbon cũng là WPF (System.Windows.Media) nên phải tắt kèm — xem DHCB_NO_WPF. -->
     <Compile Remove="UI\**" Condition="'$(DhcbSkipWpf)'=='true'" />
     <Page Remove="UI\**" Condition="'$(DhcbSkipWpf)'=='true'" />
   </ItemGroup>

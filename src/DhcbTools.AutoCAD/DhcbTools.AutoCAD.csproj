@@ -6,7 +6,14 @@
     <AssemblyName>DhcbTools.AutoCAD</AssemblyName>
     <UseWPF>true</UseWPF>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <DefineConstants Condition="'$(DhcbSkipWpf)'=='true'">$(DefineConstants);DHCB_NO_WPF</DefineConstants>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Build kiểm tra không WPF (Linux/CI): Ribbon dựng bằng WPF (System.Windows.Media) nên bỏ ra,
+         mọi thứ còn lại vẫn phải biên dịch. Chỗ gọi trong App.cs guard bằng DHCB_NO_WPF. -->
+    <Compile Remove="Ribbon\**" Condition="'$(DhcbSkipWpf)'=='true'" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\DhcbTools.Core.AutoCAD\DhcbTools.Core.AutoCAD.csproj" />

@@ -1,6 +1,9 @@
 using Autodesk.AutoCAD.Runtime;
 using DhcbTools.AutoCAD.Bridge;
 using DhcbTools.Shared.Hosting;
+#if !DHCB_NO_WPF
+using DhcbTools.AutoCAD.Ribbon;
+#endif
 using AcApp = Autodesk.AutoCAD.ApplicationServices.Core.Application;
 
 [assembly: ExtensionApplication(typeof(DhcbTools.AutoCAD.App))]
@@ -38,6 +41,17 @@ public sealed class App : IExtensionApplication
         DhcbLog.Write("AutoCAD", $"Plugin nạp — phiên bản "
             + $"{DhcbVersion.Of(System.Reflection.Assembly.GetExecutingAssembly())}, PID {pid}.");
         Say("[DHCB Tools] Đã tải DHCB AutoCAD Tools (PID " + pid + "). Gõ DHCB_BRIDGE để xem trạng thái Bridge.");
+
+#if !DHCB_NO_WPF
+        try
+        {
+            RibbonBuilder.EnsureBuilt();
+        }
+        catch (System.Exception ex)
+        {
+            DhcbLog.Error("AutoCAD", "dựng Ribbon", ex);
+        }
+#endif
 
         try
         {
