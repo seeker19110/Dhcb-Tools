@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Library</OutputType>
@@ -24,6 +24,18 @@
   <ItemGroup>
     <PackageReference Include="AutoCAD.NET" Version="$(AcadNetVersion)" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <!--
+      snapshot (10.1) trả System.Drawing.Bitmap: net48 có System.Drawing trong hộp, còn net8/net10 phải
+      kéo System.Drawing.Common — AutoCAD.NET không khai dependency này dù AcDbMgd trả Bitmap.
+      Không dùng "Reference" cho net8+ (không có assembly đó trong runtime pack) và không dùng package
+      cho net48 (thừa, và kéo cả bộ phụ thuộc .NET Core vào add-in .NET Framework).
+    -->
+    <Reference Include="System.Drawing" Condition="'$(TargetFramework)'=='net48'" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.*" Condition="'$(TargetFramework)'=='net8.0-windows'" />
+    <!-- AcDbMgd 25.1 (AutoCAD 2026, net10) tham chiếu System.Drawing.Common 10.0.0.0 — bản 8.0 gây CS1705. -->
+    <PackageReference Include="System.Drawing.Common" Version="10.0.*" Condition="'$(TargetFramework)'=='net10.0-windows'" />
   </ItemGroup>
 
 </Project>

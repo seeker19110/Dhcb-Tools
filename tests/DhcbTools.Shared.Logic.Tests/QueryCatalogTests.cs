@@ -35,7 +35,8 @@ public class QueryCatalogTests
     /// <summary>Tên trong hằng <c>ValidQueries</c> — danh sách mà agent đọc khi gõ sai tên truy vấn.</summary>
     private static HashSet<string> Advertised(string source)
     {
-        var m = Regex.Match(source, @"ValidQueries\s*=\s*?
+        var m = Regex.Match(source, @"ValidQueries\s*=\s*
+?
 ?\s*""([^""]+)""");
         Assert.True(m.Success, "Không tìm thấy hằng ValidQueries trong handler.");
         return new HashSet<string>(
@@ -52,6 +53,7 @@ public class QueryCatalogTests
 
         Assert.Contains("entity_geometry", dispatched);
         Assert.Contains("attributes_of", dispatched);
+        Assert.Contains("snapshot", dispatched);
         Assert.True(dispatched.SetEquals(advertised),
             "Lệch giữa bảng dispatch và câu \"Hợp lệ\": chỉ dispatch " +
             string.Join(", ", dispatched.Except(advertised)) + " · chỉ quảng cáo " +
@@ -74,7 +76,7 @@ public class QueryCatalogTests
         var vo = Read("src", "DhcbTools.AutoCAD", "Bridge", "AcadUiQueryHandler.cs");
         var doc = Read("src", "DhcbTools.Core.AutoCAD", "Query", "QueryRequest.cs");
 
-        foreach (var query in new[] { "selection", "show_entities", "active_layout" })
+        foreach (var query in new[] { "selection", "show_entities", "active_layout", "snapshot" })
         {
             Assert.Contains(query.ToUpperInvariant(), vo);
             Assert.Contains(query, doc);

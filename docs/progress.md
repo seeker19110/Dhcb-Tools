@@ -24,6 +24,9 @@
 > `BatchRunner --verify-log`. Bốn cách sửa log đều bị bắt, chỉ ra đúng số dòng — §23. Đã chạy thật trên
 > log đêm batch **30 dòng / 351 KB** và log AutoCAD nối qua **4 tiến trình accoreconsole** — §24.
 >
+> **`snapshot` phía AutoCAD (10.1) đã có:** agent nhìn được bản vẽ — render off-screen sống (`live`) hoặc ảnh xem
+> trước trong DWG (`thumbnail`), chạy thật trên AutoCAD 2026.1 — §25. Giai đoạn 10 không còn mục ⬜ nào.
+>
 > **Còn lại:** chưa có job nào chạy **tự động qua Task Scheduler** (hai lượt ở §20/§21 đều chạy tay); chất
 > lượng tuyến `AutoRoute` vẫn chưa chứng minh được; và 9.4 — đưa cho một nhóm kỹ sư dùng thật.
 

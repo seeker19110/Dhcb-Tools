@@ -133,7 +133,7 @@ còn phần đủ để agent **nhìn, chỉ và kiểm** được kết quả: 
 config không phải đoán), `element_geometry` (hộp bao, đường tâm, connector kèm tình trạng nối — toạ độ mm),
 `schedule_rows`, `snapshot` (ảnh PNG base64 của view), `selection` (đọc và **đặt** lựa chọn),
 `show_elements` (zoom cho kỹ sư nhìn), `active_view`. Phía AutoCAD là bộ đối xứng — `entity_geometry`,
-`attributes_of`, `selection`, `show_entities`, `active_layout` — định danh bằng **handle** hex.
+`attributes_of`, `selection`, `show_entities`, `active_layout`, `snapshot` (ảnh PNG — render off-screen sống hoặc ảnh xem trước trong DWG, kết quả ghi rõ `source`) — định danh bằng **handle** hex.
 Mọi `CommandResult` mang theo `changedIds` nên agent kiểm lại được đúng phần tử vừa đổi.
 Chi tiết: [`docs/agent-khep-vong.md`](docs/agent-khep-vong.md).
 
