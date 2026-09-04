@@ -201,7 +201,7 @@ AutoCAD ≥ 2026 (package 25.1.x) và Revit ≥ 2027 dùng **net10.0-windows** �
 - **CI** (`.github/workflows/tests.yml`, ubuntu-latest, mọi push/PR): test `Shared.Logic` + `dotnet build` toàn bộ
   Core/vỏ (kể cả vỏ core-only) bằng API package NuGet, `UseWPF=false` — bắt lỗi biên dịch không cần Windows.
 - **CD** (`.github/workflows/release.yml`, windows-latest, khi đẩy tag `vX.Y.Z` hoặc chạy tay): build **Release thật**
-  (đủ WPF) cho Revit 2023/2024/2025 và AutoCAD 2024/2025 + vỏ core-only, đóng gói zip kèm hướng dẫn cài đặt, và tạo
+  (đủ WPF) cho Revit 2023/2024/2025 và AutoCAD 2024/2025/2026 + vỏ core-only, đóng gói zip kèm hướng dẫn cài đặt, và tạo
   GitHub Release đính kèm toàn bộ gói.
 
 ```powershell

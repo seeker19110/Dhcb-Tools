@@ -30,7 +30,7 @@ Ma trận ba phiên bản là cố ý: lỗi chỉ xảy ra trên net48 (`Dictio
 Revit ≤ 2023 (`ElementId.Value`) từng lọt tới tận bước phát hành khi CI chỉ build 2025.
 
 **`release.yml` — CD, chỉ chạy khi đẩy tag `vX.Y.Z` hoặc bấm tay (`workflow_dispatch`).** Trên
-windows-latest: build Release thật (có WPF) cho Revit 2023/2024/2025 và AutoCAD 2024/2025 + vỏ core-only,
+windows-latest: build Release thật (có WPF) cho Revit 2023/2024/2025 và AutoCAD 2024/2025/**2026** + vỏ core-only,
 đóng gói zip kèm `jobs/`, `configs/`, `scripts/`, dựng installer Inno Setup rồi tạo GitHub Release.
 Không chạy trên PR nên **không phải chờ nó** khi merge.
 

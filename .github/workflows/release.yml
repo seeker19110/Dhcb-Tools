@@ -79,12 +79,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        acad: [2024, 2025]
+        acad: [2024, 2025, 2026]   # 2026 = R25.1, .NET 10 — đã chạy thật (bang-chung-test.md §24, §25)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          # AutoCAD 2026 (net10.0-windows) cần SDK 10; 2024/2025 vẫn dùng SDK 8.
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
       - name: Build vỏ đầy đủ (AutoCAD ${{ matrix.acad }})
         run: dotnet build src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj -c Release -p:RevitVersion=${{ matrix.acad }} -p:AcadVersion=${{ matrix.acad }} -p:Version=${{ needs.version.outputs.version }}
@@ -105,6 +108,12 @@ jobs:
                     "$full/DhcbTools.Shared.Hosting.dll", "$full/Newtonsoft.Json.dll" $pkg
           $core = "src/DhcbTools.AutoCAD.Core/bin/Release/$tfm"
           Copy-Item "$core/DhcbTools.AutoCAD.Core.dll" $pkg
+          # AutoCAD 2025+ nạp assembly .NET Core qua AssemblyLoadContext riêng; bundle đã chứng minh
+          # chạy được trên AutoCAD 2026.1 (bang-chung-test.md §25) có kèm deps.json. net48 không có file này.
+          if ($tfm -ne "net48") { Copy-Item "$full/DhcbTools.AutoCAD.deps.json" $pkg }
+          # KHÔNG đóng gói System.Drawing.Common.dll dù nó nằm trong bin của net8/net10: AcDbMgd tham chiếu
+          # nó nên chính AutoCAD đã cấp — §25 chạy thật với bundle KHÔNG có file này. Chép thêm bản riêng
+          # chỉ tạo nguy cơ lệch phiên bản với bản AutoCAD đang chạy.
           Copy-Item docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md $pkg
           Compress-Archive -Path "$pkg/*" -DestinationPath "dist/DhcbTools.AutoCAD-${{ matrix.acad }}-${{ needs.version.outputs.version }}.zip"
 
@@ -166,7 +175,7 @@ jobs:
           foreach ($r in 2023, 2024, 2025) {
             Expand-Archive "artifacts/DhcbTools.Revit-$r-$v.zip" -DestinationPath "$stage/revit-$r" -Force
           }
-          foreach ($a in 2024, 2025) {
+          foreach ($a in 2024, 2025, 2026) {
             Expand-Archive "artifacts/DhcbTools.AutoCAD-$a-$v.zip" -DestinationPath "$stage/autocad-$a" -Force
           }
           Expand-Archive "artifacts/DhcbTools.BatchRunner-$v.zip" -DestinationPath "$stage/batchrunner" -Force
