@@ -142,7 +142,7 @@
       "name": "Tô màu theo tham số",
       "command": "ColorByParameter",
       "config": {
-        "category": "Doors",
+        "categories": ["Doors"],
         "parameterName": "Mark",
         "dryRun": true
       },

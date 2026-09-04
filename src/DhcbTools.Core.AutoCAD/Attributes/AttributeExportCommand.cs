@@ -75,6 +75,7 @@ public sealed class AttributeExportCommand : ICoreCommand<AttributeExportConfig>
 
         transaction.Commit();
 
+        AcadHelpers.EnsureParentDirectory(config.OutputPath);
         File.WriteAllText(config.OutputPath, sb.ToString(), CsvText.Utf8WithBom);
 
         return CommandResult.Ok(

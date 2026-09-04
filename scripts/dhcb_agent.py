@@ -188,8 +188,11 @@ def main():
     parser.add_argument("--categories", nargs="+")
     parser.add_argument("--output")
     parser.add_argument("--input")
-    parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--no-dry-run", action="store_true", help="Ghi thật (mặc định luôn dry-run)")
+    dry = parser.add_mutually_exclusive_group()
+    dry.add_argument("--dry-run", dest="dry_run", action="store_true", default=True,
+                     help="Chỉ xem trước, không ghi (mặc định)")
+    dry.add_argument("--no-dry-run", dest="dry_run", action="store_false",
+                     help="Ghi thật — chỉ dùng sau khi đã xem trước")
     parser.add_argument("--category")
     parser.add_argument("--param")
     parser.add_argument("--attr")
@@ -206,7 +209,7 @@ def main():
     args = parser.parse_args()
 
     app = args.app
-    dry_run = not args.no_dry_run
+    dry_run = args.dry_run
     cmd = args.command.lower()
 
     if cmd == "tools":
@@ -240,8 +243,21 @@ def main():
         if not args.arg:
             print("Cần JSON thô sau 'raw'.", file=sys.stderr)
             sys.exit(1)
-        data = json.loads(args.arg)
-        result = run(app, data["command"], data.get("config", {}), args)
+        try:
+            data = json.loads(args.arg)
+        except json.JSONDecodeError as ex:
+            print(f"JSON sau 'raw' không hợp lệ ({ex}). Ví dụ: raw '{{\"command\":\"HealthReport\",\"config\":{{}}}}'",
+                  file=sys.stderr)
+            sys.exit(2)
+        if not isinstance(data, dict) or not isinstance(data.get("command"), str) or not data["command"]:
+            print("JSON sau 'raw' phải là object có trường \"command\" (chuỗi) và tuỳ chọn \"config\" (object).",
+                  file=sys.stderr)
+            sys.exit(2)
+        config = data.get("config") or {}
+        if not isinstance(config, dict):
+            print("\"config\" trong JSON raw phải là object.", file=sys.stderr)
+            sys.exit(2)
+        result = run(app, data["command"], config, args)
         print_result(result)
         sys.exit(0 if result.get("success") else 1)
 
@@ -251,11 +267,30 @@ def main():
             sys.exit(1)
         config = {}
         if args.config_file:
-            with open(args.config_file, "r", encoding="utf-8-sig") as f:
-                config = json.load(f)
+            try:
+                with open(args.config_file, "r", encoding="utf-8-sig") as f:
+                    config = json.load(f)
+            except OSError as ex:
+                print(f"Không đọc được --config-file ({ex}).", file=sys.stderr)
+                sys.exit(2)
+            except json.JSONDecodeError as ex:
+                print(f"--config-file không phải JSON hợp lệ ({ex}).", file=sys.stderr)
+                sys.exit(2)
         if args.config:
-            config.update(json.loads(args.config))
-        if args.no_dry_run:
+            try:
+                inline = json.loads(args.config)
+            except json.JSONDecodeError as ex:
+                print(f"--config không phải JSON hợp lệ ({ex}). Trên PowerShell cần bọc: --config '{{\"key\":1}}'",
+                      file=sys.stderr)
+                sys.exit(2)
+            if not isinstance(inline, dict):
+                print("--config phải là JSON object.", file=sys.stderr)
+                sys.exit(2)
+            config.update(inline)
+        if not isinstance(config, dict):
+            print("Config phải là JSON object.", file=sys.stderr)
+            sys.exit(2)
+        if not args.dry_run:
             config["dryRun"] = False
         elif "dryRun" not in config:
             config["dryRun"] = True

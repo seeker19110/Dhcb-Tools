@@ -87,8 +87,16 @@ public sealed class SystemColorCommand : ICoreCommand<SystemColorConfig>
             return result;
         }
 
-        var existing = new FilteredElementCollector(document).OfClass(typeof(ParameterFilterElement)).Cast<ParameterFilterElement>()
-            .ToDictionary(f => f.Name, f => f, StringComparer.OrdinalIgnoreCase);
+        // Không dùng ToDictionary: hai filter chỉ khác hoa/thường ("hvac" và "HVAC") làm nó ném
+        // ArgumentException và cả lệnh đổ. Giữ cái gặp trước.
+        var existing = new Dictionary<string, ParameterFilterElement>(StringComparer.OrdinalIgnoreCase);
+        foreach (var f in new FilteredElementCollector(document).OfClass(typeof(ParameterFilterElement)).Cast<ParameterFilterElement>())
+        {
+            if (!existing.ContainsKey(f.Name))
+            {
+                existing[f.Name] = f;
+            }
+        }
         var categoryIds = MepCategories.All.Select(c => new ElementId(c)).ToList();
         var solid = new FilteredElementCollector(document).OfClass(typeof(FillPatternElement)).Cast<FillPatternElement>()
             .FirstOrDefault(f => f.GetFillPattern().IsSolidFill);
@@ -176,14 +184,18 @@ public sealed class SystemNameCommand : ICoreCommand<SystemNameConfig>
         {
             var typeName = document.GetElement(sys.GetTypeId())?.Name ?? sys.Category!.Name;
             var abbr = SystemNaming.Abbreviate(typeName, config.Abbreviations);
-            counters[abbr] = counters.TryGetValue(abbr, out var n) ? n + 1 : 1;
-            var newName = SystemNaming.Build(config.Discipline, abbr, config.Zone, counters[abbr], config.PadWidth);
 
+            // Hệ giữ tên đặt tay thì KHÔNG chiếm số thứ tự — trước đây bộ đếm tăng cả cho hệ bị bỏ
+            // qua, nên dãy tên bị thủng số.
             if (config.OnlyDefaultNames && !LooksDefault(sys.Name, typeName))
             {
                 result.Messages.Add($"Giữ \"{sys.Name}\" (đã đặt tay).");
                 continue;
             }
+
+            var next = (counters.TryGetValue(abbr, out var n) ? n : 0) + 1;
+            var newName = SystemNaming.Build(config.Discipline, abbr, config.Zone, next, config.PadWidth);
+            counters[abbr] = next; // số này đã được gán (đổi tên, hoặc hệ đã mang đúng tên)
 
             if (string.Equals(sys.Name, newName, StringComparison.Ordinal))
             {

@@ -123,6 +123,8 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
         if (!symbol.IsActive)
             symbol.Activate();
 
+        var failed = 0;
+        var failureReasons = new List<string>();
         foreach (var (point, direction) in plan)
         {
             try
@@ -141,17 +143,32 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
                 placed++;
                 placedIds.Add(RevitCompat.IdValue(inst.Id));
             }
-            catch (System.Exception)
+            catch (System.Exception ex)
             {
-                // Continue on individual placement failures
+                // Không huỷ cả lô vì một cái lỗi, nhưng phải ghi lý do — nuốt im lặng thì "0 hanger"
+                // không ai biết vì sao.
+                failed++;
+                if (failureReasons.Count < 5 && !failureReasons.Contains(ex.Message))
+                {
+                    failureReasons.Add(ex.Message);
+                }
             }
         }
 
         tx.Commit();
-        return CommandResult.Ok(
-                $"Đã đặt {placed} hanger trên {elements.Count} phần tử MEP." + SkipNote(skippedExisting),
-                placed)
-            .WithChanged(placedIds);
+        var summary = $"Đã đặt {placed} hanger trên {elements.Count} phần tử MEP." + SkipNote(skippedExisting);
+        if (failed > 0)
+        {
+            summary += $" {failed}/{plan.Count} vị trí đặt lỗi.";
+        }
+
+        var result = CommandResult.Ok(summary, placed).WithChanged(placedIds);
+        if (failed > 0)
+        {
+            result.Messages.Add($"{failed} vị trí không đặt được hanger. Lý do (tối đa 5 loại): " + string.Join(" | ", failureReasons));
+        }
+
+        return result;
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

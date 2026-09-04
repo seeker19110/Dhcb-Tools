@@ -1,8 +1,10 @@
 # Hướng dẫn cài đặt và kiểm thử thủ công trên máy thật
 
-Tài liệu này dành cho người **cài DHCB Tools lên máy có Revit/AutoCAD** và **chạy kiểm thử thủ công** lần đầu. Toàn bộ
-code đã biên dịch xanh với API package NuGet và có 340 test thuần trên CI, nhưng **chưa lệnh nào chạy trên phần mềm thật** —
-đây là bước còn thiếu để coi từng tính năng là "dùng được". Kịch bản chi tiết từng lệnh ở
+Tài liệu này dành cho người **cài DHCB Tools lên máy có Revit/AutoCAD** và **chạy kiểm thử thủ công** lần đầu. Code
+biên dịch xanh với API package NuGet và có bộ test thuần chạy trên CI (số ca xem output CI). Các lệnh **đã chạy thật**
+qua bộ ca kiểm tự động bên trong Revit 2024.3 và AutoCAD (`accoreconsole`) — xem
+[`bang-chung-test.md`](bang-chung-test.md); phần checklist tay dưới đây là lớp kiểm còn lại, đi qua đúng giao diện mà
+kỹ sư dùng. Kịch bản chi tiết từng lệnh ở
 [`dac-ta-kiem-thu.md`](dac-ta-kiem-thu.md) §4; tài liệu này nối các bước lại thành một quy trình đi từ đầu đến cuối và
 kèm mẫu ghi kết quả.
 
@@ -39,7 +41,8 @@ cd D:\DHCB\src
 dotnet test tests\DhcbTools.Shared.Logic.Tests\DhcbTools.Shared.Logic.Tests.csproj
 ```
 
-Kỳ vọng: `Passed! - Failed: 0, Passed: 340`. Nếu lỗi restore NuGet → kiểm tra proxy/kết nối, đây là bước duy nhất cần internet.
+Kỳ vọng: `Failed: 0` (số ca đang tăng theo từng PR — con số chuẩn là output của CI, đừng so với một số cứng).
+Nếu lỗi restore NuGet → kiểm tra proxy/kết nối, đây là bước duy nhất cần internet.
 
 ### 2.2 Build add-in Revit (mỗi bản Revit một lần)
 
@@ -93,8 +96,9 @@ Copy vào **một trong hai** thư mục Addins (user không cần admin):
 Nội dung: `DhcbTools.Revit.addin` + tất cả DLL ở §2.2. File `.addin` trỏ `Assembly` = `DhcbTools.Revit.dll` (đường dẫn
 tương đối, cùng thư mục) nên không phải sửa gì.
 
-Mở Revit → lần đầu Revit hỏi "Load add-in?" → **Always Load**. Ribbon xuất hiện tab **DHCB Tools** với 6 panel:
-*Nền tảng · Xuất & Kiểm tra · Dự án & Hồ sơ · Hồ sơ & Style · MEPF · AI offline & Batch*.
+Mở Revit → lần đầu Revit hỏi "Load add-in?" → **Always Load**. Ribbon xuất hiện tab **DHCB Tools** với 6 panel
+(đúng tên trong `src/DhcbTools.Revit/App.cs`):
+*Nền tảng · Xuất & Báo cáo · Khởi tạo dự án · MEPF · Hồ sơ & Style · Kiểm tra & AI*.
 
 Nếu tab không hiện: xem `%APPDATA%\Autodesk\Revit\Autodesk Revit 2024\Journals\journal.*.txt` dòng cuối có
 `DhcbTools`; lỗi thường gặp là thiếu `Newtonsoft.Json.dll` hoặc DLL bị Windows chặn (chuột phải → Properties → Unblock).
@@ -133,13 +137,21 @@ Add-in tự tạo khi chạy lần đầu. Cấu trúc sau khi dùng:
 └── clash-accepted.json       cặp va chạm đã chấp nhận
 ```
 
-Chép sẵn các file mẫu:
+Chép sẵn các file mẫu. **Hai thư mục khác nhau, đừng lẫn:**
+
+- `%APPDATA%\DHCB\` — nơi add-in **tự đọc** (token, `settings.json`, `ai.json`, config từng nút Ribbon). Đường dẫn
+  cố định, không đổi được.
+- Thư mục quy tắc của dự án (ví dụ `D:\DHCB\configs\`) — file `parameter-rules.json`, `layer-rules.json`,
+  `layer-map.csv` được **truyền đường dẫn vào config của lệnh** (`rulesPath`, `layerMapPath`…), nên đặt ở đâu cũng
+  được; để ngoài `%APPDATA%` cho cả nhóm dùng chung qua ổ mạng là chuyện thường.
 
 ```powershell
 mkdir $env:APPDATA\DHCB -Force
+mkdir D:\DHCB\configs -Force
 copy configs\parameter-rules.sample.json D:\DHCB\configs\parameter-rules.json
 copy configs\layer-rules.sample.json     D:\DHCB\configs\layer-rules.json
 copy configs\layer-map.sample.csv        D:\DHCB\configs\layer-map.csv
+copy configs\ai.sample.json              $env:APPDATA\DHCB\ai.json        # tuỳ chọn
 ```
 
 ---
@@ -184,7 +196,7 @@ lệnh thật: **Ctrl+Z hoàn tác được trọn một bước** (một lệnh
 
 | # | Việc | Kỳ vọng | Kết quả |
 |---|---|---|---|
-| R1 | Mở Revit, mở `test-model.rvt` | Tab DHCB Tools, 6 panel, không hộp thoại lỗi | ☐ |
+| R1 | Mở Revit, mở `test-model.rvt` | Tab DHCB Tools, 6 panel (*Nền tảng · Xuất & Báo cáo · Khởi tạo dự án · MEPF · Hồ sơ & Style · Kiểm tra & AI*), không hộp thoại lỗi | ☐ |
 | R2 | `type %APPDATA%\DHCB\bridge-token.txt` | Có chuỗi ~43 ký tự | ☐ |
 | R3 | `python scripts\dhcb_agent.py revit tools` | Liệt kê 42 lệnh Revit | ☐ |
 | R4 | `curl http://127.0.0.1:8765/health` | 200, chỉ có status/version, không lộ tên file | ☐ |
@@ -308,7 +320,7 @@ D:\DHCB\bin\DhcbTools.BatchRunner.exe --job D:\DHCB\jobs\test.json --log-dir D:\
 |---|---|---|
 | B1 | Console in "Phiên bản Revit theo file: 2024"; nếu có file 2023 → cảnh báo mở bằng 2024 | ☐ |
 | B2 | Revit tự mở, **không** hộp thoại nào cần bấm, tự đóng khi xong | ☐ |
-| B3 | `logs\<ngày>\run.jsonl` mỗi step một dòng; `report.html` bảng file × step xanh/đỏ; `warnings-summary.md` | ☐ |
+| B3 | `logs\<ngày>\run-<HHmmss>.jsonl` mỗi step một dòng (mỗi lượt chạy một file); `report.html` bảng file × step xanh/đỏ; `warnings-summary.md` | ☐ |
 | B4 | Bản gốc `test-model.rvt` **không đổi** (kiểm mtime); bản SaveAs nằm trong outputFolder | ☐ |
 | B5 | Mã thoát: `echo $LASTEXITCODE` = 0 (hoặc 1 nếu có step cố ý lỗi) | ☐ |
 | B6 | Chạy lại cùng job → kết quả như nhau (idempotent với step dryRun/chỉ đọc) | ☐ |
@@ -324,7 +336,7 @@ D:\DHCB\bin\DhcbTools.BatchRunner.exe --job D:\DHCB\jobs\test-acad.json --accore
 | # | Kỳ vọng | Kết quả |
 |---|---|---|
 | B9 | Console in đường dẫn plugin = `DhcbTools.AutoCAD.Core.dll` (ưu tiên core-only) | ☐ |
-| B10 | Không lỗi "assembly references AcMgd" khi NETLOAD; `run.jsonl` có dòng cho từng step | ☐ |
+| B10 | Không lỗi "assembly references AcMgd" khi NETLOAD; `run-<HHmmss>.jsonl` có dòng cho từng step; thư mục làm việc là `acad-steps-<HHmmss>` | ☐ |
 | B11 | Step `PlotPdf` sinh file PDF trong `outputFolder\pdf\` (mở được) | ☐ |
 | B12 | `LayerTranslate` dryRun trong batch chỉ báo, không đổi file gốc | ☐ |
 

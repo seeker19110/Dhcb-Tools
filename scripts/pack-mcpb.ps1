@@ -37,8 +37,8 @@ $manifest.name = "dhcb-$App"
 $manifest.display_name = "DHCB Tools — $(if ($App -eq 'revit') { 'Revit' } else { 'AutoCAD' })"
 $manifest.server.mcp_config.args = @("`${__dirname}/scripts/dhcb_mcp_server.py", $App)
 
-# Bỏ khoá chú thích "//" — hợp lệ trong repo nhưng không thuộc schema manifest.
-$manifest.PSObject.Properties.Remove('//')
+# Bỏ khoá chú thích "_comment" — hợp lệ trong repo nhưng không thuộc schema manifest.
+$manifest.PSObject.Properties.Remove('_comment')
 
 # Set-Content -Encoding UTF8 của Windows PowerShell 5.1 ghi kèm BOM, mà trình đóng gói .mcpb từ chối
 # JSON có BOM ("Unexpected token '\ufeff'"). Ghi bằng .NET với UTF8Encoding($false) để chắc chắn không BOM.

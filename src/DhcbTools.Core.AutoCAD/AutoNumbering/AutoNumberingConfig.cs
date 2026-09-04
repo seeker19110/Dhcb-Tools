@@ -37,6 +37,12 @@ public sealed class AutoNumberingConfig
     /// <summary>Hướng quét để xác định thứ tự đánh số.</summary>
     public NumberingDirection Direction { get; init; } = NumberingDirection.LeftToRightThenTopToBottom;
 
+    /// <summary>
+    /// Dung sai gom hàng/cột (đơn vị bản vẽ, thường là mm): hai block lệch dưới mức này coi như cùng hàng.
+    /// Cùng ý nghĩa với <c>rowToleranceMm</c> của AutoNumbering bên Revit — mặc định 300.
+    /// </summary>
+    public double RowToleranceMm { get; init; } = 300.0;
+
     /// <summary>Chỉ xem trước, không ghi vào drawing.</summary>
     public bool DryRun { get; init; } = true;
 }

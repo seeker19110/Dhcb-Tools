@@ -112,6 +112,11 @@ public sealed class BatchExportCommand : ICoreCommand<ExportConfig>
     private int ExportPdf(Document doc, List<ViewSheet> sheets,
         ExportConfig config, string projectNumber)
     {
+#if !REVIT2023_OR_GREATER
+        // PDFExportOptions chỉ có từ Revit 2022; Directory.Build.props không có hằng riêng cho 2022 nên
+        // dùng mốc 2023 — bản 2021/2022 báo rõ thay vì lỗi biên dịch/MissingMethodException lúc chạy.
+        throw new NotSupportedException("Xuất PDF cần Revit 2023 trở lên (API PDFExportOptions). Dùng in PDF thủ công hoặc xuất DWG.");
+#else
         var used = new HashSet<string>();
         int count = 0;
         foreach (var sheet in sheets)
@@ -130,6 +135,7 @@ public sealed class BatchExportCommand : ICoreCommand<ExportConfig>
                 count++;
         }
         return count;
+#endif
     }
 
     // ---- DWG -----------------------------------------------------------------
@@ -156,27 +162,33 @@ public sealed class BatchExportCommand : ICoreCommand<ExportConfig>
             };
             // Xuất một view với tên cụ thể → Revit ghi "<name>.dwg". Xuất cả lô với tên rỗng thì Revit
             // tự đặt "<Tên dự án>-Sheet - <số> - <tên>.dwg", bỏ qua FileNamePattern.
+            var before = SnapshotDwgFiles(config.OutputFolder);
             if (doc.Export(config.OutputFolder, name, new List<ElementId> { sheet.Id }, opts))
             {
                 count++;
-                NormalizeDwgName(config.OutputFolder, name);
+                NormalizeDwgName(config.OutputFolder, name, before);
             }
         }
         return count;
     }
 
+    private static HashSet<string> SnapshotDwgFiles(string folder) =>
+        new HashSet<string>(Directory.GetFiles(folder, "*.dwg"), StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// Một số bản Revit vẫn nối "-Sheet - ..." vào tên khi xuất DWG dù chỉ một view; đổi về đúng "&lt;name&gt;.dwg".
+    /// Nhận diện file bằng cách so danh sách .dwg trước/sau lần xuất (đúng file Revit vừa ghi) thay vì
+    /// glob "name-*.dwg" — glob đó khiến sheet "A-1" vớ nhầm file của "A-1-XX".
     /// </summary>
-    private static void NormalizeDwgName(string folder, string name)
+    private static void NormalizeDwgName(string folder, string name, HashSet<string> before)
     {
         string wanted = Path.Combine(folder, name + ".dwg");
         if (File.Exists(wanted)) return;
-        var candidates = Directory.GetFiles(folder, name + "-*.dwg");
-        if (candidates.Length == 1)
+        var created = Directory.GetFiles(folder, "*.dwg").Where(f => !before.Contains(f)).ToList();
+        if (created.Count == 1)
         {
-            File.Move(candidates[0], wanted);
-            string pcp = Path.ChangeExtension(candidates[0], ".pcp");
+            File.Move(created[0], wanted);
+            string pcp = Path.ChangeExtension(created[0], ".pcp");
             if (File.Exists(pcp)) File.Move(pcp, Path.Combine(folder, name + ".pcp"));
         }
     }

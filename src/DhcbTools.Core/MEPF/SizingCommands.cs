@@ -133,6 +133,8 @@ public sealed class SizingProposalCommand : ICoreCommand<SizingProposalConfig>
             rows++;
         }
 
+        var outputDir = Path.GetDirectoryName(config.OutputPath);
+        if (!string.IsNullOrEmpty(outputDir)) Directory.CreateDirectory(outputDir);
         File.WriteAllText(config.OutputPath, sb.ToString(), CsvText.Utf8WithBom);
         result.Summary = $"Đã đề xuất kích thước cho {rows} đoạn ({changes} khác hiện tại) → \"{config.OutputPath}\". Duyệt trong Excel rồi chạy ApplySizing.";
         result.AffectedCount = rows;
@@ -152,15 +154,16 @@ public sealed class ApplySizingCommand : ICoreCommand<ApplySizingConfig>
             return CommandResult.Fail($"Không tìm thấy file \"{config.InputPath}\".");
         }
 
-        var lines = File.ReadAllLines(config.InputPath, CsvText.Utf8WithBom);
-        if (lines.Length < 2)
+        // RFC 4180 qua CsvText.ReadRecords: ô nhiều dòng không còn bị cắt thành bản ghi hỏng.
+        var rows = CsvText.ReadRecords(config.InputPath).ToList();
+        if (rows.Count < 2)
         {
             return CommandResult.Fail("File CSV chỉ có tiêu đề hoặc rỗng.");
         }
 
-        var header = CsvText.SplitLine(lines[0]);
-        var idCol = header.FindIndex(h => h.Equals("ElementId", StringComparison.OrdinalIgnoreCase));
-        var sizeCol = header.FindIndex(h => h.Equals("SuggestedSizeMm", StringComparison.OrdinalIgnoreCase));
+        var header = rows[0];
+        var idCol = Array.FindIndex(header, h => h.Equals("ElementId", StringComparison.OrdinalIgnoreCase));
+        var sizeCol = Array.FindIndex(header, h => h.Equals("SuggestedSizeMm", StringComparison.OrdinalIgnoreCase));
         if (idCol < 0 || sizeCol < 0)
         {
             return CommandResult.Fail("CSV cần cột ElementId và SuggestedSizeMm.");
@@ -168,11 +171,11 @@ public sealed class ApplySizingCommand : ICoreCommand<ApplySizingConfig>
 
         var plan = new List<(MEPCurve Curve, double Mm)>();
         var result = CommandResult.Ok(string.Empty);
-        for (var i = 1; i < lines.Length; i++)
+        for (var i = 1; i < rows.Count; i++)
         {
-            if (string.IsNullOrWhiteSpace(lines[i])) continue;
-            var cells = CsvText.SplitLine(lines[i]);
-            if (cells.Count <= Math.Max(idCol, sizeCol) || !RevitCompat.TryParseId(cells[idCol], out var id) || !NumericText.TryParseDouble(cells[sizeCol], out var mm) || mm <= 0)
+            var cells = rows[i];
+            if (cells.All(string.IsNullOrWhiteSpace)) continue;
+            if (cells.Length <= Math.Max(idCol, sizeCol) || !RevitCompat.TryParseId(cells[idCol], out var id) || !NumericText.TryParseDouble(cells[sizeCol], out var mm) || mm <= 0)
             {
                 result.Messages.Add($"Dòng {i + 1}: thiếu ElementId/SuggestedSizeMm hợp lệ — bỏ qua.");
                 continue;

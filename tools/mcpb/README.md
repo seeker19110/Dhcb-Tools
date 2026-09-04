@@ -5,7 +5,12 @@ Giai đoạn 10.4. Cài DHCB Tools vào Claude Desktop bằng một cú mở fil
 
 ## Đóng gói
 
+**Cần trên máy đóng gói:** Windows + PowerShell, và **Node.js (kèm `npx`)** — script gọi
+`npx @anthropic-ai/mcpb pack`, không có `npx` thì dừng ngay ở bước đó. Người **cài** gói `.mcpb` thì không
+cần Node, chỉ cần Python 3.9+.
+
 ```powershell
+node --version   # kiểm tra trước; chưa có thì cài Node LTS từ nodejs.org
 .\scripts\pack-mcpb.ps1
 ```
 

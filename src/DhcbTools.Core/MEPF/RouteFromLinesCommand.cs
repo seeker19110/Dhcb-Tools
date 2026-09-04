@@ -328,7 +328,22 @@ public sealed class RouteFromLinesCommand : ICoreCommand<RouteFromLinesConfig>
     {
         var createdIds = new HashSet<ElementId>(created.Select(c => c.Id));
         var candidates = new List<Connector>();
-        foreach (var el in new FilteredElementCollector(doc).WhereElementIsNotElementType().ToElements())
+        // Chỉ quét các category MEP có connector — trước đây duyệt MỌI phần tử trong tài liệu.
+        var mepCategories = new List<BuiltInCategory>
+        {
+            BuiltInCategory.OST_PipeCurves, BuiltInCategory.OST_PipeFitting, BuiltInCategory.OST_PipeAccessory,
+            BuiltInCategory.OST_FlexPipeCurves, BuiltInCategory.OST_PlumbingFixtures, BuiltInCategory.OST_Sprinklers,
+            BuiltInCategory.OST_DuctCurves, BuiltInCategory.OST_DuctFitting, BuiltInCategory.OST_DuctAccessory,
+            BuiltInCategory.OST_FlexDuctCurves, BuiltInCategory.OST_DuctTerminal, BuiltInCategory.OST_MechanicalEquipment,
+            BuiltInCategory.OST_CableTray, BuiltInCategory.OST_CableTrayFitting,
+            BuiltInCategory.OST_Conduit, BuiltInCategory.OST_ConduitFitting,
+            BuiltInCategory.OST_ElectricalEquipment, BuiltInCategory.OST_ElectricalFixtures,
+        };
+        var elements = new FilteredElementCollector(doc)
+            .WherePasses(new ElementMulticategoryFilter(mepCategories))
+            .WhereElementIsNotElementType()
+            .ToElements();
+        foreach (var el in elements)
         {
             if (createdIds.Contains(el.Id))
             {
@@ -343,7 +358,11 @@ public sealed class RouteFromLinesCommand : ICoreCommand<RouteFromLinesConfig>
 
             foreach (Connector c in cm.Connectors)
             {
-                if (!c.IsConnected && c.ConnectorType != ConnectorType.End)
+                // Đầu ống/ống gió là ConnectorType.End (family là Physical) — không được loại End,
+                // chỉ bỏ Logical và Curve vì không nối được vật lý.
+                if (!c.IsConnected
+                    && c.ConnectorType != ConnectorType.Logical
+                    && c.ConnectorType != ConnectorType.Curve)
                 {
                     candidates.Add(c);
                 }

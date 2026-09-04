@@ -8,9 +8,9 @@ một task hẹn giờ là đủ để sáng hôm sau có PDF, health report, lo
 | Thành phần | Ở đâu | Việc |
 |---|---|---|
 | `DhcbTools.BatchRunner.exe` | `src/DhcbTools.BatchRunner` (net8.0, không tham chiếu Revit/AutoCAD) | Đọc job, mở Revit / accoreconsole, gom log, xuất báo cáo HTML, trả mã thoát |
-| `BatchJobRunner` | `src/DhcbTools.Core/Batch` | Bên trong Revit: mở → chạy step qua `RevitCommandTable` → lưu → đóng, ghi `run.jsonl` |
+| `BatchJobRunner` | `src/DhcbTools.Core/Batch` | Bên trong Revit: mở → chạy step qua `RevitCommandTable` → lưu → đóng, ghi log JSONL của lượt chạy |
 | Hook trong `App.cs` | `src/DhcbTools.Revit` | Khi Revit khởi động, thấy `%APPDATA%\DHCB\pending-job.json` thì chạy job rồi thoát |
-| `DHCB_RUN` | `src/DhcbTools.AutoCAD/Commands` | Lệnh không hỏi gì, đọc step JSON, ghi `run.jsonl` — dùng trong script accoreconsole |
+| `DHCB_RUN` | `src/DhcbTools.AutoCAD.Core` (vỏ core-only) | Lệnh không hỏi gì, đọc step JSON, ghi log JSONL — dùng trong script accoreconsole |
 | `JobTokens`, `BatchJob`, `RunLog`, `BatchReport`, `AcadScriptGen` | `Shared.Logic/Batch` | Phần thuần, có test |
 
 ## File job
@@ -20,6 +20,11 @@ Xem [`jobs/nightly.sample.json`](../jobs/nightly.sample.json) (Revit) và
 
 - `app`: `revit` (mặc định) hoặc `autocad`.
 - `saveMode`: `None` (đóng không lưu) · `Save` · `SaveAs` (lưu bản sao vào `outputFolder`, **mặc định**, không đụng bản gốc).
+  ⚠️ **Đổi hành vi:** bên AutoCAD, `Save` nay **lưu đè file gốc thật** bằng `SAVEAS`; trước đây nó chỉ ghi một dòng log
+  mà không lưu gì. Job cũ đang để `Save` vì tưởng vô hại thì phải đổi sang `None`/`SaveAs` trước khi chạy lại.
+- `saveOnError` (bool, mặc định `false`): batch Revit **không lưu** file có bước lỗi. Đặt `true` nếu muốn giữ lại phần
+  đã làm được của file lỗi.
+- `dwgVersion` (chuỗi, mặc định `"2018"`): phiên bản DWG cho `SAVEAS` bên AutoCAD.
 - `files[]`: `path`, `detachFromCentral`, `worksets` (chỉ mở các workset này), `onlySteps` (lọc step cho riêng file).
 - `steps[]`: `command` = đúng `CommandName` của Core (xem `dhcb_agent.py revit tools`), `config` = config của lệnh,
   `skipIfPreviousFailed`.
@@ -41,14 +46,20 @@ DhcbTools.BatchRunner.exe --job jobs\nightly.json --report-only --analyze
 DhcbTools.BatchRunner.exe --job jobs\nightly.json --dry-run
 ```
 
-Kết quả trong `logs/{yyyy-MM-dd}/`: `run.jsonl` (mỗi dòng một step), `report.html` (bảng file × step, xanh/đỏ, bấm
-xem chi tiết), `warnings-summary.md` (khi `--analyze`, xem [`ai-offline.md`](ai-offline.md)).
+Kết quả trong `logs/{yyyy-MM-dd}/`: **`run-HHmmss.jsonl`** (mỗi dòng một step; **mỗi lần chạy một file riêng**, không
+gộp chung theo ngày như bản `run.jsonl` cũ), `report.html` (bảng file × step, xanh/đỏ, bấm xem chi tiết),
+`warnings-summary.md` (khi `--analyze`, xem [`ai-offline.md`](ai-offline.md)).
+
+`--report-only` lấy **file log mới nhất** trong thư mục ngày, và vẫn đọc được `run.jsonl` cũ nên log của các đêm trước
+không mất giá trị. Bước AutoCAD dựng script trong thư mục làm việc `acad-steps-HHmmss` (trước là `acad-steps`) nên hai
+lượt chạy trong cùng một ngày không giẫm lên nhau.
 
 Mã thoát: `0` mọi step thành công · `1` có step lỗi/bỏ qua · `2` lỗi cấu hình (không đọc được job, không tìm thấy Revit).
 
 ## Luồng Revit
 
-1. Runner ghi `pending-job.json` (đường dẫn job, run.jsonl, max-minutes, dryRun) và một journal tối giản tắt hộp thoại lỗi.
+1. Runner ghi `pending-job.json` (đường dẫn job, đường dẫn file log của lượt chạy, max-minutes, dryRun) và một journal
+   tối giản tắt hộp thoại lỗi.
 2. Runner mở `Revit.exe journal /nosplash` và chờ `batch-done.json`.
 3. Add-in, trong `ApplicationInitialized`, thấy pending-job → `BatchJobRunner.Run` → ghi `batch-done.json` → `Environment.Exit`.
    Mọi transaction dùng `SilentFailuresPreprocessor` nên không có hộp thoại treo máy.

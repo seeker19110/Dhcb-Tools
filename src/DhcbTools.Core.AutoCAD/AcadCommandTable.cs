@@ -7,8 +7,10 @@ using DhcbTools.Core.AutoCAD.Reporting;
 using DhcbTools.Core.AutoCAD.TextTools;
 using DhcbTools.Core.AutoCAD.Testing;
 using DhcbTools.Shared.Logic.Ai;
+using System.Text.RegularExpressions;
 using Autodesk.AutoCAD.DatabaseServices;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace DhcbTools.Core.AutoCAD;
 
@@ -57,11 +59,31 @@ public static class AcadCommandTable
         }
     }
 
+    /// <summary>
+    /// Trường lạ trong config là lỗi, không phải bỏ qua: agent gõ <c>outputPatch</c> thay vì <c>outputPath</c>
+    /// mà lệnh vẫn chạy với giá trị mặc định thì không ai biết vì sao file không ra.
+    /// </summary>
+    private static readonly JsonSerializerSettings StrictSettings = new()
+    {
+        MissingMemberHandling = MissingMemberHandling.Error,
+    };
+
+    private static readonly Regex MissingMemberName = new("member '(?<name>[^']+)'", RegexOptions.Compiled);
+
     private static T Deserialize<T>(string json)
     {
         try
         {
-            var result = JsonConvert.DeserializeObject<T>(string.IsNullOrWhiteSpace(json) ? "{}" : json);
+            var text = string.IsNullOrWhiteSpace(json) ? "{}" : json;
+
+            // RunTests ép "dryRun" vào MỌI ca kiểm (kể cả lệnh chỉ đọc như LayerExport) — đó là cờ an toàn
+            // của runner chứ không phải lỗi gõ, nên bỏ qua riêng nó khi config không có DryRun.
+            if (typeof(T).GetProperty("DryRun") is null && JsonConvert.DeserializeObject<JObject>(text) is { } obj && obj.Remove("dryRun"))
+            {
+                text = obj.ToString(Formatting.None);
+            }
+
+            var result = JsonConvert.DeserializeObject<T>(text, StrictSettings);
             if (result is null)
             {
                 throw new ConfigException($"Không thể deserialize config thành {typeof(T).Name}.");
@@ -71,6 +93,12 @@ public static class AcadCommandTable
             // trường thì property là null và lệnh nổ NullReferenceException trần trụi. Chặn ở đây.
             RequiredConfig.ThrowIfIncomplete(result, typeof(T).Name);
             return result;
+        }
+        catch (JsonSerializationException ex) when (MissingMemberName.Match(ex.Message) is { Success: true } m)
+        {
+            var known = string.Join(", ", typeof(T).GetProperties().Select(p => char.ToLowerInvariant(p.Name[0]) + p.Name.Substring(1)));
+            throw new ConfigException(
+                $"E-CONFIG-UNKNOWN: config cho {typeof(T).Name} có trường không tồn tại \"{m.Groups["name"].Value}\". Trường hợp lệ: {known}.", ex);
         }
         catch (JsonException ex)
         {

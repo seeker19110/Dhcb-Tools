@@ -48,6 +48,7 @@ Name: "revit2025";  Description: "Add-in Revit 2025";      Types: full
 Name: "acad2024";   Description: "Plugin AutoCAD 2024";    Types: full
 Name: "acad2025";   Description: "Plugin AutoCAD 2025";    Types: full
 Name: "batch";      Description: "Batch runner chạy đêm";  Types: full
+Name: "scripts";    Description: "Script Python (agent client, MCP server, AI offline)"; Types: full
 
 [Files]
 ; ── Revit: %APPDATA%\Autodesk\Revit\Addins\<năm>\ ────────────────────────────
@@ -70,12 +71,20 @@ Source: "{#StageDir}\PackageContents.xml"; DestDir: "{userappdata}\Autodesk\Appl
 Source: "{#StageDir}\batchrunner\*"; DestDir: "{app}"; \
   Components: batch; Flags: ignoreversion recursesubdirs createallsubdirs
 
+; ── Script Python: dhcb_agent.py / dhcb_mcp_server.py / dhcb_ai.py ──────────
+; release.yml đã chép scripts/*.py và *.ps1 vào gói batchrunner, nhưng người chỉ cài phần "scripts"
+; (không cài batch runner) vẫn cần chúng: MCP server cho Claude Desktop và client dòng lệnh đều nằm ở đây.
+; Chỉ cần Python 3.9+, không có dependency ngoài.
+Source: "{#StageDir}\batchrunner\scripts\*"; DestDir: "{app}\scripts"; \
+  Components: scripts; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+
 [Dirs]
 ; Tạo sẵn để shortcut log không trỏ vào thư mục chưa tồn tại (add-in tự tạo khi ghi dòng đầu tiên).
 Name: "{userappdata}\DHCB\logs"
 
 [Icons]
 Name: "{group}\Thư mục batch runner"; Filename: "{app}"; Components: batch
+Name: "{group}\Thư mục script Python"; Filename: "{app}\scripts"; Components: scripts
 Name: "{group}\Thư mục log DHCB";     Filename: "{userappdata}\DHCB\logs"
 Name: "{group}\Gỡ cài đặt DHCB Tools"; Filename: "{uninstallexe}"
 
@@ -100,7 +109,8 @@ begin
     // Revit hỏi "Unsigned Add-In" ở lần mở đầu tiên — nói trước để kỹ sư không tưởng là lỗi.
     MsgBox('Đã cài xong.' + #13#10 + #13#10 +
            'Lần đầu mở Revit sẽ có hộp thoại "Unsigned Add-In" — chọn "Always Load".' + #13#10 +
-           'AutoCAD: plugin tự nạp khi khởi động (không cần NETLOAD).' + #13#10 + #13#10 +
+           'AutoCAD: plugin tự nạp khi khởi động (không cần NETLOAD).' + #13#10 +
+           'Script Python (nếu đã chọn) nằm trong thư mục cài đặt, mục scripts\ — cần Python 3.9+.' + #13#10 + #13#10 +
            'Log nằm ở %APPDATA%\DHCB\logs.', mbInformation, MB_OK);
   end;
 end;

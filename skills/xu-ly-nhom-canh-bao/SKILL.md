@@ -17,7 +17,9 @@ query warnings { "limit": 0 }
 exec WarningsExport { "outputPath": "<Documents>/warnings.csv" }
 ```
 
-`query warnings` cho dữ liệu để phân tích ngay; `WarningsExport` cho file CSV kỹ sư lọc trong Excel.
+`query warnings` cho dữ liệu để phân tích ngay; `WarningsExport` cho file CSV kỹ sư lọc trong Excel (ghi file,
+không sửa mô hình). `limit: 0` nghĩa là **không giới hạn** — lấy hết để đếm đúng; chỉ đặt `limit > 0` khi
+muốn xem nhanh vài dòng đầu.
 
 ### 2. Gom theo loại, không theo từng cái
 

@@ -2,13 +2,13 @@
 
 Ảnh chụp tại thời điểm cập nhật gần nhất. Kế hoạch phía trước xem [`roadmap.md`](roadmap.md).
 
-> Cập nhật lần cuối: 2026-09-03 · Nhánh `main`, sau vòng kiểm thử chạy **bên trong Revit 2024.3** cho
-> **đủ 42/42 lệnh**.
+> Cập nhật lần cuối: 2026-09-04 · Nhánh `main`, sau đêm batch đầu tiên trên **dự án thật** (§20) và vòng
+> đóng vai kỹ sư dùng thử (§21).
 >
 > **Đã kiểm trên Revit thật:** 42/42 lệnh Revit có ít nhất một ca kiểm chạy trong Revit, chia ba bộ theo
 > model mẫu (kiến trúc / HVAC / cấp thoát nước) — xem [Kiểm thử](#kiểm-thử) và
-> [`bang-chung-test.md`](bang-chung-test.md) §8. Vòng này lộ ra **7 lỗi** mà 481 test thuần không bắt được,
-> tất cả đã sửa kèm test chốt chặn.
+> [`bang-chung-test.md`](bang-chung-test.md) §8. Vòng này lộ ra **7 lỗi** mà bộ test thuần (481 ca *tại thời
+> điểm đó*) không bắt được, tất cả đã sửa kèm test chốt chặn.
 >
 > **Đã kiểm trên AutoCAD thật:** 15/15 lệnh AutoCAD cũng có ca kiểm tự động, chạy qua `accoreconsole`
 > bằng cùng cơ chế và cùng tầng đánh giá với bên Revit — §10. Vòng đầu lộ ra 2 lỗi (cùng họ với lỗi
@@ -17,8 +17,11 @@
 > **Đường ghi thật:** 12 ca ghi thật trên bản chép của file mẫu, chuỗi tự chứng minh đã `Commit()` chứ
 > không rollback, và tự khôi phục — §11.
 >
-> **Còn lại:** đường ghi mới phủ 4 lệnh có phép nghịch đảo; lệnh **tạo phần tử mới** chưa có ca ghi. Và
-> cần một đêm batch trên **dự án thật** thay vì file mẫu.
+> **Đã chạy trên dự án thật:** một đêm batch 10 bước chỉ đọc trên 9 file `.rvt` của một dự án thật (8/9 chạy
+> trọn; file còn lại lỗi mạng tới central model) — §20; và một vòng đóng vai kỹ sư dùng thử — §21.
+>
+> **Còn lại:** chưa có job nào chạy **tự động qua Task Scheduler** (hai lượt ở §20/§21 đều chạy tay); chất
+> lượng tuyến `AutoRoute` vẫn chưa chứng minh được; và 9.4 — đưa cho một nhóm kỹ sư dùng thật.
 
 ## Tóm tắt
 
@@ -41,14 +44,14 @@
 | Giai đoạn 7 P1 — khoảng trống so với tool thị trường ([`nghien-cuu-tool-thi-truong-va-ke-hoach.md`](nghien-cuu-tool-thi-truong-va-ke-hoach.md)) | ✅ Mã nguồn (PR #11): SheetRename, RevisionOnSheets, StylePurge, ColorByParameter, FamilyAudit, WarningsExport, checkset ngưỡng; batch autodetect phiên bản Revit + PlotPdf; AI structured outputs + ≤ 8 ứng viên; MCP read-only/nhóm. ⬜ Phần AutoCAD (LayerTranslate, DrawingCompare, BlockQuantity, AttributeIncrement, purge text/dim/regapp) **chưa có mã nguồn** |
 | Giai đoạn 7 P2 | ✅ Mã nguồn (PR #12): SlopePipes, PipeKick, SystemBom, AutoRoute, ScheduleExport, ViewportCopy; vỏ `DhcbTools.AutoCAD.Core` (chỉ AcDbMgd/AcCoreMgd) cho accoreconsole; map năm AutoCAD → package (2026.1+ là .NET 10) |
 | Hướng dẫn cài đặt & kiểm thử thủ công | ✅ (PR #13) [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md) — checklist R1–R48, C1–C17, B1–B12, M1–M4 |
-| Kiểm thử tự động | ✅ **574 test xUnit** (`Shared.Logic` + `Shared.Hosting`), gồm bốn bộ đối chiếu mã nguồn với nhau: `RibbonCoverageTests` (vỏ Revit ↔ bảng lệnh), `CatalogFieldTests` (catalog ↔ property config thật), `SuiteCoverageTests` (42/42 lệnh có ca kiểm chạy trong Revit), `VietnameseMessageTests` (không còn thông báo tiếng Anh trong Core) |
+| Kiểm thử tự động | ✅ Bộ test xUnit (`Shared.Logic` + `Shared.Hosting`), gồm bốn bộ đối chiếu mã nguồn với nhau: `RibbonCoverageTests` (vỏ Revit ↔ bảng lệnh), `CatalogFieldTests` (catalog ↔ property config thật), `SuiteCoverageTests` (42/42 lệnh có ca kiểm chạy trong Revit), `VietnameseMessageTests` (không còn thông báo tiếng Anh trong Core) |
 | CI | ✅ `tests.yml` (test + check-build bằng API package, ubuntu) — xanh |
 | CD | ✅ đóng gói Release thật (Revit 2023/2024/2025, AutoCAD 2024/2025) + GitHub Release khi đẩy tag (`release.yml`, windows-latest) |
 
 Toàn bộ 57 lệnh đã có mã nguồn và biên dịch xanh với API package. **42/42 lệnh Revit đã chạy thật ít nhất
-một lần trong Revit 2024.3**; 15 lệnh AutoCAD mới chạy tay một phần. Việc có giá trị nhất lúc này là
-**làm cho AutoCAD có bộ ca kiểm tự động tương đương** (accoreconsole đã chạy được nên không cần cơ chế mới),
-rồi mới tới 9.4 — đưa cho một nhóm kỹ sư dùng thật.
+một lần trong Revit 2024.3** và **15/15 lệnh AutoCAD** đã có ca kiểm tự động qua `accoreconsole` (§10).
+Việc có giá trị nhất lúc này là **9.4 — đưa cho một nhóm kỹ sư dùng thật**; phản hồi của họ quyết định
+giai đoạn 10/11 đi sâu vào đâu.
 
 ---
 
@@ -68,8 +71,9 @@ nhưng file không có trong repo — CI bắt được vì bảng lệnh và ca
 `BlockQuantity`, `AttributeIncrement`, `CadLayerMap`) **đã có mã nguồn** trong `Core.AutoCAD` (thư mục
 `Attributes/`, `TextTools/`, `LayerTools/`, `Reporting/`), dây vào `AcadCommandTable` và có vỏ lệnh
 `[CommandMethod]` tương ứng trong `DhcbTools.AutoCAD`; `.Pending()` đã được gỡ nên giờ chào ra `GET /tools`,
-MCP và lớp ra lệnh tiếng Việt bình thường. **Chưa chạy thử trên AutoCAD thật** — chỉ mới đọc kỹ mã nguồn thủ
-công (không có `dotnet` trong môi trường viết code để build/test), rủi ro lỗi biên dịch hoặc sai tên API vẫn còn.
+MCP và lớp ra lệnh tiếng Việt bình thường. **Đã chạy trên AutoCAD thật**: cả 15/15 lệnh có ca kiểm tự động
+qua `accoreconsole` (18/18 ca, §10) — vòng đó lộ 2 lỗi ghi đè im lặng ở `LayerImport`/`AttributeImport`,
+đã sửa kèm ca song sinh.
 
 Hai đơn giản hoá đáng chú ý so với đặc tả gốc:
 - **`DrawingCompare`**: so sánh **mức layer** (đếm entity theo layer giữa hai file) thay vì so từng entity theo
@@ -78,7 +82,7 @@ Hai đơn giản hoá đáng chú ý so với đặc tả gốc:
   vì khớp text theo khoảng cách hình học dễ sai trên bản vẽ dày đặc.
 
 Kéo theo: `jobs/autocad-nightly.sample.json` và các mục `C16`, `B12`, phần `DrawingCompare` trong hướng dẫn kiểm
-thử thủ công nay có mã nguồn để chạy, nhưng vẫn **chưa được kiểm trên AutoCAD thật**.
+thử thủ công nay đã chạy được qua `accoreconsole`; phần **kiểm tay trong giao diện AutoCAD** (C1–C17) thì vẫn còn.
 
 ---
 
@@ -113,11 +117,10 @@ Xem [Lệnh AutoCAD — nay đã đủ 15 lệnh có mã nguồn](#lệnh-autoca
 giản hoá so với đặc tả gốc.
 
 ### Ribbon Revit
-6 panel: Nền tảng · Xuất & Báo cáo · Khởi tạo dự án · MEPF · Hồ sơ & Style · Kiểm tra & AI, phủ đủ 42 lệnh.
-`CommandRunner` đọc config JSON ở
-`%APPDATA%\DHCB\configs\revit\<Lệnh>.json` → chạy xem trước (`dryRun`) → hỏi xác nhận → chạy thật; hiện mới dùng cho
-bản build không WPF. Hai panel còn thiếu (Hồ sơ & Style, AI offline & Batch) và phần lớn lệnh giai đoạn 7 chưa có nút —
-xem [Phần chưa có mã nguồn](#phần-chưa-có-mã-nguồn).
+6 panel, đúng tên trong `src/DhcbTools.Revit/App.cs`: **Nền tảng · Xuất & Báo cáo · Khởi tạo dự án · MEPF ·
+Hồ sơ & Style · Kiểm tra & AI** — phủ đủ 42 lệnh (nút phẳng + nút xổ xuống). `CommandRunner` đọc config JSON ở
+`%APPDATA%\DHCB\configs\revit\<Lệnh>.json` → chạy xem trước (`dryRun`) → hỏi xác nhận → chạy thật.
+Còn thiếu: **AI chat dạng WPF** — lớp AI hiện dùng qua Bridge `/chat` và `dhcb_agent.py`.
 
 ### Kiểm thử
 `tests/DhcbTools.Shared.Logic.Tests`: CSV, số, đánh số, MEP layout, tên file, phiên bản xuất, HTML, token, **CleanupDecider,
@@ -142,8 +145,8 @@ Core/vỏ (kể cả vỏ core-only) trên Linux với API Revit 2025 + AutoCAD 
 | **Quét hồi quy sau 10 PR** | 2026-09-03 | **90 đạt / 0 trượt / 1 bỏ qua trên 91 ca**, cả 7 bộ (Revit smoke·mep·plumbing·write·write-mep, AutoCAD smoke·write) — §15 |
 | **`SleeveAuto` đọc model liên kết** | 2026-09-03 | **0 → 345 sleeve** trên Snowdon HVAC (tường nằm ở link kiến trúc); tối ưu hộp bao 49,8 s → **1,2 s**; bộ mep 17/17 — §14 |
 | **Bộ tìm đường `AutoRoute`** | 2026-09-03 | **4049 ms → 10 ms**, 58.720 → 5.783 ô mở rộng trên 550 vật cản (đo bản cũ cạnh bản mới); trên Snowdon HVAC **0,3 s → 82 ms** (bước 500 mm) và **17,9 s → 815 ms** (bước 100 mm); thất bại nay chứng minh được tuyến KHÔNG tồn tại thay vì chỉ báo hết giờ; bộ `mep` **20/20** — §19 |
-| **Đêm batch thật đầu tiên — dự án GOLDVIEW TTTM** | 2026-09-04 | **8/9 file `.rvt` thật** (00–03 kiến trúc, 05–08 MEP, 139–176 MB/file) chạy trọn 10 bước chỉ đọc, không đụng file gốc; lộ TaskDialog nâng cấp phiên bản treo batch 43 phút — sửa bằng `DialogBoxShowing`, chạy lại qua đúng chỗ đó trong 86 giây; file 04 lỗi mạng tới central model (`\\192.168.1.11`), không phải lỗi mã nguồn; tạo bản sao Revit 2024 cho 8/9 file để lần sau mở tức thì — §20 |
-| **Đóng vai kỹ sư dùng thử trên GOLDVIEW** | 2026-09-04 | `ApplySizing` 113/113, `HangerAuto` nhận đúng family thật của dự án, `RemoveUnusedViews` xem trước khớp thật tuyệt đối; lộ friction thật (`ElevationTag`/`HangerAuto` cần tên tham số/family riêng dự án — đúng thiết kế báo lỗi 9.2, không phải bug) và **một lỗi ngầm nguy hiểm**: bản sao mất trạng thái nạp link khiến `ClashDetection` báo sai **0** thay vì **479** va chạm — sửa bằng nạp lại link + thử file cạnh host, đo lại đúng 479 — §21 |
+| **Đêm batch thật đầu tiên — dự án thực tế A** | 2026-09-04 | **8/9 file `.rvt` thật** (00–03 kiến trúc, 05–08 MEP, 139–176 MB/file) chạy trọn 10 bước chỉ đọc, không đụng file gốc; lộ TaskDialog nâng cấp phiên bản treo batch 43 phút — sửa bằng `DialogBoxShowing`, chạy lại qua đúng chỗ đó trong 86 giây; file 04 lỗi mạng tới central model (máy chủ `<server-A>`), không phải lỗi mã nguồn; tạo bản sao Revit 2024 cho 8/9 file để lần sau mở tức thì — §20 |
+| **Đóng vai kỹ sư dùng thử trên dự án thực tế A** | 2026-09-04 | `ApplySizing` 113/113, `HangerAuto` nhận đúng family thật của dự án, `RemoveUnusedViews` xem trước khớp thật tuyệt đối; lộ friction thật (`ElevationTag`/`HangerAuto` cần tên tham số/family riêng dự án — đúng thiết kế báo lỗi 9.2, không phải bug) và **một lỗi ngầm nguy hiểm**: bản sao mất trạng thái nạp link khiến `ClashDetection` báo sai **0** thay vì **479** va chạm — sửa bằng nạp lại link + thử file cạnh host, đo lại đúng 479 — §21 |
 | **Lệnh chạy nền + `/progress/<id>`** | 2026-09-03 | 202 → `running` → `done`, hỏi lại kết quả không mất; 404/401 đúng — §13 |
 | **Đường ghi cho nhóm lệnh tạo phần tử mới** | 2026-09-03 | **11/11 (kiến trúc) + 4/4 (HVAC)**; `HangerAuto` 1120 → 0 sau khi bổ sung chống trùng; lộ lỗi chặn "batch treo ở hộp thoại cảnh báo lúc mở model" — §12 |
 
@@ -177,9 +180,9 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
   tức bị sàn và tường của model liên kết bao kín — không phải giới hạn bộ tìm đường. **Việc còn lại không
   còn là hiệu năng** mà là chọn được hai điểm trong cùng khoang trần kỹ thuật, nên chất lượng tuyến vẫn là
   con số không có. Giữ nhãn *thử nghiệm* vì lý do đó, không còn vì chậm.
-- **Chưa kiểm thử trên Revit/AutoCAD thật** cho toàn bộ lệnh — chỉ mới biên dịch với API package. Rủi ro cao nhất theo thứ tự:
-  `RouteFromLines` và `PipeKick` (fitting/cút 45° phụ thuộc routing preference), `AutoRoute` (thời gian A* với bước 100 mm
-  trên hộp lớn), `TransferStandards` (LineStyles/ObjectStyles không copy được qua API — đã ghi rõ trong Messages),
+- **Mỗi lệnh mới chạy thật trên một vài tình huống**, chưa phủ hết biến thể của dự án thật. Rủi ro còn cao nhất theo
+  thứ tự: `RouteFromLines` và `PipeKick` (fitting/cút 45° phụ thuộc routing preference), `AutoRoute` (chất lượng tuyến —
+  xem mục trên), `TransferStandards` (LineStyles/ObjectStyles không copy được qua API — đã ghi rõ trong Messages),
   `ProjectFromTemplate` (worksharing cần môi trường mạng), `StylePurge` (phân tích tham chiếu có thể thiếu trường hợp —
   luôn xem trước), `SlopePipes` trên ống đã nối fitting hai đầu (Revit có thể từ chối dịch điểm cuối).
 - `RvtFileInfo` nhận phiên bản bằng cách quét chuỗi trong 2 MB đầu file thay vì parse OLE — đủ cho batch, nhưng file mã hoá/
@@ -197,7 +200,7 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
    `SleeveAuto` cũng xong trong cùng ngày (§14): sửa lệnh để đọc model liên kết, sửa script để chép
    luôn model liên kết cạnh bản chép — chuỗi ghi thật **334 → 0** trên model thật.
 2. ~~Một đêm batch thật trên **dự án thật**~~ — phần "chạy được, chạy đúng, không làm hỏng gì trên dữ
-   liệu thật" xong (§20): 8/9 file dự án GOLDVIEW TTTM (~700 MB), lộ và sửa lỗi treo TaskDialog nâng cấp
+   liệu thật" xong (§20): 8/9 file của dự án thực tế A (~700 MB), lộ và sửa lỗi treo TaskDialog nâng cấp
    phiên bản (bug #13). File 04 lỗi mạng tới central model, việc của hạ tầng chứ không phải mã nguồn.
    Còn lại: **chưa có job nào thật sự chạy tự động qua `install-nightly-task.ps1`** — hai lượt ở §20 đều
    chạy tay. Đăng ký Task Scheduler khi có một job cần lặp lại định kỳ thật (ví dụ báo cáo đêm trên bản

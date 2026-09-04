@@ -132,7 +132,7 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("category", "category").Field("parameterName", "tham số đích").Field("prefix", "tiền tố").Field("padWidth", "số chữ số").Field("dryRun", "xem trước")
                 .Words("đánh số", "numbering", "đánh số cửa", "đánh số phòng"),
             new CommandDescriptor("BatchExport", Revit, "Xuất PDF/DWG/IFC/NWC hàng loạt", false, "Export")
-                .Field("outputFolder", "thư mục").Field("formats", "Pdf/Dwg/Ifc/Nwc").Field("sheetNumbers", "lọc sheet")
+                .Field("outputFolder", "thư mục").Field("formats", "Pdf/Dwg/Ifc/Nwc").Field("sheetNumbers", "lọc sheet").Field("fileNamePattern", "mẫu tên file {SheetNumber}-{SheetName}").Field("dryRun", "xem trước")
                 .Words("xuất pdf", "xuất dwg", "in hàng loạt", "export pdf", "xuất ifc"),
             new CommandDescriptor("HealthReport", Revit, "Báo cáo HTML sức khoẻ mô hình", false, "Health")
                 .Field("outputPath", "file HTML")
@@ -164,7 +164,9 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("maxSegmentMm", "chiều dài tối đa").Field("dryRun", "xem trước")
                 .Words("chia ống", "cắt ống", "split pipe", "chia đoạn"),
             new CommandDescriptor("ConnectorChecker", Revit, "Liệt kê connector MEP hở", false, "ConnectorCheck", "CheckConnectors")
-                .Field("create3dView", "tạo view khoanh vùng")
+                .Field("categories", "danh sách category (rỗng = mọi category MEP)").Field("domains", "Piping/Hvac/Electrical (rỗng = tất cả)")
+                .Field("create3dView", "true = GHI một 3D view khoanh vùng vào mô hình (thao tác ghi duy nhất của lệnh, mặc định false)")
+                .Field("viewName", "tên 3D view").Field("dryRun", "xem trước: không tạo view")
                 .Words("connector hở", "open connector", "kiểm tra connector"),
             new CommandDescriptor("RouteFromLines", Revit, "Routing mức A: dựng duct/pipe/tray từ model line vẽ tay", true, "Routing", "RouteA")
                 .Field("lineStyleName", "line style tuyến").Field("elementType", "Duct/Pipe/CableTray/Conduit").Field("typeName", "type").Field("systemType", "hệ")
@@ -211,7 +213,7 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("revisionSequence", "số thứ tự revision").Field("sheetNumberContains", "lọc sheet").Field("remove", "bỏ thay vì gán").Field("dryRun", "xem trước")
                 .Words("revision", "gán revision", "phát hành", "set revision"),
             new CommandDescriptor("StylePurge", Revit, "Liệt kê và xoá style không được tham chiếu: view template, filter, line/fill pattern, text/dim type, material", true, "PurgeStyles", "Wipe")
-                .Field("kinds", "ViewTemplates/Filters/LinePatterns/FillPatterns/TextTypes/DimensionTypes/Materials").Field("keepNameContains", "giữ lại").Field("dryRun", "xem trước")
+                .Field("kinds", "ViewTemplates/Filters/LinePatterns/FillPatterns/TextTypes/DimensionTypes/Materials").Field("keepNameContains", "giữ lại").Field("keepIfUncertain", "không xoá nhóm nào kiểm tham chiếu bị lỗi (mặc định bật)").Field("dryRun", "xem trước")
                 .Words("purge style", "xoá view template thừa", "xoá filter thừa", "dọn style", "wipe"),
             new CommandDescriptor("ColorByParameter", Revit, "Tô màu phần tử trong view theo giá trị tham số (palette tự sinh) + chú giải CSV", true, "ColorSplasher", "ColourSplasher")
                 .Field("viewName", "view (rỗng = view đang mở)").Field("categories", "category").Field("parameterName", "tham số").Field("legendCsvPath", "chú giải").Field("reset", "xoá override").Field("dryRun", "xem trước")
@@ -245,10 +247,11 @@ namespace DhcbTools.Shared.Logic.Ai
 
             // ── Revit — kiểm tra (cấp 2) ────────────────────────────────────
             new CommandDescriptor("ParameterRuleCheck", Revit, "Kiểm tra tham số thiếu / sai quy tắc đặt tên → HTML", false, "RuleCheck")
-                .Field("rulesPath", "file JSON quy tắc").Field("outputPath", "file HTML")
+                .Field("rulesPath", "file JSON quy tắc").Field("outputPath", "file HTML").Field("create3dView", "true = GHI một 3D view isolate phần tử vi phạm (chỉ khi dryRun=false)").Field("dryRun", "xem trước: không tạo view")
                 .Words("kiểm tra tham số", "rule check", "kiểm tra đặt tên"),
             new CommandDescriptor("ClashDetection", Revit, "Va chạm nội bộ giữa hai nhóm category → HTML + 3D view", false, "Clash")
                 .Field("categoriesA", "nhóm A").Field("categoriesB", "nhóm B").Field("outputPath", "file HTML").Field("acceptedPath", "clash-accepted.json")
+                .Field("includeLinkedModels", "xét cả model liên kết cho nhóm B (mặc định bật)", FieldKind.Bool).Field("create3dView", "true = GHI một 3D view isolate phần tử va chạm (chỉ khi dryRun=false)").Field("dryRun", "xem trước: không tạo view")
                 .Words("clash", "va chạm", "kiểm tra va chạm"),
 
             // ── Revit — AI (offline) ────────────────────────────────────────
@@ -336,6 +339,44 @@ namespace DhcbTools.Shared.Logic.Ai
         /// "lệnh không xác định" kèm danh sách hợp lệ thay vì im lặng bỏ qua.
         /// </summary>
         public static CommandDescriptor? Find(string app, string commandOrAlias) => AllFor(app).FirstOrDefault(c => c.Matches(commandOrAlias));
+
+        /// <summary>
+        /// Trường bool mà lớp Config THẬT mặc định <c>true</c> — form động dùng để tick sẵn checkbox khi
+        /// người dùng chưa lưu giá trị. Mọi trường bool khác mặc định false. (Danh sách này đối chiếu tay
+        /// với các <c>= true</c> trong Core; <c>dryRun</c> do form tự điều khiển nên không cần.)
+        /// </summary>
+        private static readonly HashSet<string> BoolTrueByDefault = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "dryRun",
+            "keepIfUncertain",
+            "includeLinkedModels",
+            "pinAfterCopy",
+            "fillSurfaces",
+            "findIsRegex",
+            "includeHeader",
+            "skipExisting",
+            "createFloorPlan",
+            "createCentral",
+            "closeAfterSave",
+            "removeUnplacedViews",
+            "removeEmptySheets",
+            "allowVertical",
+            "keepDuctHeight",
+            "onlyDefaultNames",
+            "depthFirst",
+            "skipFittings",
+            "checkWarnings",
+            "checkUnplacedViews",
+            "checkOpenConnectors",
+            "checkInPlaceFamilies",
+            "checkFileSizeMb",
+            "removeEmptyLayers",
+            "purgeUnusedBlocks",
+            "purgeUnusedLinetypes",
+        };
+
+        /// <summary>Giá trị mặc định của một trường bool theo lớp Config thật (false nếu không biết).</summary>
+        public static bool DefaultBool(string fieldName) => BoolTrueByDefault.Contains(fieldName ?? string.Empty);
 
         /// <summary>Danh sách tên chuẩn (phân biệt hoa thường theo Core) của một nền tảng.</summary>
         public static IReadOnlyList<string> Names(string app) => For(app).Select(c => c.Name).Distinct().ToList();

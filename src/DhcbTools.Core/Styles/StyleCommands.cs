@@ -13,6 +13,12 @@ public sealed class StylePurgeConfig
 
     public List<string> KeepNameContains { get; init; } = new List<string>();
 
+    /// <summary>
+    /// Nếu một bước phân tích tham chiếu ném lỗi (view template hỏng, category lạ…) thì KHÔNG xoá nhóm
+    /// đó — thiếu một nguồn tham chiếu là "không dùng" trở thành đoán mò. Mặc định bật.
+    /// </summary>
+    public bool KeepIfUncertain { get; init; } = true;
+
     public bool DryRun { get; init; } = true;
 }
 
@@ -33,6 +39,47 @@ public sealed class StylePurgeCommand : ICoreCommand<StylePurgeConfig>
         var kinds = new HashSet<string>(config.Kinds, StringComparer.OrdinalIgnoreCase);
         var views = new FilteredElementCollector(document).OfClass(typeof(View)).Cast<View>().ToList();
         var realViews = views.Where(v => !v.IsTemplate).ToList();
+        var templates = views.Where(v => v.IsTemplate).ToList();
+        var uncertain = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Một bước gom tham chiếu mà ném lỗi thì nhóm đó "không chắc": ghi lại và (mặc định) không xoá.
+        void Guard(string kind, Action gather, string what)
+        {
+            try
+            {
+                gather();
+            }
+            catch (Exception ex)
+            {
+                uncertain.Add(kind);
+                result.Messages.Add($"{kind}: không kiểm được {what} ({ex.Message})" + (config.KeepIfUncertain ? " — giữ nguyên nhóm này." : "."));
+            }
+        }
+
+        // Override theo category trong view template (line pattern chiếu/cắt, fill pattern) — nguồn tham
+        // chiếu bị bỏ sót trước đây nên pattern chỉ dùng trong template bị coi là thừa.
+        var templateLinePatterns = new HashSet<ElementId>();
+        var templateFillPatterns = new HashSet<ElementId>();
+        if (kinds.Contains("LinePatterns") || kinds.Contains("FillPatterns"))
+        {
+            var categoryIds = document.Settings.Categories.Cast<Category>().Select(c => c.Id).ToList();
+            foreach (var t in templates)
+            {
+                Guard(kinds.Contains("LinePatterns") ? "LinePattern" : "FillPattern", () =>
+                {
+                    foreach (var cid in categoryIds)
+                    {
+                        OverrideGraphicSettings o;
+                        try { o = t.GetCategoryOverrides(cid); } catch { continue; }
+                        templateLinePatterns.Add(o.ProjectionLinePatternId); templateLinePatterns.Add(o.CutLinePatternId);
+                        templateFillPatterns.Add(o.SurfaceForegroundPatternId); templateFillPatterns.Add(o.SurfaceBackgroundPatternId);
+                        templateFillPatterns.Add(o.CutForegroundPatternId); templateFillPatterns.Add(o.CutBackgroundPatternId);
+                    }
+                }, $"override category của view template \"{t.Name}\"");
+            }
+            if (uncertain.Contains("LinePattern")) uncertain.Add("FillPattern");
+            if (uncertain.Contains("FillPattern")) uncertain.Add("LinePattern");
+        }
 
         if (kinds.Contains("ViewTemplates"))
         {
@@ -48,7 +95,7 @@ public sealed class StylePurgeCommand : ICoreCommand<StylePurgeConfig>
             var used = new HashSet<ElementId>();
             foreach (var v in views)
             {
-                try { foreach (var f in v.GetFilters()) used.Add(f); } catch { /* view không hỗ trợ filter */ }
+                Guard("Filter", () => { foreach (var f in v.GetFilters()) used.Add(f); }, $"filter của view \"{v.Name}\"");
             }
             foreach (var f in new FilteredElementCollector(document).OfClass(typeof(ParameterFilterElement)).Cast<ParameterFilterElement>())
             {
@@ -62,7 +109,7 @@ public sealed class StylePurgeCommand : ICoreCommand<StylePurgeConfig>
 
         if (kinds.Contains("LinePatterns"))
         {
-            var used = new HashSet<ElementId>();
+            var used = new HashSet<ElementId>(templateLinePatterns);
             foreach (Category cat in document.Settings.Categories)
             {
                 try
@@ -79,7 +126,7 @@ public sealed class StylePurgeCommand : ICoreCommand<StylePurgeConfig>
             }
             foreach (var v in views)
             {
-                try
+                Guard("LinePattern", () =>
                 {
                     foreach (var f in v.GetFilters())
                     {
@@ -87,8 +134,7 @@ public sealed class StylePurgeCommand : ICoreCommand<StylePurgeConfig>
                         used.Add(o.ProjectionLinePatternId);
                         used.Add(o.CutLinePatternId);
                     }
-                }
-                catch { /* ignore */ }
+                }, $"override filter của view \"{v.Name}\"");
             }
             foreach (var lp in new FilteredElementCollector(document).OfClass(typeof(LinePatternElement)).Cast<LinePatternElement>())
             {
@@ -98,19 +144,22 @@ public sealed class StylePurgeCommand : ICoreCommand<StylePurgeConfig>
 
         if (kinds.Contains("FillPatterns"))
         {
-            var used = new HashSet<ElementId>();
-            foreach (var m in new FilteredElementCollector(document).OfClass(typeof(Material)).Cast<Material>())
+            var used = new HashSet<ElementId>(templateFillPatterns);
+            Guard("FillPattern", () =>
             {
-                used.Add(m.SurfaceForegroundPatternId); used.Add(m.SurfaceBackgroundPatternId);
-                used.Add(m.CutForegroundPatternId); used.Add(m.CutBackgroundPatternId);
-            }
-            foreach (var fr in new FilteredElementCollector(document).OfClass(typeof(FilledRegionType)).Cast<FilledRegionType>())
-            {
-                used.Add(fr.ForegroundPatternId); used.Add(fr.BackgroundPatternId);
-            }
+                foreach (var m in new FilteredElementCollector(document).OfClass(typeof(Material)).Cast<Material>())
+                {
+                    used.Add(m.SurfaceForegroundPatternId); used.Add(m.SurfaceBackgroundPatternId);
+                    used.Add(m.CutForegroundPatternId); used.Add(m.CutBackgroundPatternId);
+                }
+                foreach (var fr in new FilteredElementCollector(document).OfClass(typeof(FilledRegionType)).Cast<FilledRegionType>())
+                {
+                    used.Add(fr.ForegroundPatternId); used.Add(fr.BackgroundPatternId);
+                }
+            }, "pattern của material / filled region");
             foreach (var v in views)
             {
-                try
+                Guard("FillPattern", () =>
                 {
                     foreach (var f in v.GetFilters())
                     {
@@ -118,8 +167,7 @@ public sealed class StylePurgeCommand : ICoreCommand<StylePurgeConfig>
                         used.Add(o.SurfaceForegroundPatternId); used.Add(o.SurfaceBackgroundPatternId);
                         used.Add(o.CutForegroundPatternId); used.Add(o.CutBackgroundPatternId);
                     }
-                }
-                catch { /* ignore */ }
+                }, $"override filter của view \"{v.Name}\"");
             }
             foreach (var fp in new FilteredElementCollector(document).OfClass(typeof(FillPatternElement)).Cast<FillPatternElement>())
             {
@@ -132,6 +180,20 @@ public sealed class StylePurgeCommand : ICoreCommand<StylePurgeConfig>
         if (kinds.Contains("TextTypes"))
         {
             var used = new HashSet<ElementId>(new FilteredElementCollector(document).OfClass(typeof(TextNote)).Select(t => t.GetTypeId()));
+            // Type khác (tag, dimension, keynote, callout…) tham chiếu text type qua tham số kiểu ElementId — rẻ vì chỉ quét ElementType.
+            Guard("TextType", () =>
+            {
+                var textTypeIds = new HashSet<ElementId>(new FilteredElementCollector(document).OfClass(typeof(TextNoteType)).ToElementIds());
+                foreach (var et in new FilteredElementCollector(document).WhereElementIsElementType())
+                {
+                    foreach (Parameter prm in et.Parameters)
+                    {
+                        if (prm.StorageType != StorageType.ElementId) continue;
+                        var id = prm.AsElementId();
+                        if (id != null && textTypeIds.Contains(id)) used.Add(id);
+                    }
+                }
+            }, "tham số trỏ tới text type của các ElementType");
             var types = new FilteredElementCollector(document).OfClass(typeof(TextNoteType)).Cast<TextNoteType>().ToList();
             foreach (var t in types)
             {
@@ -168,10 +230,21 @@ public sealed class StylePurgeCommand : ICoreCommand<StylePurgeConfig>
 
         void Consider(ElementId id, string kind, string name, bool isUsed, bool isSystem = false)
         {
+            // Tên bắt đầu bằng "<" là style hệ thống của Revit (<Solid fill>, <Invisible lines>…) — không bao giờ xoá.
             var sys = isSystem || name.StartsWith("<", StringComparison.Ordinal) || name.StartsWith("Default", StringComparison.OrdinalIgnoreCase) && kind == "DimensionType";
+            if (sys) return;
             if (CleanupDecider.ShouldErase(name, isUsed, false, sys, config.KeepNameContains))
             {
                 toDelete.Add((id, kind, name));
+            }
+        }
+
+        if (config.KeepIfUncertain && uncertain.Count > 0)
+        {
+            var kept = toDelete.RemoveAll(t => uncertain.Contains(t.Kind));
+            if (kept > 0)
+            {
+                result.Messages.Add($"Giữ lại {kept} style thuộc nhóm không kiểm được hết tham chiếu ({string.Join(", ", uncertain)}); đặt keepIfUncertain=false nếu vẫn muốn xoá.");
             }
         }
 
@@ -294,6 +367,7 @@ public sealed class ColorByParameterCommand : ICoreCommand<ColorByParameterConfi
             {
                 sb.Append(CsvText.JoinLine(new[] { kv.Key.Length == 0 ? "(trống)" : kv.Key, kv.Value.ToString(), counts.TryGetValue(kv.Key, out var c) ? c.ToString() : "0" })).Append('\n');
             }
+            RevitCompat.EnsureParentDirectory(config.LegendCsvPath);
             File.WriteAllText(config.LegendCsvPath!, sb.ToString(), CsvText.Utf8WithBom);
         }
 
@@ -359,8 +433,11 @@ public sealed class FamilyAuditCommand : ICoreCommand<FamilyAuditConfig>
             .OrderBy(f => f.FamilyCategory?.Name).ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+        // Symbol/Family có thể null với instance mồ côi (family bị xoá dở, link hỏng) — không để một instance làm hỏng cả kiểm kê.
         var instanceCount = new FilteredElementCollector(document).OfClass(typeof(FamilyInstance)).Cast<FamilyInstance>()
-            .GroupBy(i => i.Symbol.Family.Id).ToDictionary(g => g.Key, g => g.Count());
+            .Select(i => { try { return i.Symbol?.Family?.Id; } catch (Exception) { return null; } })
+            .Where(id => id != null)
+            .GroupBy(id => id!).ToDictionary(g => g.Key, g => g.Count());
 
         var rows = families.Select(f => new
         {
@@ -379,6 +456,7 @@ public sealed class FamilyAuditCommand : ICoreCommand<FamilyAuditConfig>
             {
                 sb.Append(CsvText.JoinLine(new[] { r.Family.Name, r.Category, r.Types.ToString(), r.Instances.ToString(), r.InPlace ? "true" : "false", r.Family.IsEditable ? "true" : "false" })).Append('\n');
             }
+            RevitCompat.EnsureParentDirectory(config.OutputPath);
             File.WriteAllText(config.OutputPath!, sb.ToString(), CsvText.Utf8WithBom);
         }
 

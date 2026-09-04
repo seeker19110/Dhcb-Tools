@@ -51,7 +51,7 @@
       "python": ">=3.9"
     }
   },
-  "//": [
+  "_comment": [
     "Đóng gói:  npx @anthropic-ai/mcpb pack tools/mcpb dist/dhcb-revit.mcpb",
     "Cài: mở file .mcpb bằng Claude Desktop.",
     "Yêu cầu: Revit đang mở, add-in DHCB Tools đã nạp (Bridge nghe ở 127.0.0.1:8765).",

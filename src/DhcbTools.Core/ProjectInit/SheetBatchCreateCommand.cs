@@ -36,20 +36,21 @@ public sealed class SheetBatchCreateCommand : ICoreCommand<SheetBatchCreateConfi
         }
 
         var result = CommandResult.Ok(string.Empty);
-        var lines = File.ReadAllLines(config.InputPath, CsvText.Utf8WithBom);
+        // RFC 4180 qua CsvText.ReadRecords: tên sheet có dấu phẩy/xuống dòng không còn làm lệch cột.
+        var records = CsvText.ReadRecords(config.InputPath).ToList();
         var rows = new List<Row>();
-        for (var i = 1; i < lines.Length; i++)
+        for (var i = 1; i < records.Count; i++)
         {
-            if (string.IsNullOrWhiteSpace(lines[i])) continue;
-            var c = CsvText.SplitLine(lines[i]);
-            if (c.Count < 2 || string.IsNullOrWhiteSpace(c[0]))
+            var c = records[i];
+            if (c.All(string.IsNullOrWhiteSpace)) continue;
+            if (c.Length < 2 || string.IsNullOrWhiteSpace(c[0]))
             {
                 result.Messages.Add($"Dòng {i + 1}: thiếu SheetNumber/SheetName — bỏ qua.");
                 continue;
             }
 
-            var views = c.Count > 3 ? c[3].Split(new[] { config.ViewSeparator }, StringSplitOptions.RemoveEmptyEntries).Select(v => v.Trim()).Where(v => v.Length > 0).ToList() : new List<string>();
-            rows.Add(new Row(c[0].Trim(), c[1].Trim(), c.Count > 2 ? c[2].Trim() : string.Empty, views, i + 1));
+            var views = c.Length > 3 ? c[3].Split(new[] { config.ViewSeparator }, StringSplitOptions.RemoveEmptyEntries).Select(v => v.Trim()).Where(v => v.Length > 0).ToList() : new List<string>();
+            rows.Add(new Row(c[0].Trim(), c[1].Trim(), c.Length > 2 ? c[2].Trim() : string.Empty, views, i + 1));
         }
 
         var existingNumbers = new FilteredElementCollector(document).OfClass(typeof(ViewSheet)).Cast<ViewSheet>().Select(s => s.SheetNumber).ToHashSet(StringComparer.OrdinalIgnoreCase);

@@ -1,0 +1,19 @@
+# Khai báo cho phần Python của repo (scripts/ và tools/autocad-mcp-server/). Không đóng gói lên PyPI;
+# file này chỉ để cố định phiên bản Python tối thiểu và cấu hình pytest/pyflakes dùng chung.
+#
+#   scripts/dhcb_agent.py, dhcb_mcp_server.py, dhcb_ai.py : thư viện chuẩn, Python >= 3.9
+#   tools/autocad-mcp-server/server.py                     : thêm fastmcp (xem requirements.txt ở đó, cần >= 3.10)
+[project]
+name = "dhcb-tools-scripts"
+version = "0.0.0"
+description = "Script Python đi kèm DHCB Tools: client Bridge, MCP server, lớp AI offline, panel AutoCAD"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.optional-dependencies]
+autocad-panel = ["fastmcp==4.0.2"]
+dev = ["pytest>=8,<10", "pyflakes>=3,<4"]
+
+[tool.pytest.ini_options]
+testpaths = ["tools/autocad-mcp-server"]
+python_files = ["test_*.py"]

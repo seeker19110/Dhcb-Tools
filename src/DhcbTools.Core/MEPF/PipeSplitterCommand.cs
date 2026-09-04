@@ -41,7 +41,8 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
         }
 
         // 2. Compute split plan: (element, category, list of split points along curve)
-        var plan = new List<(Element Element, string Category, List<XYZ> SplitPoints)>();
+        // CableTray/Conduit không có API BreakCurve — chỉ liệt kê để báo cáo, KHÔNG tính vào tổng sẽ cắt.
+        var plan = new List<(Element Element, string Category, List<XYZ> SplitPoints, bool Splittable)>();
 
         foreach (var (elem, category) in elements)
         {
@@ -49,27 +50,35 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
             var curve = locCurve.Curve;
             double lengthFt = curve.Length;
 
+            // Sắp xếp điểm cắt theo tham số dọc tuyến — thứ tự quan trọng vì sau mỗi lần cắt phải
+            // xác định điểm tiếp theo nằm trên đoạn nào.
             var splitPoints = new List<XYZ>();
-            foreach (var pos in MepLayout.SplitPositions(lengthFt, maxSegmentFt))
+            foreach (var pos in MepLayout.SplitPositions(lengthFt, maxSegmentFt).OrderBy(x => x))
             {
                 double normalized = pos / lengthFt;
                 splitPoints.Add(curve.Evaluate(normalized, true));
             }
 
             if (splitPoints.Count > 0)
-                plan.Add((elem, category, splitPoints));
+                plan.Add((elem, category, splitPoints, IsSplittable(category)));
         }
+
+        var splittable = plan.Where(p => p.Splittable).ToList();
+        var reportOnly = plan.Where(p => !p.Splittable).ToList();
 
         if (config.DryRun)
         {
-            int totalSplits = plan.Sum(p => p.SplitPoints.Count);
+            int totalSplits = splittable.Sum(p => p.SplitPoints.Count);
             var preview = CommandResult.Ok(
-                $"[Xem trước] Sẽ cắt {plan.Count} phần tử, tạo {totalSplits} điểm cắt.",
+                $"[Xem trước] Sẽ cắt {splittable.Count} phần tử, tạo {totalSplits} điểm cắt."
+                + (reportOnly.Count > 0
+                    ? $" {reportOnly.Count} CableTray/Conduit quá dài chỉ liệt kê (Revit không có API cắt), không tính vào tổng."
+                    : string.Empty),
                 totalSplits);
-            foreach (var (elem, cat, pts) in plan)
+            foreach (var (elem, cat, pts, ok) in plan)
             {
                 preview.Messages.Add(
-                    $"  {cat} {elem.Id}: {pts.Count} điểm cắt tại " +
+                    $"  {cat} {elem.Id}{(ok ? string.Empty : " [chỉ báo cáo]")}: {pts.Count} điểm cắt tại " +
                     string.Join(", ", pts.Select(p => $"({RevitCompat.FtToMm(p.X):F0},{RevitCompat.FtToMm(p.Y):F0},{RevitCompat.FtToMm(p.Z):F0})mm")));
             }
             return preview;
@@ -77,59 +86,70 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
 
         // 3. Execute splits
         int totalSplitsDone = 0;
+        var failures = new List<string>();
 
         using var tx = new Transaction(document, "DHCB - Cắt đoạn MEP dài");
         tx.Start();
         RevitCompat.ApplyFailurePolicy(tx);
 
-        foreach (var (elem, category, splitPoints) in plan)
+        foreach (var (elem, category, splitPoints, _) in splittable)
         {
-            // Must split from END backwards so ElementIds of already-split segments remain valid
-            // Actually BreakCurve returns the new tail element; keep splitting the original from start
+            bool isPipe = category.IndexOf("Pipe", StringComparison.OrdinalIgnoreCase) >= 0;
+
+            // BreakCurve trả về id của đoạn MỚI (phần đuôi); đoạn gốc giữ id cũ nhưng ngắn lại.
+            // Điểm cắt tiếp theo (đã sắp xếp dọc tuyến) nằm trên phần đuôi, nên sau mỗi lần cắt phải
+            // chọn lại đoạn chứa điểm đó thay vì cắt mãi đoạn gốc.
             var currentId = elem.Id;
 
             foreach (var splitPoint in splitPoints)
             {
                 try
                 {
-                    ElementId newSegmentId;
+                    var newSegmentId = isPipe
+                        ? PlumbingUtils.BreakCurve(document, currentId, splitPoint)
+                        : MechanicalUtils.BreakCurve(document, currentId, splitPoint);
 
-                    if (category.IndexOf("Pipe", StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (newSegmentId == null || newSegmentId == ElementId.InvalidElementId)
                     {
-                        newSegmentId = PlumbingUtils.BreakCurve(document, currentId, splitPoint);
-                    }
-                    else if (category.IndexOf("Duct", StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        newSegmentId = MechanicalUtils.BreakCurve(document, currentId, splitPoint);
-                    }
-                    else
-                    {
-                        // CableTray / Conduit — no direct BreakCurve API; skip (report only)
+                        failures.Add($"{category} {elem.Id}: BreakCurve không tạo được đoạn mới tại {Fmt(splitPoint)}.");
                         continue;
                     }
 
-                    if (newSegmentId != null && newSegmentId != ElementId.InvalidElementId)
-                    {
-                        totalSplitsDone++;
-                        // After split, the head segment retains currentId; tail is newSegmentId.
-                        // Next split point is relative to original curve — keep currentId.
-                    }
+                    totalSplitsDone++;
+                    currentId = newSegmentId;
                 }
-                catch (System.Exception)
+                catch (System.Exception ex)
                 {
-                    // Individual split failure — continue with next point
+                    failures.Add($"{category} {elem.Id}: không cắt được tại {Fmt(splitPoint)} — {ex.Message}");
                 }
             }
         }
 
         tx.Commit();
-        return CommandResult.Ok(
-            $"Đã cắt {totalSplitsDone} điểm trên {plan.Count} phần tử MEP.",
+
+        var result = CommandResult.Ok(
+            $"Đã cắt {totalSplitsDone} điểm trên {splittable.Count} phần tử MEP"
+            + (failures.Count > 0 ? $", {failures.Count} điểm cắt lỗi" : string.Empty)
+            + (reportOnly.Count > 0 ? $"; {reportOnly.Count} CableTray/Conduit quá dài chỉ báo cáo (không có API cắt)" : string.Empty)
+            + ".",
             totalSplitsDone);
+        result.Messages.AddRange(failures);
+        foreach (var (elem, cat, pts, _) in reportOnly)
+        {
+            result.Messages.Add($"  {cat} {elem.Id} [chỉ báo cáo]: cần {pts.Count} điểm cắt, cắt tay.");
+        }
+
+        return result;
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
+    private static bool IsSplittable(string category) =>
+        category.IndexOf("Pipe", StringComparison.OrdinalIgnoreCase) >= 0
+        || category.IndexOf("Duct", StringComparison.OrdinalIgnoreCase) >= 0;
+
+    private static string Fmt(XYZ p) =>
+        $"({RevitCompat.FtToMm(p.X):F0},{RevitCompat.FtToMm(p.Y):F0},{RevitCompat.FtToMm(p.Z):F0})mm";
 
     private static List<(Element Element, string Category)> CollectElements(Document doc, PipeSplitterConfig config, List<string> unknown)
     {

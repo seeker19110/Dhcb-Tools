@@ -19,18 +19,23 @@ param(
     [switch] $Analyze
 )
 
+$ErrorActionPreference = 'Stop'
+
 if (-not (Test-Path $Job)) { throw "Không tìm thấy file job: $Job" }
 if (-not (Test-Path $RunnerExe)) { throw "Không tìm thấy runner: $RunnerExe" }
 
-$args = "--job `"$Job`" --log-dir `"$LogDir`" --max-minutes $MaxMinutes"
-if ($Analyze) { $args += " --analyze" }
+# Không dùng tên $args: đó là biến tự động của PowerShell (tham số không khai báo), ghi đè nó là lỗi ngầm.
+$runnerArgs = "--job `"$Job`" --log-dir `"$LogDir`" --max-minutes $MaxMinutes"
+if ($Analyze) { $runnerArgs += " --analyze" }
 
-$action = New-ScheduledTaskAction -Execute $RunnerExe -Argument $args -WorkingDirectory (Split-Path $RunnerExe)
+$action = New-ScheduledTaskAction -Execute $RunnerExe -Argument $runnerArgs -WorkingDirectory (Split-Path $RunnerExe)
 $trigger = New-ScheduledTaskTrigger -Daily -At $Time
 $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes ($MaxMinutes + 30)) -StartWhenAvailable -WakeToRun
 $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
 
-Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force | Out-Null
+$task = Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force
+if (-not $task) { throw "Register-ScheduledTask không trả về task — chưa đăng ký được '$TaskName'." }
+
 Write-Host "Đã đăng ký task '$TaskName' chạy $Time hàng ngày."
-Write-Host "  $RunnerExe $args"
+Write-Host "  $RunnerExe $runnerArgs"
 Write-Host "Chạy thử ngay: Start-ScheduledTask -TaskName '$TaskName'"

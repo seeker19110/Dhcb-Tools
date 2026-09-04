@@ -99,6 +99,8 @@ public class BatchJobTests
     {
         var job = BatchJob.Parse(Sample);
         Assert.Equal(SaveMode.SaveAs, job.SaveMode);
+        Assert.False(job.SaveOnError);
+        Assert.Equal("2018", job.DwgVersion);
         Assert.False(job.Files[0].DetachFromCentral);
         Assert.True(job.Files[1].DetachFromCentral);
     }
@@ -124,6 +126,17 @@ public class BatchJobTests
     public void JsonHong_BaoLoiKhongNemJsonException()
     {
         Assert.Throws<System.IO.InvalidDataException>(() => BatchJob.Parse("{ not json"));
+    }
+}
+
+public class BatchJobSaveOptionsTests
+{
+    [Fact]
+    public void SaveOnErrorVaDwgVersion_DocTuJob()
+    {
+        var job = BatchJob.Parse("""{ "files": [{"path":"a.dwg"}], "steps": [{"command":"X"}], "saveMode":"Save", "saveOnError": true, "dwgVersion": "2013" }""");
+        Assert.True(job.SaveOnError);
+        Assert.Equal("2013", job.DwgVersion);
     }
 }
 
@@ -246,6 +259,59 @@ public class AcadScriptGenTests
     {
         var scr = AcadScriptGen.Build("p.dll", new[] { "s.json" }, null, "log", "a.dwg");
         Assert.DoesNotContain("SAVEAS", scr);
+    }
+
+    /// <summary>
+    /// File đích đã có (luôn đúng với saveMode=Save, thường đúng với SaveAs chạy lại) → AutoCAD hỏi
+    /// "replace it?"; thiếu dòng Y thì prompt nuốt lệnh kế tiếp và bản vẽ KHÔNG được lưu.
+    /// </summary>
+    [Fact]
+    public void SaveAs_FileDichDaCo_ThemDongY_VaPhienBanDwgTheoJob()
+    {
+        var scr = AcadScriptGen.Build("p.dll", new[] { "s.json" }, @"D:\o\a.dwg", "log", @"D:\o\a.dwg", dwgVersion: "2013", saveTargetExists: true);
+        var lines = scr.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var i = Array.FindIndex(lines, l => l.StartsWith("SAVEAS", StringComparison.Ordinal));
+
+        Assert.Equal(@"SAVEAS 2013 ""D:\o\a.dwg""", lines[i]);
+        Assert.Equal("Y", lines[i + 1]);
+        Assert.Equal("FILEDIA 1", lines[i + 2]);
+    }
+
+    [Fact]
+    public void SaveAs_FileDichChuaCo_KhongCoDongY_VaPhienBanSaiVe2018()
+    {
+        var scr = AcadScriptGen.Build("p.dll", new[] { "s.json" }, @"D:\o\a.dwg", "log", "a.dwg", dwgVersion: "9999");
+        var lines = scr.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var i = Array.FindIndex(lines, l => l.StartsWith("SAVEAS", StringComparison.Ordinal));
+
+        Assert.StartsWith("SAVEAS 2018 ", lines[i]);
+        Assert.Equal("FILEDIA 1", lines[i + 1]);
+    }
+
+    /// <summary>Một ký tự xuống dòng lọt vào giá trị là một lần Enter thừa — dòng còn lại thành lệnh mới.</summary>
+    [Fact]
+    public void Escape_BoXuongDongVaNhay_KhoiMoiGiaTri()
+    {
+        var scr = AcadScriptGen.Build("p.dll", new[] { "s\n.json" }, "o\r\n.dwg", "l\"og", "a\nb.dwg", AcadScriptGen.PlotPdf("x\n.pdf", layout: "A3\nQUIT", plotStyle: "mono\r.ctb"));
+        var lines = scr.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+
+        Assert.Contains("s.json", lines);
+        Assert.Contains("o.dwg", string.Join("\n", lines));
+        Assert.Contains("log", lines);
+        Assert.Contains("ab.dwg", lines);
+        Assert.Contains("A3QUIT", lines);
+        Assert.Contains("mono.ctb", lines);
+        Assert.DoesNotContain("QUIT", lines.Take(lines.Length - 1).Where(l => l != "A3QUIT"));
+        Assert.DoesNotContain('"', string.Join("", lines.Where(l => l.StartsWith("DHCB_RUN") || l == "log")));
+    }
+
+    [Fact]
+    public void Arguments_BocNhayDuongDan_VaLocLocale()
+    {
+        Assert.Equal(@"/i ""P:\ban ve\a.dwg"" /s ""D:\l\001.scr"" /l en-US", AcadScriptGen.Arguments(@"P:\ban ve\a.dwg", @"D:\l\001.scr"));
+        Assert.Equal(@"/i ""a.dwg"" /s ""s.scr""", AcadScriptGen.Arguments("a.dwg", "s.scr", null));
+        Assert.Equal(@"/i ""a.dwg"" /s ""s.scr"" /l vi-VNx", AcadScriptGen.Arguments("a\".dwg", "s.scr", "vi-VN\" /x"));
+        Assert.Equal(@"""C:\A\accoreconsole.exe"" /i ""a.dwg"" /s ""s.scr"" /l en-US", AcadScriptGen.CommandLine(@"C:\A\accoreconsole.exe", "a.dwg", "s.scr"));
     }
 
     [Fact]

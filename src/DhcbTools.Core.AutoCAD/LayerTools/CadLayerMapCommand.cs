@@ -9,8 +9,9 @@ namespace DhcbTools.Core.AutoCAD.LayerTools;
 /// Gợi ý map layer CAD hiện có trong drawing → Revit type từ danh sách type cho trước, dùng
 /// heuristic offline (<see cref="LayerMappingSuggester"/>) — không viết lại logic khớp, tái sử dụng
 /// class dùng chung với lệnh SpecToConfig/LayerMap bên Revit.
-/// UseOllama chỉ là cờ dự phòng: nếu bật nhưng chưa cấu hình được model local, lệnh vẫn chạy
-/// heuristic thay vì throw lỗi (dự án chưa dây Ollama vào Core.AutoCAD).
+/// <c>useOllama</c>: nếu bật và <c>%APPDATA%\DHCB\ai.json</c> có model local hợp lệ thì hỏi model rồi trộn với
+/// heuristic (cùng cách với lệnh LayerMap bên Revit); không có model thì rơi về heuristic và NÓI rõ trong
+/// Messages — trước đây vỏ hỏi "Dùng Ollama?" nhưng core bỏ qua cờ này.
 /// </summary>
 public sealed class CadLayerMapCommand : ICoreCommand<CadLayerMapConfig>
 {
@@ -48,9 +49,40 @@ public sealed class CadLayerMapCommand : ICoreCommand<CadLayerMapConfig>
             transaction.Commit();
         }
 
-        // UseOllama: dự phòng cho tương lai — chưa có client Ollama dây vào Core.AutoCAD nên luôn
-        // rơi về heuristic offline, không throw.
         var suggestions = LayerMappingSuggester.Suggest(layerNames, revitTypes);
+        var notes = new List<string>();
+        var source = "heuristic offline";
+
+        if (config.UseOllama)
+        {
+            var settings = LocalAiSettings.Load();
+            var client = new OllamaClient(settings);
+            if (!client.IsUsable)
+            {
+                notes.Add("Model local chưa bật/không hợp lệ (ai.json: enabled, endpoint loopback, model) — dùng heuristic.");
+            }
+            else
+            {
+                var rejected = new List<string>();
+                var fromModel = client.SuggestLayerMappings(layerNames, revitTypes, rejected);
+                if (fromModel == null)
+                {
+                    notes.Add("Model local không trả lời (" + (client.LastError ?? "không rõ lý do") + ") — dùng heuristic.");
+                }
+                else
+                {
+                    // Trộn như bên Revit: model có kết quả thì ưu tiên, trừ khi heuristic đã chắc hơn.
+                    var byLayer = fromModel
+                        .GroupBy(m => m.Layer, StringComparer.OrdinalIgnoreCase)
+                        .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+                    suggestions = suggestions
+                        .Select(h => byLayer.TryGetValue(h.Layer, out var m) && (h.RevitType == null || m.Confidence >= h.Confidence) ? m : h)
+                        .ToList();
+                    notes.AddRange(rejected.Select(r => "Model: " + r));
+                    source = $"model local {settings.Model} + heuristic";
+                }
+            }
+        }
 
         var sb = new StringBuilder();
         sb.AppendLine("CadLayer,SuggestedRevitType,Confidence");
@@ -71,10 +103,13 @@ public sealed class CadLayerMapCommand : ICoreCommand<CadLayerMapConfig>
             }
         }
 
+        AcadHelpers.EnsureParentDirectory(config.OutputPath);
         File.WriteAllText(config.OutputPath, sb.ToString(), CsvText.Utf8WithBom);
 
-        return CommandResult.Ok(
-            $"Đã gợi ý map cho {suggestions.Count} layer ({needsReview} cần xem lại) ra \"{config.OutputPath}\".",
+        var result = CommandResult.Ok(
+            $"Đã gợi ý map cho {suggestions.Count} layer ({needsReview} cần xem lại, nguồn: {source}) ra \"{config.OutputPath}\".",
             suggestions.Count);
+        result.Messages.AddRange(notes);
+        return result;
     }
 }

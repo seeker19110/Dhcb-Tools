@@ -54,12 +54,18 @@ namespace DhcbTools.Shared.Logic.Geometry
                 throw new ArgumentOutOfRangeException(nameof(positionTolerance));
             }
 
+            if (angleToleranceDeg < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(angleToleranceDeg), "Dung sai góc không được âm.");
+            }
+
             var verticals = new List<Segment2D>();
             var horizontals = new List<Segment2D>();
 
             foreach (var s in segments)
             {
-                if (s.Length < minLength)
+                // Đoạn dài 0 không có hướng (AngleDeg = 0 giả) — bỏ luôn dù minLength = 0.
+                if (s.Length <= 0 || s.Length < minLength)
                 {
                     continue;
                 }

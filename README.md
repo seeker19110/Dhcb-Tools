@@ -7,6 +7,31 @@ Hermes CLI nên prompt kèm nội dung bản vẽ **được gửi tới provide
 [`tools/autocad-mcp-server/README.md`](tools/autocad-mcp-server/README.md#dữ-liệu-đi-đâu). Nghiên cứu và lộ trình ở [`docs/nghien-cuu-dhcb-revit-tools.md`](docs/nghien-cuu-dhcb-revit-tools.md),
 hiện trạng ở [`docs/progress.md`](docs/progress.md).
 
+## Bắt đầu nhanh (10 phút)
+
+**Cần có:**
+
+| Thành phần | Bản | Bắt buộc khi |
+|---|---|---|
+| Windows | 10/11 x64 | Chạy add-in (chỉ để build/test thuần thì Linux/macOS cũng được) |
+| .NET SDK | 8.0.x | Luôn — build cả net48 lẫn net8.0-windows |
+| Revit | 2023–2025 | Dùng add-in Revit |
+| AutoCAD | 2024–2026 | Dùng plugin AutoCAD (2026.1+ dùng .NET 10, chưa kiểm) |
+| Python | 3.9+ | Dùng `scripts/*.py` (client Bridge, MCP server, AI offline) |
+| Node/npx | bất kỳ LTS | **Chỉ** khi đóng gói `.mcpb` bằng `scripts/pack-mcpb.ps1` |
+| Hermes CLI | — | **Chỉ** cho panel web AutoCAD (`tools/autocad-mcp-server`) |
+| Ollama | — | Tuỳ chọn: tinh chỉnh lớp AI offline (mặc định chạy heuristic, không cần) |
+
+**Chạy test tại chỗ** (không cần cài Revit/AutoCAD — đúng hai việc CI chạy):
+
+```bash
+dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj -c Release
+python3 -m pytest tools/autocad-mcp-server -q      # cần: pip install -r requirements-dev.txt
+```
+
+Cài để dùng thật: [Cài đặt](#cài-đặt) · quy trình kiểm thử tay:
+[`docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md).
+
 ## Cấu trúc solution
 
 ```
@@ -35,13 +60,19 @@ src/
 │                                  #   (pending-job.json), ElevationUpdater, WPF AutoNumbering
 ├── DhcbTools.Core.AutoCAD/        # Core AutoCAD: AcadCommandTable, LayerSync, DrawingCleanup, AutoNumbering, Attributes,
 │                                  #   Text (TextReplace), Standards (LayerStandardCheck, GridExtract, XrefAudit, CadLayerMap), Query
-├── DhcbTools.AutoCAD/             # Vỏ AutoCAD: CommandMethod DHCB_*, Bridge 8766, DHCB_RUN cho batch, DHCB_AI
+├── DhcbTools.AutoCAD/             # Vỏ AutoCAD: 16 lệnh CommandMethod DHCB_*, Bridge 8766
 ├── DhcbTools.AutoCAD.Core/        # Vỏ core-only (AcDbMgd/AcCoreMgd, không AcMgd): DHCB_RUN cho accoreconsole
 └── DhcbTools.BatchRunner/         # Console chạy đêm (Revit qua add-in, AutoCAD qua accoreconsole), báo cáo, mã thoát
-scripts/  dhcb_agent.py · dhcb_mcp_server.py · dhcb_ai.py · install-nightly-task.ps1 · check-build.sh
+scripts/  dhcb_agent.py · dhcb_mcp_server.py · dhcb_ai.py           # client Bridge, MCP server, AI offline
+          check-build.sh                                            # biên dịch Core + vỏ bằng API package (Linux/CI)
+          run-in-revit-tests.ps1 · run-in-autocad-tests.ps1          # chạy bộ ca kiểm bên trong Revit / accoreconsole
+          install-nightly-task.ps1                                   # đăng ký Task Scheduler chạy batch đêm
+          sign-addin.ps1 · pack-mcpb.ps1                             # ký DLL · đóng gói .mcpb (cần Node/npx)
+tools/    autocad-mcp-server/ (MCP + panel web cho Hermes) · mcpb/ (manifest gói Claude Desktop)
+installer/ dhcb-tools.iss (Inno Setup) · PackageContents.xml
 jobs/     nightly.sample.json · autocad-nightly.sample.json
-configs/  parameter-rules · layer-rules · ai · settings (mẫu)
-tests/    DhcbTools.Shared.Logic.Tests (489 test, chạy trên CI Linux) + suites/ (ca kiểm chạy trong Revit & AutoCAD)
+configs/  parameter-rules · layer-rules · ai · settings · dictionary (mẫu)
+tests/    DhcbTools.Shared.Logic.Tests (chạy trên CI Linux — số ca xem output CI) + suites/ (ca kiểm chạy trong Revit & AutoCAD)
 ```
 
 ## Lệnh
@@ -60,12 +91,14 @@ Ribbon/dòng lệnh, HTTP Bridge, batch runner, lớp AI. Danh mục đầy đ�
 | MEPF | `SleeveAuto`, `ElevationTag`, `HangerAuto`, `PipeSplitter`, `RouteFromLines`, `DevicePlacement`, `SizingProposal` / `ApplySizing`, `SystemColor`, `SystemName` | — |
 | Hồ sơ & style (giai đoạn 7) | `SheetRename`, `RevisionOnSheets`, `StylePurge`, `ColorByParameter`, `FamilyAudit`, `WarningsExport`, `ScheduleExport`, `ViewportCopy` | `LayerTranslate`, `DrawingCompare`, `BlockQuantity`, `AttributeIncrement` |
 | MEPF nâng cao (P2) | `SlopePipes`, `PipeKick`, `SystemBom`, `AutoRoute` (mức C → mức A) | — |
-| AI offline | `CadLayerMap`, `SpecToConfig`, nút *Ra lệnh tiếng Việt* | `CadLayerMap`, `DHCB_AI` |
+| AI offline | `CadLayerMap`, `SpecToConfig`, nút *Ra lệnh tiếng Việt* | `CadLayerMap` (`DHCB_LAYER_MAP`); ra lệnh tiếng Việt qua Bridge `POST /chat` |
 
-Lệnh AutoCAD trên dòng lệnh: `DHCB` (trợ giúp), `DHCB_LAYER_EXPORT/IMPORT`, `DHCB_CLEANUP`, `DHCB_AUTONUMBER`,
-`DHCB_ATTR_EXPORT/IMPORT`, `DHCB_TEXT_REPLACE`, `DHCB_XREF_AUDIT`, `DHCB_GRID_EXTRACT`, `DHCB_LAYER_CHECK`,
-`DHCB_LAYERMAP`, `DHCB_LAYTRANS`, `DHCB_COMPARE`, `DHCB_BLOCKCOUNT`, `DHCB_ATTR_INC`, `DHCB_EXEC <Lệnh>` (config JSON),
-`DHCB_CFG <Lệnh>` (tạo config mẫu), `DHCB_AI`, `DHCB_RUN` (batch).
+Lệnh AutoCAD trên dòng lệnh — đúng các `[CommandMethod]` có trong `src/DhcbTools.AutoCAD`:
+`DHCB_LAYER_EXPORT`, `DHCB_LAYER_IMPORT`, `DHCB_CLEANUP`, `DHCB_AUTONUMBER`, `DHCB_ATTR_EXPORT`,
+`DHCB_ATTR_IMPORT`, `DHCB_ATTR_INCREMENT`, `DHCB_TEXT_REPLACE`, `DHCB_LAYER_CHECK`, `DHCB_LAYER_MAP`,
+`DHCB_LAYER_TRANSLATE`, `DHCB_GRID_EXTRACT`, `DHCB_XREF_AUDIT`, `DHCB_DRAWING_COMPARE`,
+`DHCB_BLOCK_QUANTITY`, `DHCB_BRIDGE` (bật/tắt HTTP Bridge).
+`DHCB_RUN` (batch qua accoreconsole) nằm ở vỏ **core-only** `DhcbTools.AutoCAD.Core`, không có trong vỏ đầy đủ.
 
 Nút Ribbon Revit dùng chung **một form động** dựng từ `CommandCatalog`: mỗi trường config thành một ô nhập đúng kiểu
 (checkbox, ô số, nút chọn file/thư mục, combo category/tham số/level/view/family lấy từ mô hình đang mở). Bấm
@@ -76,12 +109,31 @@ lưu ở `%APPDATA%\DHCB\configs\revit\<Lệnh>.json` cho lần sau.
 
 Revit `http://127.0.0.1:8765`, AutoCAD `http://127.0.0.1:8766`. Token sinh lần đầu ở `%APPDATA%\DHCB\bridge-token.txt`
 (header `Authorization: Bearer …`, sai 5 lần/60 s → khoá 5 phút). Endpoint: `GET /health`, `GET /tools`,
-`POST /execute`, `POST /query`, `POST /chat` (đề xuất lệnh từ tiếng Việt, không chạy),
-`GET /progress/<id>`. Lệnh client bỏ đi vì timeout **không** được chạy.
+`POST /execute`, `POST /query`, `POST /chat` (đề xuất lệnh từ tiếng Việt, không chạy; trần riêng 60 giây),
+`GET /progress/<id>`.
 
-Truy vấn đọc (`POST /query`): Revit có 17 loại, AutoCAD 12 — gồm `entity_geometry`, `attributes_of`,
-`selection`, `show_entities`, `active_layout` để agent nhìn và chỉ được đúng đối tượng vừa đụng tới
-(AutoCAD định danh bằng **handle** hex). Chi tiết: [`docs/agent-khep-vong.md`](docs/agent-khep-vong.md).
+| Mã | Khi nào |
+|---|---|
+| `401` / `429` | Sai token · khoá 5 phút vì dò token, **hoặc** `/execute` async khi hàng đợi đã đủ 20 job |
+| `413` | Body quá 4 MB |
+| `415` | Sai `Content-Type` — trước đây lẫn vào `401` và bị tính nhầm vào bộ đếm dò token |
+| `503` | Quá 8 request đang xử lý cùng lúc |
+| `504` | Hết thời gian chờ của `/execute` đồng bộ |
+
+**Về `504`:** chỉ khi Bridge giành được quyền huỷ **trước lúc lệnh bắt đầu** thì mới khẳng định lệnh *không chạy*.
+Ngược lại `504` kèm `id` + `progressUrl` và nghĩa là **"có thể đã chạy — đừng gửi lại"**: hỏi `GET /progress/<id>`
+để biết chắc. `/progress` có thêm trạng thái `abandoned` và cờ `started`; phản hồi `202` kèm `timeoutSeconds`.
+Lỗi `500` không trả nội dung exception ra ngoài nữa (chi tiết nằm trong log).
+
+**Truy vấn đọc (`POST /query`)** — Revit 17 loại, AutoCAD 12. Ngoài các truy vấn đếm/liệt kê cơ bản
+(`document_info`, `levels`, `views`, `sheets`, `rooms`, `elements`, `families`, `warnings`, `links`, `stats`)
+còn phần đủ để agent **nhìn, chỉ và kiểm** được kết quả: `parameters_of` (tham số của category, để dựng
+config không phải đoán), `element_geometry` (hộp bao, đường tâm, connector kèm tình trạng nối — toạ độ mm),
+`schedule_rows`, `snapshot` (ảnh PNG base64 của view), `selection` (đọc và **đặt** lựa chọn),
+`show_elements` (zoom cho kỹ sư nhìn), `active_view`. Phía AutoCAD là bộ đối xứng — `entity_geometry`,
+`attributes_of`, `selection`, `show_entities`, `active_layout` — định danh bằng **handle** hex.
+Mọi `CommandResult` mang theo `changedIds` nên agent kiểm lại được đúng phần tử vừa đổi.
+Chi tiết: [`docs/agent-khep-vong.md`](docs/agent-khep-vong.md).
 
 **Lệnh chạy lâu**: gửi `POST /execute` kèm `"async": true` → nhận ngay `202 {id}`, rồi hỏi
 `GET /progress/<id>` tới khi `status` là `done`. Kết quả nằm ở server theo id nên đứt kết nối giữa chừng
@@ -96,14 +148,8 @@ python scripts/dhcb_agent.py autocad exec GridExtract --config '{"gridLayer":"AX
 python scripts/dhcb_mcp_server.py revit        # MCP server stdio cho Claude Desktop / Claude Code
 ```
 
-Ngoài truy vấn đọc cơ bản, `POST /query` còn có phần đủ để agent **nhìn, chỉ và kiểm** được kết quả:
-`parameters_of` (tham số của category, để dựng config không phải đoán), `element_geometry` (hộp bao, đường tâm,
-connector kèm tình trạng nối — toạ độ mm), `schedule_rows`, `snapshot` (ảnh PNG base64 của view), `selection`
-(đọc và **đặt** lựa chọn), `show_elements` (zoom cho kỹ sư nhìn), `active_view`. Mọi `CommandResult` mang theo
-`changedIds` nên agent kiểm lại được đúng phần tử vừa đổi. Chi tiết:
-[`docs/agent-khep-vong.md`](docs/agent-khep-vong.md).
-
-Chi tiết lớp AI offline (heuristic mặc định, Ollama local tuỳ chọn): [`docs/ai-offline.md`](docs/ai-offline.md).
+Chi tiết lớp AI offline (heuristic mặc định, Ollama local tuỳ chọn) **và cấu hình MCP cho Claude Desktop /
+Claude Code**: [`docs/ai-offline.md`](docs/ai-offline.md) — cấu hình `mcpServers` chỉ chép ở một chỗ đó.
 
 ## Batch chạy đêm
 
@@ -112,7 +158,9 @@ DhcbTools.BatchRunner.exe --job jobs\nightly.json --log-dir D:\DHCB\logs --max-m
 .\scripts\install-nightly-task.ps1 -Job D:\DHCB\jobs\nightly.json -RunnerExe D:\DHCB\bin\DhcbTools.BatchRunner.exe -Time 23:00
 ```
 
-Ra `run.jsonl`, `report.html`, `warnings-summary.md`; mã thoát 0/1/2 cho Task Scheduler. Chi tiết:
+Ra `logs/{yyyy-MM-dd}/run-HHmmss.jsonl` (mỗi lượt chạy một file log), `report.html`, `warnings-summary.md`;
+mã thoát 0/1/2 cho Task Scheduler. Job có thêm `saveOnError` (mặc định `false`) và `dwgVersion` (mặc định `"2018"`);
+**bên AutoCAD `saveMode: "Save"` nay lưu đè file gốc thật**. Chi tiết:
 [`docs/batch-runner.md`](docs/batch-runner.md).
 
 ## Build
@@ -182,7 +230,9 @@ vào bundle `%APPDATA%\Autodesk\ApplicationPlugins\DhcbTools.bundle\` nên **t�
 
 ## Từ điển tham số
 
-Core không gọi thẳng `LookupParameter("Level")` nữa. Mỗi khoá logic (`level`, `diameter`, `bottomElevation`…) có một
+Các tra cứu tham số **của lệnh MEPF và khởi tạo dự án** không còn gọi thẳng `LookupParameter("Level")`
+mà đi qua `RevitCompat` + lớp từ điển (vẫn còn vài chỗ gọi trực tiếp, ví dụ tham số do chính kỹ sư đặt tên
+trong config, hoặc `Level` của view trong `SheetCommands`). Mỗi khoá logic (`level`, `diameter`, `bottomElevation`…) có một
 danh sách tên đồng nghĩa Anh–Việt; dự án khai thêm tên riêng trong `%APPDATA%\DHCB\dictionary.json`
 (mẫu: [`configs/dictionary.sample.json`](configs/dictionary.sample.json)). Tên khai trong file đứng trước tên dựng sẵn
 chứ không thay thế, nên dự án dùng thư viện chuẩn chạy được mà không cần file này.
@@ -198,10 +248,13 @@ Tra không ra thì lệnh **báo lỗi `E-PARAM-MISSING` kèm danh sách tên đ
 
 ## Trạng thái
 
-Toàn bộ giai đoạn 0–5, 6.1/6.2 của [`docs/dac-ta-tinh-nang.md`](docs/dac-ta-tinh-nang.md) và P1 giai đoạn 7
+Toàn bộ giai đoạn 0–6 của [`docs/dac-ta-tinh-nang.md`](docs/dac-ta-tinh-nang.md) và cả P1 lẫn P2 giai đoạn 7
 ([`docs/nghien-cuu-tool-thi-truong-va-ke-hoach.md`](docs/nghien-cuu-tool-thi-truong-va-ke-hoach.md) — khoảng trống so với
-pyRevit, DiRoots, Ideate, Colour Splasher, LAYTRANS, Drawing Compare, RevitBatchProcessor) đã có mã nguồn, biên dịch xanh
-với API Revit 2023/2024/2025 và AutoCAD 2024/2025, 489 test thuần xanh. P2 giai đoạn 7 (ống dốc, kick, BOM spool, AutoRoute,
-ScheduleExport, ViewportCopy, vỏ AutoCAD core-only) cũng đã có mã nguồn. **Chưa kiểm thử trên Revit/AutoCAD thật** cho
-các lệnh mới — kịch bản ở [`docs/dac-ta-kiem-thu.md`](docs/dac-ta-kiem-thu.md) §4. Chi tiết và lỗi còn mở:
+pyRevit, DiRoots, Ideate, Colour Splasher, LAYTRANS, Drawing Compare, RevitBatchProcessor) đã có mã nguồn và biên dịch xanh
+với API Revit 2023/2024/2025 + AutoCAD 2024/2025; số test thuần xem output CI (`tests.yml` → artifact `test-results`).
+
+**Đã chạy trên phần mềm thật:** 42/42 lệnh Revit có ít nhất một ca kiểm chạy bên trong Revit 2024.3 và 15/15 lệnh
+AutoCAD có ca kiểm qua `accoreconsole`, cộng một đêm batch trên **dự án thật** — bằng chứng và số liệu từng vòng:
+[`docs/bang-chung-test.md`](docs/bang-chung-test.md). Phần **chưa** khép: chất lượng tuyến của `AutoRoute` (còn nhãn
+*thử nghiệm*), AutoCAD 2026.1+/.NET 10, và 9.4 — đưa cho một nhóm kỹ sư dùng thật. Chi tiết và lỗi còn mở:
 [`docs/progress.md`](docs/progress.md) · lộ trình: [`docs/roadmap.md`](docs/roadmap.md).

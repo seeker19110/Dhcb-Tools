@@ -1,0 +1,3 @@
+# MCP server cho Hermes (server.py). panel_api.py và test_panel_api.py chỉ dùng thư viện chuẩn.
+# Phiên bản ghim theo bản đã kiểm (2026-09-04); fastmcp 4.x cần Python >= 3.10.
+fastmcp==4.0.2

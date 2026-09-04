@@ -40,8 +40,12 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
             return CommandResult.Ok("Không tìm thấy connector hở nào trong mô hình.", 0);
         }
 
-        // 2. Optionally create/update 3D view
-        if (config.Create3dView && elementIds.Count > 0)
+        // 2. Tuỳ chọn tạo/cập nhật 3D view — chỉ khi không phải xem trước.
+        if (config.Create3dView && elementIds.Count > 0 && config.DryRun)
+        {
+            reportLines.Insert(0, $"[Xem trước] Sẽ tạo/cập nhật 3D view \"{config.ViewName}\" khoanh vùng {elementIds.Count} phần tử khi chạy thật.");
+        }
+        else if (config.Create3dView && elementIds.Count > 0)
         {
             try
             {
@@ -124,8 +128,12 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
                     var connector = iter.Current as Connector;
                     if (connector == null) continue;
 
-                    // Skip End-type connectors (terminators, not real open ends)
-                    if (connector.ConnectorType == ConnectorType.End) continue;
+                    // Trong Revit API, đầu ống/ống gió/máng cáp/ống luồn CHÍNH LÀ ConnectorType.End
+                    // (connector của family mới là Physical) — loại End ra thì bỏ sót toàn bộ đầu tuyến hở.
+                    // Chỉ bỏ Logical (không có vị trí vật lý) và Curve (điểm dọc tuyến,
+                    // không phải đầu hở).
+                    if (connector.ConnectorType == ConnectorType.Logical
+                        || connector.ConnectorType == ConnectorType.Curve) continue;
 
                     if (connector.IsConnected) continue;
 

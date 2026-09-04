@@ -11,9 +11,6 @@ public sealed class PipeSplitterConfig
     /// <summary>Categories to split: "Pipe", "Duct", "CableTray", "Conduit".</summary>
     public List<string> Categories { get; init; } = new List<string>();
 
-    /// <summary>Coupling family name to insert at split points (optional — leave null to just split).</summary>
-    public string? CouplingFamilyName { get; init; } = null;
-
     /// <summary>Level name filter (empty = all levels).</summary>
     public string? LevelName { get; init; } = null;
 

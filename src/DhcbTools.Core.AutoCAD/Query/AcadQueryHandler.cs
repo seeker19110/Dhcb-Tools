@@ -187,6 +187,8 @@ public static class AcadQueryHandler
 
             list.Add(new
             {
+                // handle: định danh bền, dùng được cho show_entities/entity_geometry/selection; objectId chỉ sống trong phiên.
+                handle    = HandleText.ToText(entId.Handle.Value),
                 objectId  = entId.ToString(),
                 blockName,
                 layer     = br.Layer,
@@ -231,6 +233,7 @@ public static class AcadQueryHandler
 
             var row = new Dictionary<string, object?>
             {
+                ["handle"]   = HandleText.ToText(entId.Handle.Value),
                 ["objectId"] = entId.ToString(),
                 ["type"]     = typeName,
                 ["layer"]    = entity.Layer,

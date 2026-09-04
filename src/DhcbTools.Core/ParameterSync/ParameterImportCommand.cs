@@ -18,13 +18,15 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
             return CommandResult.Fail($"Không tìm thấy file: \"{config.InputPath}\".");
         }
 
-        var lines = File.ReadAllLines(config.InputPath);
-        if (lines.Length < 2)
+        // RFC 4180 qua CsvText.ReadRecords — ô Comments/Description nhiều dòng do ParameterExport ghi ra
+        // trước đây bị ReadAllLines cắt thành hai bản ghi hỏng.
+        var rows = CsvText.ReadRecords(config.InputPath).ToList();
+        if (rows.Count < 2)
         {
             return CommandResult.Fail("File CSV không có dữ liệu (chỉ có dòng tiêu đề hoặc rỗng).");
         }
 
-        var header = CsvText.SplitLine(lines[0]);
+        var header = rows[0].ToList();
         // 3 cột đầu cố định: ElementId, Category, Name — phần còn lại là tên tham số.
         var parameterColumns = header.Skip(3).ToList();
 
@@ -36,15 +38,15 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
         transaction.Start();
         RevitCompat.ApplyFailurePolicy(transaction);
 
-        for (var i = 1; i < lines.Length; i++)
+        for (var i = 1; i < rows.Count; i++)
         {
-            if (string.IsNullOrWhiteSpace(lines[i]))
+            var cells = rows[i];
+            if (cells.All(string.IsNullOrWhiteSpace))
             {
                 continue;
             }
 
-            var cells = CsvText.SplitLine(lines[i]);
-            if (cells.Count < 3 || !long.TryParse(cells[0], out var idValue))
+            if (cells.Length < 3 || !long.TryParse(cells[0], out var idValue))
             {
                 result.Messages.Add($"Bỏ qua dòng {i + 1}: ElementId không hợp lệ.");
                 continue;
@@ -65,13 +67,13 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
             for (var col = 0; col < parameterColumns.Count; col++)
             {
                 var cellIndex = 3 + col;
-                if (cellIndex >= cells.Count)
+                if (cellIndex >= cells.Length)
                 {
                     continue;
                 }
 
                 var name = parameterColumns[col];
-                var parameter = element.LookupParameter(name);
+                var parameter = RevitCompat.LookupInstance(element, name, name);
 
                 if (parameter is null)
                 {

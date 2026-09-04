@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AutoCAD Control Panel</title>
 <script>
+  // Mở từ file:// thì chuyển sang gateway (origin "null" bị gateway từ chối). Luôn chuyển tới 127.0.0.1
+  // cho nhất quán; mở tay bằng http://localhost:8767/panel cũng được vì gateway cho phép cả hai origin.
   if (location.protocol === 'file:') location.replace('http://127.0.0.1:8767/panel');
 </script>
 <style>
@@ -995,7 +997,8 @@
 </div>
 
 <script>
-const BASE = 'http://127.0.0.1:8767';
+// Gọi về đúng origin đang mở (127.0.0.1 hay localhost) để không thành cross-origin.
+const BASE = location.protocol === 'http:' ? location.origin : 'http://127.0.0.1:8767';
 const PANEL_TOKEN = '__PANEL_TOKEN__';
 let allLayers = [];
 
@@ -1146,7 +1149,7 @@ function renderLayerTable(layers) {
 
 function filterLayers() {
   const q = document.getElementById('layerFilter').value.toLowerCase();
-  renderLayerTable(allLayers.filter(l => l.name.toLowerCase().includes(q)));
+  renderLayerTable(allLayers.filter(l => String(l?.name ?? '').toLowerCase().includes(q)));
 }
 
 async function exportLayers() {
@@ -1321,7 +1324,8 @@ function removeThinking() {
 }
 
 function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 async function processUserMessage(text) {

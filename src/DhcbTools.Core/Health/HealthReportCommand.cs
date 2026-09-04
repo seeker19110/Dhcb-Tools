@@ -39,16 +39,17 @@ public sealed class HealthReportCommand : ICoreCommand<HealthReportConfig>
                     .Where(v => !v.IsTemplate)
                     .ToList();
 
-                foreach (var v in allViews)
-                {
-                    // Check if view is on a sheet by looking for its viewport
-                    var vports = new FilteredElementCollector(document)
+                // Gom id các view đã đặt lên sheet MỘT lần — trước đây mỗi view tạo một collector
+                // Viewport riêng (O(view × viewport)), chậm rõ rệt trên model vài nghìn view.
+                var viewedIds = new HashSet<ElementId>(
+                    new FilteredElementCollector(document)
                         .OfClass(typeof(Viewport))
                         .Cast<Viewport>()
-                        .Where(vp => vp.ViewId == v.Id)
-                        .ToList();
+                        .Select(vp => vp.ViewId));
 
-                    bool isOnSheet = vports.Count > 0;
+                foreach (var v in allViews)
+                {
+                    bool isOnSheet = viewedIds.Contains(v.Id);
                     bool isSheetView = v.ViewType == ViewType.DrawingSheet;
                     bool isSchedule = v.ViewType == ViewType.Schedule;
                     bool isLegend = v.ViewType == ViewType.Legend;
@@ -147,7 +148,11 @@ public sealed class HealthReportCommand : ICoreCommand<HealthReportConfig>
                 {
                     try
                     {
-                        if (!conn.IsConnected && conn.ConnectorType != ConnectorType.End)
+                        // Đầu ống/ống gió/máng cáp là ConnectorType.End (family mới là Physical) —
+                        // không được loại End, chỉ bỏ Logical và Curve (không phải đầu hở).
+                        if (!conn.IsConnected
+                            && conn.ConnectorType != ConnectorType.Logical
+                            && conn.ConnectorType != ConnectorType.Curve)
                         {
                             metrics.OpenConnectorCount++;
                         }

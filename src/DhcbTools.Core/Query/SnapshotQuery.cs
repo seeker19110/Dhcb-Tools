@@ -49,11 +49,14 @@ internal static class SnapshotQuery
         }
 
         var folder = Path.Combine(Path.GetTempPath(), "DHCB", "snapshots");
-        var stem = Path.Combine(folder, "view-" + DateTime.Now.ToString("HHmmss-fff"));
+        // Tên duy nhất theo Guid: hai request trong cùng mili-giây (hoặc hai phiên trong ngày cùng giờ
+        // phút giây) không được vớ nhầm ảnh của nhau.
+        var stem = Path.Combine(folder, "view-" + Guid.NewGuid().ToString("N"));
 
         try
         {
             Directory.CreateDirectory(folder);
+            PruneOld(folder);
 
             var options = new ImageExportOptions
             {
@@ -75,7 +78,7 @@ internal static class SnapshotQuery
             return new { error = $"Không xuất được ảnh view \"{view.Name}\": {ex.Message}" };
         }
 
-        // Revit thêm hậu tố tên view vào tên file nên phải đi tìm file vừa tạo.
+        // Revit thêm hậu tố tên view vào tên file nên phải đi tìm file vừa tạo (tiền tố Guid nên chỉ có của lần này).
         var file = Directory.EnumerateFiles(folder, Path.GetFileName(stem) + "*.png")
             .OrderByDescending(File.GetLastWriteTimeUtc)
             .FirstOrDefault();
@@ -106,6 +109,23 @@ internal static class SnapshotQuery
         catch (Exception ex)
         {
             return new { error = "Không đọc lại được ảnh vừa xuất: " + ex.Message };
+        }
+    }
+
+    /// <summary>Xoá ảnh cũ hơn một ngày — thư mục tạm không được phình mãi theo số lần agent "nhìn".</summary>
+    private static void PruneOld(string folder)
+    {
+        try
+        {
+            var cutoff = DateTime.UtcNow.AddDays(-1);
+            foreach (var old in Directory.EnumerateFiles(folder, "view-*.png").Where(f => File.GetLastWriteTimeUtc(f) < cutoff))
+            {
+                try { File.Delete(old); } catch (Exception) { /* file đang mở — lần sau */ }
+            }
+        }
+        catch (Exception)
+        {
+            // Dọn không được thì vẫn chụp được; không phải lý do để hỏng request.
         }
     }
 }

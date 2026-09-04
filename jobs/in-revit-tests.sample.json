@@ -4,7 +4,7 @@
   "revitVersion": 2024,
   "stopOnError": false,
 
-  "//": [
+  "_comment": [
     "Giai đoạn 8.3: chạy bộ ca kiểm BÊN TRONG Revit, không người ngồi máy.",
     "saveMode None — bộ test không bao giờ được lưu đè lên model mẫu.",
     "Chạy: DhcbTools.BatchRunner.exe --job jobs/in-revit-tests.json --log-dir D:/DHCB/logs",

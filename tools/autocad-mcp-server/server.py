@@ -1,49 +1,83 @@
 """
 AutoCAD Tools MCP Server
 Cung cấp tools để điều khiển AutoCAD qua HTTP bridge (localhost:8766).
-Cài: hermes mcp add autocad-tools --command python --args <path>/server.py
+Cài: hermes mcp add autocad-tools --command python --args <repo>/tools/autocad-mcp-server/server.py
 """
 
 from __future__ import annotations
+import atexit
 import json
-import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
 from fastmcp import FastMCP
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import panel_api  # noqa: E402  — cùng thư mục; dùng chung whitelist + chuỗi xác nhận với gateway
+
 BRIDGE_URL = "http://localhost:8766"
-PANEL_API_URL = "http://127.0.0.1:8767"
+PANEL_API_URL = f"http://{panel_api.HOST}:{panel_api.PORT}"
 PANEL_HTML = str(Path(__file__).parent / "panel.html")
 PANEL_API_SCRIPT = str(Path(__file__).parent / "panel_api.py")
+DEFAULT_LAYER_CSV = str(Path(tempfile.gettempdir()) / "dhcb_layers_export.csv")
+
+_gateway_process: subprocess.Popen | None = None
 
 
-def _ensure_panel_api() -> None:
-    """Start the CORS/AI gateway once; validate identity before accepting existing instance."""
-    import time
+def _probe_panel_api() -> str:
+    """'ours' = gateway của mình đang chạy · 'free' = port trống · 'foreign' = port bị thứ khác chiếm."""
+    import urllib.error
     import urllib.request
 
-    def _probe() -> bool:
-        try:
-            with urllib.request.urlopen(PANEL_API_URL + "/alive", timeout=2) as resp:
-                data = json.loads(resp.read())
-                return data.get("panelApi") == "ok"
-        except Exception:
-            return False
+    try:
+        with urllib.request.urlopen(PANEL_API_URL + "/alive", timeout=2) as resp:
+            data = json.loads(resp.read())
+            return "ours" if data.get("panelApi") == "ok" else "foreign"
+    except urllib.error.HTTPError:
+        return "foreign"  # có server trả lời nhưng không phải /alive của gateway
+    except (urllib.error.URLError, OSError, ValueError):
+        return "free"
 
-    if _probe():
-        return  # Verified our own gateway is already running
+
+def _stop_gateway() -> None:
+    proc = _gateway_process
+    if proc is None or proc.poll() is not None:
+        return
+    proc.terminate()
+    try:
+        proc.wait(timeout=3)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+
+
+def _ensure_panel_api() -> str | None:
+    """Khởi động gateway CORS/AI khi cần (lần đầu mở panel), không phải lúc import.
+
+    Trả None nếu gateway sẵn sàng, ngược lại trả thông báo lỗi. Port đang bị chương trình khác
+    chiếm thì KHÔNG spawn thêm — spawn nữa chỉ sinh một tiến trình chết vì bind lỗi.
+    """
+    global _gateway_process
+    import time
+
+    state = _probe_panel_api()
+    if state == "ours":
+        return None
+    if state == "foreign":
+        return (
+            f"Port {panel_api.PORT} đang bị một chương trình khác chiếm (không phải panel gateway). "
+            "Tắt chương trình đó hoặc đổi PORT trong panel_api.py rồi thử lại."
+        )
 
     creationflags = 0
     if sys.platform == "win32":
         creationflags = (
             getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-            | getattr(subprocess, "DETACHED_PROCESS", 0)
             | getattr(subprocess, "CREATE_NO_WINDOW", 0)
         )
-    subprocess.Popen(
+    _gateway_process = subprocess.Popen(
         [sys.executable, PANEL_API_SCRIPT],
         cwd=str(Path(__file__).parent),
         stdin=subprocess.DEVNULL,
@@ -52,15 +86,15 @@ def _ensure_panel_api() -> None:
         creationflags=creationflags,
         close_fds=True,
     )
+    atexit.register(_stop_gateway)
 
-    # Poll for readiness (up to 5 s) before returning so first tool call doesn't race.
+    # Chờ sẵn sàng (tối đa 5 s) để lần gọi đầu không đua với gateway.
     for _ in range(25):
         time.sleep(0.2)
-        if _probe():
-            return
+        if _probe_panel_api() == "ours":
+            return None
+    return "Gateway panel không lên được trong 5 giây — chạy tay `python panel_api.py` để xem lỗi."
 
-
-_ensure_panel_api()
 
 mcp = FastMCP(
     name="autocad-tools",
@@ -72,22 +106,6 @@ mcp = FastMCP(
 )
 
 
-def _bridge_headers(has_body: bool) -> dict[str, str]:
-    headers = {"Content-Type": "application/json"} if has_body else {}
-    token = os.environ.get("DHCB_BRIDGE_TOKEN", "").strip()
-    if not token:
-        appdata = os.environ.get("APPDATA")
-        base = Path(appdata) if appdata else Path.home() / "AppData" / "Roaming"
-        token_path = base / "DHCB" / "bridge-token.txt"
-        try:
-            token = token_path.read_text(encoding="utf-8").strip()
-        except OSError:
-            token = ""
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    return headers
-
-
 def _fetch(path: str, body: dict | None = None) -> dict:
     """Gọi HTTP bridge."""
     try:
@@ -95,13 +113,13 @@ def _fetch(path: str, body: dict | None = None) -> dict:
         import urllib.error
 
         if body is None:
-            req = urllib.request.Request(BRIDGE_URL + path, headers=_bridge_headers(False))
+            req = urllib.request.Request(BRIDGE_URL + path, headers=panel_api.bridge_headers(False))
         else:
             data = json.dumps(body).encode()
             req = urllib.request.Request(
                 BRIDGE_URL + path,
                 data=data,
-                headers=_bridge_headers(True),
+                headers=panel_api.bridge_headers(True),
                 method="POST",
             )
         with urllib.request.urlopen(req, timeout=10) as resp:
@@ -124,8 +142,8 @@ def autocad_health() -> str:
     elif "error" in result:
         return (
             f"❌ Không kết nối được: {result['error']}\n"
-            "→ Hãy mở AutoCAD và load add-in bằng lệnh NETLOAD:\n"
-            r"  C:\Users\liend\Dhcb Tools\build_v2\DhcbTools.AutoCAD.dll"
+            "→ Hãy mở AutoCAD. Cài bằng installer thì plugin tự nạp; bản build tay thì gõ NETLOAD\n"
+            "  và chọn <repo>\\src\\DhcbTools.AutoCAD\\bin\\<Cấu hình>\\<TFM>\\DhcbTools.AutoCAD.dll"
         )
     return f"⚠️ Phản hồi lạ: {result}"
 
@@ -139,13 +157,17 @@ def autocad_open_panel() -> str:
     Bảng có đầy đủ: Query, Layers, AutoNumbering, Cleanup, Raw JSON.
     Trả về directive ::preview{} để Hermes nhúng widget vào chat.
     """
-    # Đảm bảo panel.html tồn tại (copy từ embedded hoặc đọc từ file)
     panel_path = Path(PANEL_HTML)
     if not panel_path.exists():
         return (
             f"❌ Không tìm thấy panel.html tại {PANEL_HTML}\n"
-            "→ Chạy: autocad_install_panel để cài lại."
+            "→ Chép lại thư mục tools/autocad-mcp-server từ repo (panel.html nằm cạnh server.py)."
         )
+
+    # Gateway chỉ cần cho panel — khởi động ở đây, không phải lúc import server.
+    problem = _ensure_panel_api()
+    if problem:
+        return f"❌ {problem}"
 
     # Trả về marker mà Hermes sẽ render thành widget nhúng
     abs_path = str(panel_path).replace("\\", "/")
@@ -166,7 +188,7 @@ def autocad_query(
                 text, xrefs, layouts, stats
     limit: số lượng kết quả tối đa (áp dụng cho entities/inserts/text/blocks)
     """
-    valid = {"drawing_info", "layers", "blocks", "inserts", "entities", "text", "xrefs", "layouts", "stats"}
+    valid = panel_api.ALLOWED_QUERIES
     if query_type not in valid:
         return f"❌ query_type không hợp lệ. Chọn một trong: {', '.join(sorted(valid))}"
 
@@ -174,6 +196,10 @@ def autocad_query(
     body: dict[str, Any] = {"query": query_type}
     if config:
         body["config"] = config
+    try:
+        body = panel_api.prepare_bridge_payload("/query", body)
+    except ValueError as exc:
+        return f"❌ {exc}"
 
     result = _fetch("/query", body)
     if "error" in result and not result.get("layers") and not result.get("count") and not result.get("filename"):
@@ -205,7 +231,7 @@ def autocad_query(
         lines = [f"🗂 {count} layers:"]
         for l in sample:
             status = ("OFF " if l.get("isOff") else "") + ("FRZ " if l.get("isFrozen") else "") + ("LCK" if l.get("isLocked") else "")
-            lines.append(f"  {l['name']:<35} color={l.get('colorIndex'):>3}  {status}")
+            lines.append(f"  {l.get('name', ''):<35} color={l.get('colorIndex'):>3}  {status}")
         if count > 5:
             lines.append(f"  ... và {count-5} layer khác")
         return "\n".join(lines)
@@ -213,7 +239,7 @@ def autocad_query(
     if query_type == "layouts":
         layouts = result.get("layouts", [])
         count = result.get("count", len(layouts))
-        names = [l["name"] for l in layouts]
+        names = [l.get("name", "") for l in layouts]
         return f"📋 {count} layouts: {', '.join(names)}"
 
     # Generic fallback — trả JSON
@@ -222,9 +248,9 @@ def autocad_query(
 
 # ── Tool 4: Execute ───────────────────────────────────────────────────────────
 
-@mcp.tool()
-def autocad_execute(
+def build_execute_payload(
     command: str,
+    *,
     block_name: str = "",
     attribute_tag: str = "",
     prefix: str = "",
@@ -234,23 +260,18 @@ def autocad_execute(
     purge_unused: bool = True,
     audit_errors: bool = True,
     output_path: str = "",
+    input_path: str = "",
+    create_missing: bool = False,
     dry_run: bool = True,
-) -> str:
+    confirm: str = "",
+) -> dict[str, Any]:
+    """Dựng payload /execute rồi đưa qua ĐÚNG bộ validate của gateway (panel_api).
+
+    dry_run=False không có `confirm` khớp chuỗi trong panel_api.CONFIRMATIONS → ValueError.
     """
-    Thực thi lệnh vào AutoCAD.
+    if command not in panel_api.ALLOWED_COMMANDS:
+        raise ValueError(f"command không hợp lệ. Chọn: {', '.join(sorted(panel_api.ALLOWED_COMMANDS))}")
 
-    command: AutoNumbering | DrawingCleanup | LayerExport | LayerImport
-    dry_run: True = xem trước không ghi thật (mặc định True để an toàn)
-
-    AutoNumbering params: block_name, attribute_tag, prefix, start_number, step, pad_width
-    DrawingCleanup params: purge_unused, audit_errors
-    LayerExport params: output_path (đường dẫn CSV đầu ra)
-    """
-    valid_cmds = {"AutoNumbering", "DrawingCleanup", "LayerExport", "LayerImport"}
-    if command not in valid_cmds:
-        return f"❌ command không hợp lệ. Chọn: {', '.join(sorted(valid_cmds))}"
-
-    # Build config theo lệnh
     if command == "AutoNumbering":
         config: dict[str, Any] = {
             "blockName": block_name,
@@ -268,13 +289,62 @@ def autocad_execute(
             "dryRun": dry_run,
         }
     elif command == "LayerExport":
-        if not output_path:
-            output_path = "C:/Users/liend/AppData/Local/Temp/dhcb_layers_export.csv"
-        config = {"outputPath": output_path}
-    else:
-        config = {}
+        config = {"outputPath": output_path or DEFAULT_LAYER_CSV}
+    else:  # LayerImport
+        if not input_path:
+            raise ValueError("LayerImport cần input_path (file CSV do LayerExport sinh ra, nằm trong thư mục tạm)")
+        config = {"inputPath": input_path, "createMissing": create_missing, "dryRun": dry_run}
 
-    result = _fetch("/execute", {"command": command, "config": config})
+    payload: dict[str, Any] = {"command": command, "config": config}
+    if confirm:
+        payload["confirmation"] = confirm
+    return panel_api.prepare_bridge_payload("/execute", payload)
+
+
+@mcp.tool()
+def autocad_execute(
+    command: str,
+    block_name: str = "",
+    attribute_tag: str = "",
+    prefix: str = "",
+    start_number: int = 1,
+    step: int = 1,
+    pad_width: int = 0,
+    purge_unused: bool = True,
+    audit_errors: bool = True,
+    output_path: str = "",
+    input_path: str = "",
+    create_missing: bool = False,
+    dry_run: bool = True,
+    confirm: str = "",
+) -> str:
+    """
+    Thực thi lệnh vào AutoCAD.
+
+    command: AutoNumbering | DrawingCleanup | LayerExport | LayerImport
+    dry_run: True = xem trước không ghi thật (mặc định True để an toàn)
+    confirm: BẮT BUỘC khi dry_run=False — chuỗi xác nhận theo lệnh:
+             DrawingCleanup → "DELETE_UNUSED", AutoNumbering → "WRITE_AUTONUMBER",
+             LayerImport → "IMPORT_LAYERS". Chỉ truyền sau khi kỹ sư đã xem trước và đồng ý.
+
+    AutoNumbering params: block_name, attribute_tag, prefix, start_number, step, pad_width
+    DrawingCleanup params: purge_unused, audit_errors
+    LayerExport params: output_path (CSV; mặc định <Temp>/dhcb_layers_export.csv)
+    LayerImport params: input_path (CSV, bắt buộc), create_missing, dry_run
+    """
+    try:
+        payload = build_execute_payload(
+            command,
+            block_name=block_name, attribute_tag=attribute_tag, prefix=prefix,
+            start_number=start_number, step=step, pad_width=pad_width,
+            purge_unused=purge_unused, audit_errors=audit_errors,
+            output_path=output_path, input_path=input_path, create_missing=create_missing,
+            dry_run=dry_run, confirm=confirm,
+        )
+    except ValueError as exc:
+        return f"❌ {exc}"
+
+    result = _fetch("/execute", payload)
 
     success = result.get("success", False)
     summary = result.get("summary", "")
@@ -306,12 +376,15 @@ def autocad_execute(
 def autocad_export_layers(output_path: str = "") -> str:
     """
     Xuất toàn bộ layer ra file CSV.
-    output_path: đường dẫn file CSV (mặc định: Temp/dhcb_layers_export.csv)
+    output_path: đường dẫn file CSV (mặc định: <Temp>/dhcb_layers_export.csv; phải nằm trong thư mục tạm)
     """
-    if not output_path:
-        output_path = "C:/Users/liend/AppData/Local/Temp/dhcb_layers_export.csv"
+    try:
+        payload = build_execute_payload("LayerExport", output_path=output_path)
+    except ValueError as exc:
+        return f"❌ {exc}"
+    output_path = payload["config"]["outputPath"]
 
-    result = _fetch("/execute", {"command": "LayerExport", "config": {"outputPath": output_path}})
+    result = _fetch("/execute", payload)
     if result.get("success"):
         count = result.get("affectedCount", 0)
         return f"✅ Xuất {count} layers → {output_path}"

@@ -125,8 +125,11 @@ public sealed class DevicePlacementCommand : ICoreCommand<DevicePlacementConfig>
             CoverageRadius = config.MaxCoverageRadiusMm,
         };
 
-        var plans = new List<(Room Room, DevicePlacementPlan Plan, double ZFt)>();
+        var plans = new List<(Room Room, DevicePlacementPlan Plan, double ZFt, Level HostLevel)>();
         var result = CommandResult.Ok(string.Empty);
+
+        // Level của file chủ, dùng để gắn thiết bị và để đối chiếu cao độ phòng ở model liên kết.
+        var hostLevels = new FilteredElementCollector(document).OfClass(typeof(Level)).Cast<Level>().ToList();
 
         // Nói rõ đã chọn type nào: tra theo tên family có thể ra nhiều type, người dùng phải thấy cái
         // thực sự được dùng thay vì đoán.
@@ -157,8 +160,43 @@ public sealed class DevicePlacementCommand : ICoreCommand<DevicePlacementConfig>
                 continue;
             }
 
-            var z = room.Level!.Elevation + RevitCompat.MmToFt(config.MountHeightMm ?? (room.UnboundedHeight > 0 ? RevitCompat.FtToMm(room.UnboundedHeight) : 0));
-            plans.Add((room, plan, z));
+            // Phòng ở model liên kết: room.Level thuộc document của LINK — không dùng được để gắn thiết bị
+            // trong file chủ, và cao độ của nó ở toạ độ link. Đưa cao độ qua phép biến đổi của link (Z cũng
+            // phải qua transform như XY) rồi tìm Level file chủ gần nhất.
+            Level? hostLevel;
+            if (source.Transform == null)
+            {
+                hostLevel = room.Level;
+            }
+            else
+            {
+                var linkLevelZ = room.Level == null
+                    ? (double?)null
+                    : source.Transform.OfPoint(new XYZ(0, 0, room.Level.Elevation)).Z;
+                var deltaFt = 0.0;
+                hostLevel = linkLevelZ.HasValue ? NearestLevel(hostLevels, linkLevelZ.Value, out deltaFt) : null;
+                if (hostLevel == null)
+                {
+                    result.Messages.Add($"Phòng {room.Name} ({room.Id}, link \"{source.LinkName}\"): không có Level nào trong file chủ để đối chiếu cao độ — bỏ qua.");
+                    continue;
+                }
+
+                if (Math.Abs(deltaFt) > LevelMatchToleranceFt)
+                {
+                    result.Messages.Add($"Phòng {room.Name} ({room.Id}, link \"{source.LinkName}\"): cao độ tầng {RevitCompat.FtToMm(linkLevelZ!.Value):F0} mm "
+                                        + $"không khớp Level nào của file chủ (gần nhất \"{hostLevel.Name}\" lệch {RevitCompat.FtToMm(Math.Abs(deltaFt)):F0} mm) — bỏ qua.");
+                    continue;
+                }
+            }
+
+            if (hostLevel == null)
+            {
+                result.Messages.Add($"Phòng {room.Name} ({room.Id}): không có Level — bỏ qua.");
+                continue;
+            }
+
+            var z = hostLevel.Elevation + RevitCompat.MmToFt(config.MountHeightMm ?? (room.UnboundedHeight > 0 ? RevitCompat.FtToMm(room.UnboundedHeight) : 0));
+            plans.Add((room, plan, z, hostLevel));
             result.Messages.Add($"Phòng {room.Name}: {plan.Points.Count} thiết bị ({plan.AddedForCoverage.Count} chèn thêm để phủ, {plan.Uncovered.Count} điểm chưa phủ).");
             result.Messages.AddRange(plan.Messages.Select(m => "  " + m));
         }
@@ -179,14 +217,14 @@ public sealed class DevicePlacementCommand : ICoreCommand<DevicePlacementConfig>
             document.Regenerate();
         }
 
-        foreach (var (room, plan, z) in plans)
+        foreach (var (room, plan, z, hostLevel) in plans)
         {
             foreach (var p in plan.Points)
             {
                 try
                 {
                     var xyz = new XYZ(RevitCompat.MmToFt(p.X), RevitCompat.MmToFt(p.Y), z);
-                    document.Create.NewFamilyInstance(xyz, symbol, room.Level, Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
+                    document.Create.NewFamilyInstance(xyz, symbol, hostLevel, Autodesk.Revit.DB.Structure.StructuralType.NonStructural);
                     placed++;
                 }
                 catch (Exception ex)
@@ -200,6 +238,27 @@ public sealed class DevicePlacementCommand : ICoreCommand<DevicePlacementConfig>
         result.Summary = $"Đã đặt {placed}/{total} thiết bị trong {plans.Count} phòng.";
         result.AffectedCount = placed;
         return result;
+    }
+
+    /// <summary>Sai số cao độ tối đa (ft) để coi Level file chủ "khớp" Level của link — 500 mm.</summary>
+    private static readonly double LevelMatchToleranceFt = RevitCompat.MmToFt(500);
+
+    /// <summary>Level có cao độ gần <paramref name="elevationFt"/> nhất; <paramref name="deltaFt"/> = level − mục tiêu.</summary>
+    private static Level? NearestLevel(List<Level> levels, double elevationFt, out double deltaFt)
+    {
+        Level? best = null;
+        deltaFt = double.MaxValue;
+        foreach (var level in levels)
+        {
+            var d = level.Elevation - elevationFt;
+            if (Math.Abs(d) < Math.Abs(deltaFt))
+            {
+                deltaFt = d;
+                best = level;
+            }
+        }
+
+        return best;
     }
 
     /// <summary>Biên ngoài của phòng (vòng dài nhất) đổi sang mm, XY.</summary>

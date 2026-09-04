@@ -56,8 +56,8 @@ public sealed class SystemBomCommand : ICoreCommand<SystemBomConfig>
         var skipped = 0;
         foreach (var e in elements)
         {
-            var system = RevitCompat.ReadString(e, "System Name");
-            if (string.IsNullOrEmpty(system)) system = RevitCompat.ReadString(e, "System Type");
+            // BuiltInParameter thay vì "System Name"/"System Type" — tên hiển thị đổi theo ngôn ngữ Revit.
+            var system = MepParams.SystemNameOrType(e);
             if (!string.IsNullOrEmpty(config.SystemContains) && system.IndexOf(config.SystemContains!, StringComparison.OrdinalIgnoreCase) < 0)
             {
                 skipped++;
@@ -65,8 +65,18 @@ public sealed class SystemBomCommand : ICoreCommand<SystemBomConfig>
             }
 
             var typeName = document.GetElement(e.GetTypeId()) is ElementType t ? (t.FamilyName + (string.IsNullOrEmpty(t.FamilyName) ? string.Empty : ": ") + t.Name) : e.Name;
-            var size = RevitCompat.ReadString(e, "Size");
-            if (string.IsNullOrEmpty(size)) size = RevitCompat.ReadString(e, "Diameter");
+            var sizeParam = e.get_Parameter(BuiltInParameter.RBS_CALCULATED_SIZE);
+            var size = sizeParam != null && sizeParam.HasValue ? sizeParam.AsString() ?? string.Empty : string.Empty;
+            if (string.IsNullOrEmpty(size))
+            {
+                var diameter = RevitCompat.Lookup(e, "diameter");
+                if (diameter != null && diameter.HasValue)
+                {
+                    size = diameter.StorageType == StorageType.Double
+                        ? NumericText.Format(RevitCompat.FtToMm(diameter.AsDouble()), 0)
+                        : diameter.AsValueString() ?? string.Empty;
+                }
+            }
             double? lengthMm = null;
             if (e is MEPCurve)
             {

@@ -45,8 +45,8 @@ public sealed class SlopePipesCommand : ICoreCommand<SlopePipesConfig>
         if (!string.IsNullOrEmpty(config.SystemContains))
         {
             pipes = pipes.Where(p =>
-                RevitCompat.ReadString(p, "System Name").IndexOf(config.SystemContains!, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                RevitCompat.ReadString(p, "System Type").IndexOf(config.SystemContains!, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
+                MepParams.SystemName(p).IndexOf(config.SystemContains!, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                MepParams.SystemType(p).IndexOf(config.SystemContains!, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
         }
         if (!string.IsNullOrEmpty(config.LevelName))
         {
@@ -216,10 +216,12 @@ public sealed class PipeKickCommand : ICoreCommand<PipeKickConfig>
         using var tx = RevitCompat.StartTransaction(document, "DHCB - Kick ống");
         try
         {
-            // Tách tại A rồi tại B (B nằm trên đoạn sau A).
+            // Tách tại A rồi tại B (B nằm trên đoạn sau A). Sau BreakCurve, nhận diện đoạn bằng cách xem
+            // đoạn nào CHỨA một điểm dò (trung điểm của khoảng cần tìm) — không so đầu mút bằng
+            // IsAlmostEqualTo (dung sai 1e-9 ft, BreakCurve làm tròn là trượt).
             var id2 = PlumbingUtils.BreakCurve(document, pipe.Id, a);
             var pipe2 = (Pipe)document.GetElement(id2);
-            var afterA = ((LocationCurve)pipe2.Location).Curve.GetEndPoint(0).IsAlmostEqualTo(a) ? pipe2 : pipe;
+            var afterA = Containing(pipe, pipe2, (a + p1) * 0.5);
             var beforeA = afterA == pipe2 ? pipe : pipe2;
 
             Pipe middle, tail;
@@ -227,9 +229,8 @@ public sealed class PipeKickCommand : ICoreCommand<PipeKickConfig>
             {
                 var id3 = PlumbingUtils.BreakCurve(document, afterA.Id, b);
                 var pipe3 = (Pipe)document.GetElement(id3);
-                var startsAtA = ((LocationCurve)afterA.Location).Curve.GetEndPoint(0).IsAlmostEqualTo(a) || ((LocationCurve)afterA.Location).Curve.GetEndPoint(1).IsAlmostEqualTo(a);
-                middle = startsAtA ? afterA : pipe3;
-                tail = startsAtA ? pipe3 : afterA;
+                middle = Containing(afterA, pipe3, (a + b) * 0.5);
+                tail = middle == pipe3 ? afterA : pipe3;
             }
             else
             {
@@ -237,9 +238,8 @@ public sealed class PipeKickCommand : ICoreCommand<PipeKickConfig>
                 var bb = a + dir * RevitCompat.MmToFt(Math.Max(diameterMm, 50));
                 var id3 = PlumbingUtils.BreakCurve(document, afterA.Id, bb);
                 var pipe3 = (Pipe)document.GetElement(id3);
-                var startsAtA = ((LocationCurve)afterA.Location).Curve.GetEndPoint(0).IsAlmostEqualTo(a) || ((LocationCurve)afterA.Location).Curve.GetEndPoint(1).IsAlmostEqualTo(a);
-                middle = startsAtA ? afterA : pipe3;
-                tail = startsAtA ? pipe3 : afterA;
+                middle = Containing(afterA, pipe3, (a + bb) * 0.5);
+                tail = middle == pipe3 ? afterA : pipe3;
                 bOff = a + offsetDir * RevitCompat.MmToFt(config.OffsetMm);
             }
 
@@ -267,6 +267,17 @@ public sealed class PipeKickCommand : ICoreCommand<PipeKickConfig>
             tx.RollBack();
             return CommandResult.Fail("Kick thất bại, đã hoàn tác: " + ex.Message);
         }
+    }
+
+    /// <summary>Trong hai đoạn, đoạn nào chứa <paramref name="probe"/> (khoảng cách tới tuyến nhỏ hơn; dung sai 1 mm).</summary>
+    private static Pipe Containing(Pipe x, Pipe y, XYZ probe)
+    {
+        var dx = ((LocationCurve)x.Location).Curve.Distance(probe);
+        var dy = ((LocationCurve)y.Location).Curve.Distance(probe);
+        var tol = RevitCompat.MmToFt(1.0);
+        if (dx <= tol && dy > tol) return x;
+        if (dy <= tol && dx > tol) return y;
+        return dx <= dy ? x : y;
     }
 
     private static bool TryElbow(Document doc, Pipe a, Pipe b, XYZ at, CommandResult result)

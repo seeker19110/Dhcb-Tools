@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Autodesk.AutoCAD.DatabaseServices;
+using DhcbTools.Shared.Logic;
 
 namespace DhcbTools.Core.AutoCAD.LayerSync;
 
@@ -40,19 +41,20 @@ public sealed class LayerExportCommand : ICoreCommand<LayerExportConfig>
             var plottable = layer.IsPlottable ? "true" : "false";
             var description = layer.Description ?? string.Empty;
 
-            sb.Append(CsvEscape(layer.Name)).Append(',')
-              .Append(CsvEscape(colorIndex)).Append(',')
-              .Append(CsvEscape(linetype)).Append(',')
-              .Append(CsvEscape(lineweight)).Append(',')
+            sb.Append(CsvText.Escape(layer.Name)).Append(',')
+              .Append(CsvText.Escape(colorIndex)).Append(',')
+              .Append(CsvText.Escape(linetype)).Append(',')
+              .Append(CsvText.Escape(lineweight)).Append(',')
               .Append(plottable).Append(',')
-              .AppendLine(CsvEscape(description));
+              .AppendLine(CsvText.Escape(description));
 
             count++;
         }
 
         transaction.Commit();
 
-        File.WriteAllText(config.OutputPath, sb.ToString(), Encoding.UTF8);
+        AcadHelpers.EnsureParentDirectory(config.OutputPath);
+        File.WriteAllText(config.OutputPath, sb.ToString(), CsvText.Utf8WithBom);
 
         return CommandResult.Ok(
             $"Đã xuất {count} layer ra \"{config.OutputPath}\".",
@@ -75,15 +77,5 @@ public sealed class LayerExportCommand : ICoreCommand<LayerExportConfig>
         {
             return "Continuous";
         }
-    }
-
-    private static string CsvEscape(string? value)
-    {
-        value ??= string.Empty;
-        if (value.Contains(',') || value.Contains('"') || value.Contains('\n'))
-        {
-            return "\"" + value.Replace("\"", "\"\"") + "\"";
-        }
-        return value;
     }
 }
