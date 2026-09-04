@@ -5,6 +5,16 @@
     Quy ước: mỗi build cấu hình (Debug/Release) x (R21..R25) tương ứng một TargetFramework.
     RevitVersion truyền vào qua biến môi trường hoặc -p:RevitVersion=2024 khi build.
   -->
+  <!--
+    RevitVersion phải có mặc định: PackageReference của Core dùng Version="$(RevitVersion).*", nên khi
+    biến rỗng thì chuỗi phiên bản thành ".*" — NuGet trả về false mà KHÔNG log lỗi nào, và `dotnet build`
+    trần chỉ báo "error MSB4181: The RestoreTask task returned false but did not log an error". Mặc định
+    2024 trùng đúng nhánh TFM cũ dành cho biến rỗng (net48), nên không đổi kết quả build nào đang có.
+  -->
+  <PropertyGroup>
+    <RevitVersion Condition="'$(RevitVersion)'==''">2024</RevitVersion>
+  </PropertyGroup>
+
   <PropertyGroup>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
