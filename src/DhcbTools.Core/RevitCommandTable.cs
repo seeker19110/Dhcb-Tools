@@ -143,7 +143,7 @@ public static class RevitCommandTable
                 .Select(p => char.ToLowerInvariant(p.Name[0]) + p.Name.Substring(1))
                 .OrderBy(n => n, StringComparer.Ordinal);
             throw new ConfigException(
-                $"Config cho {typeof(T).Name} có trường không tồn tại \"{unknown}\". "
+                $"E-CONFIG-UNKNOWN: config cho {typeof(T).Name} có trường không tồn tại \"{unknown}\". "
                 + "Trường hợp lệ: " + string.Join(", ", valid) + ".", ex);
         }
         catch (JsonException ex)

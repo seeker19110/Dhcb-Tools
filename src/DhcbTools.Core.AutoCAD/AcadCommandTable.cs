@@ -98,7 +98,7 @@ public static class AcadCommandTable
         {
             var known = string.Join(", ", typeof(T).GetProperties().Select(p => char.ToLowerInvariant(p.Name[0]) + p.Name.Substring(1)));
             throw new ConfigException(
-                $"Config cho {typeof(T).Name} có trường không tồn tại: \"{m.Groups["name"].Value}\". Trường hợp lệ: {known}.", ex);
+                $"E-CONFIG-UNKNOWN: config cho {typeof(T).Name} có trường không tồn tại \"{m.Groups["name"].Value}\". Trường hợp lệ: {known}.", ex);
         }
         catch (JsonException ex)
         {

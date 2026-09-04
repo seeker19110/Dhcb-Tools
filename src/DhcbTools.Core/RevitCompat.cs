@@ -127,7 +127,7 @@ public static class RevitCompat
 
         var candidates = partial.Select(Full).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(n => n, StringComparer.OrdinalIgnoreCase).Take(20).ToList();
         throw new ConfigException(
-            $"Tên \"{name}\" khớp {partial.Count} type, không rõ chọn cái nào. Ghi đúng dạng \"Family: Type\", ví dụ: "
+            $"E-CONFIG-AMBIGUOUS: tên \"{name}\" khớp {partial.Count} type, không rõ chọn cái nào. Ghi đúng dạng \"Family: Type\", ví dụ: "
             + string.Join("; ", candidates) + (partial.Count > candidates.Count ? "; …" : "") + ".");
     }
 

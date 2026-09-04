@@ -19,8 +19,10 @@ thêm mã mà quên ghi vào đây (hoặc ngược lại) là test đỏ.
 | `E-PATH-MISSING` | Đường dẫn trong config không tồn tại | Thư mục family, file CSV, thư mục xuất bị đổi tên/di chuyển; job chạy trên máy khác | Kiểm đường dẫn tuyệt đối trong job; dùng token `{outputFolder}`, `{suiteFolder}` thay vì đường dẫn cứng của một máy |
 | `E-PARAM-MISSING` | Không tìm thấy tham số trong model | Tên tham số khác giữa các dự án (Việt/Anh), hoặc category không có tham số đó | Tra tham số có thật bằng query `parameters_of`; thêm bí danh vào từ điển `%APPDATA%\DHCB\dictionary.json` — thông báo có liệt kê những tên đã thử |
 | `E-PARAM-READONLY` | Tham số có thật nhưng chỉ đọc | Ghi vào tham số Revit tự tính (diện tích, thể tích, tham số của type dùng chung) | Không ghi được bằng API — chọn tham số khác hoặc sửa ở nguồn sinh ra giá trị |
+| `E-CONFIG-UNKNOWN` | Config có trường không tồn tại trong lớp config của lệnh | Gõ sai tên trường (`outputPatch` thay vì `outputPath`), hoặc dùng lại config của phiên bản cũ sau khi trường bị đổi tên | Thông báo liệt kê đủ tên trường hợp lệ của lệnh — sửa đúng tên. Trước đây trường lạ bị bỏ qua im lặng nên lệnh chạy với giá trị mặc định mà không ai biết |
+| `E-CONFIG-AMBIGUOUS` | Tên type/family trong config khớp nhiều ứng viên trong mô hình | Ghi tên rút gọn (`"Pipe"`) trong dự án có nhiều type cùng chứa chuỗi đó | Ghi đủ dạng `"Family: Type"`; thông báo có liệt kê tối đa 20 ứng viên đang khớp |
 
-## Vì sao chỉ có bốn mã
+## Vì sao chỉ có sáu mã
 
 Mã lỗi chỉ đặt cho tình trạng **người dùng xử lý được và lặp lại nhiều lệnh**. Lỗi chỉ xảy ra ở một
 lệnh, hoặc lỗi mà người dùng không làm gì được (Revit từ chối dịch điểm cuối ống đã nối hai đầu), thì
