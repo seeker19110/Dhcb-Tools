@@ -45,6 +45,15 @@ namespace DhcbTools.Shared.Logic.Ai
             {
                 return new LocalAiSettings();
             }
+            catch (IOException)
+            {
+                // File đang bị khoá/đọc dở: coi như chưa cấu hình, không làm hỏng lệnh đang chạy.
+                return new LocalAiSettings();
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return new LocalAiSettings();
+            }
         }
 
         /// <summary>Chỉ chấp nhận endpoint loopback — đảm bảo "offline" đúng nghĩa: dữ liệu mô hình không rời máy.</summary>
@@ -66,16 +75,80 @@ namespace DhcbTools.Shared.Logic.Ai
     /// </summary>
     public sealed class OllamaClient
     {
+        /// <summary>Giới hạn thân phản hồi đọc vào (1 MB) — model local trả lời dài bất thường không được phép nuốt hết RAM.</summary>
+        public const int MaxResponseBytes = 1024 * 1024;
+
+        /// <summary>Độ dài tối đa của <c>reason</c> do model sinh — chuỗi dài hơn bị cắt để không tràn log/UI.</summary>
+        public const int MaxReasonLength = 300;
+
         private readonly LocalAiSettings _settings;
+        private readonly Func<string, string, int, string?> _transport;
 
         public OllamaClient(LocalAiSettings settings)
+            : this(settings, null)
+        {
+        }
+
+        /// <summary>
+        /// <paramref name="transport"/>: hàm (url, body JSON, timeout giây) → thân phản hồi; null → <see cref="HttpTransport"/>.
+        /// Tiêm được để test toàn bộ đường parse/whitelist mà không cần Ollama thật.
+        /// </summary>
+        public OllamaClient(LocalAiSettings settings, Func<string, string, int, string?>? transport)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            _transport = transport ?? HttpTransport;
         }
 
         public bool IsUsable => _settings.Enabled && _settings.IsLoopback() && !string.IsNullOrWhiteSpace(_settings.Model);
 
-        /// <summary>Sinh văn bản. Trả null nếu tắt, không loopback, hoặc lỗi.</summary>
+        /// <summary>
+        /// Lý do lần gọi gần nhất trả null (kết nối, IO, JSON hỏng…), để lệnh gọi nói được với kỹ sư
+        /// "vì sao rơi về heuristic". Null nếu lần gọi gần nhất thành công.
+        /// </summary>
+        public string? LastError { get; private set; }
+
+        /// <summary>Transport mặc định: <see cref="HttpWebRequest"/> POST, đọc tối đa <see cref="MaxResponseBytes"/>.</summary>
+        public static string? HttpTransport(string url, string body, int timeoutSeconds)
+        {
+            var request = (HttpWebRequest)WebRequest.Create(url);
+            request.Method = "POST";
+            request.ContentType = "application/json";
+            request.Timeout = Math.Max(5, timeoutSeconds) * 1000;
+            request.ReadWriteTimeout = request.Timeout;
+            var bytes = Encoding.UTF8.GetBytes(body);
+            request.ContentLength = bytes.Length;
+            using (var stream = request.GetRequestStream())
+            {
+                stream.Write(bytes, 0, bytes.Length);
+            }
+
+            using (var response = (HttpWebResponse)request.GetResponse())
+            using (var reader = new StreamReader(response.GetResponseStream() ?? Stream.Null, Encoding.UTF8))
+            {
+                return ReadCapped(reader, MaxResponseBytes);
+            }
+        }
+
+        /// <summary>Đọc tối đa <paramref name="maxChars"/> ký tự; dài hơn thì ném IOException thay vì đọc tiếp.</summary>
+        internal static string ReadCapped(TextReader reader, int maxChars)
+        {
+            var sb = new StringBuilder();
+            var buffer = new char[8192];
+            int read;
+            while ((read = reader.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                if (sb.Length + read > maxChars)
+                {
+                    throw new IOException("Phản hồi model vượt " + (maxChars / 1024) + " KB — bỏ qua.");
+                }
+
+                sb.Append(buffer, 0, read);
+            }
+
+            return sb.ToString();
+        }
+
+        /// <summary>Sinh văn bản. Trả null nếu tắt, không loopback, hoặc lỗi (xem <see cref="LastError"/>).</summary>
         public string? Generate(string prompt, string? system = null, bool jsonMode = false) => Generate(prompt, system, jsonMode ? (JToken)"json" : null);
 
         /// <summary>
@@ -86,53 +159,103 @@ namespace DhcbTools.Shared.Logic.Ai
 
         private string? Generate(string prompt, string? system, JToken? format)
         {
+            LastError = null;
             if (!IsUsable)
             {
+                LastError = "Model local đang tắt hoặc endpoint không phải loopback.";
                 return null;
+            }
+
+            var body = new JObject
+            {
+                ["model"] = _settings.Model,
+                ["prompt"] = prompt,
+                ["stream"] = false,
+                ["options"] = new JObject { ["temperature"] = 0.1 },
+            };
+            if (!string.IsNullOrEmpty(system))
+            {
+                body["system"] = system;
+            }
+
+            if (format != null)
+            {
+                body["format"] = format;
             }
 
             try
             {
-                var body = new JObject
+                var raw = _transport(_settings.Endpoint.TrimEnd('/') + "/api/generate", body.ToString(Formatting.None), _settings.TimeoutSeconds);
+                if (raw == null)
                 {
-                    ["model"] = _settings.Model,
-                    ["prompt"] = prompt,
-                    ["stream"] = false,
-                    ["options"] = new JObject { ["temperature"] = 0.1 },
-                };
-                if (!string.IsNullOrEmpty(system))
-                {
-                    body["system"] = system;
+                    LastError = "Không nhận được phản hồi từ model local.";
+                    return null;
                 }
 
-                if (format != null)
-                {
-                    body["format"] = format;
-                }
+                var json = JObject.Parse(raw);
+                return json["response"]?.ToString();
+            }
+            catch (WebException ex)
+            {
+                LastError = "Không kết nối được model local (" + _settings.Endpoint + "): " + ex.Message;
+                return null;
+            }
+            catch (IOException ex)
+            {
+                LastError = "Lỗi đọc phản hồi model local: " + ex.Message;
+                return null;
+            }
+            catch (JsonException ex)
+            {
+                LastError = "Phản hồi model local không phải JSON: " + ex.Message;
+                return null;
+            }
+        }
 
-                var request = (HttpWebRequest)WebRequest.Create(_settings.Endpoint.TrimEnd('/') + "/api/generate");
-                request.Method = "POST";
-                request.ContentType = "application/json";
-                request.Timeout = Math.Max(5, _settings.TimeoutSeconds) * 1000;
-                request.ReadWriteTimeout = request.Timeout;
-                var bytes = Encoding.UTF8.GetBytes(body.ToString(Formatting.None));
-                request.ContentLength = bytes.Length;
-                using (var stream = request.GetRequestStream())
-                {
-                    stream.Write(bytes, 0, bytes.Length);
-                }
+        /// <summary>Đọc <c>confidence</c> chịu được model trả số dạng chuỗi, số quá lớn hoặc kiểu lạ; mặc định 0.5.</summary>
+        internal static double ReadConfidence(JToken? token)
+        {
+            if (token == null)
+            {
+                return 0.5;
+            }
 
-                using (var response = (HttpWebResponse)request.GetResponse())
-                using (var reader = new StreamReader(response.GetResponseStream() ?? Stream.Null, Encoding.UTF8))
+            try
+            {
+                switch (token.Type)
                 {
-                    var json = JObject.Parse(reader.ReadToEnd());
-                    return json["response"]?.ToString();
+                    case JTokenType.Float:
+                    case JTokenType.Integer:
+                        return Clamp(token.Value<double>());
+                    case JTokenType.String:
+                        var text = (token.ToString() ?? string.Empty).Trim().Replace(',', '.');
+                        return double.TryParse(text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? Clamp(v) : 0.5;
+                    default:
+                        return 0.5;
                 }
             }
-            catch (Exception)
+            catch (OverflowException)
+            {
+                return 0.5;
+            }
+            catch (FormatException)
+            {
+                return 0.5;
+            }
+        }
+
+        private static double Clamp(double v) => double.IsNaN(v) ? 0.5 : Math.Max(0.0, Math.Min(1.0, v));
+
+        /// <summary>Cắt <c>reason</c> của model về tối đa <see cref="MaxReasonLength"/> ký tự.</summary>
+        internal static string? TrimReason(JToken? token)
+        {
+            if (token == null || token.Type == JTokenType.Null)
             {
                 return null;
             }
+
+            var text = token.Type == JTokenType.String ? token.ToString() : token.ToString(Formatting.None);
+            return text.Length <= MaxReasonLength ? text : text.Substring(0, MaxReasonLength) + "…";
         }
 
         /// <summary>
@@ -214,19 +337,28 @@ namespace DhcbTools.Shared.Logic.Ai
             try
             {
                 var json = JObject.Parse(text);
-                var name = json["command"]?.Type == JTokenType.Null ? null : json["command"]?.ToString();
-                confidence = json["confidence"]?.Type == JTokenType.Float || json["confidence"]?.Type == JTokenType.Integer ? json["confidence"]!.Value<double>() : 0.5;
-                reason = json["reason"]?.ToString();
-                if (name == null)
+                var cmdToken = json["command"];
+                var name = cmdToken == null || cmdToken.Type == JTokenType.Null
+                    ? null
+                    : cmdToken.Type == JTokenType.String ? cmdToken.ToString() : cmdToken.ToString(Formatting.None);
+                confidence = ReadConfidence(json["confidence"]);
+                reason = TrimReason(json["reason"]);
+                if (string.IsNullOrWhiteSpace(name))
                 {
                     return null;
                 }
 
-                var match = candidates.FirstOrDefault(c => c.Matches(name));
+                var match = candidates.FirstOrDefault(c => c.Matches(name!));
+                if (match == null)
+                {
+                    LastError = "Model chọn lệnh ngoài danh sách: \"" + TrimReason(cmdToken) + "\".";
+                }
+
                 return match?.Name; // ngoài danh sách → null (whitelist)
             }
-            catch (JsonException)
+            catch (JsonException ex)
             {
+                LastError = "Model trả JSON không đọc được: " + ex.Message;
                 return null;
             }
         }
@@ -253,8 +385,8 @@ namespace DhcbTools.Shared.Logic.Ai
                 var proposed = arr.OfType<JObject>().Select(o => new LayerMapping(
                     o["layer"]?.ToString() ?? string.Empty,
                     o["revitType"]?.Type == JTokenType.Null ? null : o["revitType"]?.ToString(),
-                    o["confidence"]?.Type == JTokenType.Float || o["confidence"]?.Type == JTokenType.Integer ? o["confidence"]!.Value<double>() : 0.5,
-                    o["reason"]?.ToString() ?? "model local")).Where(m => m.Layer.Length > 0);
+                    ReadConfidence(o["confidence"]),
+                    TrimReason(o["reason"]) ?? "model local")).Where(m => m.Layer.Length > 0);
 
                 return LayerMappingSuggester.Validate(proposed, revitTypes, rejected);
             }

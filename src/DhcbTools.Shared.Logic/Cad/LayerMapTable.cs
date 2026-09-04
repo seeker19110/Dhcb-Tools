@@ -51,26 +51,27 @@ namespace DhcbTools.Shared.Logic.Cad
         public static LayerMapTable ParseCsv(string csv, List<string> errors)
         {
             var table = new LayerMapTable();
-            var lines = (csv ?? string.Empty).Replace("\r\n", "\n").Split('\n');
+            // Đọc theo bản ghi RFC 4180 (không tách theo '\n') để ô có nháy chứa xuống dòng không vỡ.
+            var records = new List<string[]>(CsvText.ReadRecords(new System.IO.StringReader(csv ?? string.Empty)));
             var start = 0;
-            if (lines.Length > 0)
+            if (records.Count > 0)
             {
-                var head = CsvText.SplitLine(lines[0]);
-                if (head.Count > 0 && head[0].Trim().Equals("Source", StringComparison.OrdinalIgnoreCase))
+                var head = records[0];
+                if (head.Length > 0 && head[0].Trim().Equals("Source", StringComparison.OrdinalIgnoreCase))
                 {
                     start = 1;
                 }
             }
 
-            for (var i = start; i < lines.Length; i++)
+            for (var i = start; i < records.Count; i++)
             {
-                if (string.IsNullOrWhiteSpace(lines[i]))
+                var c = records[i];
+                if (c.Length == 0 || (c.Length == 1 && string.IsNullOrWhiteSpace(c[0])))
                 {
                     continue;
                 }
 
-                var c = CsvText.SplitLine(lines[i]);
-                if (c.Count < 2 || string.IsNullOrWhiteSpace(c[0]) || string.IsNullOrWhiteSpace(c[1]))
+                if (c.Length < 2 || string.IsNullOrWhiteSpace(c[0]) || string.IsNullOrWhiteSpace(c[1]))
                 {
                     errors.Add("Dòng " + (i + 1) + ": cần Source,Target — bỏ qua.");
                     continue;
@@ -78,11 +79,11 @@ namespace DhcbTools.Shared.Logic.Cad
 
                 var e = new LayerMapEntry(c[0].Trim(), c[1].Trim())
                 {
-                    Color = c.Count > 2 && c[2].Trim().Length > 0 ? c[2].Trim() : null,
-                    Linetype = c.Count > 3 && c[3].Trim().Length > 0 ? c[3].Trim() : null,
-                    Lineweight = c.Count > 4 && c[4].Trim().Length > 0 ? c[4].Trim() : null,
+                    Color = c.Length > 2 && c[2].Trim().Length > 0 ? c[2].Trim() : null,
+                    Linetype = c.Length > 3 && c[3].Trim().Length > 0 ? c[3].Trim() : null,
+                    Lineweight = c.Length > 4 && c[4].Trim().Length > 0 ? c[4].Trim() : null,
                 };
-                if (c.Count > 5 && c[5].Trim().Length > 0)
+                if (c.Length > 5 && c[5].Trim().Length > 0)
                 {
                     e.Plottable = c[5].Trim().Equals("true", StringComparison.OrdinalIgnoreCase) || c[5].Trim() == "1";
                 }

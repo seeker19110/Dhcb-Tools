@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 
 namespace DhcbTools.Shared.Logic
@@ -109,6 +110,100 @@ namespace DhcbTools.Shared.Logic
                 first = false;
             }
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Đọc toàn bộ bản ghi CSV theo RFC 4180: ô có nháy được phép chứa dấu phẩy, nháy kép đôi VÀ xuống dòng.
+        /// Trước đây mọi chỗ đọc đều <c>File.ReadAllLines</c> + <see cref="SplitLine"/>, nên một ô Description
+        /// nhiều dòng (do chính <see cref="Escape"/> ghi ra) bị cắt thành hai bản ghi hỏng. Dòng trống trả về
+        /// một bản ghi có đúng một ô rỗng (giống <see cref="SplitLine"/>); dòng trống cuối file không sinh bản ghi.
+        /// </summary>
+        public static IEnumerable<string[]> ReadRecords(TextReader reader)
+        {
+            if (reader == null)
+            {
+                throw new System.ArgumentNullException(nameof(reader));
+            }
+
+            var cells = new List<string>();
+            var current = new StringBuilder();
+            var inQuotes = false;
+            var hasContent = false; // đã đọc được ký tự nào của bản ghi hiện tại chưa
+
+            int ch;
+            while ((ch = reader.Read()) >= 0)
+            {
+                var c = (char)ch;
+                if (inQuotes)
+                {
+                    if (c == '"')
+                    {
+                        if (reader.Peek() == '"')
+                        {
+                            reader.Read();
+                            current.Append('"');
+                        }
+                        else
+                        {
+                            inQuotes = false;
+                        }
+                    }
+                    else
+                    {
+                        current.Append(c);
+                    }
+
+                    continue;
+                }
+
+                switch (c)
+                {
+                    case '"':
+                        inQuotes = true;
+                        hasContent = true;
+                        break;
+                    case ',':
+                        cells.Add(current.ToString());
+                        current.Length = 0;
+                        hasContent = true;
+                        break;
+                    case '\r':
+                        if (reader.Peek() == '\n')
+                        {
+                            reader.Read();
+                        }
+                        goto case '\n';
+                    case '\n':
+                        cells.Add(current.ToString());
+                        yield return cells.ToArray();
+                        cells.Clear();
+                        current.Length = 0;
+                        hasContent = false;
+                        break;
+                    default:
+                        current.Append(c);
+                        hasContent = true;
+                        break;
+                }
+            }
+
+            if (hasContent || cells.Count > 0 || current.Length > 0)
+            {
+                cells.Add(current.ToString());
+                yield return cells.ToArray();
+            }
+        }
+
+        /// <summary>Đọc file CSV theo <see cref="ReadRecords(TextReader)"/>; nhận cả UTF-8 có/không BOM.</summary>
+        public static IEnumerable<string[]> ReadRecords(string path)
+        {
+            using (var reader = new StreamReader(path, Encoding.UTF8, detectEncodingFromByteOrderMarks: true))
+            {
+                foreach (var record in ReadRecords(reader))
+                {
+                    yield return record;
+                }
+            }
         }
     }
 }

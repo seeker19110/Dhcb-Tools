@@ -94,16 +94,16 @@ namespace DhcbTools.Shared.Logic.Geometry
         public static List<GridLine> FromCsv(string csv, List<string> errors)
         {
             var result = new List<GridLine>();
-            var lines = csv.Replace("\r\n", "\n").Split('\n');
-            for (var i = 1; i < lines.Length; i++)
+            var records = new List<string[]>(CsvText.ReadRecords(new System.IO.StringReader(csv ?? string.Empty)));
+            for (var i = 1; i < records.Count; i++)
             {
-                if (string.IsNullOrWhiteSpace(lines[i]))
+                var cells = records[i];
+                if (cells.Length == 1 && string.IsNullOrWhiteSpace(cells[0]))
                 {
                     continue;
                 }
 
-                var cells = CsvText.SplitLine(lines[i]);
-                if (cells.Count < 5
+                if (cells.Length < 5
                     || !NumericText.TryParseDouble(cells[1], out var x1) || !NumericText.TryParseDouble(cells[2], out var y1)
                     || !NumericText.TryParseDouble(cells[3], out var x2) || !NumericText.TryParseDouble(cells[4], out var y2))
                 {

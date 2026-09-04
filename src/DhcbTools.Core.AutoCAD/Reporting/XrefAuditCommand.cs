@@ -50,6 +50,7 @@ public sealed class XrefAuditCommand : ICoreCommand<XrefAuditConfig>
                 sb.Append(CsvText.JoinLine(new[] { name, path, status })).Append('\n');
             }
 
+            AcadHelpers.EnsureParentDirectory(config.OutputPath);
             File.WriteAllText(config.OutputPath, sb.ToString(), CsvText.Utf8WithBom);
             result.Messages.Add($"Đã ghi báo cáo ra \"{config.OutputPath}\".");
         }

@@ -202,13 +202,21 @@ namespace DhcbTools.Shared.Logic
                 throw new ArgumentNullException(nameof(orderedItems));
             }
 
+            if (step == 0)
+            {
+                // Bước 0 làm mọi phần tử cùng một số — chắc chắn là lỗi cấu hình, không phải ý định.
+                throw new ArgumentOutOfRangeException(nameof(step), "Bước nhảy phải khác 0.");
+            }
+
             var assignments = new List<NumberingAssignment<TKey>>();
-            var number = startNumber;
+            long number = startNumber;
 
             foreach (var item in orderedItems)
             {
-                assignments.Add(new NumberingAssignment<TKey>(item.Key, number, FormatLabel(prefix, number, padWidth)));
-                number += step;
+                // Tính bằng long + checked: startNumber gần int.MaxValue không được lặng lẽ quay vòng về số âm.
+                var current = checked((int)number);
+                assignments.Add(new NumberingAssignment<TKey>(item.Key, current, FormatLabel(prefix, current, padWidth)));
+                number = checked(number + step);
             }
 
             return assignments;

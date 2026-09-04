@@ -1,11 +1,13 @@
 using Autodesk.AutoCAD.DatabaseServices;
-using Autodesk.AutoCAD.Geometry;
+using DhcbTools.Shared.Logic;
 
 namespace DhcbTools.Core.AutoCAD.AutoNumbering;
 
 /// <summary>
 /// Đánh số hàng loạt Block Reference theo vị trí hình học — tương đương AutoNumberingCommand của Revit.
-/// Sắp Block Reference theo InsertionPoint rồi ghi giá trị vào AttributeReference khớp tag.
+/// Sắp Block Reference theo InsertionPoint (gom hàng theo <c>rowToleranceMm</c> bằng <see cref="NumberingPlanner"/>,
+/// cùng thuật toán với Revit nên hai nền tảng đánh số giống hệt nhau) rồi ghi giá trị vào AttributeReference khớp tag.
+/// Phần chung với AttributeIncrement nằm ở <see cref="BlockNumbering"/>.
 /// </summary>
 public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
 {
@@ -13,108 +15,27 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
 
     public CommandResult Execute(Database database, AutoNumberingConfig config)
     {
-        using var transaction = database.TransactionManager.StartTransaction();
-
-        var modelSpace = (BlockTableRecord)transaction.GetObject(
-            SymbolUtilityServices.GetBlockModelSpaceId(database), OpenMode.ForRead);
-
-        // Thu thập tất cả BlockReference có tên khớp
-        var inserts = new List<(BlockReference Insert, Point3d InsertPoint)>();
-
-        foreach (ObjectId entityId in modelSpace)
+        if (config.PadWidth < 0)
         {
-            var entity = transaction.GetObject(entityId, OpenMode.ForRead);
-            if (entity is not BlockReference blockRef)
-            {
-                continue;
-            }
-
-            // Lấy tên block thực (xử lý cả dynamic block)
-            var blockName = blockRef.IsDynamicBlock
-                ? ((BlockTableRecord)transaction.GetObject(blockRef.DynamicBlockTableRecord, OpenMode.ForRead)).Name
-                : blockRef.Name;
-
-            if (!string.Equals(blockName, config.BlockName, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            inserts.Add((blockRef, blockRef.Position));
+            return CommandResult.Fail($"Số chữ số đệm (padWidth) không được âm: {config.PadWidth}.");
         }
 
-        if (inserts.Count == 0)
+        var direction = config.Direction == NumberingDirection.LeftToRightThenTopToBottom
+            ? ScanDirection.LeftToRightThenTopToBottom
+            : ScanDirection.TopToBottomThenLeftToRight;
+
+        return BlockNumbering.Execute(database, new BlockNumberingRequest
         {
-            transaction.Abort();
-            return CommandResult.Fail($"Không tìm thấy Block \"{config.BlockName}\" trong Model Space.");
-        }
-
-        // Sắp xếp theo hướng đã chọn
-        var ordered = config.Direction == NumberingDirection.LeftToRightThenTopToBottom
-            ? inserts.OrderByDescending(t => t.InsertPoint.Y).ThenBy(t => t.InsertPoint.X)
-            : inserts.OrderBy(t => t.InsertPoint.X).ThenByDescending(t => t.InsertPoint.Y);
-
-        var plan = new List<(ObjectId RefId, string Value)>();
-        var number = config.StartNumber;
-
-        foreach (var (blockRef, _) in ordered)
-        {
-            var digits = number.ToString();
-            if (config.PadWidth > 0)
-            {
-                digits = digits.PadLeft(config.PadWidth, '0');
-            }
-
-            plan.Add((blockRef.ObjectId, config.Prefix + digits));
-            number += config.Step;
-        }
-
-        if (config.DryRun)
-        {
-            transaction.Abort();
-            var preview = CommandResult.Ok(
-                $"[Xem trước] Sẽ đánh số {plan.Count} Block \"{config.BlockName}\" vào attribute \"{config.AttributeTag}\".",
-                plan.Count);
-
-            foreach (var (refId, value) in plan)
-            {
-                preview.Messages.Add($"{refId}: \"{value}\"");
-            }
-
-            return preview;
-        }
-
-        // Ghi thật vào attribute
-        var updated = 0;
-
-        foreach (var (refId, value) in plan)
-        {
-            var blockRef = (BlockReference)transaction.GetObject(refId, OpenMode.ForRead);
-
-            foreach (ObjectId attId in blockRef.AttributeCollection)
-            {
-                var attRef = (AttributeReference)transaction.GetObject(attId, OpenMode.ForRead);
-
-                // Khi AttributeTag rỗng → ghi vào attribute đầu tiên tìm thấy
-                var matchByTag = !string.IsNullOrEmpty(config.AttributeTag)
-                    && string.Equals(attRef.Tag, config.AttributeTag, StringComparison.OrdinalIgnoreCase);
-                var matchFirst = string.IsNullOrEmpty(config.AttributeTag);
-
-                if (!matchByTag && !matchFirst)
-                {
-                    continue;
-                }
-
-                attRef.UpgradeOpen();
-                attRef.TextString = value;
-                updated++;
-                break;
-            }
-        }
-
-        transaction.Commit();
-
-        return CommandResult.Ok(
-            $"Đã đánh số {updated}/{plan.Count} Block \"{config.BlockName}\".",
-            updated);
+            BlockName = config.BlockName,
+            AttributeTag = config.AttributeTag,
+            Direction = direction,
+            RowTolerance = config.RowToleranceMm,
+            StartNumber = config.StartNumber,
+            Step = config.Step,
+            Label = n => NumberingPlanner.FormatLabel(config.Prefix, n, config.PadWidth),
+            DryRun = config.DryRun,
+            PreviewSummary = count => $"[Xem trước] Sẽ đánh số {count} Block \"{config.BlockName}\" vào attribute \"{config.AttributeTag}\".",
+            DoneSummary = (updated, count) => $"Đã đánh số {updated}/{count} Block \"{config.BlockName}\".",
+        });
     }
 }

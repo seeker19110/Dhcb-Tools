@@ -21,6 +21,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Để test được các helper internal (StringGuard, ReadCapped…) mà không phải mở public. -->
+    <InternalsVisibleTo Include="DhcbTools.Shared.Logic.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Chỉ để đọc/ghi JSON (job batch, log JSONL, config AI). Không có API Autodesk nào ở đây. -->
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>

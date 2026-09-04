@@ -53,6 +53,11 @@ namespace DhcbTools.Shared.Logic.Mep
                 throw new ArgumentOutOfRangeException(nameof(diameterM));
             }
 
+            if (flowM3s < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(flowM3s), "Lưu lượng không được âm.");
+            }
+
             var area = Math.PI * diameterM * diameterM / 4.0;
             var v = flowM3s / area;
             if (v <= 0)
@@ -135,10 +140,15 @@ namespace DhcbTools.Shared.Logic.Mep
                     break;
                 }
 
-                if (EquivalentDiameterMm(w, fixedHeightMm) >= round.SuggestedMm)
+                // De ≥ tròn đảm bảo ma sát; vận tốc thực a×b phải kiểm riêng vì tiết diện chữ nhật < tiết diện tròn cùng De.
+                var de = EquivalentDiameterMm(w, fixedHeightMm);
+                var v = q / (w / 1000.0 * fixedHeightMm / 1000.0);
+                if (de >= round.SuggestedMm && v <= maxVelocityMs)
                 {
-                    var v = q / (w / 1000.0 * fixedHeightMm / 1000.0);
-                    return new SizingSuggestion(w, Math.Round(v, 2), "De = " + NumericText.Format(EquivalentDiameterMm(w, fixedHeightMm), 0) + " mm ≥ tròn " + NumericText.Format(round.SuggestedMm, 0) + " mm; " + round.Reason);
+                    // Không nối round.Reason vào đây: khi tròn vượt bảng, câu "cần tách nhánh hoặc dùng chữ nhật" sẽ gây hiểu nhầm.
+                    return new SizingSuggestion(w, Math.Round(v, 2),
+                        "De = " + NumericText.Format(de, 0) + " mm ≥ tròn " + NumericText.Format(round.SuggestedMm, 0)
+                        + " mm; v = " + NumericText.Format(v, 2) + " m/s ≤ " + NumericText.Format(maxVelocityMs, 2));
                 }
             }
 

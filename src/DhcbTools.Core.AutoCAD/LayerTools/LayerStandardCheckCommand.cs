@@ -88,6 +88,7 @@ public sealed class LayerStandardCheckCommand : ICoreCommand<LayerStandardCheckC
         }
 
         var html = BuildHtml(allLayers, invalidLayers, rules);
+        AcadHelpers.EnsureParentDirectory(config.OutputPath);
         File.WriteAllText(config.OutputPath, html, Encoding.UTF8);
 
         var result = CommandResult.Ok(

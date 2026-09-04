@@ -2,10 +2,9 @@ namespace DhcbTools.Core.AutoCAD.Reporting;
 
 /// <summary>
 /// Cấu hình so sánh bản vẽ hiện tại với một file DWG khác.
-/// GHI CHÚ QUAN TRỌNG: so khớp theo Handle giữa hai file DWG độc lập không đáng tin (handle được
-/// AutoCAD cấp lại mỗi khi save-as/insert nên hai file riêng biệt gần như chắc chắn không cùng handle
-/// cho "cùng một" entity) — vì vậy bản triển khai này CHỈ so sánh ở MỨC LAYER: đếm số entity theo layer
-/// ở mỗi file rồi báo chênh lệch, không phải so từng entity theo handle như đặc tả gốc mô tả.
+/// Lệnh chạy HAI mức: mức layer (đếm entity theo layer — luôn có) và mức entity theo Handle (chỉ có nghĩa
+/// khi bản kia là bản lưu khác của CÙNG bản vẽ; hai file độc lập không chung handle thì mức này tự tắt và
+/// lệnh nói rõ trong Messages thay vì liệt kê mọi thứ là thêm/xoá).
 /// </summary>
 public sealed class DrawingCompareConfig
 {
@@ -15,6 +14,9 @@ public sealed class DrawingCompareConfig
     /// <summary>Đường dẫn file báo cáo — .html xuất HTML, còn lại xuất CSV.</summary>
     public required string OutputPath { get; init; }
 
-    /// <summary>Giữ lại để tương thích đặc tả — KHÔNG dùng trong bản so sánh mức layer hiện tại.</summary>
+    /// <summary>
+    /// Ngưỡng coi là "đã di chuyển" khi so theo Handle: tâm bounding box lệch quá giá trị này (đơn vị bản vẽ,
+    /// thường là mm) thì entity được báo là đã di chuyển. Mặc định 0 = mọi dịch chuyển đều báo.
+    /// </summary>
     public double MoveToleranceMm { get; init; }
 }

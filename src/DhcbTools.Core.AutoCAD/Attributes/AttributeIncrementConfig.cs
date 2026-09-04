@@ -18,6 +18,9 @@ public sealed class AttributeIncrementConfig
     /// <summary>Số bắt đầu.</summary>
     public int StartNumber { get; init; } = 1;
 
+    /// <summary>Dung sai gom hàng (đơn vị bản vẽ, thường là mm) — như AutoNumbering; mặc định 300.</summary>
+    public double RowToleranceMm { get; init; } = 300.0;
+
     /// <summary>Chỉ xem trước, không ghi vào drawing.</summary>
     public bool DryRun { get; init; } = true;
 }

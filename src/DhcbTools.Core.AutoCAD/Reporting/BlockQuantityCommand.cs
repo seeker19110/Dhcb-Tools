@@ -68,6 +68,7 @@ public sealed class BlockQuantityCommand : ICoreCommand<BlockQuantityConfig>
             sb.Append(CsvText.JoinLine(new[] { kv.Key.BlockName, kv.Key.GroupValue, NumericText.Format(kv.Value) })).Append('\n');
         }
 
+        AcadHelpers.EnsureParentDirectory(config.OutputPath);
         File.WriteAllText(config.OutputPath, sb.ToString(), CsvText.Utf8WithBom);
 
         var totalBlocks = counts.Values.Sum();
