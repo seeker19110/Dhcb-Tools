@@ -3,7 +3,9 @@
 Tài liệu này mô tả **kế hoạch phía trước**. Hiện trạng thực tế nằm ở [`progress.md`](progress.md). Đặc tả chi tiết ở
 [`dac-ta-tinh-nang.md`](dac-ta-tinh-nang.md), kế hoạch kiểm thử ở [`dac-ta-kiem-thu.md`](dac-ta-kiem-thu.md), cơ sở kỹ
 thuật ở [`nghien-cuu-dhcb-revit-tools.md`](nghien-cuu-dhcb-revit-tools.md), khảo sát thị trường ở
-[`nghien-cuu-tool-thi-truong-va-ke-hoach.md`](nghien-cuu-tool-thi-truong-va-ke-hoach.md).
+[`nghien-cuu-tool-thi-truong-va-ke-hoach.md`](nghien-cuu-tool-thi-truong-va-ke-hoach.md), khảo sát theo **chặng
+công việc** (thiết kế → BIM → shop → thi công → hoàn công) ở
+[`nghien-cuu-chuoi-den-hoan-cong.md`](nghien-cuu-chuoi-den-hoan-cong.md).
 
 > **Đổi hướng 2026-09-03.** Giai đoạn 0–7 đã cho 57 lệnh có mã nguồn, nhưng mới 4/42 lệnh Revit chạy thật và
 > ~4.500 dòng chạm Revit API chưa có test nào. Từ đây **dừng mở rộng số lệnh**, chuyển sang **chiều sâu** ở ba hướng
@@ -90,6 +92,12 @@ catalog, MCP — thiếu đúng phần làm agent *nhìn, chỉ, kiểm* đượ
 ---
 
 ## Giai đoạn 11 — Gói tuân thủ BIM theo Nghị định 217/2026/NĐ-CP ⬜ (tuần 9–10, mở tiếp theo phản hồi)
+
+> ⚠️ **Phải viết lại trước khi code (phát hiện 2026-09-04).** Mục này soạn khi **NĐ 06/2021/NĐ-CP** còn hiệu lực.
+> Nghị định đó **đã bị NĐ 207/2026/NĐ-CP thay thế từ 01/7/2026**: mẫu dấu hoàn công, danh mục hồ sơ hoàn thành
+> công trình (nay ở Phụ lục VII) và điều kiện chấp nhận **nhật ký thi công điện tử** (dấu thời gian không thể
+> chỉnh sửa ngược · xác nhận của các bên · sao lưu độc lập) đều phải tra lại theo văn bản mới. Phân tích và đề
+> xuất kèm theo: [`nghien-cuu-chuoi-den-hoan-cong.md`](nghien-cuu-chuoi-den-hoan-cong.md) §2 và §4 đợt C.
 
 Từ 01/07/2026 công trình **cấp II trở lên** bắt buộc áp dụng BIM từ bước nghiên cứu khả thi; hoàn công phải cập nhật
 mô hình theo chuẩn và nộp vào cơ sở dữ liệu quốc gia. Batch runner đêm + `ParameterRuleCheck` + `HealthReport` +
