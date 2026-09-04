@@ -36,12 +36,13 @@ lớn nhất của một dự án nằm sau chỗ đó.
 ## 2. Bốn ràng buộc mới từ luật và chuẩn mở — đổi thứ tự ưu tiên
 
 Tra lại tại thời điểm khảo sát, có **hai** nghị định cùng hiệu lực **01/7/2026** chạm trực tiếp vào chuỗi này.
-`roadmap.md` §11 mới nhắc cái thứ nhất:
+`roadmap.md` §11 lúc đó mới nhắc cái thứ nhất; **đã viết lại theo cả hai ngày 2026-09-04** — mục 11 hiện là
+bản chi tiết hơn bảng này (số điều, số phụ lục), hai tài liệu phải sửa cùng nhau nếu luật đổi tiếp:
 
 | Văn bản | Nội dung chạm tới DHCB | Hệ quả |
 |---|---|---|
 | **NĐ 217/2026/NĐ-CP** (thay NĐ 175/2024) | BIM bắt buộc với công trình mới **từ cấp II trở lên**, từ bước báo cáo khả thi (bỏ điều kiện "nhóm B trở lên"). Chủ đầu tư phải **cung cấp dữ liệu BIM cho cơ quan chuyên môn**; mô hình phải **cập nhật sau hoàn công** rồi chuyển cho đơn vị vận hành; cấp I phải lập **CDE**. Dữ liệu BIM có giá trị pháp lý tương đương hồ sơ giấy khi cơ quan quản lý đủ hạ tầng | Mô hình hoàn công thành **sản phẩm phải nộp**, không còn là việc nội bộ. Cần đường "kiểm trước khi nộp" theo chuẩn đọc được bằng máy |
-| **NĐ 207/2026/NĐ-CP** (thay **NĐ 06/2021**, hiệu lực 01/7/2026) | Nhật ký thi công (Phụ lục II) phải ghi **đồng thời với sự kiện, không ghi bù**. Chấp nhận nhật ký điện tử **với điều kiện**: dấu thời gian **không thể chỉnh sửa ngược**, cơ chế xác nhận của các bên, sao lưu độc lập. Hồ sơ hoàn thành công trình ở **Phụ lục VII**, trách nhiệm lập thuộc **chủ đầu tư** | ⚠️ **`roadmap.md` §11 và mọi chỗ nhắc NĐ 06/2021 đã lỗi thời.** Mẫu dấu hoàn công và danh mục hồ sơ phải tra lại theo NĐ 207/2026 trước khi code. Đổi lại: yêu cầu "dấu thời gian không sửa ngược" mô tả gần đúng thứ batch runner đã ghi — xem đề xuất C1 |
+| **NĐ 207/2026/NĐ-CP** ngày 15/6/2026 (thay **NĐ 06/2021**, hiệu lực 01/7/2026, quy định chi tiết Luật Xây dựng số 135/2025/QH15, **11 phụ lục**) | Nhật ký thi công (Phụ lục II, nghĩa vụ nhà thầu thi công theo Điều 15) phải ghi **đồng thời với sự kiện, không ghi bù**. Chấp nhận nhật ký điện tử **với điều kiện**: dấu thời gian **không thể chỉnh sửa ngược**, cơ chế xác nhận của các bên, sao lưu độc lập. **Mẫu dấu bản vẽ hoàn công: Phụ lục IIb, hai mẫu** (Mẫu 2 cho thầu chính/thầu phụ, EPC, chìa khoá trao tay). Hồ sơ hoàn thành công trình ở **Điều 28 + Phụ lục VII**, trách nhiệm lập thuộc **chủ đầu tư**. **Điều 11**: hồ sơ điện tử phải trích xuất, **in ra giấy và được chủ đầu tư xác nhận** khi cơ quan có thẩm quyền yêu cầu | ✅ `roadmap.md` §11 **đã viết lại theo văn bản này (2026-09-04)**, không còn chỗ nào trong repo căn cứ vào NĐ 06/2021. Đổi lại: yêu cầu "dấu thời gian không sửa ngược" mô tả gần đúng thứ batch runner đã ghi — xem đề xuất C1 |
 | **IDS 1.0** (buildingSMART, chuẩn chính thức từ 01/6/2024) | Định dạng XML khai yêu cầu thông tin, kiểm tự động được, **cho kết quả giống nhau ở mọi phần mềm kiểm** | Thay vì DHCB tự định nghĩa checkset JSON riêng ở 11.1, đọc file IDS: chủ đầu tư khai một lần, kiểm được bằng cả DHCB lẫn IfcTester/Solibri |
 | **BCF 2.1/3.0** (buildingSMART) | Định dạng trao đổi *vấn đề* kèm góc nhìn; mọi phần mềm điều phối đều mở được | Báo cáo va chạm HTML của DHCB hiện chỉ DHCB đọc. Xuất `.bcf` là ra khỏi ốc đảo |
 
@@ -135,15 +136,20 @@ và nó đến từ luật chứ không từ ý thích.
 > độc lập — đúng ba điều kiện NĐ 207/2026 nêu. DHCB làm được điều kiện thứ nhất và tạo điều kiện cho hai điều
 > còn lại; hứa quá là tự tạo rủi ro cho khách hàng.
 
-**C2 — `AsBuiltStamp`.** ⚠️ **Việc đầu tiên không phải code mà là tra lại phụ lục.** Mẫu dấu hoàn công lâu nay
-theo mục 2 **Phụ lục IIb NĐ 06/2021**, nhưng nghị định đó **hết hiệu lực 01/7/2026**; phải đọc phụ lục tương ứng
-của **NĐ 207/2026** rồi mới dựng family mẫu. DHCB cung cấp **family mẫu + cơ chế điền** (tên nhà thầu, ngày,
+**C2 — `AsBuiltStamp`.** ✅ **Đã tra xong phụ lục (2026-09-04).** Mẫu dấu bản vẽ hoàn công nay ở **Phụ lục IIb
+NĐ 207/2026** — vẫn **hai mẫu** như trước: Mẫu 1 cho hợp đồng thường, **Mẫu 2** cho thầu chính/thầu phụ, EPC,
+chìa khoá trao tay (Mẫu 2 tách riêng dòng của tổng thầu). Các dòng trong dấu: tên nhà thầu thi công · "BẢN VẼ
+HOÀN CÔNG" · ngày tháng năm · người lập · chỉ huy trưởng hoặc giám đốc dự án · tư vấn giám sát trưởng. Kích
+thước thực tế **không vượt dung sai** thì photocopy bản vẽ thi công rồi đóng dấu, ký xác nhận; vẽ lại thì khung
+tên phải tương tự mẫu Phụ lục IIb. Nội dung từng dòng vẫn phải đối chiếu bản gốc Công báo trước khi dựng family
+— danh mục hồ sơ đi kèm lấy theo **Phụ lục VII**. DHCB cung cấp **family mẫu + cơ chế điền** (tên nhà thầu, ngày,
 người ký, số hợp đồng lấy từ config), doanh nghiệp chịu trách nhiệm nội dung. Phần tự động: gán dấu lên loạt
 sheet, đặt revision "Hoàn công", xuất PDF theo danh mục — ba việc mà `RevisionOnSheets` + `BatchExport` đã làm
 được một nửa.
 
-**C3 — `IdsValidate` thay cho checkset tự nghĩ.** `roadmap.md` §11.1 định viết checkset JSON riêng. Đề nghị đổi:
-đọc file **IDS** chuẩn. Lý do: chủ đầu tư/tư vấn thẩm tra khai yêu cầu **một lần** rồi kiểm được bằng cả DHCB lẫn
+**C3 — `IdsValidate` thay cho checkset tự nghĩ.** `roadmap.md` §11.1 trước đây định viết checkset JSON riêng;
+đề nghị đổi sang đọc file **IDS** chuẩn **đã được nhận vào §11.1 ngày 2026-09-04**, và §11.4 thu hẹp lại thành
+câu hỏi "có mở sang kiểm trên file IFC hay không". Lý do: chủ đầu tư/tư vấn thẩm tra khai yêu cầu **một lần** rồi kiểm được bằng cả DHCB lẫn
 IfcTester/Solibri và nhận **cùng một kết quả** — đó chính là điều IDS được lập ra để bảo đảm. Kiểm thẳng trên mô
 hình Revit (không qua vòng IFC) là lợi thế riêng: kỹ sư sửa được ngay tại chỗ thay vì xuất IFC → kiểm → quay lại
 Revit. `ParameterRuleCheck` giữ nguyên cho quy tắc nội bộ công ty.
@@ -160,8 +166,9 @@ Revit cho lệnh đó**; và [`progress.md`](progress.md) nói việc có giá t
 | **Song song, rẻ** | **B3 `BcfExport`** · **C4 `ModelLinesFromCad`** | Thuần gần hết; B3 chỉ thêm đầu ra cho lệnh đã chạy thật, C4 nối hai lệnh đã có |
 | **Sau khi có số liệu 9.4/`UsageReport`** | **A2** → **A4** → **A3** → **B2** → **C3** → **C2** | Sáu mục này đắt hoặc phụ thuộc thói quen từng công ty (template view/sheet, thư viện tag, bảng mã định mức, mẫu dấu). Làm trước khi biết kỹ sư thật cần gì là lặp lại đúng sai lầm "bề rộng trước" mà `roadmap.md` đã ghi lại |
 
-Một việc **không phải code, nên làm trước tất cả**: sửa `roadmap.md` §11 — nó đang căn cứ vào **NĐ 06/2021 đã
-hết hiệu lực từ 01/7/2026**. Toàn bộ giai đoạn 11 phải viết lại theo NĐ 207/2026 + NĐ 217/2026.
+Một việc **không phải code, nên làm trước tất cả**: sửa `roadmap.md` §11, khi đó còn căn cứ vào **NĐ 06/2021 đã
+hết hiệu lực từ 01/7/2026**. ✅ **Xong 2026-09-04** — giai đoạn 11 đã viết lại theo NĐ 207/2026 + NĐ 217/2026 và
+nhận C1 → 11.5, C2 → 11.6, C3 → 11.1; cả repo không còn chỗ nào lấy NĐ 06/2021 làm căn cứ.
 
 ## 6. Không nên làm (và vì sao)
 
@@ -193,7 +200,9 @@ Chỉ số thứ ba là chỉ số của chính tài liệu này: **hôm nay chu
 [Bắt buộc BIM với công trình từ cấp II từ 01/7/2026](https://luatvietnam.vn/tin-van-ban-moi/tu-01-7-2026-bat-buoc-ap-dung-bim-doi-voi-cong-trinh-xay-dung-moi-tu-cap-ii-tro-len-186-109713-article.html) ·
 [9 điểm về BIM trong NĐ 217/2026](https://storekonia.com/9-diem-noi-bat-ve-bim-trong-nghi-dinh-217-2026-nd-cp-ma-doanh-nghiep-xay-dung-can-nam-ro/) ·
 [Nhật ký thi công & hồ sơ hoàn công theo NĐ 207/2026 — HTIC Law](https://hticlaw.vn/tintuc/nhat-ky-thi-cong-ho-so-hoan-cong-nghi-dinh-207-2026-nd-cp-gia-tri-chung-cu/) ·
-[Mẫu dấu hoàn công (Phụ lục IIb NĐ 06/2021 — nay phải tra lại theo NĐ 207/2026)](https://thuvienphapluat.vn/phap-luat-doanh-nghiep/bai-viet/tai-ve-mau-dau-hoan-cong-moi-nhat-2026-20706.html) ·
+[Toàn văn NĐ 207/2026 — Công báo Chính phủ](https://congbao.chinhphu.vn/van-ban/nghi-dinh-so-207-2026-nd-cp-469769.htm) ·
+[Toàn bộ 11 phụ lục NĐ 207/2026](https://thuvienphapluat.vn/chinh-sach-phap-luat-moi/vn/ho-tro-phap-luat/chinh-sach-moi/114944/toan-bo-phu-luc-nghi-dinh-207-2026-nd-cp-quan-ly-cong-trinh-xay-dung-tu-01-7-2026) ·
+[Mẫu dấu bản vẽ hoàn công theo Phụ lục IIb NĐ 207/2026](https://thuvienphapluat.vn/phap-luat/tu-01-07-2026-mau-dau-ban-ve-hoan-cong-theo-nghi-dinh-207-2026-nd-cp-huong-dan-ap-dung-mau-dau-ban--275398.html) ·
 [Định mức xây dựng TT 12/2021/TT-BXD, sửa bởi TT 09/2024/TT-BXD](https://bacnam.com.vn/thong-tu-092024tt-bxd-sua-doi-bo-sung-mot-so-dinh-muc-xay-dung-ban-hanh-tai-thong-tu-122021tt-bxd)
 
 **Chuẩn mở** — [Information Delivery Specification (IDS) — buildingSMART](https://www.buildingsmart.org/standards/bsi-standards/information-delivery-specification-ids/) ·
