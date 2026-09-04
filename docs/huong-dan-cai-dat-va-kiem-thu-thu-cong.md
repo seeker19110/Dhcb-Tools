@@ -53,6 +53,9 @@ dotnet build src\DhcbTools.Revit\DhcbTools.Revit.csproj -c Release -p:RevitVersi
 dotnet build src\DhcbTools.Revit\DhcbTools.Revit.csproj -c Release -p:RevitVersion=2025
 ```
 
+`RevitVersion` mặc định là **2024** (net48) khi không truyền gì, nên `dotnet build Dhcb-Tools.sln -c Release`
+trần cũng chạy được; truyền tham số khi cần bản khác.
+
 Kết quả nằm ở `src\DhcbTools.Revit\bin\Release\net48\` (2024) hoặc `...\net8.0-windows\` (2025). Phải có đủ:
 `DhcbTools.Revit.dll`, `DhcbTools.Core.dll`, `DhcbTools.Shared.Logic.dll`, `DhcbTools.Shared.Hosting.dll`,
 `Newtonsoft.Json.dll`, `DhcbTools.Revit.addin`.
