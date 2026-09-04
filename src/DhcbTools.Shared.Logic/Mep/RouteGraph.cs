@@ -109,6 +109,14 @@ namespace DhcbTools.Shared.Logic.Mep
         {
         }
 
+        /// <summary>Tra cạnh theo Id O(1) — trước đây <c>Edges.First(e => e.Id == …)</c> làm BFS/duyệt thành O(E²).</summary>
+        private readonly Dictionary<int, RouteEdge<TKey>> _edgeById = new Dictionary<int, RouteEdge<TKey>>();
+
+        /// <summary>Băm không gian cho <see cref="FindOrAddNode"/>: ô = dung sai, chỉ so với đỉnh trong 27 ô lân cận.</summary>
+        private readonly Dictionary<long, List<int>> _cells = new Dictionary<long, List<int>>();
+
+        private double _cellSize = 1.0;
+
         public List<RouteNode> Nodes { get; } = new List<RouteNode>();
 
         public List<RouteEdge<TKey>> Edges { get; } = new List<RouteEdge<TKey>>();
@@ -131,6 +139,7 @@ namespace DhcbTools.Shared.Logic.Mep
             }
 
             var graph = new RouteGraph<TKey>();
+            graph._cellSize = tolerance > 0 ? tolerance : 1.0;
             var edgeId = 0;
             var candidates = new List<RouteEdge<TKey>>();
 
@@ -179,7 +188,7 @@ namespace DhcbTools.Shared.Logic.Mep
                 }
 
                 parent[ra] = rb;
-                graph.Edges.Add(e);
+                graph.AddEdge(e);
                 graph.Nodes[e.StartNode].EdgeIds.Add(e.Id);
                 graph.Nodes[e.EndNode].EdgeIds.Add(e.Id);
             }
@@ -192,18 +201,74 @@ namespace DhcbTools.Shared.Logic.Mep
             return graph;
         }
 
+        private void AddEdge(RouteEdge<TKey> e)
+        {
+            Edges.Add(e);
+            _edgeById[e.Id] = e;
+        }
+
+        private RouteEdge<TKey> EdgeById(int id)
+        {
+            if (_edgeById.TryGetValue(id, out var e))
+            {
+                return e;
+            }
+
+            // Edges là List public: phòng người gọi tự thêm cạnh ngoài Build.
+            e = Edges.First(x => x.Id == id);
+            _edgeById[id] = e;
+            return e;
+        }
+
+        private static long CellKey(long cx, long cy, long cz)
+        {
+            // Gói 3 chỉ số ô (mỗi cái 21 bit có dấu) vào một long; bản vẽ thực tế không bao giờ vượt ±1 triệu ô.
+            const long mask = (1L << 21) - 1;
+            return ((cx & mask) << 42) | ((cy & mask) << 21) | (cz & mask);
+        }
+
+        private long CellIndex(double v) => (long)Math.Floor(v / _cellSize);
+
         private int FindOrAddNode(Point3 p, double tolerance)
         {
-            for (var i = 0; i < Nodes.Count; i++)
+            var cx = CellIndex(p.X);
+            var cy = CellIndex(p.Y);
+            var cz = CellIndex(p.Z);
+
+            // Đỉnh cách p ≤ tolerance chắc chắn nằm trong ô của p hoặc 26 ô kề (ô = tolerance).
+            for (var dx = -1; dx <= 1; dx++)
             {
-                if (Nodes[i].Position.DistanceTo(p) <= tolerance)
+                for (var dy = -1; dy <= 1; dy++)
                 {
-                    return i;
+                    for (var dz = -1; dz <= 1; dz++)
+                    {
+                        if (!_cells.TryGetValue(CellKey(cx + dx, cy + dy, cz + dz), out var bucket))
+                        {
+                            continue;
+                        }
+
+                        foreach (var i in bucket)
+                        {
+                            if (Nodes[i].Position.DistanceTo(p) <= tolerance)
+                            {
+                                return i;
+                            }
+                        }
+                    }
                 }
             }
 
             Nodes.Add(new RouteNode(Nodes.Count, p));
-            return Nodes.Count - 1;
+            var id = Nodes.Count - 1;
+            var key = CellKey(cx, cy, cz);
+            if (!_cells.TryGetValue(key, out var list))
+            {
+                list = new List<int>();
+                _cells[key] = list;
+            }
+
+            list.Add(id);
+            return id;
         }
 
         /// <summary>Fitting cần dựng tại đỉnh theo bậc. Bậc 2 nhưng hai cạnh thẳng hàng (góc &lt; <paramref name="straightToleranceDeg"/>) → None (nối thẳng, dùng union/coupling).</summary>
@@ -235,8 +300,8 @@ namespace DhcbTools.Shared.Logic.Mep
                 return double.NaN;
             }
 
-            var e1 = Edges.First(e => e.Id == node.EdgeIds[0]);
-            var e2 = Edges.First(e => e.Id == node.EdgeIds[1]);
+            var e1 = EdgeById(node.EdgeIds[0]);
+            var e2 = EdgeById(node.EdgeIds[1]);
             var p0 = node.Position;
             var p1 = Nodes[e1.OtherNode(nodeId)].Position;
             var p2 = Nodes[e2.OtherNode(nodeId)].Position;
@@ -309,7 +374,7 @@ namespace DhcbTools.Shared.Logic.Mep
                             continue;
                         }
 
-                        var e = Edges.First(x => x.Id == eid);
+                        var e = EdgeById(eid);
                         result.Add(e);
                         var other = e.OtherNode(n);
                         if (visitedNodes.Add(other))
@@ -334,7 +399,7 @@ namespace DhcbTools.Shared.Logic.Mep
                 yield return n;
                 foreach (var eid in Nodes[n].EdgeIds)
                 {
-                    var other = Edges.First(x => x.Id == eid).OtherNode(n);
+                    var other = EdgeById(eid).OtherNode(n);
                     if (seen.Add(other))
                     {
                         stack.Push(other);

@@ -101,6 +101,11 @@ namespace DhcbTools.Shared.Logic.Mep
 
         public static PathResult FindPath(Point3 start, Point3 goal, IReadOnlyList<Box3> obstacles, Box3 searchBounds, PathFinderOptions? options = null)
         {
+            if (obstacles == null)
+            {
+                throw new ArgumentNullException(nameof(obstacles));
+            }
+
             options = options ?? new PathFinderOptions();
             if (options.StepMm <= 0)
             {

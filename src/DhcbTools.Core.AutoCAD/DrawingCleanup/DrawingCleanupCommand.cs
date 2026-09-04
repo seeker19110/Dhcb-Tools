@@ -97,7 +97,7 @@ public sealed class DrawingCleanupCommand : ICoreCommand<CleanupConfig>
     private static void CollectLayers(
         Database database, Transaction transaction, CleanupConfig config, List<ObjectId> toErase, List<string> report)
     {
-        var usedLayers = CollectUsedLayerNames(database, transaction);
+        var usedLayers = AcadHelpers.CollectUsedLayerNames(database, transaction);
         var currentLayerId = database.Clayer;
 
         var layerTable = (LayerTable)transaction.GetObject(database.LayerTableId, OpenMode.ForRead);
@@ -118,24 +118,6 @@ public sealed class DrawingCleanupCommand : ICoreCommand<CleanupConfig>
                 report.Add($"Layer rỗng: \"{layer.Name}\"");
             }
         }
-    }
-
-    private static HashSet<string> CollectUsedLayerNames(Database database, Transaction transaction)
-    {
-        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var blockTable = (BlockTable)transaction.GetObject(database.BlockTableId, OpenMode.ForRead);
-
-        foreach (ObjectId blockId in blockTable)
-        {
-            var block = (BlockTableRecord)transaction.GetObject(blockId, OpenMode.ForRead);
-            foreach (ObjectId entityId in block)
-            {
-                var entity = (Entity)transaction.GetObject(entityId, OpenMode.ForRead);
-                used.Add(entity.Layer);
-            }
-        }
-
-        return used;
     }
 
     // ── Block ────────────────────────────────────────────────────────────────

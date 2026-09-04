@@ -37,9 +37,9 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
             return CommandResult.Fail($"Không tìm thấy file: \"{config.InputPath}\".");
         }
 
-        // Cùng encoding với lúc xuất (UTF-8 có BOM) để tên layer tiếng Việt không vỡ.
-        var lines = File.ReadAllLines(config.InputPath, CsvText.Utf8WithBom);
-        if (lines.Length < 2)
+        // Đọc theo bản ghi RFC 4180: cột Description nhiều dòng (Escape đã bọc nháy) không bị cắt đôi như ReadAllLines.
+        var lines = CsvText.ReadRecords(config.InputPath).ToList();
+        if (lines.Count < 2)
         {
             return CommandResult.Fail("File CSV không có dữ liệu (chỉ có dòng tiêu đề hoặc rỗng).");
         }
@@ -52,14 +52,11 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
         using var transaction = database.TransactionManager.StartTransaction();
         var layerTable = (LayerTable)transaction.GetObject(database.LayerTableId, OpenMode.ForRead);
 
-        for (var i = 1; i < lines.Length; i++)
-        {
-            if (string.IsNullOrWhiteSpace(lines[i]))
-            {
-                continue;
-            }
+        var invalid = 0;
 
-            var row = LayerCsvRow.Parse(lines[i], i + 1);
+        for (var i = 1; i < lines.Count; i++)
+        {
+            var row = LayerCsvRow.FromCells(lines[i], i + 1);
             if (row.IsEmpty)
             {
                 continue;
@@ -69,6 +66,15 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
             result.Messages.AddRange(row.Warnings);
 
             var layerName = row.Name;
+
+            // Tên có ký tự cấm (< > / \ " : ; ? * | , = `) làm LayerTableRecord.Name ném exception giữa
+            // transaction — báo dòng lỗi rồi đi tiếp thay vì sập cả lệnh.
+            if (!AcadHelpers.IsValidSymbolName(layerName))
+            {
+                result.Messages.Add($"Bỏ qua dòng {i + 1}: tên layer \"{layerName}\" không hợp lệ với AutoCAD.");
+                invalid++;
+                continue;
+            }
 
             var isNew = !layerTable.Has(layerName);
             if (isNew && !config.CreateMissing)
@@ -123,6 +129,11 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
         if (unchanged > 0)
         {
             result.Messages.Insert(0, $"{unchanged} layer giữ nguyên vì mọi giá trị trong CSV trùng với drawing.");
+        }
+
+        if (invalid > 0)
+        {
+            result.Messages.Insert(0, $"{invalid} dòng có tên layer không hợp lệ — bỏ qua (xem chi tiết bên dưới).");
         }
 
         if (config.DryRun)

@@ -9,6 +9,7 @@ using DhcbTools.Core.AutoCAD.LayerSync;
 using DhcbTools.Core.AutoCAD.LayerTools;
 using DhcbTools.Core.AutoCAD.Reporting;
 using DhcbTools.Core.AutoCAD.TextTools;
+using DhcbTools.Shared.Hosting;
 
 namespace DhcbTools.AutoCAD.Commands;
 
@@ -37,7 +38,9 @@ public sealed class DhcbCommands
     // Lệnh 1: Xuất layer ra CSV
     // ──────────────────────────────────────────────
     [CommandMethod("DHCB_LAYER_EXPORT", CommandFlags.Modal)]
-    public void LayerExport()
+    public void LayerExport() => Run("DHCB_LAYER_EXPORT", LayerExportCore);
+
+    private static void LayerExportCore()
     {
         var doc = Application.DocumentManager.MdiActiveDocument;
         if (doc is null) return;
@@ -45,20 +48,12 @@ public sealed class DhcbCommands
         var ed = doc.Editor;
 
         // Hỏi đường dẫn output
-        var outputOpt = new PromptStringOptions("\nĐường dẫn file CSV xuất ra [Enter = Desktop\\dhcb_layers.csv]: ")
-        {
-            AllowSpaces = true,
-            DefaultValue = System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "dhcb_layers.csv")
-        };
-        var outputResult = ed.GetString(outputOpt);
-        if (outputResult.Status != PromptStatus.OK) return;
+        var outputPath = AskOutputPath(ed, "Đường dẫn file CSV xuất ra", "dhcb_layers.csv");
+        if (outputPath is null) return;
 
         var config = new LayerExportConfig
         {
-            OutputPath = string.IsNullOrWhiteSpace(outputResult.StringResult)
-                ? outputOpt.DefaultValue
-                : outputResult.StringResult,
+            OutputPath = outputPath,
         };
 
         var command = new LayerExportCommand();
@@ -71,7 +66,9 @@ public sealed class DhcbCommands
     // Lệnh 2: Nhập layer từ CSV
     // ──────────────────────────────────────────────
     [CommandMethod("DHCB_LAYER_IMPORT", CommandFlags.Modal)]
-    public void LayerImport()
+    public void LayerImport() => Run("DHCB_LAYER_IMPORT", LayerImportCore);
+
+    private static void LayerImportCore()
     {
         var doc = Application.DocumentManager.MdiActiveDocument;
         if (doc is null) return;
@@ -82,12 +79,7 @@ public sealed class DhcbCommands
         var inputResult = ed.GetString(inputOpt);
         if (inputResult.Status != PromptStatus.OK || string.IsNullOrWhiteSpace(inputResult.StringResult)) return;
 
-        var dryOpt = new PromptKeywordOptions("\nChế độ [Xemtrước/Thật] <Xemtrước>: ");
-        dryOpt.Keywords.Add("Xemtrước");
-        dryOpt.Keywords.Add("Thật");
-        dryOpt.AllowNone = true;
-        var dryResult = ed.GetKeywords(dryOpt);
-        var isDryRun = dryResult.Status != PromptStatus.OK || dryResult.StringResult != "Thật";
+        var isDryRun = AskDryRun(ed);
 
         var config = new LayerImportConfig
         {
@@ -106,19 +98,16 @@ public sealed class DhcbCommands
     // Lệnh 3: Dọn dẹp drawing
     // ──────────────────────────────────────────────
     [CommandMethod("DHCB_CLEANUP", CommandFlags.Modal)]
-    public void DrawingCleanup()
+    public void DrawingCleanup() => Run("DHCB_CLEANUP", DrawingCleanupCore);
+
+    private static void DrawingCleanupCore()
     {
         var doc = Application.DocumentManager.MdiActiveDocument;
         if (doc is null) return;
 
         var ed = doc.Editor;
 
-        var dryOpt = new PromptKeywordOptions("\nChế độ [Xemtrước/Thật] <Xemtrước>: ");
-        dryOpt.Keywords.Add("Xemtrước");
-        dryOpt.Keywords.Add("Thật");
-        dryOpt.AllowNone = true;
-        var dryResult = ed.GetKeywords(dryOpt);
-        var isDryRun = dryResult.Status != PromptStatus.OK || dryResult.StringResult != "Thật";
+        var isDryRun = AskDryRun(ed);
 
         // Purge sâu (text style / dim style / regapp) hỏi riêng: đây là nhóm dễ làm hỏng bản vẽ nhất
         // nếu bản vẽ có XData của add-in khác, nên mặc định TẮT thay vì lặng lẽ bật.
@@ -150,7 +139,9 @@ public sealed class DhcbCommands
     // Lệnh 4: Đánh số hàng loạt Block
     // ──────────────────────────────────────────────
     [CommandMethod("DHCB_AUTONUMBER", CommandFlags.Modal)]
-    public void AutoNumber()
+    public void AutoNumber() => Run("DHCB_AUTONUMBER", AutoNumberCore);
+
+    private static void AutoNumberCore()
     {
         var doc = Application.DocumentManager.MdiActiveDocument;
         if (doc is null) return;
@@ -176,12 +167,7 @@ public sealed class DhcbCommands
         };
         var prefixResult = ed.GetString(prefixOpt);
 
-        var dryOpt = new PromptKeywordOptions("\nChế độ [Xemtrước/Thật] <Xemtrước>: ");
-        dryOpt.Keywords.Add("Xemtrước");
-        dryOpt.Keywords.Add("Thật");
-        dryOpt.AllowNone = true;
-        var dryResult = ed.GetKeywords(dryOpt);
-        var isDryRun = dryResult.Status != PromptStatus.OK || dryResult.StringResult != "Thật";
+        var isDryRun = AskDryRun(ed);
 
         var config = new AutoNumberingConfig
         {
@@ -201,7 +187,9 @@ public sealed class DhcbCommands
     // Lệnh 5: Xuất attribute ra CSV
     // ──────────────────────────────────────────────
     [CommandMethod("DHCB_ATTR_EXPORT", CommandFlags.Modal)]
-    public void AttributeExport()
+    public void AttributeExport() => Run("DHCB_ATTR_EXPORT", AttributeExportCore);
+
+    private static void AttributeExportCore()
     {
         var doc = Application.DocumentManager.MdiActiveDocument;
         if (doc is null) return;
@@ -216,19 +204,13 @@ public sealed class DhcbCommands
         var blockResult = ed.GetString(blockOpt);
         if (blockResult.Status != PromptStatus.OK) return;
 
-        var outputOpt = new PromptStringOptions("\nĐường dẫn file CSV xuất ra [Enter = Desktop\\dhcb_attributes.csv]: ")
-        {
-            AllowSpaces = true,
-            DefaultValue = System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "dhcb_attributes.csv")
-        };
-        var outputResult = ed.GetString(outputOpt);
-        if (outputResult.Status != PromptStatus.OK) return;
+        var outputPath = AskOutputPath(ed, "Đường dẫn file CSV xuất ra", "dhcb_attributes.csv");
+        if (outputPath is null) return;
 
         var config = new AttributeExportConfig
         {
             BlockName = string.IsNullOrWhiteSpace(blockResult.StringResult) ? null : blockResult.StringResult,
-            OutputPath = string.IsNullOrWhiteSpace(outputResult.StringResult) ? outputOpt.DefaultValue : outputResult.StringResult,
+            OutputPath = outputPath,
         };
 
         var command = new AttributeExportCommand();
@@ -241,7 +223,9 @@ public sealed class DhcbCommands
     // Lệnh 6: Nhập attribute từ CSV
     // ──────────────────────────────────────────────
     [CommandMethod("DHCB_ATTR_IMPORT", CommandFlags.Modal)]
-    public void AttributeImport()
+    public void AttributeImport() => Run("DHCB_ATTR_IMPORT", AttributeImportCore);
+
+    private static void AttributeImportCore()
     {
         var doc = Application.DocumentManager.MdiActiveDocument;
         if (doc is null) return;
@@ -252,12 +236,7 @@ public sealed class DhcbCommands
         var inputResult = ed.GetString(inputOpt);
         if (inputResult.Status != PromptStatus.OK || string.IsNullOrWhiteSpace(inputResult.StringResult)) return;
 
-        var dryOpt = new PromptKeywordOptions("\nChế độ [Xemtrước/Thật] <Xemtrước>: ");
-        dryOpt.Keywords.Add("Xemtrước");
-        dryOpt.Keywords.Add("Thật");
-        dryOpt.AllowNone = true;
-        var dryResult = ed.GetKeywords(dryOpt);
-        var isDryRun = dryResult.Status != PromptStatus.OK || dryResult.StringResult != "Thật";
+        var isDryRun = AskDryRun(ed);
 
         var config = new AttributeImportConfig
         {
@@ -275,7 +254,9 @@ public sealed class DhcbCommands
     // Lệnh 7: Tìm/thay văn bản hàng loạt
     // ──────────────────────────────────────────────
     [CommandMethod("DHCB_TEXT_REPLACE", CommandFlags.Modal)]
-    public void TextReplace()
+    public void TextReplace() => Run("DHCB_TEXT_REPLACE", TextReplaceCore);
+
+    private static void TextReplaceCore()
     {
         var doc = Application.DocumentManager.MdiActiveDocument;
         if (doc is null) return;
@@ -297,12 +278,7 @@ public sealed class DhcbCommands
         var regexResult = ed.GetKeywords(regexOpt);
         var useRegex = regexResult.Status == PromptStatus.OK && regexResult.StringResult == "Co";
 
-        var dryOpt = new PromptKeywordOptions("\nChế độ [Xemtrước/Thật] <Xemtrước>: ");
-        dryOpt.Keywords.Add("Xemtrước");
-        dryOpt.Keywords.Add("Thật");
-        dryOpt.AllowNone = true;
-        var dryResult = ed.GetKeywords(dryOpt);
-        var isDryRun = dryResult.Status != PromptStatus.OK || dryResult.StringResult != "Thật";
+        var isDryRun = AskDryRun(ed);
 
         var config = new TextReplaceConfig
         {
@@ -322,7 +298,9 @@ public sealed class DhcbCommands
     // Lệnh 8: Kiểm tra chuẩn layer → HTML
     // ──────────────────────────────────────────────
     [CommandMethod("DHCB_LAYER_CHECK", CommandFlags.Modal)]
-    public void LayerStandardCheck()
+    public void LayerStandardCheck() => Run("DHCB_LAYER_CHECK", LayerStandardCheckCore);
+
+    private static void LayerStandardCheckCore()
     {
         var doc = Application.DocumentManager.MdiActiveDocument;
         if (doc is null) return;
@@ -333,19 +311,13 @@ public sealed class DhcbCommands
         var rulesResult = ed.GetString(rulesOpt);
         if (rulesResult.Status != PromptStatus.OK || string.IsNullOrWhiteSpace(rulesResult.StringResult)) return;
 
-        var outputOpt = new PromptStringOptions("\nĐường dẫn file HTML xuất ra [Enter = Desktop\\dhcb_layer_check.html]: ")
-        {
-            AllowSpaces = true,
-            DefaultValue = System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "dhcb_layer_check.html")
-        };
-        var outputResult = ed.GetString(outputOpt);
-        if (outputResult.Status != PromptStatus.OK) return;
+        var outputPath = AskOutputPath(ed, "Đường dẫn file HTML xuất ra", "dhcb_layer_check.html");
+        if (outputPath is null) return;
 
         var config = new LayerStandardCheckConfig
         {
             RulesPath = rulesResult.StringResult,
-            OutputPath = string.IsNullOrWhiteSpace(outputResult.StringResult) ? outputOpt.DefaultValue : outputResult.StringResult,
+            OutputPath = outputPath,
         };
 
         var command = new LayerStandardCheckCommand();
@@ -358,7 +330,9 @@ public sealed class DhcbCommands
     // Lệnh 9: Trích trục từ layer AXIS
     // ──────────────────────────────────────────────
     [CommandMethod("DHCB_GRID_EXTRACT", CommandFlags.Modal)]
-    public void GridExtract()
+    public void GridExtract() => Run("DHCB_GRID_EXTRACT", GridExtractCore);
+
+    private static void GridExtractCore()
     {
         var doc = Application.DocumentManager.MdiActiveDocument;
         if (doc is null) return;
@@ -369,19 +343,13 @@ public sealed class DhcbCommands
         var layerResult = ed.GetString(layerOpt);
         if (layerResult.Status != PromptStatus.OK) return;
 
-        var outputOpt = new PromptStringOptions("\nĐường dẫn file CSV xuất ra [Enter = Desktop\\dhcb_grids.csv]: ")
-        {
-            AllowSpaces = true,
-            DefaultValue = System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "dhcb_grids.csv")
-        };
-        var outputResult = ed.GetString(outputOpt);
-        if (outputResult.Status != PromptStatus.OK) return;
+        var outputPath = AskOutputPath(ed, "Đường dẫn file CSV xuất ra", "dhcb_grids.csv");
+        if (outputPath is null) return;
 
         var config = new GridExtractConfig
         {
             GridLayer = string.IsNullOrWhiteSpace(layerResult.StringResult) ? "AXIS" : layerResult.StringResult,
-            OutputPath = string.IsNullOrWhiteSpace(outputResult.StringResult) ? outputOpt.DefaultValue : outputResult.StringResult,
+            OutputPath = outputPath,
         };
 
         var command = new GridExtractCommand();
@@ -394,7 +362,9 @@ public sealed class DhcbCommands
     // Lệnh 10: Kiểm tra Xref
     // ──────────────────────────────────────────────
     [CommandMethod("DHCB_XREF_AUDIT", CommandFlags.Modal)]
-    public void XrefAudit()
+    public void XrefAudit() => Run("DHCB_XREF_AUDIT", XrefAuditCore);
+
+    private static void XrefAuditCore()
     {
         var doc = Application.DocumentManager.MdiActiveDocument;
         if (doc is null) return;
@@ -424,7 +394,9 @@ public sealed class DhcbCommands
     // Lệnh 11: Chuyển layer theo bảng map (LAYTRANS)
     // ──────────────────────────────────────────────
     [CommandMethod("DHCB_LAYER_TRANSLATE", CommandFlags.Modal)]
-    public void LayerTranslate()
+    public void LayerTranslate() => Run("DHCB_LAYER_TRANSLATE", LayerTranslateCore);
+
+    private static void LayerTranslateCore()
     {
         var doc = Application.DocumentManager.MdiActiveDocument;
         if (doc is null) return;
@@ -442,12 +414,7 @@ public sealed class DhcbCommands
         var deleteResult = ed.GetKeywords(deleteOpt);
         var deleteEmptySource = deleteResult.Status == PromptStatus.OK && deleteResult.StringResult == "Co";
 
-        var dryOpt = new PromptKeywordOptions("\nChế độ [Xemtrước/Thật] <Xemtrước>: ");
-        dryOpt.Keywords.Add("Xemtrước");
-        dryOpt.Keywords.Add("Thật");
-        dryOpt.AllowNone = true;
-        var dryResult = ed.GetKeywords(dryOpt);
-        var isDryRun = dryResult.Status != PromptStatus.OK || dryResult.StringResult != "Thật";
+        var isDryRun = AskDryRun(ed);
 
         var config = new LayerTranslateConfig
         {
@@ -466,7 +433,9 @@ public sealed class DhcbCommands
     // Lệnh 12: So sánh bản vẽ (mức layer)
     // ──────────────────────────────────────────────
     [CommandMethod("DHCB_DRAWING_COMPARE", CommandFlags.Modal)]
-    public void DrawingCompare()
+    public void DrawingCompare() => Run("DHCB_DRAWING_COMPARE", DrawingCompareCore);
+
+    private static void DrawingCompareCore()
     {
         var doc = Application.DocumentManager.MdiActiveDocument;
         if (doc is null) return;
@@ -477,19 +446,13 @@ public sealed class DhcbCommands
         var otherResult = ed.GetString(otherOpt);
         if (otherResult.Status != PromptStatus.OK || string.IsNullOrWhiteSpace(otherResult.StringResult)) return;
 
-        var outputOpt = new PromptStringOptions("\nĐường dẫn file báo cáo (.csv hoặc .html) [Enter = Desktop\\dhcb_compare.csv]: ")
-        {
-            AllowSpaces = true,
-            DefaultValue = System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "dhcb_compare.csv")
-        };
-        var outputResult = ed.GetString(outputOpt);
-        if (outputResult.Status != PromptStatus.OK) return;
+        var outputPath = AskOutputPath(ed, "Đường dẫn file báo cáo (.csv hoặc .html)", "dhcb_compare.csv");
+        if (outputPath is null) return;
 
         var config = new DrawingCompareConfig
         {
             OtherPath = otherResult.StringResult,
-            OutputPath = string.IsNullOrWhiteSpace(outputResult.StringResult) ? outputOpt.DefaultValue : outputResult.StringResult,
+            OutputPath = outputPath,
             MoveToleranceMm = 0,
         };
 
@@ -503,7 +466,9 @@ public sealed class DhcbCommands
     // Lệnh 13: Thống kê Block (BOM)
     // ──────────────────────────────────────────────
     [CommandMethod("DHCB_BLOCK_QUANTITY", CommandFlags.Modal)]
-    public void BlockQuantity()
+    public void BlockQuantity() => Run("DHCB_BLOCK_QUANTITY", BlockQuantityCore);
+
+    private static void BlockQuantityCore()
     {
         var doc = Application.DocumentManager.MdiActiveDocument;
         if (doc is null) return;
@@ -526,20 +491,14 @@ public sealed class DhcbCommands
         var groupResult = ed.GetString(groupOpt);
         if (groupResult.Status != PromptStatus.OK) return;
 
-        var outputOpt = new PromptStringOptions("\nĐường dẫn file CSV xuất ra [Enter = Desktop\\dhcb_block_bom.csv]: ")
-        {
-            AllowSpaces = true,
-            DefaultValue = System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "dhcb_block_bom.csv")
-        };
-        var outputResult = ed.GetString(outputOpt);
-        if (outputResult.Status != PromptStatus.OK) return;
+        var outputPath = AskOutputPath(ed, "Đường dẫn file CSV xuất ra", "dhcb_block_bom.csv");
+        if (outputPath is null) return;
 
         var config = new BlockQuantityConfig
         {
             BlockNameContains = string.IsNullOrWhiteSpace(filterResult.StringResult) ? null : filterResult.StringResult,
             GroupByAttribute = string.IsNullOrWhiteSpace(groupResult.StringResult) ? null : groupResult.StringResult,
-            OutputPath = string.IsNullOrWhiteSpace(outputResult.StringResult) ? outputOpt.DefaultValue : outputResult.StringResult,
+            OutputPath = outputPath,
         };
 
         var command = new BlockQuantityCommand();
@@ -552,7 +511,9 @@ public sealed class DhcbCommands
     // Lệnh 14: Gán attribute tăng dần theo mẫu (BATTE)
     // ──────────────────────────────────────────────
     [CommandMethod("DHCB_ATTR_INCREMENT", CommandFlags.Modal)]
-    public void AttributeIncrement()
+    public void AttributeIncrement() => Run("DHCB_ATTR_INCREMENT", AttributeIncrementCore);
+
+    private static void AttributeIncrementCore()
     {
         var doc = Application.DocumentManager.MdiActiveDocument;
         if (doc is null) return;
@@ -582,12 +543,7 @@ public sealed class DhcbCommands
         var startOpt = new PromptIntegerOptions("\nSố bắt đầu [Enter = 1]: ") { DefaultValue = 1, AllowNegative = false };
         var startResult = ed.GetInteger(startOpt);
 
-        var dryOpt = new PromptKeywordOptions("\nChế độ [Xemtrước/Thật] <Xemtrước>: ");
-        dryOpt.Keywords.Add("Xemtrước");
-        dryOpt.Keywords.Add("Thật");
-        dryOpt.AllowNone = true;
-        var dryResult = ed.GetKeywords(dryOpt);
-        var isDryRun = dryResult.Status != PromptStatus.OK || dryResult.StringResult != "Thật";
+        var isDryRun = AskDryRun(ed);
 
         var config = new AttributeIncrementConfig
         {
@@ -608,7 +564,9 @@ public sealed class DhcbCommands
     // Lệnh 15: Gợi ý map layer CAD → Revit type
     // ──────────────────────────────────────────────
     [CommandMethod("DHCB_LAYER_MAP", CommandFlags.Modal)]
-    public void CadLayerMap()
+    public void CadLayerMap() => Run("DHCB_LAYER_MAP", CadLayerMapCore);
+
+    private static void CadLayerMapCore()
     {
         var doc = Application.DocumentManager.MdiActiveDocument;
         if (doc is null) return;
@@ -619,14 +577,8 @@ public sealed class DhcbCommands
         var typesResult = ed.GetString(typesOpt);
         if (typesResult.Status != PromptStatus.OK || string.IsNullOrWhiteSpace(typesResult.StringResult)) return;
 
-        var outputOpt = new PromptStringOptions("\nĐường dẫn file CSV mapping xuất ra [Enter = Desktop\\dhcb_layer_map.csv]: ")
-        {
-            AllowSpaces = true,
-            DefaultValue = System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "dhcb_layer_map.csv")
-        };
-        var outputResult = ed.GetString(outputOpt);
-        if (outputResult.Status != PromptStatus.OK) return;
+        var outputPath = AskOutputPath(ed, "Đường dẫn file CSV mapping xuất ra", "dhcb_layer_map.csv");
+        if (outputPath is null) return;
 
         var ollamaOpt = new PromptKeywordOptions("\nDùng model local (Ollama) nếu có? [Co/Khong] <Khong>: ");
         ollamaOpt.Keywords.Add("Co");
@@ -638,7 +590,7 @@ public sealed class DhcbCommands
         var config = new CadLayerMapConfig
         {
             RevitTypesPath = typesResult.StringResult,
-            OutputPath = string.IsNullOrWhiteSpace(outputResult.StringResult) ? outputOpt.DefaultValue : outputResult.StringResult,
+            OutputPath = outputPath,
             UseOllama = useOllama,
         };
 
@@ -651,7 +603,57 @@ public sealed class DhcbCommands
     // ──────────────────────────────────────────────
     // Helper
     // ──────────────────────────────────────────────
-    private static void PrintResult(Editor ed, DhcbTools.Shared.Hosting.CommandResult result)
+
+    /// <summary>
+    /// Vỏ chung cho mọi lệnh: một exception lọt ra khỏi CommandMethod chỉ hiện hộp thoại .NET của AutoCAD
+    /// rồi mất, không để lại gì để gửi kèm khi báo lỗi. Ở đây bắt một lần, in ra dòng lệnh VÀ ghi vào
+    /// <see cref="DhcbLog"/> (%APPDATA%\DHCB\logs\AutoCAD-yyyy-MM-dd.log) — cùng log mà App/Bridge đang dùng.
+    /// </summary>
+    private static void Run(string commandName, Action body)
+    {
+        var editor = Application.DocumentManager.MdiActiveDocument?.Editor;
+        try
+        {
+            body();
+        }
+        catch (System.Exception ex)
+        {
+            DhcbLog.Error("AutoCAD", commandName, ex);
+            editor?.WriteMessage($"\n✗ {commandName} lỗi: {ex.Message}\n  (chi tiết đã ghi vào {DhcbLog.PathFor("AutoCAD")})\n");
+        }
+    }
+
+    /// <summary>Hỏi chế độ chạy. Mặc định (Enter/huỷ) luôn là XEM TRƯỚC — không bao giờ ghi khi kỹ sư không nói rõ.</summary>
+    private static bool AskDryRun(Editor ed)
+    {
+        var options = new PromptKeywordOptions("\nChế độ [Xemtrước/Thật] <Xemtrước>: ");
+        options.Keywords.Add("Xemtrước");
+        options.Keywords.Add("Thật");
+        options.AllowNone = true;
+        var result = ed.GetKeywords(options);
+        return result.Status != PromptStatus.OK || result.StringResult != "Thật";
+    }
+
+    /// <summary>Hỏi đường dẫn file đầu ra, mặc định là <paramref name="defaultFileName"/> trên Desktop. Null = kỹ sư huỷ.</summary>
+    private static string? AskOutputPath(Editor ed, string label, string defaultFileName)
+    {
+        var fallback = System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.Desktop), defaultFileName);
+        var options = new PromptStringOptions($"\n{label} [Enter = Desktop\\{defaultFileName}]: ")
+        {
+            AllowSpaces = true,
+            DefaultValue = fallback,
+        };
+        var result = ed.GetString(options);
+        if (result.Status != PromptStatus.OK)
+        {
+            return null;
+        }
+
+        return string.IsNullOrWhiteSpace(result.StringResult) ? fallback : result.StringResult;
+    }
+
+    private static void PrintResult(Editor ed, CommandResult result)
     {
         ed.WriteMessage($"\n{(result.Success ? "✓" : "✗")} {result.Summary}\n");
         foreach (var msg in result.Messages)

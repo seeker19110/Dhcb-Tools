@@ -49,7 +49,14 @@ namespace DhcbTools.Shared.Logic.Ai
     /// </summary>
     public static class CommandIntentParser
     {
-        private static readonly Regex Number = new Regex(@"(?<![\w.])(?<v>\d+(?:[.,]\d+)?)\s*(?<u>mm|m|cm)?\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        /// <summary>
+        /// Số kèm đơn vị tuỳ chọn. Nhận cả "2.000"/"2,000" (nghìn kiểu Việt/Âu) lẫn "2,5"/"2.5" (thập phân) —
+        /// phân định ở <see cref="TryParseNumber"/>. Đơn vị phải là từ trọn vẹn: "2 max" không được đọc thành "2 m".
+        /// </summary>
+        private static readonly Regex Number = new Regex(@"(?<![\w.,])(?<v>\d+(?:[.,]\d+)*)\s*(?<u>mm|cm|mét|met|m)?(?![\p{L}\d])", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+        /// <summary>Từ đứng ngay trước một số khiến số đó KHÔNG phải kích thước: "tầng 2", "level 3", "số 5".</summary>
+        private static readonly Regex OrdinalWord = new Regex(@"(?:^|[^\p{L}])(?:tang|lau|level|floor|so|no)$", RegexOptions.Compiled);
 
         private static readonly Regex Quoted = new Regex("[\"“”'‘’]([^\"“”'‘’]{1,80})[\"“”'‘’]", RegexOptions.Compiled);
 
@@ -139,7 +146,8 @@ namespace DhcbTools.Shared.Logic.Ai
                     Array.Empty<string>());
             }
 
-            scored.Sort((a, b) => b.Score.CompareTo(a.Score));
+            // OrderBy ổn định (List.Sort thì không): hai lệnh đồng điểm luôn ra cùng thứ tự giữa các lần chạy.
+            scored = scored.OrderByDescending(s => s.Score).ThenBy(s => s.Cmd.Name, StringComparer.Ordinal).ToList();
             var top = scored[0];
             var alternatives = scored.Skip(1).Take(3).Select(s => s.Cmd.Name).Distinct().ToList();
 
@@ -166,14 +174,7 @@ namespace DhcbTools.Shared.Logic.Ai
 
             var quoted = Quoted.Matches(original).Cast<Match>().Select(m => m.Groups[1].Value.Trim()).ToList();
             var paths = PathLike.Matches(original).Cast<Match>().Select(m => m.Groups["p"].Value.Trim()).ToList();
-            var numbers = Number.Matches(original).Cast<Match>().Select(m =>
-            {
-                var v = double.Parse(m.Groups["v"].Value.Replace(',', '.'), CultureInfo.InvariantCulture);
-                var u = m.Groups["u"].Value.ToLowerInvariant();
-                if (u == "m") v *= 1000;
-                else if (u == "cm") v *= 10;
-                return v;
-            }).ToList();
+            var numbers = ExtractLengthsMm(original);
 
             foreach (var field in cmd.ConfigFields.Keys)
             {
@@ -269,6 +270,118 @@ namespace DhcbTools.Shared.Logic.Ai
             }
 
             return cfg;
+        }
+
+        /// <summary>
+        /// Các số đo (mm) trong câu, theo thứ tự xuất hiện. Bỏ số đứng ngay sau tầng/level/số ("tầng 2" không phải 2 mm),
+        /// quy đổi đơn vị: m/mét → ×1000, cm → ×10, mm hoặc không đơn vị → giữ nguyên.
+        /// </summary>
+        public static List<double> ExtractLengthsMm(string text)
+        {
+            var result = new List<double>();
+            if (string.IsNullOrEmpty(text))
+            {
+                return result;
+            }
+
+            foreach (Match m in Number.Matches(text))
+            {
+                var before = LayerMappingSuggester.RemoveDiacritics(text.Substring(0, m.Index)).TrimEnd().ToLowerInvariant();
+                if (OrdinalWord.IsMatch(before))
+                {
+                    continue;
+                }
+
+                if (!TryParseNumber(m.Groups["v"].Value, out var v))
+                {
+                    continue;
+                }
+
+                var u = LayerMappingSuggester.RemoveDiacritics(m.Groups["u"].Value).ToLowerInvariant();
+                if (u == "m" || u == "met")
+                {
+                    v *= 1000;
+                }
+                else if (u == "cm")
+                {
+                    v *= 10;
+                }
+
+                result.Add(v);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Đọc số viết kiểu Việt/Âu lẫn Anh. Quy tắc: dấu phân cách theo sau ĐÚNG 3 chữ số và không có dấu nào khác
+        /// là dấu nghìn ("2.000" = "2,000" = 2000); còn lại là dấu thập phân ("2,5" = "2.5" = 2,5). Nhiều dấu:
+        /// dấu cuối là thập phân nếu nhóm sau nó không đủ 3 chữ số hoặc khác loại với các dấu trước ("1.000,5"),
+        /// nếu không thì tất cả là dấu nghìn ("1.234.567").
+        /// </summary>
+        public static bool TryParseNumber(string? text, out double value)
+        {
+            value = 0;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
+
+            var t = text!.Trim();
+            var separators = new List<int>();
+            for (var i = 0; i < t.Length; i++)
+            {
+                if (t[i] == '.' || t[i] == ',')
+                {
+                    separators.Add(i);
+                }
+            }
+
+            string normalized;
+            if (separators.Count == 0)
+            {
+                normalized = t;
+            }
+            else if (separators.Count == 1)
+            {
+                var sep = separators[0];
+                var after = t.Length - sep - 1;
+                normalized = after == 3 ? t.Remove(sep, 1) : t.Substring(0, sep) + "." + t.Substring(sep + 1);
+            }
+            else
+            {
+                var last = separators[separators.Count - 1];
+                var lastGroup = t.Length - last - 1;
+                var sameKind = true;
+                for (var i = 1; i < separators.Count; i++)
+                {
+                    if (t[separators[i]] != t[separators[0]])
+                    {
+                        sameKind = false;
+                    }
+                }
+
+                var lastIsDecimal = lastGroup != 3 || !sameKind;
+                var sb = new System.Text.StringBuilder(t.Length);
+                for (var i = 0; i < t.Length; i++)
+                {
+                    if (t[i] == '.' || t[i] == ',')
+                    {
+                        if (i == last && lastIsDecimal)
+                        {
+                            sb.Append('.');
+                        }
+
+                        continue;
+                    }
+
+                    sb.Append(t[i]);
+                }
+
+                normalized = sb.ToString();
+            }
+
+            return double.TryParse(normalized, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
         }
 
         private static string FieldExtension(string field)

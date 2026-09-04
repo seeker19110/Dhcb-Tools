@@ -24,9 +24,10 @@ public sealed class AttributeImportCommand : ICoreCommand<AttributeImportConfig>
             return CommandResult.Fail($"Không tìm thấy file: \"{config.InputPath}\".");
         }
 
-        // Cùng encoding với lúc xuất để giá trị tiếng Việt không vỡ.
-        var lines = File.ReadAllLines(config.InputPath, CsvText.Utf8WithBom);
-        if (lines.Length < 2)
+        // Đọc theo bản ghi RFC 4180 (ReadRecords): giá trị attribute nhiều dòng do chính AttributeExport
+        // ghi ra (đã escape) trước đây bị ReadAllLines cắt đôi thành hai dòng hỏng.
+        var lines = CsvText.ReadRecords(config.InputPath).ToList();
+        if (lines.Count < 2)
         {
             return CommandResult.Fail("File CSV không có dữ liệu (chỉ có dòng tiêu đề hoặc rỗng).");
         }
@@ -38,15 +39,15 @@ public sealed class AttributeImportCommand : ICoreCommand<AttributeImportConfig>
 
         using var transaction = database.TransactionManager.StartTransaction();
 
-        for (var i = 1; i < lines.Length; i++)
+        for (var i = 1; i < lines.Count; i++)
         {
-            if (string.IsNullOrWhiteSpace(lines[i]))
+            var cells = lines[i];
+            if (cells.Length == 1 && string.IsNullOrWhiteSpace(cells[0]))
             {
                 continue;
             }
 
-            var cells = CsvText.SplitLine(lines[i]);
-            if (cells.Count < 4)
+            if (cells.Length < 4)
             {
                 skipped++;
                 continue;
