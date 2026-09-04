@@ -40,8 +40,12 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
             return CommandResult.Ok("Không tìm thấy connector hở nào trong mô hình.", 0);
         }
 
-        // 2. Optionally create/update 3D view
-        if (config.Create3dView && elementIds.Count > 0)
+        // 2. Tuỳ chọn tạo/cập nhật 3D view — chỉ khi không phải xem trước.
+        if (config.Create3dView && elementIds.Count > 0 && config.DryRun)
+        {
+            reportLines.Insert(0, $"[Xem trước] Sẽ tạo/cập nhật 3D view \"{config.ViewName}\" khoanh vùng {elementIds.Count} phần tử khi chạy thật.");
+        }
+        else if (config.Create3dView && elementIds.Count > 0)
         {
             try
             {

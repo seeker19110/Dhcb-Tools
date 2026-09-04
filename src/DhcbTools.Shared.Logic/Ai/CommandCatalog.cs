@@ -164,7 +164,9 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("maxSegmentMm", "chiều dài tối đa").Field("dryRun", "xem trước")
                 .Words("chia ống", "cắt ống", "split pipe", "chia đoạn"),
             new CommandDescriptor("ConnectorChecker", Revit, "Liệt kê connector MEP hở", false, "ConnectorCheck", "CheckConnectors")
-                .Field("create3dView", "true = GHI một 3D view khoanh vùng vào mô hình (thao tác ghi duy nhất của lệnh)")
+                .Field("categories", "danh sách category (rỗng = mọi category MEP)").Field("domains", "Piping/Hvac/Electrical (rỗng = tất cả)")
+                .Field("create3dView", "true = GHI một 3D view khoanh vùng vào mô hình (thao tác ghi duy nhất của lệnh, mặc định false)")
+                .Field("viewName", "tên 3D view").Field("dryRun", "xem trước: không tạo view")
                 .Words("connector hở", "open connector", "kiểm tra connector"),
             new CommandDescriptor("RouteFromLines", Revit, "Routing mức A: dựng duct/pipe/tray từ model line vẽ tay", true, "Routing", "RouteA")
                 .Field("lineStyleName", "line style tuyến").Field("elementType", "Duct/Pipe/CableTray/Conduit").Field("typeName", "type").Field("systemType", "hệ")
