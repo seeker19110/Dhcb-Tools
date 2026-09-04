@@ -44,6 +44,9 @@ DhcbTools.BatchRunner.exe --job jobs\nightly.json --report-only --analyze
 
 # Diễn tập: ép mọi step dryRun:true và không lưu
 DhcbTools.BatchRunner.exe --job jobs\nightly.json --dry-run
+
+# Kiểm chuỗi băm của một log đã ghi (không cần job, không mở Revit/AutoCAD)
+DhcbTools.BatchRunner.exe --verify-log logs\2026-09-04\run-013000.jsonl
 ```
 
 Kết quả trong `logs/{yyyy-MM-dd}/`: **`run-HHmmss.jsonl`** (mỗi dòng một step; **mỗi lần chạy một file riêng**, không
@@ -55,6 +58,42 @@ không mất giá trị. Bước AutoCAD dựng script trong thư mục làm vi�
 lượt chạy trong cùng một ngày không giẫm lên nhau.
 
 Mã thoát: `0` mọi step thành công · `1` có step lỗi/bỏ qua · `2` lỗi cấu hình (không đọc được job, không tìm thấy Revit).
+
+## Chuỗi băm của nhật ký (`--verify-log`)
+
+Mỗi dòng trong `run-HHmmss.jsonl` mang thêm hai trường ở cuối:
+
+| Trường | Nghĩa |
+|---|---|
+| `prevHash` | Băm của **dòng ngay trước** trong cùng file. Dòng đầu tiên mang 64 số 0 |
+| `hash` | SHA-256 của **chính dòng đó**, tính trên phần đứng trước trường `hash` |
+
+Sửa một dòng cũ làm gãy chuỗi từ dòng đó trở đi. Kiểm lại bất cứ lúc nào:
+
+```bash
+DhcbTools.BatchRunner.exe --verify-log logs\2026-09-04\run-013000.jsonl
+```
+
+Mã thoát: `0` nguyên vẹn · `1` chuỗi hỏng (in ra **đúng số thứ tự dòng** hỏng) · `2` không có file. Bốn kết luận
+có thể gặp:
+
+| Kết luận | Nghĩa |
+|---|---|
+| *Chuỗi băm nguyên vẹn* | Mọi dòng khớp và nối liền nhau |
+| *Dòng N đã bị sửa* | Băm ghi trong dòng không khớp nội dung của chính dòng đó |
+| *Chuỗi đứt tại dòng N* | `prevHash` không khớp băm của dòng trước — có dòng bị chèn, xoá hoặc đảo chỗ. Cũng là kết luận khi người sửa **biết thuật toán** và đã tính lại băm cho riêng dòng họ sửa |
+| *Dòng N chưa mang chuỗi băm* | Log ghi bằng bản cài trước tính năng này, hoặc dấu vết đã bị gỡ |
+
+Gắn dấu vết nằm ở `RunLog.Append` — điểm ghi duy nhất của cả batch Revit lẫn AutoCAD — nên không có đường ghi
+nào lọt ra ngoài. Trường mới là phần thêm vào cuối dòng JSON, nên `report.html`, `--analyze` và log của các đêm
+trước vẫn đọc bình thường.
+
+> **Chuỗi băm chứng minh cái gì và không chứng minh cái gì.** Nó chứng minh **tính toàn vẹn nội bộ**: ai sửa một
+> dòng mà không tính lại toàn bộ chuỗi từ đó về sau thì bị phát hiện, và phát hiện ở đúng dòng nào. Nó **không**
+> chứng minh log do ai ghi và ghi lúc nào — người có quyền ghi file vẫn dựng lại được cả chuỗi. Theo
+> **NĐ 207/2026/NĐ-CP**, nhật ký thi công điện tử cần đủ ba điều kiện: ① dấu thời gian không thể chỉnh sửa ngược ·
+> ② cơ chế xác nhận của các bên · ③ sao lưu độc lập. DHCB làm được ①, và tạo điều kiện cho ② (chữ ký số của các
+> bên) và ③ (sao lưu của chủ đầu tư). Đừng bán nó như chữ ký số.
 
 ## Luồng Revit
 

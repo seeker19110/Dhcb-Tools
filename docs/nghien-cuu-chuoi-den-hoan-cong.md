@@ -121,15 +121,22 @@ tên GUID chứa `markup.bcf` (bắt buộc) + `.bcfv` (góc nhìn) + ảnh PNG 
 
 | # | Lệnh | Vì sao | Tầng thuần |
 |---|---|---|---|
-| C1 | **`EvidenceLog`** + **`EvidenceVerify`** | NĐ 207/2026 đòi dấu thời gian **không thể chỉnh sửa ngược** cho nhật ký điện tử | `Evidence/HashChain` — **thuần tuyệt đối** |
+| C1 ✅ | Chuỗi băm nhật ký — `RunLog.Append` gắn, `BatchRunner --verify-log` kiểm | NĐ 207/2026 đòi dấu thời gian **không thể chỉnh sửa ngược** cho nhật ký điện tử | `Evidence/HashChain` — **thuần tuyệt đối**, 24 ca test |
 | C2 | **`AsBuiltStamp`** + bộ hồ sơ hoàn công | Đóng dấu hoàn công + ghép danh mục đang làm tay 100% | `AsBuilt/DossierIndex` (danh mục theo Phụ lục VII) |
 | C3 | **`IdsValidate`** | NĐ 217/2026 bắt nộp dữ liệu BIM; IDS là chuẩn kiểm đọc được bằng máy | `Ids/IdsSpec` + `Ids/IdsEvaluator` (6 loại facet) |
 | C4 | **`ModelLinesFromCad`** | Mắt xích còn thiếu ở chặng 1: `CadLayerMap` map layer, `RouteFromLines` cần model line — không có ai dựng model line từ DWG | `PolylineSimplifier` (**đã có**) + `CadCurveFilter` |
 
-**C1 — nhật ký bằng chứng, khác biệt lớn nhất mà rẻ nhất.** Batch runner đã ghi `run-HHmmss.jsonl` mỗi lượt.
-Nâng: mỗi dòng mang thêm `prevHash` và `hash` = SHA-256(nội dung dòng + `prevHash`). Sửa một dòng cũ là gãy chuỗi
-từ dòng đó trở đi, và `EvidenceVerify` chỉ ra **đúng dòng bị sửa**. Không ai trong danh sách đối thủ có thứ này,
-và nó đến từ luật chứ không từ ý thích.
+**C1 — nhật ký bằng chứng, khác biệt lớn nhất mà rẻ nhất.** ✅ **Đã làm 2026-09-04** — xem `roadmap.md` §11.5 và
+[`bang-chung-test.md`](bang-chung-test.md) §23. Batch runner đã ghi `run-HHmmss.jsonl` mỗi lượt; nay mỗi dòng mang
+thêm `prevHash` và `hash` = SHA-256 của **chính chuỗi ký tự đã ghi ra file** (tính đến trước trường `hash`, không
+serialize lại object — vòng JSON → object → JSON không bảo đảm ra byte y hệt). Sửa một dòng cũ là gãy chuỗi từ dòng
+đó trở đi, và bản kiểm chỉ ra **đúng dòng bị sửa**. Không ai trong danh sách đối thủ có thứ này, và nó đến từ luật
+chứ không từ ý thích.
+
+Hai điều chỉnh so với đề xuất gốc, đều theo hướng làm ít đi: gắn dấu vết đặt ở **`RunLog.Append`** — điểm ghi duy
+nhất của cả batch Revit lẫn AutoCAD — nên không cần một lệnh `EvidenceLog` riêng; và bản kiểm là cờ
+**`BatchRunner --verify-log`** chứ không phải lệnh Core `EvidenceVerify`, vì kiểm log không cần `Document` nào mà
+thêm lệnh Core thì vướng nguyên tắc 6.
 
 > **Phải nói thật trong tài liệu sản phẩm:** chuỗi băm chứng minh **tính toàn vẹn nội bộ** của log, *không* thay
 > chữ ký số hay dấu thời gian của một CA. Muốn đủ giá trị pháp lý còn cần chữ ký số của các bên và bản sao lưu
@@ -162,7 +169,7 @@ Revit cho lệnh đó**; và [`progress.md`](progress.md) nói việc có giá t
 
 | Đợt | Làm gì | Vì sao đúng thời điểm |
 |---|---|---|
-| **Ngay, không cần chờ số liệu** | **A1 `SetoutExport`** · **B1 `ConstructionStatus`/`ProgressReport`** · **C1 `EvidenceLog`** | Cả ba **chỉ đọc hoặc ghi tham số**, tầng thuần chiếm phần lớn công sức, không phụ thuộc thư viện/template của dự án. Giá trị không phụ thuộc kết quả 9.4 — trắc đạc, chỉ huy trưởng và bộ phận hồ sơ là ba nhóm người **khác** với nhóm đang dùng 43 lệnh hiện có, nên mở thêm được tệp người dùng cho chính vòng 9.4 |
+| **Ngay, không cần chờ số liệu** | **A1 `SetoutExport`** · **B1 `ConstructionStatus`/`ProgressReport`** · ~~**C1** chuỗi băm nhật ký~~ ✅ **xong 2026-09-04** | Cả ba **chỉ đọc hoặc ghi tham số**, tầng thuần chiếm phần lớn công sức, không phụ thuộc thư viện/template của dự án. Giá trị không phụ thuộc kết quả 9.4 — trắc đạc, chỉ huy trưởng và bộ phận hồ sơ là ba nhóm người **khác** với nhóm đang dùng 43 lệnh hiện có, nên mở thêm được tệp người dùng cho chính vòng 9.4 |
 | **Song song, rẻ** | **B3 `BcfExport`** · **C4 `ModelLinesFromCad`** | Thuần gần hết; B3 chỉ thêm đầu ra cho lệnh đã chạy thật, C4 nối hai lệnh đã có |
 | **Sau khi có số liệu 9.4/`UsageReport`** | **A2** → **A4** → **A3** → **B2** → **C3** → **C2** | Sáu mục này đắt hoặc phụ thuộc thói quen từng công ty (template view/sheet, thư viện tag, bảng mã định mức, mẫu dấu). Làm trước khi biết kỹ sư thật cần gì là lặp lại đúng sai lầm "bề rộng trước" mà `roadmap.md` đã ghi lại |
 
@@ -190,7 +197,7 @@ Bốn chỉ số, mỗi cái đo được bằng máy chứ không bằng cảm 
 | Số điểm định vị xuất ra và **được trắc đạc dùng thật** trên một dự án | ≥ 1 dự án, ≥ 200 điểm | `UsageReport` (số ngày dùng `SetoutExport`) + xác nhận của tổ trắc đạc |
 | Thời gian ra một bộ bản vẽ spool cho một hệ | Giảm ≥ 50% so với làm tay | Bấm giờ hai lần trên **cùng một hệ** — cách §19/§21 đã đo |
 | Số chặng của chuỗi có ít nhất một lệnh chạy thật | 5/5 (nay 3/5) | [`bang-chung-test.md`](bang-chung-test.md) |
-| Chuỗi băm nhật ký batch kiểm lại được sau 30 ngày | `EvidenceVerify` xanh trên log thật | Chạy trên log của đêm batch dự án A |
+| Chuỗi băm nhật ký batch kiểm lại được sau 30 ngày | `BatchRunner --verify-log` mã thoát 0 trên log thật | Chạy trên log của đêm batch dự án A |
 
 Chỉ số thứ ba là chỉ số của chính tài liệu này: **hôm nay chuỗi đứt ở chặng 3.**
 
