@@ -220,9 +220,18 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
    một trong hai nhóm category rỗng — "0 va chạm" khi không có gì để kiểm là câu nói về đầu vào chứ không
    về mô hình. Ca kiểm `revit-smoke` chốt đường chặn bằng nhóm category rỗng (đường link chưa nạp không
    dựng được bằng file JSON khai báo — kiểm tay theo §21).
-6. Rồi tới **9.4 — đưa cho một nhóm kỹ sư dùng thật**; phản hồi của họ quyết định giai đoạn 10/11 đi sâu
+6. ~~Thu số liệu 9.4 bằng máy thay vì chờ người điền form~~ — xong: **`UsageReport`** (công cụ nội bộ
+   như `RunTests`, không lên Ribbon). Phát hiện khi làm: log **chỉ ghi khi lệnh ném exception**, lần chạy
+   thành công không để lại dấu vết nào — nên câu hỏi quyết định giai đoạn 10/11 không có dữ liệu nào trả
+   lời được. Nay mọi lần chạy đều ghi một dòng ở đúng chỗ hội tụ của cả bốn đường vào
+   (`RevitCommandTable.Dispatch` / `AcadCommandTable.Dispatch`), và `UsageReport` đọc lại thành *lệnh nào
+   dùng bao nhiêu **ngày**, lệnh nào bấm rồi bỏ (xem trước mà chưa bao giờ chạy thật), lệnh nào lỗi nhiều
+   nhất, lệnh nào chưa ai bấm*. `RunTests` tắt cờ ghi trong lúc chạy bộ ca kiểm, nếu không chính bộ test
+   bơm số liệu lên. Tầng thuần `Usage/UsageLog` có test, gồm vòng tròn `Format` → `Parse` (định dạng dòng
+   log là hợp đồng giữa hai thời điểm cách nhau 30 ngày). ⬜ Số liệu chỉ bắt đầu tích từ bản cài kế tiếp.
+7. Rồi tới **9.4 — đưa cho một nhóm kỹ sư dùng thật**; phản hồi của họ quyết định giai đoạn 10/11 đi sâu
    vào đâu. **Mẫu thu phản hồi đã có**: [`mau-phan-hoi-9-4.md`](mau-phan-hoi-9-4.md) — bảng tick
    *dùng hằng tuần / bấm rồi bỏ / chưa dùng* cho đủ 42 lệnh Revit + 15 lệnh AutoCAD, kèm bốn câu hỏi mở.
    `PhanHoiFormTests` đối chiếu danh sách lệnh trong mẫu với `CommandCatalog` hai chiều nên mẫu không trôi.
    Còn thiếu: phát hành v1.1 và chọn nhóm kỹ sư — cả hai đều là việc của người, không phải của mã.
-7. **Không mở P3** — giữ hướng chiều sâu theo [`roadmap.md`](roadmap.md).
+8. **Không mở P3** — giữ hướng chiều sâu theo [`roadmap.md`](roadmap.md).

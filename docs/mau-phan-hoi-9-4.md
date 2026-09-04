@@ -6,6 +6,11 @@ dùng hằng tuần, lệnh nào bấm rồi bỏ). Số liệu này quyết đ�
 Mẫu này tồn tại để phản hồi **đếm được**, không phải để thu cảm nhận. Cảm nhận thì ai cũng nói "tốt";
 cái quyết định được giai đoạn 10/11 là bảng đánh dấu bên dưới.
 
+> **Phần đo được đã có máy làm.** Lệnh nội bộ `UsageReport` đọc log của chính máy đó (`%APPDATA%\DHCB\logs`,
+> 30 ngày) ra đúng ba cột dưới đây: *dùng bao nhiêu ngày · bấm rồi bỏ (xem trước mà chưa bao giờ chạy thật) ·
+> chưa bấm lần nào*. Chạy nó trước khi phát mẫu này, rồi chỉ hỏi người phần mà máy không trả lời được —
+> **vì sao bỏ**, và bốn câu hỏi mở cuối trang. Số liệu không rời máy kỹ sư.
+
 ## Cách dùng
 
 Mỗi kỹ sư nhận một bản chép của file này, dùng **hai tuần**, rồi điền. Chỉ tick một cột cho mỗi lệnh:

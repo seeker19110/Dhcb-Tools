@@ -61,6 +61,10 @@ public sealed class RunTestsCommand : ICoreCommand<RunTestsConfig>
         var only = new HashSet<string>(config.OnlyCommands, StringComparer.OrdinalIgnoreCase);
         var outcomes = new List<TestOutcome>();
 
+        // Bộ ca kiểm chạy hàng chục lệnh trong vài phút. Không tắt cờ này thì số liệu "lệnh nào kỹ sư
+        // dùng hằng tuần" bị chính bộ test bơm lên — đúng kiểu số đo tự huỷ hoại mình.
+        RevitCommandTable.LogUsage = false;
+
         // Cùng bộ token với file job của batch runner ({outputFolder}, {fileName}, {yyyy-MM-dd}...),
         // để bộ test viết đường dẫn giống hệt cách người ta viết job thật.
         var outputFolder = ResolveOutputFolder(config);
@@ -71,6 +75,8 @@ public sealed class RunTestsCommand : ICoreCommand<RunTestsConfig>
         // máy đang chạy, tức là chỉ chạy được trên đúng một máy.
         tokens.Extra["suiteFolder"] = Path.GetDirectoryName(Path.GetFullPath(config.SuitePath)) ?? ".";
 
+        try
+        {
         foreach (var testCase in suite.Cases)
         {
             if (only.Count > 0 && !only.Contains(testCase.Command))
@@ -99,6 +105,14 @@ public sealed class RunTestsCommand : ICoreCommand<RunTestsConfig>
                 observation,
                 path => File.Exists(JobTokens.Expand(path, tokens))));
             outcomes.Add(outcome);
+        }
+
+        }
+        finally
+        {
+            // Bật lại bằng mọi giá: một ca kiểm ném ra ngoài mà cờ vẫn tắt thì cả phiên Revit sau đó
+            // không ghi số liệu nào, và không ai biết vì sao báo cáo trống.
+            RevitCommandTable.LogUsage = true;
         }
 
         return WriteReports(suite, config, outcomes);

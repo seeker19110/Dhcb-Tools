@@ -268,6 +268,11 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Words("đọc thuyết minh", "spec sang config", "trích cao độ"),
 
             // ── Revit — công cụ nội bộ (không lên Ribbon, không chào ra /tools) ──
+            new CommandDescriptor("UsageReport", Revit, "Đọc log của máy này thành số liệu: lệnh nào dùng thật, lệnh nào bấm rồi bỏ", false)
+                .Field("logFolder", "thư mục log").Field("outputPath", "báo cáo Markdown").Field("csvPath", "CSV để gộp nhiều máy")
+                .Field("days", "chỉ tính N ngày gần nhất").Field("app", "Revit / AutoCAD")
+                .Words("số liệu sử dụng", "lệnh nào hay dùng", "usage")
+                .Tooling(),
             new CommandDescriptor("RunTests", Revit, "Chạy bộ kiểm thử bên trong Revit trên model mẫu, ghi TRX + Markdown", false)
                 .Field("suitePath", "file JSON mô tả bộ ca kiểm").Field("outputFolder", "nơi ghi báo cáo")
                 .Field("onlyCommands", "chỉ chạy các lệnh này").Field("allowWrites", "cho phép ca allowWrite ghi thật")

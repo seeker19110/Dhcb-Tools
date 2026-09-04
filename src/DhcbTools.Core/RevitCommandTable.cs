@@ -31,9 +31,11 @@ public static class RevitCommandTable
 
         // Config hỏng/thiếu trường bắt buộc là lỗi của người gọi, không phải sự cố hệ thống:
         // trả CommandResult.Fail có thông báo đọc được thay vì ném stack trace .NET ra Bridge/agent.
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        CommandResult result;
         try
         {
-            return name switch
+            result = name switch
             {
                 "PARAMETEREXPORT" => new ParameterExportCommand().Execute(doc, Deserialize<ParameterExportConfig>(configJson)),
                 "PARAMETERIMPORT" => new ParameterImportCommand().Execute(doc, Deserialize<ParameterImportConfig>(configJson)),
@@ -84,6 +86,7 @@ public static class RevitCommandTable
                 "CADLAYERMAP" => new CadLayerMapCommand().Execute(doc, Deserialize<CadLayerMapConfig>(configJson)),
                 "DICTIONARYLEARN" => new DictionaryLearnCommand().Execute(doc, Deserialize<DictionaryLearnConfig>(configJson)),
                 "SPECTOCONFIG" => new SpecToConfigCommand().Execute(doc, Deserialize<SpecToConfigConfig>(configJson)),
+                "USAGEREPORT" => new UsageReportCommand().Execute(doc, Deserialize<UsageReportConfig>(configJson)),
                 "RUNTESTS" => new RunTestsCommand().Execute(doc, Deserialize<RunTestsConfig>(configJson)),
 
                 _ => CommandResult.Fail($"Lệnh không xác định: \"{command}\". Hợp lệ: {string.Join(", ", CommandCatalog.Names(CommandCatalog.Revit))}."),
@@ -91,7 +94,58 @@ public static class RevitCommandTable
         }
         catch (ConfigException ex)
         {
-            return CommandResult.Fail(ex.Message);
+            result = CommandResult.Fail(ex.Message);
+        }
+
+        stopwatch.Stop();
+        LogRun("Revit", descriptor?.Name ?? command, result, configJson, stopwatch.ElapsedMilliseconds);
+        return result;
+    }
+
+    /// <summary>
+    /// Tắt ghi số liệu sử dụng — <c>RunTests</c> bật cờ này khi chạy bộ ca kiểm, nếu không hàng chục
+    /// lần chạy của bộ test sẽ trộn vào số liệu "lệnh nào kỹ sư dùng thật".
+    /// </summary>
+    public static bool LogUsage { get; set; } = true;
+
+    /// <summary>
+    /// Ghi một dòng số liệu cho MỌI lần chạy lệnh. Đây là chỗ hội tụ duy nhất của cả bốn đường vào
+    /// (Ribbon, Bridge, batch, lớp AI), nên đặt ở đây là đủ cho toàn bộ sản phẩm.
+    /// <para>
+    /// Trước đây log chỉ ghi khi lệnh NÉM exception, nên câu hỏi quyết định giai đoạn 10/11 — "lệnh nào
+    /// kỹ sư dùng hằng tuần, lệnh nào bấm rồi bỏ" — không có dữ liệu nào trả lời được ngoài trí nhớ.
+    /// </para>
+    /// </summary>
+    private static void LogRun(string app, string command, CommandResult result, string configJson, long ms)
+    {
+        if (!LogUsage)
+        {
+            return;
+        }
+
+        try
+        {
+            DhcbLog.Write(app, Shared.Logic.Usage.UsageLog.Format(command, result.Success, IsDryRun(configJson), result.AffectedCount, ms));
+        }
+        catch (Exception)
+        {
+            // Ghi số liệu không bao giờ được phép làm hỏng lệnh vừa chạy xong.
+        }
+    }
+
+    private static bool IsDryRun(string configJson)
+    {
+        try
+        {
+            return !string.IsNullOrWhiteSpace(configJson)
+                && JToken.Parse(configJson) is JObject obj
+                && obj.Properties().FirstOrDefault(p => string.Equals(p.Name, "dryRun", StringComparison.OrdinalIgnoreCase))
+                    ?.Value.Type == JTokenType.Boolean
+                && obj.Properties().First(p => string.Equals(p.Name, "dryRun", StringComparison.OrdinalIgnoreCase)).Value.Value<bool>();
+        }
+        catch (Exception)
+        {
+            return false;
         }
     }
 
