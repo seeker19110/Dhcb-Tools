@@ -129,17 +129,17 @@ ngược** cho nhật ký điện tử.
 | 11.2 | **Kiểm IFC trước nộp** | Mapping export chuẩn, `IfcClassification`, Pset bắt buộc; đọc lại file IFC vừa xuất bằng parser thuần (STEP) trong `Shared.Logic` để kiểm số phần tử, thuộc tính thiếu — có test với file IFC mẫu. Căn cứ đổi: NĐ 217/2026 bắt **nộp dữ liệu BIM** cho cơ quan chuyên môn, nên "xuất được" chưa đủ — phải "xuất rồi tự đọc lại thấy đúng" |
 | 11.3 | **Gói bàn giao tự động** | Một job đêm sinh: IFC, PDF, danh mục bản vẽ, báo cáo tuân thủ HTML/PDF có dấu thời gian và version add-in. **Thêm theo Điều 11 NĐ 207/2026:** mọi đầu ra điện tử phải **trích xuất được ra PDF/giấy** kèm chỗ **chủ đầu tư xác nhận** — không được chỉ tồn tại dưới dạng dữ liệu trong máy. Chạy trên 2 dự án thật trước khi công bố |
 | 11.4 | Quyết định **mức sâu của kiểm IDS** | 11.1 đã chốt IDS là nền nên câu hỏi còn lại hẹp hơn bản cũ: có mở `IdsValidate` sang kiểm **trên file IFC** (đối chiếu kết quả với IfcTester để chứng minh cùng kết luận) hay dừng ở kiểm trên mô hình Revit. Dựa trên phản hồi chủ đầu tư/thẩm tra sau 11.3 |
-| 11.5 | **`EvidenceLog` + `EvidenceVerify`** — chuỗi băm cho nhật ký điện tử | Batch runner đã ghi `run-HHmmss.jsonl` mỗi lượt. Nâng: mỗi dòng mang thêm `prevHash` và `hash` = SHA-256(nội dung dòng + `prevHash`); sửa một dòng cũ là gãy chuỗi từ dòng đó trở đi, `EvidenceVerify` chỉ ra **đúng dòng bị sửa**. `Shared.Logic/Evidence/HashChain` — **thuần tuyệt đối**, không chạm Revit API. ⚠️ **Phải nói thật trong tài liệu sản phẩm:** chuỗi băm chứng minh **tính toàn vẹn nội bộ** của log, *không* thay chữ ký số hay dấu thời gian của một CA. Nó phủ **điều kiện ①** trong ba điều kiện của NĐ 207/2026, và tạo điều kiện cho ② (xác nhận của các bên — cần chữ ký số) và ③ (sao lưu độc lập — cần hạ tầng của chủ đầu tư); hứa quá là tự tạo rủi ro cho khách hàng. = đề xuất **C1** |
+| 11.5 ✅ | **Chuỗi băm cho nhật ký điện tử** (đề xuất **C1**) | ✅ Mỗi dòng `run-HHmmss.jsonl` nay mang `prevHash` (băm dòng trước) và `hash` = SHA-256 của **chính chuỗi ký tự đã ghi ra file**, tính đến trước trường `hash` — băm trên byte đã ghi chứ không serialize lại, nên kiểm không phụ thuộc thư viện JSON. `Shared.Logic/Evidence/HashChain` **thuần tuyệt đối**, 24 ca test. Gắn dấu vết đặt ở `RunLog.Append` — **điểm ghi duy nhất** của cả batch Revit lẫn AutoCAD — nên phủ hết mọi đường ghi mà không sửa chỗ gọi nào; trường mới thêm ở cuối dòng nên `report.html`/`--analyze`/log đêm cũ vẫn đọc được. ✅ Kiểm bằng **`DhcbTools.BatchRunner --verify-log <file>`** (0 nguyên vẹn · 1 hỏng, in **đúng số dòng** · 2 không có file). **Không làm thành lệnh Core** như tên `EvidenceVerify` ban đầu gợi ý: kiểm log không cần `Document` nào, mà thêm lệnh Core thì vướng **nguyên tắc 6** (phải có ca kiểm chạy trong Revit) — đổi lại được thứ chạy trên CI. Bằng chứng: [`bang-chung-test.md`](bang-chung-test.md) §23 — bốn cách sửa log, bốn lần bị bắt, kể cả ca kẻ sửa **biết thuật toán** và tính lại băm cho chính dòng vừa sửa. ⚠️ **Phải nói thật trong tài liệu sản phẩm:** chuỗi băm chứng minh **tính toàn vẹn nội bộ** của log, *không* thay chữ ký số hay dấu thời gian của một CA. Nó phủ **điều kiện ①** trong ba điều kiện của NĐ 207/2026, và tạo điều kiện cho ② (xác nhận của các bên — cần chữ ký số) và ③ (sao lưu độc lập — cần hạ tầng của chủ đầu tư); hứa quá là tự tạo rủi ro cho khách hàng. ⬜ Còn: chạy trên log của một đêm batch thật, và chỉ số 30 ngày |
 | 11.6 | **`AsBuiltStamp` + `DossierIndex`** — dấu hoàn công và danh mục hồ sơ | DHCB cung cấp **family mẫu dấu theo Phụ lục IIb — dựng cả hai mẫu** — cùng cơ chế điền (tên nhà thầu, ngày, người ký, số hợp đồng lấy từ config); **doanh nghiệp chịu trách nhiệm nội dung**. Phần tự động: gán dấu lên loạt sheet, đặt revision "Hoàn công", xuất PDF theo danh mục — `RevisionOnSheets` + `BatchExport` đã làm được một nửa. `DossierIndex` (`Shared.Logic/AsBuilt`) sinh danh mục theo **Phụ lục VII** rồi **đối chiếu với file thật trong thư mục** và báo thiếu mục nào — cùng cách playbook xuất PDF theo revision đã dùng. = đề xuất **C2** |
 
 **Thứ tự bên trong giai đoạn 11** (theo [`nghien-cuu-chuoi-den-hoan-cong.md`](nghien-cuu-chuoi-den-hoan-cong.md) §5):
 **11.5 làm được ngay** — thuần gần hết, không phụ thuộc template hay thư viện của dự án, giá trị không phụ thuộc
-kết quả 9.4. **11.1 rồi 11.6 chờ số liệu 9.4/`UsageReport`**: mẫu dấu và danh mục hồ sơ phụ thuộc thói quen từng
+kết quả 9.4; ✅ **đã làm 2026-09-04**. **11.1 rồi 11.6 chờ số liệu 9.4/`UsageReport`**: mẫu dấu và danh mục hồ sơ phụ thuộc thói quen từng
 công ty; làm trước khi biết kỹ sư thật cần gì là lặp lại đúng sai lầm "bề rộng trước" mà mục cuối tài liệu này đã
 ghi lại. Ràng buộc không đổi: **nguyên tắc 6** — không thêm lệnh Core khi chưa có ca kiểm chạy trong Revit.
 
-**Chỉ số:** báo cáo tuân thủ đêm chạy trên **2 dự án thật** trước khi công bố; `EvidenceVerify` xanh trên log
-thật của một đêm batch **kiểm lại sau 30 ngày**.
+**Chỉ số:** báo cáo tuân thủ đêm chạy trên **2 dự án thật** trước khi công bố; `BatchRunner --verify-log` mã thoát 0 trên
+log thật của một đêm batch, **kiểm lại sau 30 ngày**.
 
 ---
 
@@ -168,7 +168,7 @@ mới, kiểm `Shared.*` (netstandard2.0) nạp được. Không đổi logic. L
 | Số kỹ sư dùng hằng tuần không cần hỏi (9.4) | ≥ 5 sau v1.1 |
 | Thời gian agent hoàn thành kịch bản 20 warning (10) | < 15 phút, 0 thao tác tay ngoài xác nhận |
 | Số dự án chạy báo cáo tuân thủ đêm (11.3) | 2 dự án thật trước khi công bố |
-| Chuỗi băm nhật ký batch kiểm lại được sau 30 ngày (11.5) | `EvidenceVerify` xanh trên log thật của một đêm batch |
+| Chuỗi băm nhật ký batch kiểm lại được sau 30 ngày (11.5) | `BatchRunner --verify-log` mã thoát 0 trên log thật của một đêm batch |
 
 ---
 

@@ -11,6 +11,7 @@ namespace DhcbTools.BatchRunner;
 ///                           [--revit-exe "C:\Program Files\Autodesk\Revit 2024\Revit.exe"]
 ///                           [--accoreconsole "C:\Program Files\Autodesk\AutoCAD 2024\accoreconsole.exe"] [--plugin-dll path]
 ///                           [--report-only] [--analyze]
+///                           [--verify-log logs/2026-09-04/run-013000.jsonl]
 /// Mã thoát: 0 mọi step OK · 1 có step lỗi/bỏ qua · 2 lỗi cấu hình.
 /// Log: logs/{yyyy-MM-dd}/run-HHmmss.jsonl (mỗi lần chạy một file); --report-only lấy lần mới nhất.
 /// </summary>
@@ -24,6 +25,12 @@ public static class Program
         {
             Console.Error.WriteLine(Options.Usage);
             return 2;
+        }
+
+        // Kiểm log là việc độc lập với chạy job: không cần --job, không mở Revit/AutoCAD, không ghi gì.
+        if (!string.IsNullOrEmpty(opts.VerifyLog))
+        {
+            return VerifyLog(opts.VerifyLog!);
         }
 
         BatchJob job;
@@ -86,6 +93,25 @@ public static class Program
         var code = entries.Count == 0 ? 1 : RunLog.ExitCode(entries);
         Console.WriteLine($"Kết thúc, mã thoát {code}: {entries.Count(e => e.Success && !e.Skipped)} OK, {entries.Count(e => !e.Success && !e.Skipped)} lỗi, {entries.Count(e => e.Skipped)} bỏ qua.");
         return code;
+    }
+
+    /// <summary>
+    /// <c>--verify-log</c>: kiểm chuỗi băm của một file log đã ghi (mục 11.5). Mã thoát 0 nguyên vẹn ·
+    /// 1 chuỗi hỏng (in ra đúng dòng) · 2 không có file. Tách khỏi đường chạy job để kiểm lại được một
+    /// log 30 ngày tuổi mà không cần job, không cần Revit, không ghi thêm gì vào file đang kiểm.
+    /// </summary>
+    internal static int VerifyLog(string path)
+    {
+        if (!File.Exists(path))
+        {
+            Console.Error.WriteLine("Không có file log: " + path);
+            return 2;
+        }
+
+        var result = RunLog.VerifyFile(path);
+        Console.WriteLine(path);
+        Console.WriteLine(result.Message);
+        return result.Ok ? 0 : 1;
     }
 
     /// <summary>
@@ -487,12 +513,15 @@ internal sealed class Options
     public bool ReportOnly { get; private set; }
     public bool Analyze { get; private set; }
     public bool AutoDetectVersion { get; private set; } = true;
+    public string? VerifyLog { get; private set; }
 
     public const string Usage = """
         DhcbTools.BatchRunner --job <job.json> [--dry-run] [--log-dir logs] [--max-minutes 480]
                               [--revit-exe <Revit.exe>] [--accoreconsole <accoreconsole.exe>] [--plugin-dll <DhcbTools.AutoCAD.dll>]
                               [--report-only] [--analyze] [--no-autodetect]
+        DhcbTools.BatchRunner --verify-log <run-HHmmss.jsonl>
         (Revit: phiên bản tự nhận từ header .rvt; step "PlotPdf" trong job AutoCAD sinh -PLOT ra PDF)
+        (--verify-log kiểm chuỗi băm của log đã ghi: 0 nguyên vẹn · 1 hỏng, in ra đúng dòng · 2 không có file)
         """;
 
     public static Options? Parse(string[] args)
@@ -515,6 +544,7 @@ internal sealed class Options
                     case "--report-only": o.ReportOnly = true; break;
                     case "--analyze": o.Analyze = true; break;
                     case "--no-autodetect": o.AutoDetectVersion = false; break;
+                    case "--verify-log": o.VerifyLog = Next(); break;
                     case "-h": case "--help": return null;
                     default:
                         Console.Error.WriteLine("Tham số không biết: " + args[i]);
@@ -528,6 +558,7 @@ internal sealed class Options
             }
         }
 
-        return string.IsNullOrEmpty(o.JobPath) ? null : o;
+        // --verify-log đứng một mình được: nó không chạy job nào cả.
+        return string.IsNullOrEmpty(o.JobPath) && string.IsNullOrEmpty(o.VerifyLog) ? null : o;
     }
 }

@@ -20,6 +20,9 @@
 > **Đã chạy trên dự án thật:** một đêm batch 10 bước chỉ đọc trên 9 file `.rvt` của một dự án thật (8/9 chạy
 > trọn; file còn lại lỗi mạng tới central model) — §20; và một vòng đóng vai kỹ sư dùng thử — §21.
 >
+> **Nhật ký batch có chuỗi băm (11.5):** mỗi dòng `run-*.jsonl` mang `prevHash`/`hash`, kiểm lại bằng
+> `BatchRunner --verify-log`. Bốn cách sửa log đều bị bắt, chỉ ra đúng số dòng — §23.
+>
 > **Còn lại:** chưa có job nào chạy **tự động qua Task Scheduler** (hai lượt ở §20/§21 đều chạy tay); chất
 > lượng tuyến `AutoRoute` vẫn chưa chứng minh được; và 9.4 — đưa cho một nhóm kỹ sư dùng thật.
 
@@ -36,6 +39,7 @@
 | MEPF routing A (theo line), B (rải thiết bị theo phòng) | ✅ Core + Ribbon + Bridge; chờ kiểm thử trên model mẫu |
 | MEPF sizing (đề xuất → CSV → áp), màu/tên hệ, đánh số theo dòng chảy | ✅ |
 | Batch runner chạy đêm (Revit + AutoCAD accoreconsole) | ✅ [`batch-runner.md`](batch-runner.md) |
+| Chuỗi băm nhật ký batch (NĐ 207/2026, điều kiện ①) | ✅ `Shared.Logic/Evidence/HashChain` gắn ở `RunLog.Append`; kiểm bằng `BatchRunner --verify-log` — §23 |
 | `IUpdater` cao độ theo sự kiện | ✅ Mặc định tắt, tự tắt khi > 200 ms |
 | Checker tham số/đặt tên, clash nội bộ | ✅ HTML + 3D view, `clash-accepted.json` |
 | Lớp AI (offline) | ✅ [`ai-offline.md`](ai-offline.md) — heuristic mặc định, Ollama local tuỳ chọn |
@@ -235,4 +239,10 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
    *dùng hằng tuần / bấm rồi bỏ / chưa dùng* cho đủ 42 lệnh Revit + 15 lệnh AutoCAD, kèm bốn câu hỏi mở.
    `PhanHoiFormTests` đối chiếu danh sách lệnh trong mẫu với `CommandCatalog` hai chiều nên mẫu không trôi.
    Còn thiếu: phát hành v1.1 và chọn nhóm kỹ sư — cả hai đều là việc của người, không phải của mã.
-8. **Không mở P3** — giữ hướng chiều sâu theo [`roadmap.md`](roadmap.md).
+8. ~~Chuỗi băm cho nhật ký batch (11.5)~~ — xong: `prevHash`/`hash` gắn ở `RunLog.Append`, kiểm bằng
+   `BatchRunner --verify-log`. Làm được ngay mà không cần chờ 9.4 vì tầng thuần chiếm gần hết và nó đến
+   từ **NĐ 207/2026** chứ không từ ý thích. Không làm thành lệnh Core như tên `EvidenceVerify` ban đầu
+   gợi ý: kiểm log không cần `Document` nào, mà thêm lệnh Core thì vướng nguyên tắc 6 — đổi lại được thứ
+   chạy trên CI. ⬜ Còn: chạy trên log của một đêm batch thật (log ở §23 chỉ ba dòng), và chỉ số 30 ngày
+   theo định nghĩa phải chờ 30 ngày.
+9. **Không mở P3** — giữ hướng chiều sâu theo [`roadmap.md`](roadmap.md).

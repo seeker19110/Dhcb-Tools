@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using DhcbTools.Shared.Logic;
+using DhcbTools.Shared.Logic.Evidence;
 using Newtonsoft.Json;
 
 namespace DhcbTools.Shared.Logic.Batch
@@ -40,6 +41,20 @@ namespace DhcbTools.Shared.Logic.Batch
         /// <summary>Step bị bỏ qua (file không mở được, hết giờ…) — khác với chạy và lỗi.</summary>
         [JsonProperty("skipped")]
         public bool Skipped { get; set; }
+
+        /// <summary>
+        /// Băm của dòng ngay trước trong cùng file — mắt xích nối chuỗi (mục 11.5). Do
+        /// <see cref="RunLog.Append"/> đặt; dòng đầu tiên mang <see cref="HashChain.Genesis"/>.
+        /// </summary>
+        [JsonProperty("prevHash", NullValueHandling = NullValueHandling.Ignore)]
+        public string? PrevHash { get; set; }
+
+        /// <summary>
+        /// SHA-256 của chính dòng này, tính trên phần đứng trước trường <c>hash</c>. Do
+        /// <see cref="RunLog.Append"/> đặt và ghi ra **cuối dòng**; không tự gán.
+        /// </summary>
+        [JsonProperty("hash", NullValueHandling = NullValueHandling.Ignore)]
+        public string? Hash { get; set; }
     }
 
     /// <summary>Ghi/đọc log dòng-JSON. Mỗi dòng một object, UTF-8 không BOM, append được từ nhiều lần chạy.</summary>
@@ -70,6 +85,10 @@ namespace DhcbTools.Shared.Logic.Batch
             }
         }
 
+        /// <summary>
+        /// Ghi thêm một dòng, đã gắn sẵn chuỗi băm (mục 11.5). Đây là **điểm ghi duy nhất** của cả batch
+        /// Revit lẫn AutoCAD, nên gắn dấu vết ở đây là phủ hết mọi đường ghi mà không sửa chỗ gọi nào.
+        /// </summary>
         public static void Append(string path, RunLogEntry entry)
         {
             var dir = Path.GetDirectoryName(path);
@@ -78,7 +97,48 @@ namespace DhcbTools.Shared.Logic.Batch
                 Directory.CreateDirectory(dir);
             }
 
-            File.AppendAllText(path, Serialize(entry) + "\n", new UTF8Encoding(false));
+            entry.PrevHash = LastHash(path) ?? HashChain.Genesis;
+            entry.Hash = null;
+            var payload = Serialize(entry);
+            entry.Hash = HashChain.ComputeHash(payload);
+
+            File.AppendAllText(path, HashChain.Seal(payload, entry.Hash) + "\n", new UTF8Encoding(false));
+        }
+
+        /// <summary>
+        /// Băm của dòng cuối cùng đang có trong file; null khi file chưa có hoặc dòng cuối chưa mang dấu vết
+        /// (log cũ) — khi đó dòng mới bắt đầu lại từ <see cref="HashChain.Genesis"/> và
+        /// <see cref="VerifyFile"/> sẽ báo <see cref="ChainStatus.NotSealed"/> ở đúng dòng cũ đó.
+        /// <para>
+        /// Đọc cả file mỗi lần ghi, không đọc đuôi: một lần chạy batch là vài chục dòng (9 file × 10 step
+        /// ở đêm batch thật), nên cái giá không đáng kể, còn đọc đuôi theo byte thì phải tự xử lý ký tự
+        /// UTF-8 bị cắt đôi — đổi một lỗi không có lấy một lỗi khó thấy.
+        /// </para>
+        /// </summary>
+        internal static string? LastHash(string path)
+        {
+            if (!File.Exists(path))
+            {
+                return null;
+            }
+
+            string? last = null;
+            foreach (var line in File.ReadAllLines(path))
+            {
+                if (!StringGuard.IsBlank(line))
+                {
+                    last = line;
+                }
+            }
+
+            return HashChain.TrySplit(last, out _, out var hash) ? hash : null;
+        }
+
+        /// <summary>Kiểm chuỗi băm của một file log — trả lời "dòng nào bị sửa", không chỉ "có bị sửa không".</summary>
+        public static ChainVerification VerifyFile(string path)
+        {
+            var lines = File.Exists(path) ? File.ReadAllLines(path) : new string[0];
+            return HashChain.Verify(lines, line => Deserialize(line)?.PrevHash);
         }
 
         /// <summary>Đọc toàn bộ file, bỏ qua dòng hỏng (ghi dở khi crash) thay vì ném lỗi.</summary>

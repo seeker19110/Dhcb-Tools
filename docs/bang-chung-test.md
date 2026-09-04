@@ -1200,3 +1200,67 @@ chưa ai điền.
 Ba việc này đều mới chạy trên **model mẫu**. Giá trị thật của `DictionaryLearn` chỉ đo được trên dự án
 thực tế A — nơi §21 đã chỉ ra `ElevationTag`/`HangerAuto` đòi tên riêng của dự án. Số liệu `UsageReport`
 cũng chỉ bắt đầu tích từ bản cài kế tiếp trở đi.
+
+---
+
+## 23. Chuỗi băm nhật ký batch — bốn cách sửa log, bốn lần bị bắt (2026-09-04 23:34 ICT)
+
+Mục 11.5 của [`roadmap.md`](roadmap.md): NĐ 207/2026 chấp nhận nhật ký thi công điện tử khi có **dấu thời
+gian không thể chỉnh sửa ngược**. Vòng này kiểm xem lời hứa đó có thật không — trên log do **chính đường
+sản xuất** sinh ra, không phải log dựng riêng cho test.
+
+### Log thật, sinh bằng `BatchRunner`
+
+Một job AutoCAD ba file không tồn tại, chạy qua `DhcbTools.BatchRunner` bản Release. Ba dòng log đi qua
+đúng `RunLog.Append` mà đêm batch dự án thật (§20) dùng:
+
+```
+{"time":"2026-09-04T23:34:36.57…","file":"khong-co-1.dwg","command":"Open","success":false,…,
+ "prevHash":"0000…0000","hash":"5ca5198447ff4a8309184bc24d448626b302451a27ad2b61d3f35955d79d3309"}
+{"time":"…","file":"khong-co-2.dwg",…,"prevHash":"5ca51984…d3309","hash":"1878ebc3…528c7b"}
+{"time":"…","file":"khong-co-3.dwg",…,"prevHash":"1878ebc3…528c7b","hash":"6fd82abd…a8c90e"}
+```
+
+Mắt xích nối đúng: `prevHash` của dòng 2 = `hash` của dòng 1, `prevHash` của dòng 3 = `hash` của dòng 2,
+dòng 1 mang 64 số 0.
+
+### Bốn cách sửa log, và cái gì bắt được
+
+Mỗi lần khôi phục lại bản gốc rồi sửa một kiểu khác, gọi `--verify-log`:
+
+| # | Sửa gì | Kết luận in ra | Mã thoát |
+|---|---|---|---|
+| 1 | Không sửa gì | *Chuỗi băm nguyên vẹn: 3 dòng, không dòng nào bị sửa hay mất.* | **0** |
+| 2 | Đổi `"success":false` → `true` ở dòng 2 (che một lỗi) | *Dòng 2 đã bị sửa: băm ghi trong dòng không khớp nội dung của chính dòng đó.* | **1** |
+| 3 | Sửa dòng 2 **rồi tính lại băm cho chính dòng 2** | *Chuỗi đứt tại dòng 3: prevHash không khớp băm của dòng trước…* | **1** |
+| 4 | Xoá hẳn dòng 2 | *Chuỗi đứt tại dòng 2: prevHash không khớp băm của dòng trước…* | **1** |
+
+**Ca 3 là ca đáng giá nhất.** Người sửa biết thuật toán, mở log ra, đổi một chữ rồi tính lại SHA-256 cho
+đúng dòng vừa sửa — dòng đó tự khớp hoàn hảo. Băm từng dòng rời sẽ cho qua. Chuỗi thì không: dòng 3 vẫn trỏ
+vào băm cũ của dòng 2, nên gãy ngay. Đây chính là lý do phải **nối** chứ không chỉ băm.
+
+Ca 3 còn cho một phép kiểm chéo không cố ý mà có giá trị: băm dùng để giả mạo được tính bằng
+**`hashlib.sha256` của Python**, và mã C# nhận nó là hợp lệ cho dòng đó. Hai bản cài đặt độc lập ra cùng
+một con số ⇒ định dạng băm là SHA-256 chuẩn trên đúng chuỗi ký tự đã ghi ra file, không phải một biến thể
+riêng chỉ DHCB đọc được. Log kiểm lại sau 30 ngày bằng công cụ khác vẫn ra cùng kết luận.
+
+### Bộ test thuần
+
+**24 ca mới** (`HashChainTests` + `RunLogChainTests`), tổng **696 → 720 ca, 0 trượt**. Ngoài bốn kịch bản
+trên còn chốt: đảo chỗ hai dòng, chèn thêm dòng, gỡ dấu vết khỏi một dòng (báo *chưa mang chuỗi băm* chứ
+không im lặng cho qua), dòng đầu không phải genesis, dòng rỗng xen giữa không bị coi là sửa, nội dung log
+chứa nguyên văn chuỗi giống trường `hash` vẫn tách đúng, và SHA-256 của chuỗi rỗng là hằng số công khai —
+đổi thuật toán là biết ngay, vì log 30 ngày tuổi kiểm lại được là toàn bộ giá trị của tính năng này.
+
+`check-build.sh` xanh: trường mới chỉ thêm vào cuối dòng JSON nên `report.html`, `--analyze` và log của các
+đêm trước vẫn đọc bình thường (`TruongCu_VanDocLaiDuocDayDu` chốt chặn hướng đó).
+
+### Cái chưa chứng minh
+
+Chưa chạy trên **log của một đêm batch thật** — log ở đây là ba dòng "không tìm thấy file", đủ để chứng minh
+cơ chế nhưng không chứng minh nó chịu được log 90 dòng có `messages` dài. Và chỉ số của mục 11.5 —
+*`--verify-log` xanh trên log thật sau 30 ngày* — theo định nghĩa phải chờ 30 ngày mới có.
+
+Giới hạn không phải là thiếu sót mà là bản chất: chuỗi băm chứng minh **toàn vẹn nội bộ**, không chứng minh
+log do ai ghi. Người có quyền ghi file vẫn dựng lại được cả chuỗi. Đó là điều kiện ① trong ba điều kiện của
+NĐ 207/2026; ② (chữ ký số của các bên) và ③ (sao lưu độc lập) nằm ngoài add-in.
