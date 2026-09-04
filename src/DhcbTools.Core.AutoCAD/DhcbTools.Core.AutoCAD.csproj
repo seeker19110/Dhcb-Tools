@@ -43,8 +43,18 @@
     -->
     <Reference Include="System.Drawing" Condition="'$(TargetFramework)'=='net48'" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.*" Condition="'$(TargetFramework)'=='net8.0-windows'" />
-    <!-- AcDbMgd 25.1 (AutoCAD 2026, net10) tham chiếu System.Drawing.Common 10.0.0.0 — bản 8.0 gây CS1705. -->
+    <!--
+      AcDbMgd 25.1 (AutoCAD 2026, net10) tham chiếu System.Drawing.Common 10.0.0.0 — bản 8.0 gây CS1705.
+      NoWarn NU1510: SDK 10 báo "package tự động có sẵn, bỏ PackageReference đi", nhưng bỏ thật thì được
+      CS1069 ("type Bitmap đã forward sang System.Drawing.Common, thêm reference đi") — đã thử. Gói này chỉ
+      tự có khi project dùng WindowsDesktop.App (WinForms/WPF), mà vỏ core-only thì không.
+    -->
     <PackageReference Include="System.Drawing.Common" Version="10.0.*" Condition="'$(TargetFramework)'=='net10.0-windows'" />
   </ItemGroup>
+
+  <!-- NU1510 là cảnh báo lúc restore nên phải tắt ở PropertyGroup, không tắt được trên PackageReference. -->
+  <PropertyGroup Condition="'$(TargetFramework)'=='net10.0-windows'">
+    <NoWarn>$(NoWarn);NU1510</NoWarn>
+  </PropertyGroup>
 
 </Project>

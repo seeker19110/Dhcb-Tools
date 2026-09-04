@@ -9,7 +9,7 @@
 ;
 ; StageDir phải có cấu trúc (release.yml dựng sẵn):
 ;   revit-2023\  revit-2024\  revit-2025\   (DLL + .addin cho từng phiên bản)
-;   autocad-2024\ autocad-2025\             (DLL vỏ đầy đủ + vỏ core-only)
+;   autocad-2024\ autocad-2025\ autocad-2026\  (DLL vỏ đầy đủ + vỏ core-only; 2026 là .NET 10)
 ;   batchrunner\                            (exe + jobs/ configs/ scripts/)
 
 #ifndef Version
@@ -47,6 +47,7 @@ Name: "revit2024";  Description: "Add-in Revit 2024";      Types: full
 Name: "revit2025";  Description: "Add-in Revit 2025";      Types: full
 Name: "acad2024";   Description: "Plugin AutoCAD 2024";    Types: full
 Name: "acad2025";   Description: "Plugin AutoCAD 2025";    Types: full
+Name: "acad2026";   Description: "Plugin AutoCAD 2026";    Types: full
 Name: "batch";      Description: "Batch runner chạy đêm";  Types: full
 Name: "scripts";    Description: "Script Python (agent client, MCP server, AI offline)"; Types: full
 
@@ -64,8 +65,10 @@ Source: "{#StageDir}\autocad-2024\*"; DestDir: "{userappdata}\Autodesk\Applicati
   Components: acad2024; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#StageDir}\autocad-2025\*"; DestDir: "{userappdata}\Autodesk\ApplicationPlugins\DhcbTools.bundle\Contents\2025"; Excludes: "*.md"; \
   Components: acad2025; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#StageDir}\autocad-2026\*"; DestDir: "{userappdata}\Autodesk\ApplicationPlugins\DhcbTools.bundle\Contents\2026"; Excludes: "*.md"; \
+  Components: acad2026; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#StageDir}\PackageContents.xml"; DestDir: "{userappdata}\Autodesk\ApplicationPlugins\DhcbTools.bundle"; \
-  Components: acad2024 or acad2025; Flags: ignoreversion
+  Components: acad2024 or acad2025 or acad2026; Flags: ignoreversion
 
 ; ── Batch runner: thư mục chương trình bình thường ──────────────────────────
 Source: "{#StageDir}\batchrunner\*"; DestDir: "{app}"; \

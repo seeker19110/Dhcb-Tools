@@ -1404,3 +1404,79 @@ theo nghĩa của mình. Nếu kết quả không ghi rõ mình là loại nào,
 Mức rơi **`screen`** (chụp khung nhìn đang mở khi off-screen hỏng) chưa từng được kích hoạt — off-screen chạy ngay.
 Chỉ chạy trên AutoCAD **2026.1**; 2024/2025 mới ở mức biên dịch. Bản vẽ mẫu có extents đáng tin; nhánh "extents
 là số rác ±1e20 → ôm theo khung nhìn hiện tại" chưa gặp trên dữ liệu thật.
+
+---
+
+## 26. Phát hành AutoCAD 2026 — diễn tập đóng gói, và một test xanh trên CI mà đỏ trên máy (2026-09-05 06:40 ICT)
+
+§24 và §25 đã chạy thật trên AutoCAD 2026.1, nên phát hành nhánh .NET 10 là có cơ sở — khác Revit
+2026/2027 vẫn chưa chạy được vì máy chỉ có Revit 2024.3. Vòng này thêm component `acad2026` vào installer
+rồi **diễn tập nguyên văn** hai bước của `release.yml` trước khi tin.
+
+### Diễn tập đóng gói (không cần đẩy tag)
+
+Chạy đúng từng dòng của job `build-autocad` (acad=2026) và bước *Dựng thư mục stage* của job `installer`:
+
+| Bước | Kết quả |
+|---|---|
+| `msbuild -getProperty:TargetFramework` với `AcadVersion=2026` | **`net10.0-windows`** — đúng nhánh TFM, không hardcode |
+| Bundle sinh ra cho `Contents\2026` | 7 file: `DhcbTools.AutoCAD.dll` · `.Core.AutoCAD.dll` · `.AutoCAD.Core.dll` · `.Shared.Hosting.dll` · `.Shared.Logic.dll` · `Newtonsoft.Json.dll` · `DhcbTools.AutoCAD.deps.json` |
+| Đối chiếu với bundle **đã chạy thật ở §25** | Thiếu: **không có gì**. Thừa: `DhcbTools.AutoCAD.Core.dll` (vỏ core-only cho accoreconsole — có chủ ý, §25 chỉ chép phần vỏ đầy đủ cần) |
+| Thay `AppVersion` trong `PackageContents.xml` | `AppVersion="9.9.9-rehearsal"` — đúng |
+
+Gói là **superset** của thứ đã chứng minh chạy được, nên rủi ro nằm ở phần thừa chứ không ở phần thiếu.
+
+### Hai quyết định về nội dung bundle, cả hai đều dựa trên §25 chứ không dựa trên phỏng đoán
+
+- **Có đóng gói `deps.json`.** Bundle chạy thật ở §25 có file này; AutoCAD 2025+ nạp assembly .NET Core qua
+  `AssemblyLoadContext` riêng. `release.yml` trước đây không chép — nghĩa là gói AutoCAD 2025 phát hành ở
+  `v1.0.0` khác với thứ từng chạy. Nay chép cho mọi nhánh không phải net48.
+- **Không đóng gói `System.Drawing.Common.dll`** dù nó nằm trong `bin` của net8/net10: §25 chạy thật với
+  bundle **không có** file này, vì `AcDbMgd` tham chiếu nó nên chính AutoCAD đã cấp. Chép thêm bản riêng chỉ
+  tạo nguy cơ lệch phiên bản với bản AutoCAD đang chạy.
+
+### `NU1510` nói một đằng, trình biên dịch nói một nẻo
+
+SDK 10 cảnh báo: *"PackageReference System.Drawing.Common will not be pruned. This package is automatically
+available and does not need to be referenced explicitly. Remove the PackageReference item."* Bỏ thật thì:
+
+```
+error CS1069: The type name 'Bitmap' could not be found in the namespace 'System.Drawing'.
+This type has been forwarded to assembly 'System.Drawing.Common, Version=0.0.0.0, …'
+```
+
+Gói đó chỉ tự có khi project dùng `Microsoft.WindowsDesktop.App` (WinForms/WPF) — vỏ core-only thì không.
+Nên giữ `PackageReference` và tắt đúng một mã cảnh báo. `NoWarn` đặt trên chính `PackageReference` **không
+có tác dụng** (NU1510 phát ở bước restore, gắn với project); phải là `PropertyGroup` có điều kiện TFM. Sau
+đó bốn cấu hình đều **0 warning, 0 error**: vỏ AutoCAD 2024/2025/2026 và Core.AutoCAD 2026.
+
+### Một test xanh trên CI mà đỏ trên máy — cùng một commit
+
+Chạy `dotnet test` trên cây làm việc Windows: **719/720**, đỏ ở `QueryCatalogTests.AutoCad_BangDispatch_
+VaCauBaoLoi_KhopNhau` với *"Không tìm thấy hằng ValidQueries trong handler"* — trong khi `AcadQueryHandler.cs`
+**không hề bị nhánh này đụng tới** và `ValidQueries` vẫn nằm nguyên đó. CI của #66 thì xanh.
+
+Đọc byte của mẫu regex trong test mới thấy:
+
+```
+@"ValidQueries\s*=\s*[0D][0A]?[0D][0A]?\s*""([^""]+)"""
+```
+
+Chuỗi verbatim **nhúng ký tự xuống dòng thật**, nên mẫu đòi đúng **hai ký tự CR**. Trên CI Linux (checkout
+LF) hai ký tự đó thành LF-tuỳ-chọn nên mẫu lỏng và khớp; trên cây làm việc Windows (CRLF) thì không. Cùng
+một commit, hai kết quả — lớp lỗi tệ nhất vì CI không bao giờ bắt được.
+
+Sửa: bỏ ký tự nhúng, để `\s*` tự nhảy qua chỗ xuống dòng — `@"ValidQueries\s*=\s*""([^""]+)"""`. Chứng minh
+bằng cách ép `AcadQueryHandler.cs` về LF rồi trả lại CRLF, chạy test cả hai lần:
+
+| Kiểu xuống dòng của file bị đọc | Kết quả |
+|---|---|
+| LF | 720 đạt / 0 trượt |
+| CRLF | 720 đạt / 0 trượt |
+
+### Cái chưa chứng minh
+
+**Chưa chạy `ISCC.exe`** — Inno Setup không có trên máy, nên `.iss` mới chỉ được kiểm bằng bộ đối chiếu
+riêng (mỗi `autocad-<năm>` trỏ đúng `Contents\<năm>`, component khai báo khớp component sử dụng, XML hợp lệ,
+`.iss` và `PackageContents.xml` cùng bộ năm 2024/2025/2026). Installer thật chỉ dựng khi đẩy tag; và chưa ai
+**cài rồi mở AutoCAD 2026** từ gói do installer đặt — §25 chạy trên bundle chép tay.

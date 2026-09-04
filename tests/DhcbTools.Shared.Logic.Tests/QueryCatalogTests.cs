@@ -32,12 +32,17 @@ public class QueryCatalogTests
                 .Select(m => m.Groups[1].Value.ToLowerInvariant()),
             StringComparer.Ordinal);
 
-    /// <summary>Tên trong hằng <c>ValidQueries</c> — danh sách mà agent đọc khi gõ sai tên truy vấn.</summary>
+    /// <summary>
+    /// Tên trong hằng <c>ValidQueries</c> — danh sách mà agent đọc khi gõ sai tên truy vấn.
+    /// <para>
+    /// Mẫu chỉ dùng <c>\s*</c> để nhảy qua chỗ xuống dòng giữa <c>=</c> và chuỗi. Bản trước nhúng
+    /// <b>ký tự xuống dòng thật</b> vào chuỗi verbatim, nên mẫu đòi đúng byte CR/LF của file: xanh trên
+    /// CI Linux (checkout LF) mà đỏ trên cây làm việc Windows (CRLF) — cùng một commit, hai kết quả.
+    /// </para>
+    /// </summary>
     private static HashSet<string> Advertised(string source)
     {
-        var m = Regex.Match(source, @"ValidQueries\s*=\s*
-?
-?\s*""([^""]+)""");
+        var m = Regex.Match(source, @"ValidQueries\s*=\s*""([^""]+)""");
         Assert.True(m.Success, "Không tìm thấy hằng ValidQueries trong handler.");
         return new HashSet<string>(
             m.Groups[1].Value.Split(',').Select(x => x.Trim()).Where(x => x.Length > 0),

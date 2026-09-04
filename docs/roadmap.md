@@ -166,8 +166,9 @@ hành chứ không còn "preview".
 | `check-build.sh` chạy được đường .NET 10 | ✅ `REVIT_VERSION=2027 ACAD_VERSION=2027 ./scripts/check-build.sh` xanh; header ghi bảng phiên bản → TFM |
 | CI phủ .NET 10 | ✅ `tests.yml`: ma trận `check-build` **2023–2027**, `build-wpf-windows` **2023–2027** (2027 là bản WPF đầu tiên trên net10 — đúng chỗ SDK đổi implicit usings khi bật WPF), cài cả SDK 8 lẫn 10 |
 | `release.yml` không đóng gói nhầm thư mục | ✅ bỏ hai chỗ hardcode `-ge 2025 → net8`; TFM nay **hỏi MSBuild** (`-getProperty:TargetFramework`) — một nguồn sự thật trong `Directory.Build.props` |
+| Phát hành **AutoCAD 2026** (net10) | ✅ 2026-09-05: ma trận `build-autocad` thêm 2026, installer có component `acad2026` → bundle `Contents6`, `PackageContents.xml` thêm khối `SeriesMin/Max R25.1`. Làm được vì AutoCAD 2026.1 **đã chạy thật** (§24 batch 18/18 + 12/12, §25 snapshot) — khác Revit 2026/2027 vẫn chưa |
 | `Shared.*` (netstandard2.0) nạp được trong net10 | ✅ ở mức biên dịch/liên kết: `deps.json` của vỏ Revit net10 tham chiếu đủ `Shared.Logic`/`Shared.Hosting`; AutoCAD 2026.1 thật đã NETLOAD và chạy 18/18 + 12/12 qua accoreconsole ([`bang-chung-test.md`](bang-chung-test.md) §24) |
-| Chạy thật trên **Revit 2027** | ⬜ máy chỉ có Revit 2024.3. Vì thế `release.yml` **chưa** đóng gói 2026/2027 — không phát hành thứ chưa chạy |
+| Chạy thật trên **Revit 2026/2027** | ⬜ máy chỉ có Revit 2024.3. Vì thế `release.yml` **chưa** đóng gói Revit 2026/2027 — không phát hành thứ chưa chạy. Phía AutoCAD thì đã chạy thật nên đã phát hành 2026 |
 
 Không đổi logic. Không chặn giai đoạn 9–11.
 

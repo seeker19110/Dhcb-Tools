@@ -54,7 +54,7 @@
 | Hướng dẫn cài đặt & kiểm thử thủ công | ✅ (PR #13) [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md) — checklist R1–R48, C1–C17, B1–B12, M1–M4 |
 | Kiểm thử tự động | ✅ Bộ test xUnit (`Shared.Logic` + `Shared.Hosting`), gồm bốn bộ đối chiếu mã nguồn với nhau: `RibbonCoverageTests` (vỏ Revit ↔ bảng lệnh), `CatalogFieldTests` (catalog ↔ property config thật), `SuiteCoverageTests` (42/42 lệnh có ca kiểm chạy trong Revit), `VietnameseMessageTests` (không còn thông báo tiếng Anh trong Core) |
 | CI | ✅ `tests.yml` (test + check-build bằng API package, ubuntu) — xanh |
-| CD | ✅ đóng gói Release thật (Revit 2023/2024/2025, AutoCAD 2024/2025) + GitHub Release khi đẩy tag (`release.yml`, windows-latest) |
+| CD | ✅ đóng gói Release thật (Revit 2023/2024/2025, **AutoCAD 2024/2025/2026**) + GitHub Release khi đẩy tag (`release.yml`, windows-latest). AutoCAD 2026 là nhánh .NET 10, installer đặt vào `DhcbTools.bundle\Contents6` |
 
 Toàn bộ 57 lệnh đã có mã nguồn và biên dịch xanh với API package. **42/42 lệnh Revit đã chạy thật ít nhất
 một lần trong Revit 2024.3** và **15/15 lệnh AutoCAD** đã có ca kiểm tự động qua `accoreconsole` (§10).
