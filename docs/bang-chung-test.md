@@ -2611,3 +2611,44 @@ ghi hai mục *Không đạt* (Kiểm IFC, Kiểm IDS) và vẫn dựng xong (m�
 **Không sửa:** T1 (nit UX). Nhận xét: cả hai lỗi sập đều ở BatchRunner — nơi cổng phủ 100 % không với tới —
 và đều là đường "đầu vào hỏng"; test thuần không bao giờ đưa file rác vào vì tầng thuần chỉ nhận chuỗi.
 
+## 45. Phát hành v1.1.0, cài bằng installer thật, task đêm trỏ vào bản cài, gói bàn giao dự án thứ hai có sheet (2026-09-06 00:55 ICT)
+
+Ba việc "còn mở" cuối ngày 09-05, làm thay người.
+
+### Phát hành v1.1.0
+
+Tag `v1.1.0` (90 commit sau v1.0.0). `release.yml` chạy xong, GitHub Release có `DhcbTools-Setup-1.1.0.exe`
+(3,1 MB) và 7 zip (Revit 2023/2024/2025, AutoCAD 2024/2025/2026, BatchRunner). Trang phát hành và nhóm kỹ sư
+đề xuất theo vai: [`phat-hanh-v1.1.md`](phat-hanh-v1.1.md). Chọn **tên người** vẫn là việc của bạn.
+
+### Cài bằng chính installer vừa phát hành
+
+`DhcbTools-Setup-1.1.0.exe /VERYSILENT` trên máy này: add-in Revit 2024 và BatchRunner đều mang
+`1.1.0+f553640…` (InformationalVersion có SHA commit — đúng thứ §43 muốn). **Lỗi cài đặt:** tiến trình Setup
+không tự thoát sau khi chép xong (cửa sổ "Setup" trống, `/VERYSILENT` vẫn treo), phải kill tay sau 5 phút.
+File đã cài đủ; nguyên nhân chưa rõ (khả năng trang Finish của Inno vẫn hiện vì thiếu `/NORESTART`-tương
+đương cho `[Run]`, hoặc có `[Run]` postinstall chờ). ⬜ Việc cho lần sau: soi `dhcb-tools.iss` mục `[Run]`.
+
+### Task đêm trỏ vào bản cài
+
+Đăng ký lại cùng tên task, `RunnerExe = %LOCALAPPDATA%\Programs\DHCB Tools\DhcbTools.BatchRunner.exe`.
+Từ nay xoá `bin/` của repo không làm task hỏng; đổi bản là chạy installer mới.
+
+### Gói bàn giao dự án thứ hai — MEP tầng 4 (file duy nhất có sheet)
+
+Soi 8 file dự án A bằng `SheetIndex`: chỉ MEP L01 (1 sheet chưa đặt view) và **MEP L04 (1 sheet, 3 view)** có
+sheet. Job trên MEP L04 (167 MB) bằng **runner đã cài**:
+
+| Bước | Kết quả |
+|---|---|
+| HealthReport | 573 cảnh báo, 1336 connector hở — 0,9 s |
+| SheetIndex | 1 sheet `GV-SD-AC-4F-01.05 "GYM 02"`, phát hành 01/07/19, 3 view — 21 ms |
+| BatchExport PDF | `pdf/GV-SD-AC-4F-01.05-GYM 02.pdf` 698 KB — 4,5 s |
+| BatchExport IFC4 | **285 MB, 2.686.161 thực thể — 35,9 phút** (Revit "not responding" suốt lúc đó, không phải treo) |
+| IdsValidate (Revit) | E-PRECOND: job lọc Doors/Walls, file MEP không có — lỗi của job, ghi lại chứ không sửa job |
+| Gói | chuỗi băm 5 dòng nguyên vẹn; IFC đạt; IDS trên IFC 49.585 phần tử, 3/3 specification không có phần tử; 6 file băm SHA-256; danh mục 1 sheet vào bảng |
+
+Đủ điều kiện "2 dự án thật" của roadmap 11.3 với cả PDF lẫn danh mục — nhưng phải nói thẳng: dự án A chỉ có
+**một** sheet thật, còn bộ IDS mẫu không nhắm MEP nên ba specification đều rỗng. Giá trị thật của lượt này là
+đường IFC chịu được file 285 MB (đọc + kiểm IDS trong gói) và `--max-minutes 40` suýt cắt: xuất IFC MEP cần
+ngân sách riêng, job đêm nên đặt 60–90 phút cho file MEP lớn.
