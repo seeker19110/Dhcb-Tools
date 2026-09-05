@@ -1,4 +1,4 @@
-# CI: test tầng logic thuần + build kiểm tra toàn bộ Core/vỏ bằng API package NuGet (không cần cài Revit/AutoCAD).
+# CI: test tầng logic thuần + test CLI BatchRunner + build kiểm tra toàn bộ Core/vỏ bằng API package NuGet (không cần cài Revit/AutoCAD).
 # Vỏ Revit build với UseWPF=false (bỏ thư mục UI) vì runner Linux không có WindowsDesktop SDK — xem scripts/check-build.sh.
 name: tests
 
@@ -36,12 +36,19 @@ jobs:
             --collect:"XPlat Code Coverage" --results-directory ./coverage
           python3 scripts/check-coverage.py ./coverage
 
+      # Bộ test CLI của BatchRunner: đường "đầu vào hỏng" mà cổng phủ ở trên không với tới (§44/§47).
+      # Không đặt ngưỡng phủ cho nó: nó gọi Program.Main nên đi qua cả nhánh chỉ chạy được khi có
+      # Revit/AutoCAD trên máy — ngưỡng 100% ở đây sẽ ép viết test giả cho những nhánh đó.
+      - name: Test CLI BatchRunner (đầu vào hỏng)
+        run: |
+          dotnet test tests/DhcbTools.BatchRunner.Tests/DhcbTools.BatchRunner.Tests.csproj -c Release             --logger "trx;LogFileName=batchrunner-cli-results.trx"
+
       - name: Tải kết quả test
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: '**/test-results.trx'
+          path: '**/*-results.trx'
 
   check-build:
     runs-on: ubuntu-latest

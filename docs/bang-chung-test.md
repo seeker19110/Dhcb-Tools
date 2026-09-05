@@ -2666,3 +2666,37 @@ nên không tạo release). Tải artifact, chạy lại đúng lệnh im lặng
 trình `DhcbTools-Setup*`, add-in Revit 2024 và BatchRunner đều `1.1.1-dev+1b969dd…`. Phát hành v1.1.1 ngay sau
 để kỹ sư nhận installer đã sửa.
 
+## 47. Bộ test cho đường CLI của BatchRunner — chỗ cổng phủ 100% không với tới (2026-09-06 01:30 ICT)
+
+§44 kết lại một câu: *cả hai lỗi làm sập runner đều ở BatchRunner, và đều là đường "đầu vào hỏng"; test thuần
+không bao giờ đưa file rác vào vì tầng thuần chỉ nhận chuỗi*. Nay có `tests/DhcbTools.BatchRunner.Tests`
+(17 ca, net10.0, chạy trên CI Linux) gọi thẳng `Program.Main` với đúng tham số dòng lệnh.
+
+**Vì sao gọi `Main` chứ không gọi hàm con:** hai lỗi ở §44 nằm ở chỗ *nối* các hàm — ngoại lệ chưa bắt lọt ra
+tới runtime (mã thoát 127), danh sách bị sửa trong lúc duyệt. Gọi hàm con thì cả hai vẫn xanh.
+
+### Phủ những gì
+
+| Nhóm | Ca |
+|---|---|
+| `--verify-ifc` / `--verify-ids` | file .ifc rác (§44 T5, phải là mã 2 chứ không phải sập), thiếu file IFC/IDS, IDS không có `<specification>`, IDS không phải XML, đạt → 0 và không đạt → 1, `--ids-report` tự tạo thư mục và ghi cả .csv, IDS lệch chuẩn vẫn kiểm nhưng cảnh báo, `--verify-ids` thiếu `--verify-ifc`, tham số thiếu giá trị, `--verify-log` thiếu file |
+| Gói bàn giao (`--report-only`, không cần Revit) | **.ifc hỏng trong thư mục đầu ra (§44 T5b)**: gói vẫn dựng và ghi hai mục *Không đạt*; IFC lành: ghi *đạt* + băm SHA-256 64 ký tự; IDS hỏng khai trong job; nhật ký bị sửa → báo chuỗi băm hỏng; job thiếu file / không phải JSON / `handover` thiếu `outputFolder`; `--report-only` khi chưa có nhật ký |
+
+### Chống test-xanh-suông
+
+Gỡ tạm hai bản vá của §44 rồi chạy lại: **5 ca đỏ**, trong đó đúng hai ca chốt regression
+(`FileIfcRac_KemIds_MaThoat2_KhongNemNgoaiLe`, `IfcHongTrongThuMucDauRa_VanDungGoi_VaGhiKhongDat`). Khôi phục
+thì 17/17 xanh trở lại.
+
+**Không đặt ngưỡng phủ cho bộ này**, khác với `Shared.Logic.Tests`: nó gọi `Program.Main` nên đi qua cả nhánh
+chỉ chạy được khi máy có Revit/AutoCAD; ép 100% ở đây là ép viết test giả cho những nhánh đó. Cổng phủ vẫn
+giữ nguyên cho tầng thuần. Chạy trong CI (`tests.yml`, job `logic-tests`) và trong `scripts/check-build.sh`.
+
+### Hai dòng tài liệu đã lỗi thời, sửa kèm
+
+- *"`ParameterImport` vẫn đọc CSV theo dòng nên chưa đọc ô có xuống dòng bên trong nháy (nợ cũ)"* — thực ra
+  xong từ PR #55 (2026-09-04): lệnh dùng `CsvText.ReadRecords` (RFC 4180) đúng như `ParameterExport` ghi ra.
+- *"Giai đoạn 7 P1 ⬜ Phần AutoCAD (LayerTranslate, DrawingCompare, BlockQuantity, AttributeIncrement, purge
+  text/dim/regapp) **chưa có mã nguồn**"* — cả bốn lệnh đều có lớp `*Command` trong `Core.AutoCAD`, đều dây
+  vào `AcadCommandTable`, và `CleanupConfig` có đủ ba cờ purge text style / dim style / RegApp. Mục
+  *"Lệnh AutoCAD — nay đã đủ 15 lệnh có mã nguồn"* ngay bên dưới đã nói ngược lại từ lâu.
