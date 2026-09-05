@@ -33,7 +33,8 @@
           "Walls",
           "Floors"
         ],
-        "buildRoute": false
+        "buildRoute": false,
+        "respectOpenings": false
       },
       "expect": {
         "success": true,
@@ -74,7 +75,8 @@
           "Walls",
           "Floors"
         ],
-        "buildRoute": false
+        "buildRoute": false,
+        "respectOpenings": false
       },
       "expect": {
         "success": false,
@@ -113,7 +115,8 @@
           "Structural Columns",
           "Floors"
         ],
-        "buildRoute": false
+        "buildRoute": false,
+        "respectOpenings": false
       },
       "expect": {
         "success": true,
@@ -153,7 +156,8 @@
           "Walls",
           "Floors"
         ],
-        "buildRoute": false
+        "buildRoute": false,
+        "respectOpenings": false
       },
       "expect": {
         "success": false,
@@ -193,7 +197,8 @@
           "Walls",
           "Floors"
         ],
-        "buildRoute": false
+        "buildRoute": false,
+        "respectOpenings": false
       },
       "expect": {
         "success": false,
@@ -234,7 +239,8 @@
           "Floors",
           "Ducts"
         ],
-        "buildRoute": false
+        "buildRoute": false,
+        "respectOpenings": false
       },
       "expect": {
         "success": false,
@@ -270,7 +276,8 @@
         "obstacleCategories": [
           "Floors"
         ],
-        "buildRoute": false
+        "buildRoute": false,
+        "respectOpenings": false
       },
       "expect": {
         "success": true,
@@ -285,7 +292,7 @@
       }
     },
     {
-      "name": "Riser L3 → L4, đủ 4 category → không nối thông: lỗ sàn có nhưng tường shaft (hộp bao) bịt kín",
+      "name": "Riser L3 → L4, đủ 4 category, MỨC C (không đục lỗ) → không nối thông: tường shaft là hộp bao kín",
       "//": "Ket hop voi ca tren: lo san ton tai, chi Walls thi len thang duoc, nhung ca hai cung luc thi khong — dung kieu shaft co tuong bao quanh. Gioi han hop bao tuong, khong phai khong co shaft.",
       "command": "AutoRoute",
       "config": {
@@ -309,6 +316,159 @@
           "Walls",
           "Floors"
         ],
+        "buildRoute": false,
+        "respectOpenings": false
+      },
+      "expect": {
+        "success": false,
+        "maxMs": 60000,
+        "summaryContains": [
+          "Không có đường đi"
+        ],
+        "neverContains": [
+          "Exception",
+          "KHÔNG có vật cản"
+        ]
+      }
+    },
+    {
+      "name": "Riser L3 → L4, đủ 4 category, MỨC D → vẫn không nối thông: tường shaft trong model KHÔNG có lỗ mở nào",
+      "//": "Muc D doc duoc 48 lo mo trong hop (cua, opening tuong, generic model) nhung khong cai nao nam tren tuong shaft — so o toi duoc y het muc C (5.268). Ket luan: model khong ve lo cho o shaft, duct rieng xuyen thang. Khong phai loi muc D.",
+      "command": "AutoRoute",
+      "config": {
+        "startMm": {
+          "x": -15725,
+          "y": 1137,
+          "z": 9000
+        },
+        "endMm": {
+          "x": -15725,
+          "y": 1137,
+          "z": 13056
+        },
+        "searchMarginMm": 6000,
+        "searchMarginZMm": 500,
+        "stepMm": 200,
+        "clearanceMm": 100,
+        "obstacleCategories": [
+          "Structural Framing",
+          "Structural Columns",
+          "Walls",
+          "Floors"
+        ],
+        "respectOpenings": true,
+        "buildRoute": false
+      },
+      "expect": {
+        "success": false,
+        "maxMs": 60000,
+        "summaryContains": [
+          "lỗ mở"
+        ],
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
+      "name": "Tuyến 12,6 m L3 đủ 4 category, MỨC D → vẫn không nối thông: các duct thật xuyên tường mà tường không có lỗ chờ",
+      "command": "AutoRoute",
+      "config": {
+        "startMm": {
+          "x": -15725,
+          "y": 1137,
+          "z": 9000
+        },
+        "endMm": {
+          "x": -4245,
+          "y": 6318,
+          "z": 9000
+        },
+        "searchMarginMm": 2000,
+        "searchMarginZMm": 1000,
+        "stepMm": 100,
+        "clearanceMm": 100,
+        "obstacleCategories": [
+          "Structural Framing",
+          "Structural Columns",
+          "Walls",
+          "Floors"
+        ],
+        "respectOpenings": true,
+        "buildRoute": false
+      },
+      "expect": {
+        "success": false,
+        "maxMs": 60000,
+        "summaryContains": [
+          "lỗ mở"
+        ],
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
+      "name": "MỨC D — chui qua lỗ mở tường THẬT (Rectangular Straight Wall Opening 1118×2134 ở L4, tường 2454523): tuyến 1 đoạn thẳng",
+      "//": "Hai diem hai ben buc tuong 124 mm chay doc Y, lo mo o giua. Muc D duc lo khoi hop bao tuong, tuyen di thang qua lo, 28 node.",
+      "command": "AutoRoute",
+      "config": {
+        "startMm": {
+          "x": -10500,
+          "y": -2029,
+          "z": 10871
+        },
+        "endMm": {
+          "x": -9150,
+          "y": -2029,
+          "z": 10871
+        },
+        "searchMarginMm": 1000,
+        "searchMarginZMm": 800,
+        "stepMm": 50,
+        "clearanceMm": 50,
+        "obstacleCategories": [
+          "Walls"
+        ],
+        "respectOpenings": true,
+        "buildRoute": false
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 60000,
+        "summaryContains": [
+          "Tuyến 1 đoạn",
+          "1 lỗ mở"
+        ],
+        "neverContains": [
+          "Exception",
+          "KHÔNG có vật cản"
+        ]
+      }
+    },
+    {
+      "name": "Cùng hai điểm, MỨC C (không đục lỗ) → không nối thông: chính bức tường đó là rào kín",
+      "//": "Doi chung: cung tuong, cung diem, tat respectOpenings thi A* can hang doi (329.125 node) ma khong qua duoc.",
+      "command": "AutoRoute",
+      "config": {
+        "startMm": {
+          "x": -10500,
+          "y": -2029,
+          "z": 10871
+        },
+        "endMm": {
+          "x": -9150,
+          "y": -2029,
+          "z": 10871
+        },
+        "searchMarginMm": 1000,
+        "searchMarginZMm": 800,
+        "stepMm": 50,
+        "clearanceMm": 50,
+        "obstacleCategories": [
+          "Walls"
+        ],
+        "respectOpenings": false,
         "buildRoute": false
       },
       "expect": {
@@ -316,6 +476,46 @@
         "maxMs": 60000,
         "summaryContains": [
           "Không có đường đi"
+        ],
+        "neverContains": [
+          "Exception",
+          "KHÔNG có vật cản"
+        ]
+      }
+    },
+    {
+      "name": "Cùng lỗ mở, đủ 4 category kết cấu, MỨC D → vẫn 1 đoạn thẳng",
+      "//": "",
+      "command": "AutoRoute",
+      "config": {
+        "startMm": {
+          "x": -10500,
+          "y": -2029,
+          "z": 10871
+        },
+        "endMm": {
+          "x": -9150,
+          "y": -2029,
+          "z": 10871
+        },
+        "searchMarginMm": 1000,
+        "searchMarginZMm": 800,
+        "stepMm": 50,
+        "clearanceMm": 50,
+        "obstacleCategories": [
+          "Structural Framing",
+          "Structural Columns",
+          "Walls",
+          "Floors"
+        ],
+        "respectOpenings": true,
+        "buildRoute": false
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 60000,
+        "summaryContains": [
+          "Tuyến 1 đoạn"
         ],
         "neverContains": [
           "Exception",

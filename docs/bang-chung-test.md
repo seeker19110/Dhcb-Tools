@@ -2253,3 +2253,52 @@ biết nếu có ai viết kịch bản bấm tự động cho form này.
   **shaft có tường bao quanh**. Kết luận không phải "không có shaft" mà là giới hạn hộp bao tường ở mục trên
   áp cả vào shaft: muốn đi riser qua shaft, routing phải đọc opening của tường. Hai ca (chỉ Floors: đạt;
   đủ 4: không nối thông) vào bộ `revit-autoroute`, nay **8 ca**, cả 8 đều đã chạy trong Revit hôm nay.
+
+## 37. Routing mức D — tuyến chui qua lỗ mở của tường/sàn (2026-09-05 21:50 ICT)
+
+§36 kết luận hộp bao tường là rào kín, kể cả chỗ duct thật xuyên qua. Mức D sửa đúng chỗ đó và không sửa
+gì khác: tường/sàn vẫn là hộp bao, nhưng mỗi **insert** của vật chủ (shaft, opening, lỗ chờ, tuỳ chọn cửa)
+được **đục khỏi hộp** — phần còn lại cắt thành tối đa 6 mảnh quanh lỗ (`BoxSubtract`). Bộ tìm đường
+không biết gì về lỗ mở, vẫn chỉ nhận danh sách hộp; nhờ vậy khoảng hở tự áp lên mép lỗ: lỗ phải rộng hơn
+2 × clearance mới đi lọt — đúng về thi công.
+
+### Tầng thuần — 6 ca `BoxSubtractTests`
+
+Vét cạn 200 hộp × tối đa 3 lỗ ngẫu nhiên × 300 điểm thử: mọi điểm "trong hộp và ngoài mọi lỗ" nằm trong
+**đúng một** mảnh (không hụt, không chồng). Ở tầng A*: tường kín → hai điểm hai bên không nối thông; đục lỗ
+600 × 600 → tuyến chui qua và đoạn cắt tường nằm trong lỗ; lỗ 250 × 250 với clearance 100 → **không lọt**.
+Bộ Shared.Logic **1291 đạt / 0 trượt**.
+
+### Revit 2024, Snowdon HVAC — lỗ mở đọc được từ model LIÊN KẾT
+
+`HostObject.FindInserts(addRectOpenings: true, …)` trên tường/sàn của link kiến trúc, hộp lỗ đưa về toạ độ
+chủ qua tám đỉnh như mọi hộp khác. Danh sách lỗ in ra trong `Messages` (cả khi thua) để kỹ sư đối chiếu.
+Trong hộp 6 m quanh riser thấy 48 lỗ: cửa đi, cửa sổ (mặc định bị loại — duct không đi qua cửa),
+*Rectangular Straight Wall Opening*, *Generic Models* 305 × 305 đặt cách đều từng tầng ở góc tường (không
+phải lỗ chờ cho duct), và *Structural Connections* — cái cuối là thép đặc chứ không phải lỗ, nay bị loại.
+
+**Ca chứng minh** — hai điểm hai bên bức tường 124 mm (id 2454523, link kiến trúc), giữa có lỗ mở
+1118 × 2134 ở L4 (tâm z 10871), bước 50, khoảng hở 50:
+
+| | Kết quả |
+|---|---|
+| Mức D, chỉ Walls | **Tuyến 1 đoạn, 0 rẽ, 28 node** — đi thẳng qua lỗ; `Messages` ghi đúng "Rectangular Straight Wall Opening 124×1118×2134 tại (-9825,-2029,10871) trên Walls 2454523" |
+| Mức C, cùng điểm | không nối thông: A* cạn hàng đợi ở 329.125 node, 43.296 / 92.004 ô |
+| Mức D, đủ 4 category kết cấu | vẫn 1 đoạn thẳng |
+
+### Hai câu hỏi của §36, trả lời bằng mức D
+
+- **Riser L3 → L4** (-15725,1137): mức D đục 48 lỗ, số ô tới được **y hệt mức C** (5.268). Không lỗ nào nằm
+  trên tường shaft. Kết luận đổi từ "giới hạn công cụ" thành "**model không vẽ lỗ chờ ở shaft**" — duct riser
+  của Snowdon xuyên thẳng qua tường mà không có opening. Muốn tuyến qua đó thì vẽ lỗ vào model kiến trúc;
+  đó là việc đúng của kỹ sư, không phải của bộ tìm đường.
+- **Tuyến 12,6 m L3** qua các tường duct thật xuyên: cùng kết luận, 23.586 ô như mức C — tường không có lỗ chờ.
+
+Bộ `revit-autoroute` nay **13 ca**, Revit 2024 **13 đạt / 0 trượt**; `respectOpenings` (mặc định bật) và
+`includeDoorsWindows` (mặc định tắt) lên form. Mức C vẫn còn nguyên khi tắt `respectOpenings`.
+
+### Chưa làm
+
+- Lỗ vẫn là **hộp bao của insert**, chưa phải hình học void thật; lỗ tròn/xiên sẽ rộng hơn thực. Với sleeve
+  vuông và opening chữ nhật (đại đa số lỗ chờ MEP) thì hộp bao là chính xác.
+- Tường cong/xiên vẫn là hộp bao (giới hạn từ mức C).
