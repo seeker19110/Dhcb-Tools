@@ -120,6 +120,10 @@ public class AiGapTests
     public void CommandCatalog_DefaultBool_TheoLopConfigThat()
     {
         Assert.True(CommandCatalog.DefaultBool("includeLinkedModels"));
+        // AutoRoute mức D: Config mặc định true; thiếu trong danh sách thì form hiện bỏ tick và ghi false
+        // đè lên mặc định — kỹ sư mở form là mức D tắt ngầm. Bắt khi bấm tay 2026-09-05 (§38).
+        Assert.True(CommandCatalog.DefaultBool("respectOpenings"));
+        Assert.False(CommandCatalog.DefaultBool("includeDoorsWindows"));
         Assert.False(CommandCatalog.DefaultBool("khong-co-truong-nay"));
         Assert.False(CommandCatalog.DefaultBool(null!));
     }

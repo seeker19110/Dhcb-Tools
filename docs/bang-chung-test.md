@@ -2302,3 +2302,37 @@ Bộ `revit-autoroute` nay **13 ca**, Revit 2024 **13 đạt / 0 trượt**; `re
 - Lỗ vẫn là **hộp bao của insert**, chưa phải hình học void thật; lỗ tròn/xiên sẽ rộng hơn thực. Với sleeve
   vuông và opening chữ nhật (đại đa số lỗ chờ MEP) thì hộp bao là chính xác.
 - Tường cong/xiên vẫn là hộp bao (giới hạn từ mức C).
+
+## 38. Bấm tay form `AutoRoute` với `respectOpenings` — và lỗi mặc định chỉ lộ khi bấm tay (2026-09-05 22:05 ICT)
+
+Mở Revit 2024 bằng tay với Snowdon HVAC, DHCB Tools → MEPF → Đi tuyến → *Đi ống tự động (C)*, phóng to form.
+Hai ô mới của #88 có mặt: `respectOpenings` và `includeDoorsWindows` (checkbox), mô tả lệnh trên đầu form
+đã đổi thành "Routing mức C/D … chui qua lỗ mở của tường/sàn".
+
+### Lỗi lộ ra ngay khi form mở: `respectOpenings` hiện **bỏ tick**
+
+Config mặc định `RespectOpenings = true`, nhưng form dựng checkbox theo `CommandCatalog.DefaultBool(tên)`
+— một danh sách tên đối chiếu tay với các `= true` trong Core — và tên mới chưa được thêm vào. Hệ quả:
+kỹ sư mở form là mức D **tắt ngầm**, bấm *Xem trước* là chạy mức C, và khi form lưu config thì ghi
+`false` đè lên mặc định `true` — lần sau chạy qua batch/Bridge cũng thành mức C nốt. Bộ ca kiểm trong
+Revit (13/13) không bắt được vì batch không đi qua form. Sửa một dòng, kèm assert trong `AiGapTests` cho
+cả hai tên mới (`respectOpenings` true, `includeDoorsWindows` false).
+
+### Xem trước cả hai chiều trên cùng lỗ mở tường thật (§37)
+
+Điền hai điểm (-10500,-2029,10871) → (-9150,-2029,10871), biên 1000 / Z 800, chỉ *Walls*, bước 50, khoảng hở 50:
+
+| Form | Kết quả trong ô "Kết quả xem trước" |
+|---|---|
+| tick `respectOpenings` | **"Tuyến 1 đoạn, 0 lần rẽ, né 6 vật cản (0 trong file + 6 từ model liên kết, 1 lỗ mở đã đục)"**, 28 node, 1,4 m; dòng chi tiết ghi đúng "Lỗ mở — Rectangular Straight Wall Opening 124×1118×2134 tại (-9825,-2029,10871) trên Walls 2454523"; nút *Chạy thật* sáng |
+| bỏ tick | "Không tìm được tuyến (Không có đường đi… 43.296 / 92.004 ô)… mức C: không đục lỗ mở, … 329.125/644.028 node"; nút *Chạy thật* tự xám |
+
+Khớp từng con số với lượt batch ở §37. Không bấm *Chạy thật* — chưa có lý do ghi model line vào file mẫu.
+
+### Hai bẫy khi bấm tay, ghi lại cho lần sau
+
+- Nút *Xem trước* **không phản ứng** khi con trỏ còn nằm trong một ô nhập vừa gõ (bấm hai lần liền vẫn
+  không); bấm vào vùng trống của form trước rồi mới bấm nút thì chạy ngay. Không phải lỗi hiển thị, mà
+  nhiều khả năng là lần bấm đầu chỉ làm ô nhập mất focus. Chưa sửa — cần một người bấm tay xác nhận lại
+  trước khi đổi hành vi nút.
+- Ô JSON nhiều dòng co lại sau khi dán (đã ghi §36) — điền `startMm`/`endMm` trước, các ô dưới sau.
