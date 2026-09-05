@@ -2175,3 +2175,69 @@ bằng chứng cứ của chính nó** thay vì bằng một hằng số.
 - Bài zigzag 21 lớp cao độ **vẫn không xong trong 2 triệu node** ở tầng thuần (1,9 s, ~200 MB). Trên model
   thật sàn/trần là vật cản nên số lớp *hữu dụng* ít hơn nhiều, nhưng chưa đo trên tuyến thật nào cần lên xuống.
 - Chín ô mới trên form `AutoRoute` chưa **bấm tay** — chỉ qua `CatalogFieldTests` (kiểu ô khớp kiểu property).
+
+## 36. `AutoRoute` — ba điều §35 chưa chứng minh, nay chứng minh xong bằng tuyến duct thật (2026-09-05 21:15 ICT)
+
+§35 để lại ba dòng "chưa chứng minh". Lượt này đóng cả ba, và trên đường đi lộ ra vì sao hai năm nay
+không có tuyến nào ra khỏi Snowdon HVAC.
+
+### Vì sao điểm mẫu cũ không bao giờ ra tuyến
+
+Xuất tim duct của model bằng chính `SetoutExport` (`categories: ["Ducts"]`, `coordinateSystem: Internal`,
+`unit: mm`, `curvePoints: Ends`) — 1053 duct, 2106 đầu. Cao độ tim duct theo tầng: L1 ≈ **1600**, L2 ≈
+**4950**, L3 ≈ **9000**, L4 ≈ **13100**, L5 ≈ **17200**. Điểm mẫu của §18/§19 là **z = 3000**: nằm giữa L1
+và L2, tức là trong sàn. Hai điểm bị "bao kín" là đúng — nhưng đó là vì chọn điểm, không phải vì bộ tìm đường.
+
+### Chẩn đoán từng category — tường là thứ chặn
+
+Cùng cặp điểm trên L3 (-15725,1137) → (-4245,6318), z 9000, bước 100, mỗi lượt chỉ bật MỘT category:
+
+| Vật cản | Kết quả |
+|---|---|
+| chỉ Floors (15) / chỉ Framing (47) / chỉ Columns (3) | **tìm được**, 2 đoạn 1 rẽ, 55–61 ms |
+| Framing + Columns + Floors (65) | **tìm được**, 2 đoạn 1 rẽ, 89 ms |
+| chỉ Walls (83) | không nối thông: 36.744 / 304.668 ô |
+| hai đầu của **cùng một duct thật** (1442732, 7,2 m), đủ 4 category | không nối thông: 9.693 / 97.293 ô |
+
+Dòng cuối là bằng chứng gọn nhất: một duct đang tồn tại mà A* không nối được hai đầu của chính nó, vì
+duct đó xuyên tường. Routing mức C dùng **hộp bao**, không phải hình học thật, nên mỗi bức tường là một
+bức chắn trọn vẹn kể cả chỗ có lỗ chờ. Đây là giới hạn thiết kế (đúng khuyến nghị "một hệ, một tầng,
+một hành lang" trong mã), nay được ghi thành ca kiểm chứ không để người sau đoán lại.
+
+### Bộ `revit-autoroute` mới — 6 đạt / 0 trượt, Revit 2024, Snowdon HVAC
+
+Điểm lấy ở **giữa** duct (đầu duct thì dính clearance của dầm — ca D ở lượt chẩn đoán báo "nằm trong
+chướng ngại"). `scripts/run-in-revit-tests.ps1 -Suite autoroute`.
+
+| Ca | Kết quả |
+|---|---|
+| Giữa duct 1423463 (z 9002) → giữa duct 1423485 (z 9530), cùng trục x = -10733, đủ 4 category kể cả tường | **Tuyến 2 đoạn, 1 lần rẽ**, 35 vật cản, 145 ms — tuyến thật đầu tiên trên model thật |
+| Cùng hai điểm, `allowVertical: false` | không nối thông (2.336 / 20.951 ô) — cái nhảy 530 mm là **bắt buộc**: mạng duct thật cũng nhảy đúng chỗ này |
+| 12,6 m L3 qua dầm/cột/sàn, bỏ Walls | Tuyến 2 đoạn, 1 rẽ, 65 vật cản, 53 ms |
+| Cùng 12,6 m, thêm Walls | không nối thông — giới hạn hộp bao tường |
+| Hai đầu cùng duct 1442732 | không nối thông — duct này xuyên tường |
+| Điểm trên duct hiện có, vật cản kể cả Ducts | "nằm trong chướng ngại", không ném |
+
+Ca 1 + ca 2 cũng đóng dòng "chưa đo tuyến nào cần lên xuống" của §35: biên Z 800 (17 lớp) trên model
+thật xong trong 145 ms, vì sàn/trần đã chặn gần hết lớp — khác hẳn bài zigzag trống ở tầng thuần.
+
+### Bấm tay form `AutoRoute` trên Ribbon — 9 ô mới có mặt, chạy được cả hai chiều
+
+Mở Revit 2024 bằng tay với Snowdon HVAC, DHCB Tools → MEPF → Đi tuyến → *Đi ống tự động (C)*. Form
+(#83 + #84) hiện đủ: `searchMarginZMm`, `stepMm`, `clearanceMm`, `turnPenalty`, `nearObstaclePenalty`,
+`allowVertical` (checkbox), `maxExpandedNodes` (để trống = tự chọn), `includeLinkedModels` (checkbox),
+`linkNameContains`. Điền ca 1 ở trên rồi *Xem trước*: **"Tuyến 2 đoạn, 1 lần rẽ, né 26 vật cản (0 trong file
++ 26 từ model liên kết)"**, kèm 9 dòng chi tiết phân theo từng link. Bỏ tick `allowVertical`, `searchMarginZMm`
+= 0, *Xem trước* lần nữa: "Không có đường đi… 1.638 / 13.671 ô", và nút *Chạy thật* tự xám đi. Không bấm
+*Chạy thật* — chưa có lý do ghi model line vào file mẫu.
+
+Một bẫy khi bấm tay: ô `startMm` là ô JSON nhiều dòng, dán giá trị một dòng vào thì ô **co lại** và mọi ô
+bên dưới dịch lên — lần đầu điền mù theo toạ độ nên bảy ô sau rơi sai chỗ. Không phải lỗi, nhưng đáng
+biết nếu có ai viết kịch bản bấm tự động cho form này.
+
+### Còn lại
+
+- Tường là hộp bao: muốn tuyến xuyên lỗ chờ thật thì phải đọc hình học/opening của tường — việc của một
+  routing mức D, không phải sửa nhỏ.
+- Riser L3 → L4 cùng XY (-15725,1137): chưa chạy trong bộ chính thức (lượt thử đầu bị đẩy ra vì 5 ca đầu
+  còn sai điểm); có shaft hay không vẫn là câu hỏi mở.
