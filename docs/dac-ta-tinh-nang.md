@@ -265,12 +265,34 @@ theo vị trí cấu hình được (`center`, hoặc toạ độ mm). Bỏ qua 
 
 # Giai đoạn 3 — MEPF (phần còn lại)
 
+## 2.9 `CadLink` — link bản vẽ CAD vào mô hình
+
+Mắt **đầu tiên** của chuỗi CAD → model line → ống: kỹ sư đang bấm Insert → Link CAD cho từng tầng, từng
+model, và batch đêm thì không ai bấm được.
+
+**Đầu vào:** `cadPath` (`.dwg` hoặc `.dxf`, bắt buộc), `levelName` (rỗng = tầng thấp nhất — bản vẽ vào
+view mặt bằng của tầng đó), `unit` (`auto` để Revit tự đọc từ file, hoặc `mm`/`cm`/`m`/`inch`/`ft`),
+`placement` (`origin` mặc định — giữ được toạ độ; `shared`; `centered`), `thisViewOnly`, `dryRun`
+(mặc định **bật**).
+
+**Link chứ không Import:** bản vẽ đổi thì Reload là xong, và mô hình không phình thêm hàng nghìn phần tử.
+
+**Chạy lại không sinh bản sao:** file đã có trong mô hình thì bỏ qua và nói rõ id — link hai lần là hai
+bộ hình học chồng nhau, mà §3.0 đọc thành đường đôi. Nhận diện theo **tên file thật**, lấy qua
+`RevitCompat.CadFileName` (kiểu → category → tên phần tử): với bản vẽ **link**, `ImportInstance.Name`
+không mang tên file — đó là lỗi đã làm `dwgNameContains` của §3.0 không bao giờ khớp
+([`bang-chung-test.md`](bang-chung-test.md) §29).
+
+Thiếu `cadPath` → `E-CONFIG-MISSING`; không có file → `E-PATH-MISSING`; tầng không có view mặt bằng nào,
+hay đơn vị/cách đặt sai chữ → báo rõ kèm danh sách hợp lệ, không đoán.
+
 ## 3.0 `ModelLinesFromCad` — model line từ bản vẽ CAD (đề xuất C4)
 
 Mắt xích trước §3.1: `CadLayerMap` map được layer, `RouteFromLines` dựng được ống từ model line —
 nhưng không ai dựng **model line** từ DWG, nên kỹ sư vẫn vẽ lại tuyến bằng tay đè lên bản vẽ CAD.
 
-**Đầu vào:** DWG đã link/import trong mô hình (`dwgNameContains` lọc theo tên), `includeLayers` /
+**Đầu vào:** DWG đã link/import trong mô hình (`dwgNameContains` lọc theo **tên file thật** — xem §2.9;
+đưa bản vẽ vào mô hình bằng `CadLink`), `includeLayers` /
 `excludeLayers` (wildcard `*` `?` `~` như `CadLayerMap`), `lineStyleName` (đặt trùng `lineStyleName`
 của §3.1 để hai lệnh nối tiếp), `levelName` + `offsetMm`, `minLengthMm`, `weldToleranceMm`,
 `mergeCollinear`, `includeArcs`, `flatten`, `maxLines`, `dryRun` (mặc định **bật**).
@@ -293,7 +315,9 @@ trong dung sai) thì bỏ qua và **đếm riêng** — cùng cách chốt idemp
 qua tên layer**, vì model line mang tên line style của Revit chứ không mang tên layer DWG.
 
 Không tìm thấy bản vẽ, hoặc bộ lọc loại hết đường → **`E-PRECOND`** kèm danh sách layer đọc được, chứ
-không báo "thành công, 0 model line" — 0 đường ở đây là câu nói về bộ lọc, không phải về bản vẽ.
+không báo "thành công, 0 model line" — 0 đường ở đây là câu nói về bộ lọc, không phải về bản vẽ. Khi mô
+hình **có** bản vẽ mà `dwgNameContains` không khớp cái nào, thông báo **kể tên những bản vẽ đang có** —
+tên thật nằm ở element kiểu, không phải chỗ kỹ sư nhìn thấy trong Project Browser.
 
 ## 3.1 Routing mức A — bán tự động theo tuyến vẽ tay
 

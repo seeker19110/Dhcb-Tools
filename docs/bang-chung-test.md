@@ -1480,3 +1480,269 @@ bằng cách ép `AcadQueryHandler.cs` về LF rồi trả lại CRLF, chạy te
 riêng (mỗi `autocad-<năm>` trỏ đúng `Contents\<năm>`, component khai báo khớp component sử dụng, XML hợp lệ,
 `.iss` và `PackageContents.xml` cùng bộ năm 2024/2025/2026). Installer thật chỉ dựng khi đẩy tag; và chưa ai
 **cài rồi mở AutoCAD 2026** từ gói do installer đặt — §25 chạy trên bundle chép tay.
+
+---
+
+## 27. Kiểm IFC trước nộp — và một đường xuất chưa bao giờ chạy được (2026-09-05 12:40 ICT)
+
+Mục **11.2**. Việc định làm là tầng thuần đọc lại file IFC. Việc thật sự làm được nhiều hơn, vì hai lần
+"chạy trên đồ thật" — một lần trong Revit, một lần trên chính file 91 MB Revit vừa xuất — mỗi lần lại lộ
+ra một lỗi mà bộ test tự viết không thể bắt.
+
+### Lỗi thứ nhất: `BatchExport` định dạng `Ifc` chưa bao giờ tạo ra file nào
+
+Thêm ca kiểm *"Xuất IFC4 — GHI THẬT ra file"* vào `tests/suites/revit-write.json` rồi chạy thật trên
+Revit 2024.3, model `Snowdon Towers Sample Architectural.rvt`:
+
+```
+| Xuất IFC4 — GHI THẬT ra file | BatchExport | ❌ trượt | 52 ms | Xuất xong 0 file(s) (57 bản vẽ × 1 định dạng). 1 lỗi. |
+```
+
+52 mili giây cho một model 300 MB là con số của một lệnh **không làm gì**. Nhưng ca kiểm chỉ nói "mong ảnh
+hưởng ≥ 1 nhưng chỉ 0" — chưa nói vì sao. Thêm `"noErrors": true` vào kỳ vọng rồi chạy lại thì lỗi thật hiện ra:
+
+```
+- mong không có Errors nhưng có 1: [Ifc] Modifying  is forbidden because the document has no open transaction.
+```
+
+Khác PDF/DWG/NWC, **bộ xuất IFC dựng phần tử tạm ngay trong mô hình** rồi mới ghi ra đĩa, nên Revit đòi một
+transaction đang mở. Đường này hỏng **từ ngày viết lệnh** và im lặng suốt vì `catch` trong vòng lặp định dạng
+gom ngoại lệ vào `CommandResult.Errors` nhưng vẫn trả `Ok`: summary đọc lên là *"Xuất xong 0 file(s) … 1 lỗi"*,
+`success` vẫn `true`, và **không ca kiểm nào nhìn vào `Errors`**. Đúng lớp lỗi mà mục 8.1 gọi là *no-op im lặng*
+— chỉ khác là lần này nó nấp sau một danh sách lỗi có ghi chép hẳn hoi mà không ai đọc.
+
+Sửa: bọc `doc.Export` trong transaction rồi **`RollBack`** (file đã nằm trên đĩa; phần tử tạm không được ở lại
+trong mô hình sau một lệnh đáng lẽ chỉ đọc). Chạy lại trọn bộ ghi:
+
+| Lượt | Kết quả | `BatchExport` Ifc |
+|---|---|---|
+| Trước khi sửa | 11 đạt / 1 trượt | 0 file, 52 ms |
+| Sau khi sửa | **12 đạt / 0 trượt** | **1 file, 91.582.143 byte, 164.731 ms** |
+
+Ca kiểm giữ luôn `noErrors: true`, nên lần sau có định dạng nào ném ngoại lệ thì ca đỏ ngay chứ không lọt.
+
+### Lỗi thứ hai: bộ kiểm báo nhầm 106 "mã định danh trùng nhau"
+
+Đọc lại chính file 91 MB đó bằng công cụ vừa viết:
+
+```
+DhcbTools.BatchRunner --verify-ifc "…\Snowdon Towers Sample Architectural.ifc"
+Lược đồ: IFC4 · 925815 thực thể
+[Lỗi] Có 35480 thực thể mang mã định danh rỗng hoặc không hợp lệ: #120, #127, #128 … và 35470 nữa.
+[Lỗi] Có 106 mã định danh trùng nhau: TreadLengthAtInnerSide (#27132 và #27141) …
+```
+
+`TreadLengthAtInnerSide` là **tên một thuộc tính**, không phải mã định danh. Nó lọt vì bộ kiểm nhận dạng mã
+định danh bằng "22 ký tự trong bảng base64 của IFC" — mà tên ấy dài **đúng 22 chữ cái**. Thiếu một ràng buộc:
+22 ký tự × 6 bit = 132 bit cho một số 128 bit, nên **ký tự đầu chỉ chở được 2 bit** và luôn nằm trong `0`–`3`.
+Thêm ràng buộc đó, chạy lại đúng file ấy:
+
+```
+Lược đồ: IFC4 · 925815 thực thể
+Đạt: không có lỗi.
+exit=0   (5,1 giây)
+```
+
+Cả hai dòng báo sai biến mất, và **không có** dòng báo đúng nào biến mất theo. Đây là lý do phải chạy trên file
+thật: 44 ca test trên file mẫu tự viết đều xanh trước lẫn sau khi sửa — file mẫu không có tên thuộc tính nào dài
+đúng 22 ký tự. Ca `NhanDangMaDinhDanhTheoDungDangNenCuaIfc` nay chốt chặn bằng chính chuỗi đã bắt hụt.
+
+> Báo sai nguy hiểm hơn bỏ sót: một bộ kiểm báo 35.480 lỗi giả ở lần chạy đầu tiên thì kỹ sư tắt nó đi, và
+> sau đó nó không bắt được gì nữa.
+
+### Chạy với bộ quy tắc của dự án
+
+Cùng file, thêm `--ifc-spec` khai Pset bắt buộc:
+
+```
+[Lỗi] IFCWALL: 17/1078 phần tử thiếu thuộc tính Pset_WallCommon.LoadBearing: #444302 Parapet Cap Bandstand… và 7 nữa.
+[Lỗi] IFCDOOR: 19/132 phần tử thiếu thuộc tính Pset_DoorCommon.FireRating: #45867 Door-Passage-Single-Flush-Dbl_Acting:36" x 96":742710 … và 9 nữa.
+[Lỗi] IFCSLAB: 17/227 phần tử chưa gán mã phân loại: #26956 Assembled Stair:Stair:620883 Landing 1 … và 7 nữa.
+Không đạt: 3 lỗi.   exit=1
+```
+
+Ba con số này là **thật trên model mẫu của Autodesk**, không phải dựng lên để minh hoạ: 17 bức tường trang trí
+không có `LoadBearing`, 19 cánh cửa không có `FireRating`, 17 chiếu nghỉ cầu thang chưa gán mã phân loại. Đó
+đúng là loại thiếu sót mà bên thẩm tra trả hồ sơ về.
+
+### Mã thoát và tốc độ
+
+| Lệnh | Mã thoát |
+|---|---|
+| File đúng, quy tắc mặc định | 0 |
+| File hỏng cố ý (lệch lược đồ, tham chiếu `#99` không tồn tại, trùng mã, thiếu tên, thiếu Pset) | 1 — in 9 lỗi |
+| Không có file IFC | 2 |
+| Không có file quy tắc | 2 |
+
+**925.815 thực thể / 91 MB đọc và kiểm hết trong 5,1 giây**, bộ đọc STEP viết tay không phụ thuộc thư viện IFC
+nào — đặt được vào cuối job đêm mà không kéo dài đêm batch.
+
+### Cái chưa chứng minh
+
+- **Chưa chạy trên IFC2X3** — model mẫu xuất IFC4. Bộ đọc không phân biệt bản lược đồ (chỉ đọc `FILE_SCHEMA`),
+  nhưng vị trí tham số của `IfcClassificationReference` giữa hai bản có khác nhau một chỗ, mã đã đọc cả hai vị trí
+  mà chưa có file thật để chốt.
+- **Chưa đối chiếu với IfcTester/Solibri** trên cùng một file — việc đó thuộc mục 11.4, và chỉ có nghĩa khi đã
+  chuyển sang khai quy tắc bằng IDS (11.1).
+- **Chưa có file `.ifcZIP`**: bộ đọc chỉ đọc IFC dạng văn bản.
+
+---
+
+## 28. Bốn tính năng mới bỏ nhãn *thử nghiệm* — và một cái vẫn phải giữ (2026-09-05 12:45 ICT)
+
+A1/B1/B3/C4 vào repo hai PR trước đều mang nhãn 🧪 *chưa chạy thật trong Revit* theo **nguyên tắc 6**.
+Lượt này chạy trọn hai bộ ca kiểm trên Revit 2024.3 để bỏ nhãn — bỏ được ba, cái thứ tư phải giữ nguyên,
+và lý do giữ đáng ghi lại hơn cả ba cái bỏ được.
+
+| Bộ | Model | Kết quả |
+|---|---|---|
+| `revit-smoke` | Snowdon Towers Sample Architectural | **36 đạt / 0 trượt / 1 bỏ qua** trên 37 ca |
+| `revit-mep` | Snowdon Towers Sample HVAC | **26 đạt / 0 trượt** trên 26 ca |
+
+### Ba cái bỏ được nhãn — vì file sinh ra có nội dung thật
+
+| Đề xuất | Chạy ra gì |
+|---|---|
+| **A1 `SetoutExport`** | Kiến trúc: **260 điểm** (118 tim cột + 142 giao trục), CSV 12.710 byte + DXF 46.351 byte có `POINT` và `TEXT` trên layer `DHCB-GRD`. HVAC: **545 điểm** thiết bị. Toạ độ là toạ độ Survey thật (`417595.626, 78691.085, 237.896`), không phải toạ độ nội bộ Revit |
+| **B1 `ProgressReport`** | Kiến trúc: 142 cấu kiện, 9 nhóm theo tầng. HVAC: **1599 cấu kiện, 185 nhóm theo hệ**, có cả % theo chiều dài. HTML 42.796 byte |
+| **B3 BCF cho `ClashDetection`** | `clash.bcf` 9.897 byte, **7 topic**, mở lại bằng thư viện zip thấy đủ `bcf.version` + `project.bcfp` + mỗi topic một `markup.bcf` và `viewpoint.bcfv`. Nhãn *"Với model liên kết"* và tên model liên kết nằm đúng trong `Description` |
+
+Con số đọc từ chính file, không đọc từ summary — đó là khác biệt giữa "ca xanh" và "tính năng chạy được".
+
+### Cái phải giữ nhãn: **C4 `ModelLinesFromCad`**
+
+Hai ca kiểm đều **xanh**, nhưng đọc kỹ thì cả hai dừng ở đường lỗi:
+
+```
+E-PRECOND: ModelLinesFromCad không tìm thấy bản vẽ CAD đã import/link nào trong mô hình…
+E-PRECOND: ModelLinesFromCad không tìm thấy bản vẽ CAD có tên chứa "DHCB-KHONG-CO-BAN-VE-NAY"…
+```
+
+Model mẫu HVAC **không có bản vẽ CAD nào import hay link**, nên đường thành công của C4 chưa từng chạy một
+lần nào. Ca kiểm vẫn đúng — nó chốt rằng lệnh **báo rõ** thay vì trả "0 model line" như thể bình thường —
+nhưng nó không chứng minh lệnh làm được việc. Giữ 🧪, và việc còn thiếu là **một model fixture có sẵn một
+DWG được link**: `RunTests` chỉ chạy lệnh trong `RevitCommandTable`, mà "link một file DWG" không phải lệnh
+DHCB nào, nên không dựng được fixture đó bằng chính bộ ca kiểm.
+
+> Đây đúng là chỗ dễ tự lừa: ba dòng "✅ đạt" cạnh nhau, mà một dòng chỉ chứng minh lệnh biết từ chối.
+
+### Lỗi thật lộ ra: tên điểm định vị bị cắt mất đúng phần phân biệt
+
+Nhìn `setout.csv` của lượt đầu:
+
+```
+Block_35_Left-Bl
+Block_35_Left-X_
+Block_35_Left-B.
+Block_35_Left-E
+```
+
+Đủ 16 ký tự (giới hạn tên điểm của Leica/Trimble), đủ **duy nhất** — nên mọi ca kiểm đều xanh. Nhưng tên
+giao trục là `TrụcA-TrụcB`, mà `SetoutPlanner` cắt **đuôi**: phần đầu (`Block 35 Left`) giống nhau ở hàng
+trăm điểm thì được giữ, phần đuôi — tên trục thứ hai, thứ duy nhất phân biệt — thì bị nuốt. Trên máy toàn
+đạc, trắc đạc không biết `Block_35_Left-Bl` là giao trục nào. **Tên duy nhất mà không đọc được thì cũng
+chọn nhầm điểm như tên trùng** — đúng cái rủi ro mà A1 sinh ra để tránh.
+
+Sửa: bỏ ở **giữa**, giữ cả đầu lẫn đuôi, đánh dấu `..` (nằm trong bộ ký tự máy nhận). Chạy lại đúng bộ đó:
+
+| | Trước | Sau |
+|---|---|---|
+| Tên 6 điểm đầu | `Block_35_Left-Bl`, `Block_35_Left-X_`, `Block_35_Left-E`… | `Block_3.._Facade`, `Block_3..-X_Axis`, `Block_35_Left-E`… |
+| Hậu tố `_2`/`_3` vô nghĩa (tên đụng nhau sau khi cắt) | **21** | **10** |
+| Số điểm / số tên duy nhất | 142 / 142 | 142 / 142 |
+
+Hậu tố `_N` không mất hẳn — vẫn còn 10 chỗ hai giao trục rút gọn về cùng một tên — nhưng đó là giới hạn
+thật của 16 ký tự, và ghi chú của lệnh nói thẳng cách xử lý (rút ngắn `namePattern`). `SetoutPlanner.Shorten`
+có 6 ca `Theory` + một ca dựng đúng hình dáng dữ liệu Snowdon, chốt rằng bản cắt đuôi cũ **làm ba tên còn hai**.
+
+### Cái chưa chứng minh
+
+- **C4 `ModelLinesFromCad`** — như trên.
+- **Đường ghi của `ConstructionStatus`** — smoke mới chốt hai đường lỗi (`E-PATH-MISSING`, `E-PRECOND`);
+  mã cấu kiện trong CSV là ElementId của đúng file đang mở nên không viết sẵn vào fixture được.
+- **Tiến độ % > 0** — cả hai model mẫu không có phần tử nào mang tham số trạng thái, nên bảng luôn 0/142 và
+  0/1599. Cột "chưa ghi nhận" thì đúng, nhưng đường "đã lắp / đã nghiệm thu" chỉ có test thuần đứng sau.
+
+---
+
+## 29. Fixture CAD cho C4 — và tham số `dwgNameContains` chưa bao giờ khớp một bản vẽ link (2026-09-05 13:00 ICT)
+
+§28 khép lại với đúng một việc còn thiếu: **đường thành công của `ModelLinesFromCad` không có cách nào kiểm
+tự động**, vì không model mẫu nào của Revit có sẵn CAD link, và `RunTests` chỉ chạy được lệnh trong
+`RevitCommandTable` — mà "link một file DWG" không phải lệnh DHCB nào. Lượt này làm nốt.
+
+### Cách làm: để bộ ca kiểm tự dựng fixture
+
+Thêm lệnh Core **`CadLink`** (link file DWG/DXF vào view mặt bằng của một tầng) rồi để chính bộ ghi dựng
+fixture ngay trong model bản chép:
+
+```
+CadLink            → link tuyen-ong.dxf          → 1 bản vẽ
+CadLink lần hai    → phải bỏ qua                 → 0
+ModelLinesFromCad  → dựng model line             → n
+ModelLinesFromCad  → lần hai phải 0, "n đã có"   → 0
+```
+
+`CadLink` không phải lệnh đẻ ra để phục vụ test: kỹ sư đang bấm Insert → Link CAD cho **từng tầng, từng
+model**, và batch đêm thì không ai bấm được — thiếu nó thì chuỗi DWG → model line → `RouteFromLines` đứt
+ngay ở mắt đầu tiên.
+
+Fixture là **DXF văn bản** ([`tests/suites/fixtures/tuyen-ong.dxf`](../tests/suites/fixtures/tuyen-ong.dxf))
+chứ không phải DWG nhị phân: đọc được ngay trong repo, review được từng dòng, và không bắt máy chạy test phải
+có AutoCAD. Nội dung cố ý gài đúng những gì bộ lọc của C4 phải xử lý:
+
+| Trong file | Phải ra sao |
+|---|---|
+| 2 đoạn thẳng hàng nối đuôi nhau trên `TUYEN-ONG` | gộp thành **1** |
+| 1 đoạn dọc trên `TUYEN-ONG` | giữ, **không** gộp với đoạn ngang |
+| 1 đoạn rác dài 20 mm | bị `minLengthMm` loại |
+| 1 đoạn trên `TUYEN-ONG-TEXT` | bị `excludeLayers` loại |
+| 1 đoạn trên `RAC` | bị `includeLayers` loại |
+
+→ kỳ vọng **2 model line**.
+
+### Lượt chạy thứ nhất: 5 đạt / 3 trượt — và lỗi thật lộ ra
+
+`CadLink` **link được** (kể cả file DXF), nhưng ba ca sau đổ:
+
+```
+Link lại chính bản vẽ đó — phải bỏ qua: mong ảnh hưởng ≤ 0 nhưng tới 1
+  (thực tế: Đã link "tuyen-ong.dxf" vào view "Parking"…)   ← link lần hai, không nhận ra đã có
+Model line từ CAD: E-PRECOND: không tìm thấy bản vẽ CAD có tên chứa "tuyen-ong" nào trong mô hình
+```
+
+Bản vẽ **nằm sờ sờ trong mô hình** mà C4 báo không tìm thấy. Nguyên nhân chung cho cả hai: với bản vẽ
+**link**, `ImportInstance.Name` **không mang tên file** — tên file nằm ở **element kiểu** (`CADLinkType`) và
+ở category Revit sinh riêng cho từng bản vẽ. Hệ quả: tham số `dwgNameContains` của C4 — có trong catalog, có
+trong Ribbon, có trong tài liệu — **chưa bao giờ khớp một bản vẽ link**. Ai dùng nó sẽ nhận E-PRECOND và tin
+rằng mô hình không có CAD.
+
+Sửa ở một chỗ dùng chung, `RevitCompat.CadFileName`: thử kiểu → category → tên phần tử. Kèm theo, khi lọc
+không ra mà mô hình **có** bản vẽ, lệnh nay **in ra tên những bản vẽ đang có** thay vì chỉ bảo "kiểm cả
+dwgNameContains" rồi để kỹ sư tự đoán một cái tên nằm ở chỗ không ai nhìn thấy.
+
+### Lượt chạy thứ hai: 8 đạt / 0 trượt
+
+| Ca | Kết quả |
+|---|---|
+| Link bản vẽ CAD — GHI THẬT | ✅ 934 ms — `Đã link "tuyen-ong.dxf" vào view "Parking" của tầng "Parking" (đơn vị Millimeter, đặt theo origin)` |
+| Link lại chính bản vẽ đó | ✅ 6 ms — `Đã có "tuyen-ong.dxf" trong mô hình (id 1544489) — bỏ qua` |
+| **Model line từ CAD — đường thành công của C4** | ✅ 78 ms — **`Đã tạo 2 model line (style "DHCB-Route") ở tầng "Parking"`** |
+| Model line từ CAD lần hai | ✅ 7 ms — `Đã tạo 0 model line…; 2 đã có` |
+
+**Đúng 2** — hai đoạn thẳng hàng đã gộp, đoạn dọc giữ nguyên, ba đoạn rác/sai layer bị loại. Con số 0 ở ca
+cuối là bằng chứng lượt trước **đã commit thật**: transaction bị rollback thì lần này lại tạo đúng 2 cái nữa.
+
+C4 bỏ được nhãn 🧪 sau §28 còn treo lại một mục.
+
+### Cái chưa chứng minh
+
+- **Chưa chạy với file `.dwg` thật** — fixture là DXF. Cùng một đường code (`DWGImportOptions`, `Document.Link`)
+  nên rủi ro thấp, nhưng DWG đời mới có thể bị Revit từ chối; lệnh đã có thông báo riêng cho tình huống đó,
+  và **thông báo đó chưa ai thấy chạy**.
+- **`placement: shared` và `centered`** chưa chạy lần nào — ca kiểm chỉ dùng `origin`.
+
+> **Ghi thêm cho lần sau:** CI bắt được một lỗi mà máy này không bắt — `ElementId.IntegerValue` không còn
+> ở Revit 2026+, đúng thứ `RevitCompat.IdValue` sinh ra để tránh. Máy chỉ có Revit 2024 nên
+> `check-build.sh` chạy mặc định là xanh; nhánh 2026/2027 phải chạy tay
+> (`REVIT_VERSION=2027 ./scripts/check-build.sh`) trước khi mở PR, hoặc chấp nhận một vòng CI đỏ.

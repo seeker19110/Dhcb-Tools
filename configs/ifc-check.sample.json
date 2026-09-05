@@ -1,0 +1,42 @@
+{
+  "_doc": "Quy tắc kiểm file IFC trước khi nộp (mục 11.2). Chạy: DhcbTools.BatchRunner --verify-ifc <file.ifc> --ifc-spec <file này>. Xem docs/kiem-ifc.md.",
+  "_luuY": "Tên kiểu phải viết ĐẦY ĐỦ và không suy ra lớp con: IfcWall và IfcWallStandardCase là hai quy tắc khác nhau. Yêu cầu của chủ đầu tư/thẩm tra thì khai bằng IDS (mục 11.1), file này chỉ kiểm đầu ra của bộ xuất.",
+
+  "schema": "IFC4",
+  "requireUniqueGlobalId": true,
+  "requireResolvedReferences": true,
+  "minEntities": 100,
+
+  "rules": [
+    {
+      "_doc": "Đúng một dự án, một công trình — nhiều hơn là bộ xuất gộp nhầm nhiều model.",
+      "type": "IfcProject",
+      "minCount": 1,
+      "maxCount": 1
+    },
+    {
+      "type": "IfcBuildingStorey",
+      "minCount": 1,
+      "requireName": true
+    },
+    {
+      "_doc": "Số lượng đối chiếu với số phần tử đếm được trong mô hình trước khi xuất.",
+      "type": "IfcWallStandardCase",
+      "minCount": 1,
+      "requireName": true,
+      "requireProperties": ["Pset_WallCommon.IsExternal", "Pset_WallCommon.LoadBearing"]
+    },
+    {
+      "type": "IfcDoor",
+      "minCount": 1,
+      "requireName": true,
+      "requireProperties": ["Pset_DoorCommon.FireRating"]
+    },
+    {
+      "_doc": "requireClassification: bật khi hồ sơ yêu cầu mã phân loại (Uniclass/OmniClass) trên từng cấu kiện.",
+      "type": "IfcSlab",
+      "minCount": 1,
+      "requireClassification": false
+    }
+  ]
+}

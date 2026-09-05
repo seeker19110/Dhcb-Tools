@@ -47,6 +47,9 @@ DhcbTools.BatchRunner.exe --job jobs\nightly.json --dry-run
 
 # Kiểm chuỗi băm của một log đã ghi (không cần job, không mở Revit/AutoCAD)
 DhcbTools.BatchRunner.exe --verify-log logs\2026-09-04\run-013000.jsonl
+
+# Đọc lại file IFC vừa xuất và đối chiếu với bộ quy tắc (mục 11.2 — xem docs/kiem-ifc.md)
+DhcbTools.BatchRunner.exe --verify-ifc D:\xuat\toa-a.ifc --ifc-spec configs\ifc-check.json
 ```
 
 Kết quả trong `logs/{yyyy-MM-dd}/`: **`run-HHmmss.jsonl`** (mỗi dòng một step; **mỗi lần chạy một file riêng**, không
@@ -94,6 +97,23 @@ trước vẫn đọc bình thường.
 > **NĐ 207/2026/NĐ-CP**, nhật ký thi công điện tử cần đủ ba điều kiện: ① dấu thời gian không thể chỉnh sửa ngược ·
 > ② cơ chế xác nhận của các bên · ③ sao lưu độc lập. DHCB làm được ①, và tạo điều kiện cho ② (chữ ký số của các
 > bên) và ③ (sao lưu của chủ đầu tư). Đừng bán nó như chữ ký số.
+
+## Kiểm file IFC vừa xuất (`--verify-ifc`)
+
+```bash
+DhcbTools.BatchRunner.exe --verify-ifc D:\xuat\toa-a.ifc --ifc-spec configs\ifc-check.json
+```
+
+Mã thoát: `0` đạt · `1` có lỗi (in ra từng lỗi kèm số hiệu thực thể) · `2` không có file IFC, không có file
+quy tắc, hoặc file quy tắc hỏng. Bỏ `--ifc-spec` thì dùng bộ quy tắc mặc định (lược đồ, một `IfcProject`, mã
+định danh, tham chiếu).
+
+Đặt ngay sau bước `BatchExport` xuất IFC trong job đêm: mã thoát 1 nghĩa là đêm đó **không có file để nộp** —
+biết lúc 2 giờ sáng còn hơn biết lúc nộp hồ sơ. Toàn bộ trường của file quy tắc và giới hạn của bộ đọc nằm ở
+[`kiem-ifc.md`](kiem-ifc.md).
+
+Cùng hình dáng với `--verify-log`: chỉ đọc một file, không mở Revit/AutoCAD, nên chạy được trên CI và chạy lại
+được trên file đã nộp từ tháng trước.
 
 ## Luồng Revit
 

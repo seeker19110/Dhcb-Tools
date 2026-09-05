@@ -157,11 +157,41 @@ public class SetoutTests
 
         var plan = SetoutPlanner.Plan(sources, new SetoutPlanOptions { NamePattern = "{Mark}", MaxNameLength = 16 });
 
-        Assert.Equal("ABCDEFGHIJKLMNOP", plan.Points[0].Name);
-        Assert.Equal("ABCDEFGHIJKLMN_2", plan.Points[1].Name);   // cắt thân để cả hậu tố vẫn ≤ 16
+        // Bỏ ở GIỮA chứ không cắt đuôi: với tên ghép ({Level}-{Grid}, TrụcA-TrụcB) phần phân biệt
+        // nằm ở đuôi, cắt đuôi là bỏ đúng thứ trắc đạc cần để nhận ra điểm.
+        Assert.Equal("ABCDEFG..TUVWXYZ", plan.Points[0].Name);
+        Assert.Equal("ABCDEFG..TUVWX_2", plan.Points[1].Name);   // cắt thân để cả hậu tố vẫn ≤ 16
         Assert.All(plan.Points, p => Assert.True(p.Name.Length <= 16));
         Assert.Equal(2, plan.Truncated);
         Assert.Contains(plan.Notes, n => n.Contains("16 ký tự"));
+    }
+
+    [Theory]
+    [InlineData("Block_35_Left-B.1", 16, "Block_3..eft-B.1")]
+    [InlineData("ABCDEFGHIJ", 10, "ABCDEFGHIJ")]   // vừa đủ thì không đụng vào
+    [InlineData("ABCDEFGHIJ", 9, "ABCD..HIJ")]
+    [InlineData("ABCDEFGHIJ", 5, "AB..J")]
+    [InlineData("ABCDEFGHIJ", 4, "ABCD")]          // quá ngắn để chứa dấu .. thì đành cắt đuôi
+    [InlineData("ABCDEFGHIJ", 0, "ABCDEFGHIJ")]    // 0 = không giới hạn
+    public void RutTen_BoOGiuaGiuCaDauLanDuoi(string name, int max, string mong)
+        => Assert.Equal(mong, SetoutPlanner.Shorten(name, max));
+
+    [Fact]
+    public void RutTen_GiaoTrucCungMotTrucA_VanPhanBietDuocODuoi()
+    {
+        // Đúng hình dáng dữ liệu thật của Snowdon Towers: trục A dài, trục B mới là phần phân biệt.
+        var names = new[] { "Block_35_Left-B.1", "Block_35_Left-B.2", "Block_35_Left-X_1" }
+            .Select(n => SetoutPlanner.Shorten(n, 16)).ToList();
+
+        Assert.Equal(3, names.Distinct().Count());
+        Assert.All(names, n => Assert.True(n.Length <= 16));
+        Assert.Equal(new[] { "B.1", "B.2", "X_1" }, names.Select(n => n.Substring(n.Length - 3)));
+
+        // Bản cắt đuôi cũ nuốt mất đúng phần đuôi ấy: ba tên còn lại hai, và hai cái sống sót chỉ
+        // khác nhau ở ký tự cuối. Đây là điều không được lặp lại.
+        var cuUnique = new[] { "Block_35_Left-B.1", "Block_35_Left-B.2", "Block_35_Left-X_1" }
+            .Select(n => n.Substring(0, 16)).Distinct().Count();
+        Assert.Equal(2, cuUnique);
     }
 
     [Fact]

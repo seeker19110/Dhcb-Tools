@@ -262,6 +262,33 @@
         ],
         "maxMs": 120000
       }
+    },
+    {
+      "name": "Xuất IFC4 — GHI THẬT ra file, để kiểm lại bằng --verify-ifc",
+      "command": "BatchExport",
+      "allowWrite": true,
+      "//": [
+        "Muc 11.2: 'xuat duoc' chua du, phai 'xuat roi tu doc lai thay dung'. Ca nay chi tao ra file;",
+        "buoc doc lai nam ngoai Revit — DhcbTools.BatchRunner --verify-ifc <file.ifc> — vi doc mot file",
+        "IFC khong can Document nao, dat trong Revit thi CI khong chay duoc (cung ly do voi --verify-log).",
+        "Ten file do doc.Title quyet dinh nen khong khai filesExist; buoc verify tu tim *.ifc."
+      ],
+      "config": {
+        "outputFolder": "{outputFolder}/ifc",
+        "formats": [
+          "Ifc"
+        ],
+        "ifcVersion": "IFC4"
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "noErrors": true,
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 600000
+      }
     }
   ]
 }

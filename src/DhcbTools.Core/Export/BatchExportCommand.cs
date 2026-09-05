@@ -207,7 +207,26 @@ public sealed class BatchExportCommand : ICoreCommand<ExportConfig>
         opts.ExportBaseQuantities = true;
 
         string fileName = SanitizeFileName(doc.Title ?? "export") + ".ifc";
-        doc.Export(config.OutputFolder, fileName, opts);
+        Directory.CreateDirectory(config.OutputFolder);
+
+        // Xuất IFC PHẢI nằm trong một transaction — khác PDF/DWG/NWC. Bộ xuất IFC dựng phần tử tạm
+        // trong chính mô hình rồi mới ghi ra file, nên Revit chặn với "Modifying is forbidden because
+        // the document has no open transaction" và ném ngoại lệ trước khi tạo ra file nào.
+        //
+        // Lỗi này nằm im từ ngày viết lệnh: `catch` ở vòng lặp định dạng gom ngoại lệ vào danh sách
+        // Errors nhưng vẫn trả CommandResult.Ok, nên summary báo "Xuất xong 0 file(s) … 1 lỗi" và
+        // không ca kiểm nào nhìn vào Errors. Vòng chạy thật 2026-09-05 mới lộ ra (bang-chung-test §27).
+        using (var tx = new Transaction(doc, "DHCB — Xuất IFC"))
+        {
+            tx.Start();
+            doc.Export(config.OutputFolder, fileName, opts);
+
+            // RollBack chứ không Commit: phần tử tạm của bộ xuất không được ở lại trong mô hình, và
+            // file IFC đã ghi ra đĩa rồi nên không mất gì. Commit sẽ làm model "bẩn" sau một lệnh
+            // đáng lẽ chỉ đọc.
+            tx.RollBack();
+        }
+
         return 1;
     }
 
