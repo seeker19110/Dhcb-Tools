@@ -2688,6 +2688,17 @@ Gỡ tạm hai bản vá của §44 rồi chạy lại: **5 ca đỏ**, trong đ
 (`FileIfcRac_KemIds_MaThoat2_KhongNemNgoaiLe`, `IfcHongTrongThuMucDauRa_VanDungGoi_VaGhiKhongDat`). Khôi phục
 thì 17/17 xanh trở lại.
 
+### Chính bộ test này đỏ trên CI Linux mà xanh ở máy Windows
+
+Lượt CI đầu: 3/17 đỏ, và thông điệp lộ ngay nguyên nhân — ca *"IDS lệch chuẩn"* bắt được output của ca
+*"job hỏng"* (`String: "Lỗi file job: …"` trong khi nó chờ `"lệch chuẩn"`), còn ca *"job hỏng"* bắt được
+chuỗi rỗng. `Console.SetOut/SetError` là trạng thái **toàn cục của tiến trình**, mà xUnit chạy các lớp test
+song song: hai ca giẫm lên nhau. Ở máy Windows chúng tình cờ không trùng nhịp nên xanh — đúng loại lỗi hạ
+tầng test làm mọi khẳng định về sau thành vô nghĩa.
+
+Sửa: `[assembly: CollectionBehavior(DisableTestParallelization = true)]` cho cả assembly, cộng một khoá
+quanh đoạn đổi `Console` làm lớp chắn thứ hai. 17 ca chạy hết trong ~110 ms nên không mất gì.
+
 **Không đặt ngưỡng phủ cho bộ này**, khác với `Shared.Logic.Tests`: nó gọi `Program.Main` nên đi qua cả nhánh
 chỉ chạy được khi máy có Revit/AutoCAD; ép 100% ở đây là ép viết test giả cho những nhánh đó. Cổng phủ vẫn
 giữ nguyên cho tầng thuần. Chạy trong CI (`tests.yml`, job `logic-tests`) và trong `scripts/check-build.sh`.
@@ -2696,6 +2707,8 @@ giữ nguyên cho tầng thuần. Chạy trong CI (`tests.yml`, job `logic-tests
 
 - *"`ParameterImport` vẫn đọc CSV theo dòng nên chưa đọc ô có xuống dòng bên trong nháy (nợ cũ)"* — thực ra
   xong từ PR #55 (2026-09-04): lệnh dùng `CsvText.ReadRecords` (RFC 4180) đúng như `ParameterExport` ghi ra.
+- Cảnh báo `CS1574` lọt vào từ §43: khối `HandoverOptions` chèn vào giữa dòng doc của `BatchJob` và chính
+  class đó, làm `<see cref="Load"/>` mồ côi. Trả dòng doc về đúng chỗ — build lại sạch 0 cảnh báo.
 - *"Giai đoạn 7 P1 ⬜ Phần AutoCAD (LayerTranslate, DrawingCompare, BlockQuantity, AttributeIncrement, purge
   text/dim/regapp) **chưa có mã nguồn**"* — cả bốn lệnh đều có lớp `*Command` trong `Core.AutoCAD`, đều dây
   vào `AcadCommandTable`, và `CleanupConfig` có đủ ba cờ purge text style / dim style / RegApp. Mục

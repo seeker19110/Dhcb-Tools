@@ -35,8 +35,25 @@ internal sealed class Cli : IDisposable
         return path;
     }
 
-    /// <summary>Chạy CLI; trả về mã thoát kèm toàn bộ stdout + stderr.</summary>
+    /// <summary>
+    /// Chạy CLI; trả về mã thoát kèm toàn bộ stdout + stderr.
+    /// <para>
+    /// Khoá vì <see cref="Console"/> là trạng thái toàn cục: hai ca chạy cùng lúc thì ca này bắt được
+    /// output của ca kia (đã xảy ra thật trên CI Linux — §47). Assembly cũng tắt song song, khoá này là
+    /// lớp chắn thứ hai cho ai đó bật lại sau này.
+    /// </para>
+    /// </summary>
     public (int Code, string Output) Run(params string[] args)
+    {
+        lock (ConsoleLock)
+        {
+            return RunCore(args);
+        }
+    }
+
+    private static readonly object ConsoleLock = new object();
+
+    private static (int Code, string Output) RunCore(string[] args)
     {
         var outWriter = new StringWriter();
         var errWriter = new StringWriter();

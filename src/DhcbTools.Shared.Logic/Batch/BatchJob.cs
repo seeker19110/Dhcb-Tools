@@ -48,7 +48,6 @@ namespace DhcbTools.Shared.Logic.Batch
         public bool SkipIfPreviousFailed { get; set; }
     }
 
-    /// <summary>File job của batch runner (mục 1.2). Đọc bằng <see cref="Load"/>; token được thay lúc chạy.</summary>
     /// <summary>
     /// Mục 11.3 — gói bàn giao dựng sau khi job chạy xong: <c>ban-giao.html</c> + <c>ban-giao.json</c> trong
     /// <c>outputFolder</c>, gom IFC/PDF/danh mục bản vẽ với băm SHA-256, kiểm chuỗi băm nhật ký, kiểm IFC
@@ -77,6 +76,7 @@ namespace DhcbTools.Shared.Logic.Batch
         public string? IfcSpecPath { get; set; }
     }
 
+    /// <summary>File job của batch runner (mục 1.2). Đọc bằng <see cref="Load"/>; token được thay lúc chạy.</summary>
     public sealed class BatchJob
     {
         [JsonProperty("name")]
