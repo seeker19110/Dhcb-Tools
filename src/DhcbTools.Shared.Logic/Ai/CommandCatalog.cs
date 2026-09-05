@@ -221,8 +221,8 @@ namespace DhcbTools.Shared.Logic.Ai
             new CommandDescriptor("FamilyAudit", Revit, "Kiểm kê family/type (instance, in-place, không dùng) ra CSV; đổi tên theo mẫu", true, "FamilyReviser")
                 .Field("outputPath", "CSV kiểm kê").Field("renamePattern", "mẫu tên family, ví dụ DHCB_{Category:upper}_{Name}").Field("categories", "lọc").Field("dryRun", "xem trước")
                 .Words("kiểm kê family", "đổi tên family", "family audit", "family reviser", "family không dùng"),
-            new CommandDescriptor("WarningsExport", Revit, "Xuất toàn bộ warning ra CSV kèm ElementId/category, đếm theo loại", false, "ExportWarnings")
-                .Field("outputPath", "file CSV")
+            new CommandDescriptor("WarningsExport", Revit, "Xuất toàn bộ warning ra CSV kèm ElementId/category, đếm theo loại; tuỳ chọn xuất BCF gửi tư vấn", false, "ExportWarnings")
+                .Field("outputPath", "file CSV").Field("bcfPath", "file BCF 2.1 gửi tư vấn (tuỳ chọn)")
                 .Words("xuất warning", "danh sách warning", "warning csv", "review warnings"),
 
             // ── Revit — P2 giai đoạn 7 (Naviate/Victaulic/eVolve/pyRevit/SheetLink) ──
@@ -287,10 +287,11 @@ namespace DhcbTools.Shared.Logic.Ai
 
             // ── Revit — kiểm tra (cấp 2) ────────────────────────────────────
             new CommandDescriptor("ParameterRuleCheck", Revit, "Kiểm tra tham số thiếu / sai quy tắc đặt tên → HTML", false, "RuleCheck")
-                .Field("rulesPath", "file JSON quy tắc").Field("outputPath", "file HTML").Field("create3dView", "true = GHI một 3D view isolate phần tử vi phạm (chỉ khi dryRun=false)").Field("dryRun", "xem trước: không tạo view")
+                .Field("rulesPath", "file JSON quy tắc").Field("outputPath", "file HTML").Field("bcfPath", "file BCF 2.1 gửi tư vấn (tuỳ chọn)").Field("create3dView", "true = GHI một 3D view isolate phần tử vi phạm (chỉ khi dryRun=false)").Field("dryRun", "xem trước: không tạo view")
                 .Words("kiểm tra tham số", "rule check", "kiểm tra đặt tên"),
             new CommandDescriptor("ClashDetection", Revit, "Va chạm nội bộ giữa hai nhóm category → HTML + 3D view", false, "Clash")
                 .Field("categoriesA", "nhóm A").Field("categoriesB", "nhóm B").Field("outputPath", "file HTML").Field("acceptedPath", "clash-accepted.json")
+                .Field("bcfPath", "file BCF 2.1 gửi tư vấn — mỗi va chạm một vấn đề, camera đặt sẵn vào tâm va chạm (tuỳ chọn)")
                 .Field("includeLinkedModels", "xét cả model liên kết cho nhóm B (mặc định bật)", FieldKind.Bool).Field("create3dView", "true = GHI một 3D view isolate phần tử va chạm (chỉ khi dryRun=false)").Field("dryRun", "xem trước: không tạo view")
                 .Words("clash", "va chạm", "kiểm tra va chạm"),
 

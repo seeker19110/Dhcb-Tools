@@ -48,6 +48,7 @@ src/
 │   ├── Checks/     RuleChecker, ClashAcceptance
 │   ├── Setout/     SetoutPlanner, SetoutCsv, SetoutDxf (toạ độ định vị) · Geometry/GridIntersections
 │   ├── Progress/   ConstructionStatusValue, StatusRoll, WeeklyProgress, ProgressCsv (tiến độ thi công)
+│   ├── Bcf/        IfcGuid, BcfTopic, BcfWriter (BCF 2.1 gửi tư vấn)
 │   └── Ai/         CommandCatalog, CommandIntentParser, LayerMappingSuggester, SpecTextExtractor, WarningAnalyzer, OllamaClient
 ├── DhcbTools.Shared.Hosting/      # CommandResult, ICoreCommand<TConfig,TDocument>, HttpBridgeServer (token, khoá, timeout)
 ├── DhcbTools.Core/                # Core Revit — logic thuần, KHÔNG TaskDialog/WPF
@@ -91,7 +92,7 @@ Ribbon/dòng lệnh, HTTP Bridge, batch runner, lớp AI. Danh mục đầy đ�
 | Dọn dẹp | `RemoveUnusedViews` | `DrawingCleanup` (an toàn: CLAYER, linetype của layer, xref) |
 | Đánh số | `AutoNumbering` (theo vị trí), `FlowNumbering` (theo dòng chảy) | `AutoNumbering` (block attribute) |
 | Xuất & báo cáo | `BatchExport` (PDF/DWG/IFC/NWC), `HealthReport`, `SetoutExport` (toạ độ định vị cho máy toàn đạc — *thử nghiệm*, [`docs/toa-do-dinh-vi.md`](docs/toa-do-dinh-vi.md)) | `XrefAudit` |
-| Kiểm tra | `ParameterRuleCheck`, `ClashDetection` (+ `clash-accepted.json`), `ConnectorChecker` | `LayerStandardCheck`, `TextReplace` |
+| Kiểm tra | `ParameterRuleCheck`, `ClashDetection` (+ `clash-accepted.json`), `ConnectorChecker` — ba lệnh kiểm xuất được **BCF 2.1** gửi tư vấn qua `bcfPath` ([`docs/bcf.md`](docs/bcf.md)) | `LayerStandardCheck`, `TextReplace` |
 | Dự án & hồ sơ | `ProjectFromTemplate`, `TransferStandards`, `LevelSetup`, `GridSetup`, `GridFromCsv`, `FamilyLoader`, `ProjectInfo`, `SheetBatchCreate` | `GridExtract` (layer AXIS → CSV cho `GridFromCsv`) |
 | MEPF | `SleeveAuto`, `ElevationTag`, `HangerAuto`, `PipeSplitter`, `RouteFromLines`, `DevicePlacement`, `SizingProposal` / `ApplySizing`, `SystemColor`, `SystemName` | — |
 | Hồ sơ & style (giai đoạn 7) | `SheetRename`, `RevisionOnSheets`, `StylePurge`, `ColorByParameter`, `FamilyAudit`, `WarningsExport`, `ScheduleExport`, `ViewportCopy` | `LayerTranslate`, `DrawingCompare`, `BlockQuantity`, `AttributeIncrement` |

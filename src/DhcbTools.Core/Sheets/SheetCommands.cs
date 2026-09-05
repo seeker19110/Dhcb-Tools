@@ -264,6 +264,12 @@ public sealed class RevisionOnSheetsCommand : ICoreCommand<RevisionOnSheetsConfi
 public sealed class WarningsExportConfig
 {
     public required string OutputPath { get; init; }
+
+    /// <summary>
+    /// File BCF 2.1 (tuỳ chọn) — mỗi cảnh báo một vấn đề, phần tử gây lỗi thành component chọn sẵn.
+    /// Cảnh báo Revit không có toạ độ nên topic không có camera; máy đọc BCF vẫn chỉ đúng phần tử.
+    /// </summary>
+    public string? BcfPath { get; init; }
 }
 
 public sealed class WarningsExportCommand : ICoreCommand<WarningsExportConfig>
@@ -295,6 +301,38 @@ public sealed class WarningsExportCommand : ICoreCommand<WarningsExportConfig>
         File.WriteAllText(config.OutputPath, sb.ToString(), CsvText.Utf8WithBom);
 
         var result = CommandResult.Ok($"Đã xuất {warnings.Count} warning ({byType.Count} loại) → \"{config.OutputPath}\".", warnings.Count);
+
+        if (!string.IsNullOrWhiteSpace(config.BcfPath))
+        {
+            var topics = new List<Shared.Logic.Bcf.BcfTopic>();
+            foreach (var w in warnings.Take(Checks.RevitBcf.MaxTopics))
+            {
+                var ids = w.GetFailingElements().ToList();
+                var topic = new Shared.Logic.Bcf.BcfTopic("Cảnh báo Revit: " + w.GetDescriptionText())
+                {
+                    TopicType = "Warning",
+                    TopicStatus = "Open",
+                    Priority = w.GetSeverity() == FailureSeverity.Error ? "High" : "Normal",
+                    Description = $"Mức: {w.GetSeverity()}. Phần tử liên quan: "
+                        + string.Join(", ", ids.Take(30).Select(i => RevitCompat.IdValue(i).ToString()))
+                        + (ids.Count > 30 ? $" … (tổng {ids.Count})" : string.Empty),
+                };
+
+                foreach (var id in ids.Take(50))
+                {
+                    var component = Checks.RevitBcf.ComponentOf(document.GetElement(id));
+                    if (component != null)
+                    {
+                        topic.Components.Add(component);
+                    }
+                }
+
+                topics.Add(topic);
+            }
+
+            Checks.RevitBcf.Write(config.BcfPath, topics, warnings.Count, result);
+        }
+
         result.Messages.AddRange(byType.OrderByDescending(k => k.Value).Take(30).Select(k => $"{k.Value} × {k.Key}"));
         return result;
     }

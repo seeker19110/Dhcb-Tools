@@ -18,6 +18,12 @@ public sealed class ParameterRuleCheckConfig
 
     /// <summary>Xem trước: kiểm và ghi báo cáo như thường, nhưng không tạo 3D view trong mô hình.</summary>
     public bool DryRun { get; init; } = true;
+
+    /// <summary>
+    /// File BCF 2.1 (tuỳ chọn) — mỗi phần tử vi phạm một vấn đề. Không có camera vì vi phạm tham số
+    /// không có toạ độ; máy đọc BCF vẫn chọn được đúng phần tử qua IFC GUID.
+    /// </summary>
+    public string? BcfPath { get; init; }
 }
 
 public sealed class ParameterRuleCheckCommand : ICoreCommand<ParameterRuleCheckConfig>
@@ -118,6 +124,8 @@ public sealed class ParameterRuleCheckCommand : ICoreCommand<ParameterRuleCheckC
             }
         }
 
+        WriteBcf(document, config, violations, result);
+
         foreach (var kv in RuleChecker.CountByCategory(violations).OrderByDescending(k => k.Value))
         {
             result.Messages.Add($"{kv.Key}: {kv.Value} vi phạm");
@@ -126,6 +134,52 @@ public sealed class ParameterRuleCheckCommand : ICoreCommand<ParameterRuleCheckC
         result.Summary = $"Đã kiểm {checkedCount} giá trị + {thresholds.Count} ngưỡng, {violations.Count} vi phạm trên {violatingIds.Count} phần tử → \"{config.OutputPath}\".";
         result.AffectedCount = violations.Count;
         return result;
+    }
+
+    /// <summary>
+    /// Một topic cho mỗi <b>phần tử</b> vi phạm, không phải mỗi vi phạm: một cửa thiếu ba tham số là một
+    /// việc phải sửa, không phải ba việc — người nhận BCF đọc theo phần tử.
+    /// </summary>
+    private static void WriteBcf(Document document, ParameterRuleCheckConfig config, List<RuleViolation> violations, CommandResult result)
+    {
+        if (string.IsNullOrWhiteSpace(config.BcfPath))
+        {
+            return;
+        }
+
+        var byElement = violations
+            .Where(v => !string.IsNullOrEmpty(v.ElementId))
+            .GroupBy(v => v.ElementId, StringComparer.Ordinal)
+            .ToList();
+
+        var topics = new List<Shared.Logic.Bcf.BcfTopic>();
+        foreach (var group in byElement.Take(RevitBcf.MaxTopics))
+        {
+            var first = group.First();
+            var element = RevitCompat.TryParseId(group.Key, out var id) ? document.GetElement(id) : null;
+            var name = element?.Name ?? first.ElementName;
+
+            var topic = new Shared.Logic.Bcf.BcfTopic($"Tham số chưa đạt: {first.Category} {name}".Trim())
+            {
+                TopicType = "Issue",
+                TopicStatus = "Open",
+                Priority = group.Any(v => string.Equals(v.Severity, "error", StringComparison.OrdinalIgnoreCase)) ? "High" : "Normal",
+                Description = $"Phần tử {group.Key} ({first.Category}) có {group.Count()} vi phạm:"
+                    + string.Concat(group.Take(20).Select(v => "\n- " + v.Parameter + ": " + v.Reason)),
+            };
+
+            topic.Labels.Add(first.Category);
+
+            var component = RevitBcf.ComponentOf(element);
+            if (component != null)
+            {
+                topic.Components.Add(component);
+            }
+
+            topics.Add(topic);
+        }
+
+        RevitBcf.Write(config.BcfPath, topics, byElement.Count, result);
     }
 
     /// <summary>Số đo mô hình cho checkset (Autodesk Model Checker style).</summary>

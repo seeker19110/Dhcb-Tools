@@ -43,6 +43,12 @@ public sealed class ClashDetectionConfig
 
     /// <summary>Giới hạn số va chạm báo (0 = không giới hạn).</summary>
     public int MaxResults { get; init; } = 2000;
+
+    /// <summary>
+    /// File BCF 2.1 gửi tư vấn (tuỳ chọn) — mỗi va chạm một vấn đề, kèm góc nhìn đặt sẵn vào tâm va chạm.
+    /// Thay việc chụp màn hình dán vào Word. Đuôi file nên là <c>.bcf</c>.
+    /// </summary>
+    public string? BcfPath { get; init; }
 }
 
 /// <summary>Lọc thô <see cref="MepLayout.BoundingBoxesIntersect"/> → <see cref="ElementIntersectsElementFilter"/> chính xác.</summary>
@@ -186,6 +192,7 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
 
     Done:
         WriteHtml(document, config, clashes, skippedAccepted);
+        WriteBcf(config, clashes, result);
 
         if (config.Create3dView && clashes.Count > 0)
         {
@@ -379,6 +386,52 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
         }
 
         return null;
+    }
+
+    /// <summary>Mỗi va chạm một topic BCF: camera đặt vào tâm va chạm, hai phần tử là component đã chọn sẵn.</summary>
+    private static void WriteBcf(ClashDetectionConfig config, List<Clash> clashes, CommandResult result)
+    {
+        if (string.IsNullOrWhiteSpace(config.BcfPath))
+        {
+            return;
+        }
+
+        var topics = new List<Shared.Logic.Bcf.BcfTopic>();
+        foreach (var clash in clashes.Take(RevitBcf.MaxTopics))
+        {
+            var aName = clash.A.Category?.Name ?? string.Empty;
+            var bName = clash.B.Category?.Name ?? string.Empty;
+            var topic = new Shared.Logic.Bcf.BcfTopic($"Va chạm: {aName} × {bName}")
+            {
+                TopicType = "Clash",
+                TopicStatus = "Open",
+                Description =
+                    $"Phần tử {RevitCompat.IdValue(clash.A.Id)} ({aName}) va chạm với {RevitCompat.IdValue(clash.B.Id)} ({bName})"
+                    + (clash.LinkName == null ? string.Empty : $" trong model liên kết \"{clash.LinkName}\"")
+                    + $". Toạ độ tâm va chạm: X={NumericText.Format(RevitCompat.FtToMm(clash.Centre.X), 0)} "
+                    + $"Y={NumericText.Format(RevitCompat.FtToMm(clash.Centre.Y), 0)} "
+                    + $"Z={NumericText.Format(RevitCompat.FtToMm(clash.Centre.Z), 0)} mm (toạ độ nội bộ mô hình).",
+                Camera = RevitBcf.CameraAt(clash.Centre),
+            };
+
+            topic.Labels.Add(aName);
+            if (!string.Equals(aName, bName, StringComparison.Ordinal))
+            {
+                topic.Labels.Add(bName);
+            }
+
+            foreach (var component in new[] { RevitBcf.ComponentOf(clash.A), RevitBcf.ComponentOf(clash.B) })
+            {
+                if (component != null)
+                {
+                    topic.Components.Add(component);
+                }
+            }
+
+            topics.Add(topic);
+        }
+
+        RevitBcf.Write(config.BcfPath, topics, clashes.Count, result);
     }
 
     private static void WriteHtml(Document doc, ClashDetectionConfig config, List<Clash> clashes, int skipped)

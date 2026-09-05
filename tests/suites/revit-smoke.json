@@ -69,16 +69,21 @@
       }
     },
     {
-      "name": "Xuất cảnh báo ra CSV",
+      "name": "Xuất cảnh báo ra CSV và BCF gửi tư vấn",
       "command": "WarningsExport",
       "config": {
-        "outputPath": "{outputFolder}/warnings.csv"
+        "outputPath": "{outputFolder}/warnings.csv",
+        "bcfPath": "{outputFolder}/warnings.bcf"
       },
+      "//": "De xuat B3. Khong chot filesExist cho .bcf: model khong con canh bao nao thi lenh co y KHONG ghi file rong, va do la hanh vi dung. Cai chot o day la bat co bcfPath khong lam hong duong CSV da chay that.",
       "expect": {
         "success": true,
         "maxMs": 60000,
         "filesExist": [
           "{outputFolder}/warnings.csv"
+        ],
+        "neverContains": [
+          "Exception"
         ]
       }
     },
@@ -303,14 +308,18 @@
       "config": {
         "rulesPath": "{suiteFolder}/../../configs/parameter-rules.sample.json",
         "outputPath": "{outputFolder}/rule-check.html",
+        "bcfPath": "{outputFolder}/rule-check.bcf",
         "create3dView": false
       },
-      "//": "Dung luon file mau ship kem repo — the la kiem ca tinh hop le cua file mau do.",
+      "//": "Dung luon file mau ship kem repo — the la kiem ca tinh hop le cua file mau do. bcfPath (de xuat B3) gom moi vi pham cua CUNG mot phan tu vao mot van de; khong chot filesExist vi model sach thi khong ghi file rong.",
       "expect": {
         "success": true,
         "maxMs": 120000,
         "filesExist": [
           "{outputFolder}/rule-check.html"
+        ],
+        "neverContains": [
+          "Exception"
         ]
       }
     },

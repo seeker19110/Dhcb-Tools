@@ -186,6 +186,7 @@
           "Structural Framing"
         ],
         "outputPath": "{outputFolder}/clash.html",
+        "bcfPath": "{outputFolder}/clash.bcf",
         "create3dView": false
       },
       "expect": {
@@ -196,13 +197,14 @@
           "Không có phần tử nhóm B nào để xét"
         ],
         "filesExist": [
-          "{outputFolder}/clash.html"
+          "{outputFolder}/clash.html",
+          "{outputFolder}/clash.bcf"
         ],
         "neverContains": [
           "Exception"
         ]
       },
-      "//": "Ducts trong file MEP, Structural Framing trong model kien truc/ket cau LIEN KET. Truoc khi ClashDetection biet doc link, ca nay ra 0 va cham va xanh — mot bao cao va cham noi 'khong co va cham' la thu nguoi ta tin va lam theo. minAffected 1 chot lai dieu do."
+      "//": "De xuat B3: bcfPath ghi them file BCF 2.1 — moi va cham mot van de, camera dat san vao tam va cham, hai phan tu la component chon san. filesExist chot rang file that su ra doi (7 va cham that o §17), khong phai chi 'khong nem'. Ducts trong file MEP, Structural Framing trong model kien truc/ket cau LIEN KET. Truoc khi ClashDetection biet doc link, ca nay ra 0 va cham va xanh — mot bao cao va cham noi 'khong co va cham' la thu nguoi ta tin va lam theo. minAffected 1 chot lai dieu do."
     },
     {
       "name": "Áp kích thước từ chính CSV vừa đề xuất",

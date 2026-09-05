@@ -7,6 +7,11 @@
 > + `ProgressReport`** (đề xuất B1 — trạng thái thi công và báo cáo tiến độ, [`tien-do-thi-cong.md`](tien-do-thi-cong.md));
 > trước đó là đêm batch đầu tiên trên **dự án thật** (§20) và vòng đóng vai kỹ sư dùng thử (§21).
 >
+> **Xuất BCF (B3):** ba lệnh kiểm — `ClashDetection`, `ParameterRuleCheck`, `WarningsExport` — nay xuất được
+> **BCF 2.1** gửi tư vấn qua trường `bcfPath`, thay việc chụp màn hình dán vào Word. Không thêm lệnh Core
+> nào; tầng thuần `Shared.Logic/Bcf` có 19 ca test đọc lại chính file vừa ghi. ⬜ Chưa mở lại bằng một máy
+> đọc BCF thật (Solibri/BIMcollab) — [`bcf.md`](bcf.md).
+>
 > **Ba lệnh mới nhất chưa chạy thật:** cả ba có tầng thuần (50 + 41 ca test), lệnh Core, nút Ribbon và ca kiểm
 > trong `tests/suites/`, nhưng **chưa chạy lần nào trong Revit** — mang nhãn *thử nghiệm* theo nguyên tắc 6.
 > Con số "đã chạy thật" dưới đây vì thế là **43/46**.
@@ -53,7 +58,7 @@
 | Batch runner chạy đêm (Revit + AutoCAD accoreconsole) | ✅ [`batch-runner.md`](batch-runner.md) |
 | Chuỗi băm nhật ký batch (NĐ 207/2026, điều kiện ①) | ✅ `Shared.Logic/Evidence/HashChain` gắn ở `RunLog.Append`; kiểm bằng `BatchRunner --verify-log` — §23, và chạy thật cả hai đường Revit/AutoCAD ở §24 |
 | `IUpdater` cao độ theo sự kiện | ✅ Mặc định tắt, tự tắt khi > 200 ms |
-| Checker tham số/đặt tên, clash nội bộ | ✅ HTML + 3D view, `clash-accepted.json` |
+| Checker tham số/đặt tên, clash nội bộ | ✅ HTML + 3D view, `clash-accepted.json`, và **BCF 2.1** gửi tư vấn qua `bcfPath` (🧪 chưa mở bằng máy đọc thật) — [`bcf.md`](bcf.md) |
 | Lớp AI (offline) | ✅ [`ai-offline.md`](ai-offline.md) — heuristic mặc định, Ollama local tuỳ chọn |
 | Routing C (A* 3D) | ✅ `PathFinder3D` (thuần) + lệnh Core `AutoRoute`: 2 điểm → né chướng ngại → model line → tuỳ chọn `RouteFromLines` dựng luôn |
 | MCP server | ✅ `scripts/dhcb_mcp_server.py` |
@@ -280,4 +285,9 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
    [`tien-do-thi-cong.md`](tien-do-thi-cong.md).
    Lý do làm A1/B1 trước các đề xuất còn lại: chỉ đọc hoặc chỉ ghi tham số, tầng thuần chiếm phần lớn, và cả
    hai mở thêm **nhóm người dùng khác** (tổ trắc đạc, ban chỉ huy công trường) cho chính vòng 9.4.
-10. **Không mở P3** — giữ hướng chiều sâu theo [`roadmap.md`](roadmap.md).
+10. **Mở file BCF bằng một máy đọc thật.** `bcfPath` (đề xuất B3) đã ghi ra file đúng đặc tả 2.1 — test mở
+    lại chính file vừa ghi bằng `ZipArchive` + `XDocument` và đọc ra từng thẻ. Nhưng cấu trúc đúng đặc tả
+    **không** chứng minh Solibri hay BIMcollab chấp nhận nó; đó là việc phải làm trước khi gửi file cho tư
+    vấn thật. Cùng lúc đó kiểm luôn IFC GUID có chỉ đúng phần tử không — cách chắc nhất là xuất IFC từ chính
+    model đó rồi mở cả hai file cạnh nhau. Chi tiết: [`bcf.md`](bcf.md).
+11. **Không mở P3** — giữ hướng chiều sâu theo [`roadmap.md`](roadmap.md).
