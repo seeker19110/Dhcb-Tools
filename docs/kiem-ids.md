@@ -55,6 +55,16 @@ không neo thì `AB-01-rác` cũng đạt quy tắc `AB-\d\d`), `minInclusive` /
 không có `<specification>` nào, specification không có `<requirements>` nào. Lý do: một quy tắc bị lờ đi vẫn
 in ra dấu ✓, và người đọc báo cáo không có cách nào biết là nó chưa từng được kiểm.
 
+## File IDS lệch chuẩn — cảnh báo, không chặn
+
+Bộ đọc cố ý dễ tính (bỏ qua namespace, thứ tự thẻ) để file "gần đúng" vẫn kiểm được. Cái giá: IfcTester hay
+Solibri kiểm theo XSD sẽ **từ chối** đúng file đó (§39). Nên sau khi đọc, `IdsValidate` soát file theo các
+quy tắc rút từ `ids.xsd` 1.0 — namespace gốc và namespace `xs:` của `restriction`, `ifcVersion` bắt buộc,
+thứ tự facet trong `applicability`, thẻ con bắt buộc của từng facet — và **liệt kê từng chỗ lệch kèm số
+dòng** trong summary, messages và báo cáo HTML. Kết quả kiểm mô hình không đổi; việc của kỹ sư là sửa file
+IDS trước khi nộp cho bên thẩm tra. Không kiểm bằng XSD thật vì .NET không biên dịch được `XMLSchema.xsd`
+mà `ids.xsd` import (bằng chứng §40).
+
 ## Đọc báo cáo
 
 Báo cáo HTML có ba con số cho mỗi specification: **áp dụng cho** bao nhiêu phần tử, **đạt** bao nhiêu, **không
@@ -85,8 +95,8 @@ như fixture cố ý gài. Bằng chứng: [`bang-chung-test.md`](bang-chung-tes
 
 ## Còn thiếu
 
-- **Chưa đối chiếu với IfcTester/Solibri** trên cùng một file IDS. Câu "ba phần mềm ra cùng kết luận" mới là
-  *mục đích của IDS*, chưa phải điều DHCB đã chứng minh.
+- **Đã đối chiếu với IfcTester** trên chính IFC xuất từ Snowdon (§39: khớp cả 3 specification sau khi sửa ánh
+  xạ tường kính). Solibri không có trên máy.
 - **Tên facet khai bằng `xs:pattern`** (ví dụ "mọi property khớp `Fire.*`") không suy ngược ra tên được, nên
   facet đó **trượt** thay vì âm thầm coi như đạt.
 - Ràng buộc độ dài chuỗi (`minLength`/`maxLength`) và `partOf` theo quan hệ IFC đầy đủ chưa hỗ trợ.

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Fixture IDS CỐ Ý LỆCH CHUẨN — chính là bản fixture trước §39, thứ IfcTester 0.8.5 từ chối mở:
+    - <restriction>/<pattern> không thuộc namespace xs:
+    - specification thiếu ifcVersion
+  DHCB đọc được (bộ đọc bỏ qua namespace), nên lệnh phải CHẠY và CẢNH BÁO — không chặn.
+  Nội dung specification giống yeu-cau-thong-tin.ids để kết quả kiểm đối chiếu được 1:1.
+-->
+<ids xmlns="http://standards.buildingsmart.org/IDS">
+  <info>
+    <title>DHCB — bộ kiểm thử IDS</title>
+  </info>
+  <specifications>
+    <specification name="Cửa phải có mã hiệu (Tag)">
+      <applicability>
+        <entity><name><simpleValue>IfcDoor</simpleValue></name></entity>
+      </applicability>
+      <requirements>
+        <attribute><name><simpleValue>Tag</simpleValue></name></attribute>
+      </requirements>
+    </specification>
+
+    <specification name="Tường phải khai vật liệu">
+      <applicability>
+        <entity><name><simpleValue>IfcWall</simpleValue></name></entity>
+      </applicability>
+      <requirements>
+        <material><value><restriction base="xs:string"><pattern value=".+"/></restriction></value></material>
+      </requirements>
+    </specification>
+
+    <specification name="Lớp IFC không có trong model mẫu">
+      <applicability>
+        <entity><name><simpleValue>IfcTank</simpleValue></name></entity>
+      </applicability>
+      <requirements>
+        <attribute><name><simpleValue>Name</simpleValue></name></attribute>
+      </requirements>
+    </specification>
+  </specifications>
+</ids>

@@ -2384,3 +2384,43 @@ IFC ta xuất ra* là thứ duy nhất không tin.
   cảnh báo (không chặn) khi file lệch chuẩn, để kỹ sư biết trước khi nộp cho thẩm tra.
 - Fixture nay có spec 2 **toàn đạt**, không còn ca "phần lớn đạt" như ý ban đầu; muốn có ca không đạt thật
   thì cần một tường Revit thật sự thiếu vật liệu, model mẫu không có.
+
+## 40. `IdsValidate` cảnh báo file IDS lệch chuẩn XSD — cảnh báo, không chặn (2026-09-05 23:20 ICT)
+
+§39 để lại: một IDS "gần đúng" DHCB kiểm bình thường mà IfcTester từ chối mở, tức là cùng một file hai
+phần mềm hai kết luận — đúng thứ IDS sinh ra để tránh. Việc đúng là **cảnh báo** kèm số dòng, không chặn:
+kỹ sư vẫn có kết quả để sửa mô hình, và biết trước file IDS sẽ không được bên thẩm tra nhận.
+
+### Vì sao không kiểm bằng XSD thật
+
+`ids.xsd` 1.0.0 import chính `XMLSchema.xsd` của W3C (để dùng `xs:restriction` làm phần tử con của `value`).
+Thử `XmlSchemaSet` của .NET với bản sao offline của cả ba schema (ids, XMLSchema, xml): .NET **không biên
+dịch được** schema-của-schema — hàng loạt "The Enumeration/Pattern constraining facet is prohibited for
+'anySimpleType'". Nên `IdsSchemaLint` rút quy tắc **bằng tay** từ `ids.xsd`: namespace gốc, `<info><title>`,
+`<specifications>` bọc ngoài, `name` + `ifcVersion` bắt buộc (và chỉ IFC2X3 / IFC4 / IFC4X3_ADD2),
+`<applicability>` bắt buộc, thứ tự facet trong applicability (xs:sequence: entity → partOf → classification →
+attribute → property → material), tối đa một `entity`, `cardinality` chỉ ở requirements và đúng tập giá trị,
+`<restriction>` và ràng buộc con phải thuộc `xs:`, `idsValue` phải là `simpleValue` hoặc `xs:restriction`
+(chữ viết trần không hợp chuẩn), `dataType` viết hoa, các thẻ con bắt buộc của từng facet. Không đầy đủ như
+XSD, nhưng phủ mọi lỗi đã gặp thật. Tối đa 20 cảnh báo, mỗi cặp (thẻ, lỗi) nói một lần — file sai
+namespace từ gốc thì mọi thẻ đều sai, liệt kê hết là vô nghĩa.
+
+### Bằng chứng
+
+Fixture mới `yeu-cau-thong-tin-lech-chuan.ids` là **chính bản fixture trước §39** (thêm: bỏ `ifcVersion`).
+IfcTester 0.8.5 mở nó: *"Provided .ids file appears to be invalid"* — bản chuẩn thì mở được, 3 specification.
+
+Bộ `smoke` trong Revit 2024: **39 đạt / 0 trượt / 1 bỏ qua trên 40 ca**. Ca mới:
+
+```
+Kiểm 1270 phần tử theo 3 specification: 0 phần tử không đạt ở 0 specification,
+1 specification không có phần tử nào để kiểm; file IDS lệch chuẩn ở 3 chỗ (xem cảnh báo)
+  dòng 14: <specification> thiếu thuộc tính ifcVersion (bắt buộc; một trong IFC2X3, IFC4, IFC4X3_ADD2)
+  dòng 28: <restriction> phải thuộc namespace XML Schema: viết <xs:restriction> với xmlns:xs="…"
+  dòng 28: <pattern> phải viết <xs:pattern>
+```
+
+Ba con số kiểm **y hệt** ca fixture chuẩn (cùng specification), chỉ thêm khối cảnh báo — trong summary,
+trong messages và trong HTML (mục "⚠ File IDS lệch chuẩn IDS 1.0" đứng trước bảng tổng hợp). 12 ca test
+thuần `IdsSchemaLintTests`, trong đó một ca chốt hai fixture chuẩn trong repo **không** bị kêu oan.
+

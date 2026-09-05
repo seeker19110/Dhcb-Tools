@@ -50,15 +50,21 @@ public sealed class IdsValidateCommand : ICoreCommand<IdsValidateConfig>
             return CommandResult.Fail($"E-PATH-MISSING: không tìm thấy file IDS \"{config.IdsPath}\".");
         }
 
+        var xml = File.ReadAllText(config.IdsPath);
         IReadOnlyList<IdsSpecification> specifications;
         try
         {
-            specifications = IdsSpec.Parse(File.ReadAllText(config.IdsPath));
+            specifications = IdsSpec.Parse(xml);
         }
         catch (IdsParseException ex)
         {
             return CommandResult.Fail("File IDS không dùng được: " + ex.Message);
         }
+
+        // §39: bộ đọc cố ý dễ tính (bỏ qua namespace, thứ tự thẻ) nên một file "gần đúng" vẫn kiểm được ở
+        // DHCB — nhưng IfcTester/Solibri kiểm theo XSD sẽ từ chối. Cảnh báo, không chặn: kỹ sư vẫn có kết
+        // quả để sửa mô hình, và biết trước file IDS sẽ không được bên kia nhận.
+        var schemaWarnings = IdsSchemaLint.Check(xml);
 
         ICollection<ElementId> categoryIds = new List<ElementId>();
         if (config.Categories.Count > 0)
@@ -105,12 +111,22 @@ public sealed class IdsValidateCommand : ICoreCommand<IdsValidateConfig>
         var result = CommandResult.Ok(string.Empty);
 
         Directory.CreateDirectory(Path.GetDirectoryName(config.OutputPath) ?? ".");
-        File.WriteAllText(config.OutputPath, Html(document, config, check), new UTF8Encoding(true));
+        File.WriteAllText(config.OutputPath, Html(document, config, check, schemaWarnings), new UTF8Encoding(true));
 
         if (!string.IsNullOrWhiteSpace(config.CsvPath))
         {
             Directory.CreateDirectory(Path.GetDirectoryName(config.CsvPath!) ?? ".");
             File.WriteAllText(config.CsvPath!, Csv(check), new UTF8Encoding(true));
+        }
+
+        if (schemaWarnings.Count > 0)
+        {
+            result.Messages.Add(
+                $"⚠ File IDS lệch chuẩn IDS 1.0 ở {schemaWarnings.Count} chỗ — DHCB vẫn kiểm, nhưng IfcTester/Solibri có thể từ chối file này:");
+            foreach (var warning in schemaWarnings)
+            {
+                result.Messages.Add("   • " + warning);
+            }
         }
 
         foreach (var spec in check.Specifications)
@@ -126,6 +142,7 @@ public sealed class IdsValidateCommand : ICoreCommand<IdsValidateConfig>
             $"Kiểm {check.ElementCount} phần tử theo {check.Specifications.Count} specification: "
             + $"{check.FailureCount} phần tử không đạt ở {failedSpecs} specification"
             + (check.EmptySpecificationCount > 0 ? $", {check.EmptySpecificationCount} specification không có phần tử nào để kiểm" : string.Empty)
+            + (schemaWarnings.Count > 0 ? $"; file IDS lệch chuẩn ở {schemaWarnings.Count} chỗ (xem cảnh báo)" : string.Empty)
             + $" → \"{config.OutputPath}\".";
         result.AffectedCount = check.FailureCount;
 
@@ -155,7 +172,7 @@ public sealed class IdsValidateCommand : ICoreCommand<IdsValidateConfig>
         return sb.ToString();
     }
 
-    private static string Html(Document document, IdsValidateConfig config, IdsCheckResult check)
+    private static string Html(Document document, IdsValidateConfig config, IdsCheckResult check, IReadOnlyList<string> schemaWarnings)
     {
         var sb = new StringBuilder();
         sb.Append("<!DOCTYPE html><html lang=\"vi\"><head><meta charset=\"utf-8\"><title>DHCB — Kiểm IDS</title>")
@@ -170,6 +187,18 @@ public sealed class IdsValidateCommand : ICoreCommand<IdsValidateConfig>
         sb.Append("<p>Kiểm <b>trên mô hình Revit</b> theo ánh xạ Revit → IFC (category, <code>IfcExportAs</code>, "
                   + "property set của bộ xuất). Kết luận vì thế là <i>mô hình sẽ đạt khi xuất</i>, không thay cho một "
                   + "lượt kiểm trên chính file IFC đã nộp.</p>");
+
+        if (schemaWarnings.Count > 0)
+        {
+            sb.Append("<h2 class=\"trong\">⚠ File IDS lệch chuẩn IDS 1.0</h2><p>DHCB vẫn kiểm được, nhưng IfcTester/Solibri "
+                      + "đối chiếu theo XSD sẽ <b>từ chối file này</b> — sửa trước khi nộp cho bên thẩm tra.</p><ul>");
+            foreach (var warning in schemaWarnings)
+            {
+                sb.Append("<li>").Append(HtmlText.Escape(warning)).Append("</li>");
+            }
+
+            sb.Append("</ul>");
+        }
 
         sb.Append("<h2>Tổng hợp</h2><table><tr><th>Specification</th><th>Áp dụng cho</th><th>Đạt</th><th>Không đạt</th></tr>");
         foreach (var spec in check.Specifications)
