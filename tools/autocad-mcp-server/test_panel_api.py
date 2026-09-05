@@ -454,7 +454,11 @@ class McpExecuteTests(unittest.TestCase):
     def test_layer_export_default_lives_in_temp(self) -> None:
         payload = server.build_execute_payload("LayerExport")
         self.assertEqual(payload["config"]["outputPath"], str(Path(tempfile.gettempdir()) / "dhcb_layers_export.csv"))
-        self.assertNotIn("liend", payload["config"]["outputPath"])
+        # Không quay lại đường dẫn cứng của máy lập trình viên (xem #55).
+        self.assertNotEqual(
+            payload["config"]["outputPath"],
+            "C:/Users/liend/AppData/Local/Temp/dhcb_layers_export.csv",
+        )
 
     def test_unknown_command_is_refused(self) -> None:
         with self.assertRaisesRegex(ValueError, "command không hợp lệ"):
