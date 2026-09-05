@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using DhcbTools.Shared.Logic.Ai;
 using DhcbTools.Shared.Logic.Batch;
+using DhcbTools.Shared.Logic.Ids;
 using DhcbTools.Shared.Logic.Ifc;
 using Newtonsoft.Json.Linq;
 
@@ -38,7 +39,9 @@ public static class Program
         // Kiểm file IFC cũng là việc độc lập: chỉ đọc một file văn bản, không mở Revit/AutoCAD.
         if (!string.IsNullOrEmpty(opts.VerifyIfc))
         {
-            return VerifyIfc(opts.VerifyIfc!, opts.IfcSpec);
+            return string.IsNullOrEmpty(opts.VerifyIds)
+                ? VerifyIfc(opts.VerifyIfc!, opts.IfcSpec)
+                : VerifyIds(opts.VerifyIfc!, opts.VerifyIds!, opts.IdsReport);
         }
 
         BatchJob job;
@@ -165,6 +168,66 @@ public static class Program
         Console.WriteLine(ifcPath);
         Console.WriteLine(result.Render());
         return result.Ok ? 0 : 1;
+    }
+
+    /// <summary>
+    /// <c>--verify-ifc … --verify-ids &lt;file.ids&gt;</c>: kiểm <b>chính file IFC</b> theo IDS (mục 11.4) — cùng đầu
+    /// vào mà IfcTester/Solibri đọc, nên đối chiếu được từng dòng với họ; và chạy trên CI không cần Revit.
+    /// Mã thoát: 0 không phần tử nào không đạt · 1 có phần tử không đạt · 2 không có file hay file IDS hỏng.
+    /// Specification không có phần tử nào để kiểm KHÔNG làm mã thoát thành 1 — nhưng được in ra, vì "0 không đạt"
+    /// ở đó nói về bộ lọc chứ không nói về mô hình.
+    /// </summary>
+    internal static int VerifyIds(string ifcPath, string idsPath, string? reportPath)
+    {
+        if (!File.Exists(ifcPath))
+        {
+            Console.Error.WriteLine("Không có file IFC: " + ifcPath);
+            return 2;
+        }
+
+        if (!File.Exists(idsPath))
+        {
+            Console.Error.WriteLine("Không có file IDS: " + idsPath);
+            return 2;
+        }
+
+        var xml = File.ReadAllText(idsPath, Encoding.UTF8);
+        IReadOnlyList<IdsSpecification> specifications;
+        try
+        {
+            specifications = IdsSpec.Parse(xml);
+        }
+        catch (IdsParseException ex)
+        {
+            Console.Error.WriteLine("File IDS không dùng được: " + ex.Message);
+            return 2;
+        }
+
+        var schemaWarnings = IdsSchemaLint.Check(xml);
+        var model = IfcIdsModel.Parse(File.ReadAllText(ifcPath, Encoding.UTF8));
+        var elements = model.Elements();
+        var check = IdsEvaluator.Check(specifications, elements);
+
+        Console.WriteLine(ifcPath);
+        Console.WriteLine($"Lược đồ {model.Model.Schema}, {model.Model.Count} thực thể, {elements.Count} phần tử IDS có thể nói tới.");
+        foreach (var line in IdsReport.Messages(check, schemaWarnings))
+        {
+            Console.WriteLine(line);
+        }
+
+        if (!string.IsNullOrEmpty(reportPath))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(reportPath!)) ?? ".");
+            File.WriteAllText(
+                reportPath!,
+                IdsReport.Html(Path.GetFileName(ifcPath), idsPath, IdsReport.IfcScopeNote, check, schemaWarnings),
+                new UTF8Encoding(true));
+            var csv = Path.ChangeExtension(reportPath!, ".csv");
+            File.WriteAllText(csv, IdsReport.Csv(check), new UTF8Encoding(true));
+        }
+
+        Console.WriteLine(IdsReport.Summary(check, schemaWarnings) + (string.IsNullOrEmpty(reportPath) ? "." : $" → \"{reportPath}\"."));
+        return check.FailureCount > 0 ? 1 : 0;
     }
 
     /// <summary>
@@ -569,6 +632,8 @@ internal sealed class Options
     public string? VerifyLog { get; private set; }
     public string? VerifyIfc { get; private set; }
     public string? IfcSpec { get; private set; }
+    public string? VerifyIds { get; private set; }
+    public string? IdsReport { get; private set; }
 
     public const string Usage = """
         DhcbTools.BatchRunner --job <job.json> [--dry-run] [--log-dir logs] [--max-minutes 480]
@@ -576,9 +641,11 @@ internal sealed class Options
                               [--report-only] [--analyze] [--no-autodetect]
         DhcbTools.BatchRunner --verify-log <run-HHmmss.jsonl>
         DhcbTools.BatchRunner --verify-ifc <file.ifc> [--ifc-spec <quy-tac.json>]
+        DhcbTools.BatchRunner --verify-ifc <file.ifc> --verify-ids <yeu-cau.ids> [--ids-report <bao-cao.html>]
         (Revit: phiên bản tự nhận từ header .rvt; step "PlotPdf" trong job AutoCAD sinh -PLOT ra PDF)
         (--verify-log kiểm chuỗi băm của log đã ghi: 0 nguyên vẹn · 1 hỏng, in ra đúng dòng · 2 không có file)
         (--verify-ifc đọc lại file IFC vừa xuất: 0 đạt · 1 có lỗi · 2 không có file hay quy tắc hỏng)
+        (--verify-ids kiểm chính file IFC theo IDS 1.0: 0 không phần tử nào không đạt · 1 có · 2 không có file / IDS hỏng)
         """;
 
     public static Options? Parse(string[] args)
@@ -604,6 +671,8 @@ internal sealed class Options
                     case "--verify-log": o.VerifyLog = Next(); break;
                     case "--verify-ifc": o.VerifyIfc = Next(); break;
                     case "--ifc-spec": o.IfcSpec = Next(); break;
+                    case "--verify-ids": o.VerifyIds = Next(); break;
+                    case "--ids-report": o.IdsReport = Next(); break;
                     case "-h": case "--help": return null;
                     default:
                         Console.Error.WriteLine("Tham số không biết: " + args[i]);

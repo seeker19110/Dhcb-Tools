@@ -126,6 +126,81 @@ public class IdsSchemaLintTests
     }
 
     [Fact]
+    public void TheGocKhongPhaiIds_ChiMotCanhBaoRoiDung()
+    {
+        var warnings = IdsSchemaLint.Check("<foo " + Ns + "><specifications>" + GoodSpec + "</specifications></foo>");
+        Assert.Contains(warnings, w => w.Contains("thẻ gốc phải là <ids>"));
+        Assert.DoesNotContain(warnings, w => w.Contains("<specification>"));
+    }
+
+    [Fact]
+    public void ThieuInfo_ThieuName_SpecKhongNamTrucTiep_RequirementsTruocApplicability()
+    {
+        var spec = GoodSpec.Replace(" name=\"Cửa có Tag\"", string.Empty);
+        var appl = "<applicability><entity><name><simpleValue>IfcDoor</simpleValue></name></entity></applicability>";
+        var i = spec.IndexOf(appl);
+        var j = spec.IndexOf("<requirements>");
+        var k = spec.IndexOf("</requirements>") + "</requirements>".Length;
+        var swapped = spec.Substring(0, i) + spec.Substring(j, k - j) + "\n" + appl + spec.Substring(k);
+        var xml = "<ids " + Ns + "><specifications><nhom>" + swapped + "</nhom></specifications></ids>";
+        var warnings = IdsSchemaLint.Check(xml);
+        Assert.Contains(warnings, w => w.Contains("thiếu <info>"));
+        Assert.Contains(warnings, w => w.Contains("thiếu thuộc tính name"));
+        Assert.Contains(warnings, w => w.Contains("phải nằm trực tiếp trong <specifications>"));
+        Assert.Contains(warnings, w => w.Contains("<requirements> phải đứng sau <applicability>"));
+    }
+
+    [Fact]
+    public void ThieuApplicability_FacetLa_HaiEntity_EntityCoCardinality()
+    {
+        var xml = Wrap(
+            "<specification name=\"a\" ifcVersion=\"IFC4\"><requirements><foo/><entity cardinality=\"required\"><name><simpleValue>IfcWall</simpleValue></name></entity></requirements></specification>"
+            + "<specification name=\"b\" ifcVersion=\"IFC4\"><applicability><entity><name><simpleValue>IfcWall</simpleValue></name></entity>"
+            + "<entity><name><simpleValue>IfcSlab</simpleValue></name></entity></applicability>"
+            + "<requirements><attribute><name><simpleValue>Tag</simpleValue></name></attribute></requirements></specification>");
+        var warnings = IdsSchemaLint.Check(xml);
+        Assert.Contains(warnings, w => w.Contains("thiếu <applicability>"));
+        Assert.Contains(warnings, w => w.Contains("facet <foo> không có trong IDS 1.0"));
+        Assert.Contains(warnings, w => w.Contains("<entity> trong <requirements> không có thuộc tính cardinality"));
+        Assert.Contains(warnings, w => w.Contains("<applicability> chỉ được có một <entity>"));
+    }
+
+    [Fact]
+    public void PartOf_DataTypeThuong_RestrictionThieuBase_RangBuocLa_PatternThieuValue()
+    {
+        var xml = Wrap(
+            "<specification name=\"a\" ifcVersion=\"IFC4\"><applicability/><requirements>"
+            + "<partOf cardinality=\"required\"><entity><name><simpleValue>IFCBUILDINGSTOREY</simpleValue></name></entity></partOf>"
+            + "<partOf/>"
+            + "<property dataType=\"ifclabel\"><propertySet><simpleValue>P</simpleValue></propertySet><baseName><simpleValue>B</simpleValue></baseName></property>"
+            + "<attribute><name><simpleValue>Tag</simpleValue></name><value><xs:restriction><xs:foo/><xs:pattern/></xs:restriction></value></attribute>"
+            + "</requirements></specification>");
+        var warnings = IdsSchemaLint.Check(xml);
+        Assert.Contains(warnings, w => w.Contains("<partOf> thiếu <entity>"));
+        Assert.Contains(warnings, w => w.Contains("dataType=\"ifclabel\" phải viết HOA"));
+        Assert.Contains(warnings, w => w.Contains("<xs:restriction> thiếu thuộc tính base"));
+        Assert.Contains(warnings, w => w.Contains("<foo> không phải ràng buộc XSD"));
+        Assert.Contains(warnings, w => w.Contains("<xs:pattern> thiếu thuộc tính value"));
+        Assert.DoesNotContain(warnings, w => w.Contains("cardinality=\"required\""));
+    }
+
+    [Fact]
+    public void QuaMaxWarnings_DungDem_KhongTranDanhSach()
+    {
+        // 25 specification, mỗi cái một ifcVersion lạ khác nhau → 25 thông điệp khác nhau; cái thứ 20 làm đầy,
+        // sau đó mọi Add bị bỏ và vòng lặp dừng sớm.
+        var specs = string.Concat(Enumerable.Range(1, 25).Select(i =>
+            i == 20
+                ? "<specification name=\"s" + i + "\" ifcVersion=\"IFCX" + i + "\"><requirements><attribute><name><simpleValue>Tag</simpleValue></name></attribute></requirements></specification>"
+                : "<specification name=\"s" + i + "\" ifcVersion=\"IFCX" + i + "\"><applicability/><requirements><attribute><name><simpleValue>Tag</simpleValue></name></attribute></requirements></specification>"));
+        var warnings = IdsSchemaLint.Check(Wrap(specs));
+        Assert.Equal(IdsSchemaLint.MaxWarnings, warnings.Count);
+        Assert.Contains(warnings, w => w.Contains("ifcVersion=\"IFCX20\""));
+        Assert.DoesNotContain(warnings, w => w.Contains("ifcVersion=\"IFCX21\""));
+        Assert.DoesNotContain(warnings, w => w.Contains("thiếu <applicability>"));
+    }
+
+    [Fact]
     public void KhongPhaiXml_TraVeMotDong_KhongNem()
     {
         var warnings = IdsSchemaLint.Check("<ids");
