@@ -1,0 +1,252 @@
+{
+  "name": "DHCB — AutoRoute trên tuyến duct thật (Snowdon HVAC)",
+  "model": "Snowdon Towers Sample HVAC.rvt",
+  "//": [
+    "Diem dau/cuoi lay tu TIM duct co san (SetoutExport categories Ducts, coordinateSystem Internal, unit mm, curvePoints Ends) nen chac chan nam trong khoang tran ky thuat.",
+    "Ca cu (0,0,3000)->(12000,6000,3000) trong revit-mep.json that bai vi z=3000 nam GIUA hai tang (duct L1 o z~1600, L2 o z~4950) — tuc la trong san, khong phai loi bo tim duong.",
+    "Vat can chi la ket cau (o model lien ket). Khong tinh Ducts vi diem nam ngay tren duct — ca cuoi chot dung thong bao cho truong hop do."
+  ],
+  "cases": [
+    {
+      "name": "Tuyến thật L3 cần nhảy cao độ — giữa duct 1423463 (z 9002) → giữa duct 1423485 (z 9530), đủ 4 category kết cấu kể cả tường",
+      "//": "Hai diem lay o GIUA hai duct that cung truc x=-10733 (dau duct thi dinh clearance cua dam). Mang duct that di len 530 mm o giua — ca 'khong Z' ben duoi chung minh cai nhay do la bat buoc, khong phai tuy chon.",
+      "command": "AutoRoute",
+      "config": {
+        "startMm": {
+          "x": -10733,
+          "y": 5816,
+          "z": 9002
+        },
+        "endMm": {
+          "x": -10733,
+          "y": 9000,
+          "z": 9530
+        },
+        "searchMarginMm": 2000,
+        "searchMarginZMm": 1000,
+        "stepMm": 100,
+        "clearanceMm": 100,
+        "allowVertical": true,
+        "obstacleCategories": [
+          "Structural Framing",
+          "Structural Columns",
+          "Walls",
+          "Floors"
+        ],
+        "buildRoute": false
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 60000,
+        "neverContains": [
+          "Exception",
+          "KHÔNG có vật cản"
+        ],
+        "summaryContains": [
+          "Tuyến",
+          "từ model liên kết"
+        ]
+      }
+    },
+    {
+      "name": "Cùng hai điểm, không cho đi Z → phải KHÔNG nối thông (dải chắn ở cao độ 9000 là thật)",
+      "//": "Neu ca nay ma tim duoc tuyen thi ca tren khong chung minh duoc gi.",
+      "command": "AutoRoute",
+      "config": {
+        "startMm": {
+          "x": -10733,
+          "y": 5816,
+          "z": 9002
+        },
+        "endMm": {
+          "x": -10733,
+          "y": 9000,
+          "z": 9530
+        },
+        "searchMarginMm": 2000,
+        "searchMarginZMm": 0,
+        "stepMm": 100,
+        "clearanceMm": 100,
+        "allowVertical": false,
+        "obstacleCategories": [
+          "Structural Framing",
+          "Structural Columns",
+          "Walls",
+          "Floors"
+        ],
+        "buildRoute": false
+      },
+      "expect": {
+        "success": false,
+        "maxMs": 60000,
+        "neverContains": [
+          "Exception",
+          "KHÔNG có vật cản"
+        ],
+        "summaryContains": [
+          "Không có đường đi"
+        ]
+      }
+    },
+    {
+      "name": "Tuyến thật L3 12,6 m qua dầm/cột/sàn — KHÔNG tính tường",
+      "//": "Tu dau duct 1442732 (-15725,1137) toi dau duct 1396164 (-4245,6318). Bo Walls vi hop bao tuong la rao kin ca cho duct xuyen qua (xem ca duoi).",
+      "command": "AutoRoute",
+      "config": {
+        "startMm": {
+          "x": -15725,
+          "y": 1137,
+          "z": 9000
+        },
+        "endMm": {
+          "x": -4245,
+          "y": 6318,
+          "z": 9000
+        },
+        "searchMarginMm": 2000,
+        "searchMarginZMm": 1000,
+        "stepMm": 100,
+        "clearanceMm": 100,
+        "allowVertical": true,
+        "obstacleCategories": [
+          "Structural Framing",
+          "Structural Columns",
+          "Floors"
+        ],
+        "buildRoute": false
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 60000,
+        "neverContains": [
+          "Exception",
+          "KHÔNG có vật cản"
+        ],
+        "summaryContains": [
+          "Tuyến"
+        ]
+      }
+    },
+    {
+      "name": "Cùng 12,6 m, thêm Walls → không nối thông: hộp bao tường là rào kín kể cả chỗ duct thật xuyên qua",
+      "//": "Gioi han thiet ke cua routing muc C: chuong ngai la HOP BAO, khong phai hinh hoc that, nen moi buc tuong la mot buc chan tron ven. Muon qua tuong phai chon hai diem trong cung khong gian, hoac bo Walls.",
+      "command": "AutoRoute",
+      "config": {
+        "startMm": {
+          "x": -15725,
+          "y": 1137,
+          "z": 9000
+        },
+        "endMm": {
+          "x": -4245,
+          "y": 6318,
+          "z": 9000
+        },
+        "searchMarginMm": 2000,
+        "searchMarginZMm": 1000,
+        "stepMm": 100,
+        "clearanceMm": 100,
+        "allowVertical": true,
+        "obstacleCategories": [
+          "Structural Framing",
+          "Structural Columns",
+          "Walls",
+          "Floors"
+        ],
+        "buildRoute": false
+      },
+      "expect": {
+        "success": false,
+        "maxMs": 60000,
+        "neverContains": [
+          "Exception",
+          "KHÔNG có vật cản"
+        ],
+        "summaryContains": [
+          "Không có đường đi"
+        ]
+      }
+    },
+    {
+      "name": "Hai đầu cùng một duct thật (1442732, 7,2 m) mà không nối thông → duct này xuyên tường",
+      "//": "Con so chung minh gioi han tren bang chinh mo hinh: mot duct dang ton tai ma A* khong noi duoc hai dau, vi tim duct di qua hop bao tuong.",
+      "command": "AutoRoute",
+      "config": {
+        "startMm": {
+          "x": -15725,
+          "y": 8326,
+          "z": 8992
+        },
+        "endMm": {
+          "x": -15725,
+          "y": 1137,
+          "z": 8992
+        },
+        "searchMarginMm": 2000,
+        "searchMarginZMm": 1000,
+        "stepMm": 100,
+        "clearanceMm": 100,
+        "allowVertical": true,
+        "obstacleCategories": [
+          "Structural Framing",
+          "Structural Columns",
+          "Walls",
+          "Floors"
+        ],
+        "buildRoute": false
+      },
+      "expect": {
+        "success": false,
+        "maxMs": 60000,
+        "neverContains": [
+          "Exception",
+          "KHÔNG có vật cản"
+        ],
+        "summaryContains": [
+          "Không có đường đi"
+        ]
+      }
+    },
+    {
+      "name": "Điểm đặt ngay trên duct hiện có, vật cản mặc định (kể cả duct) → báo rõ 'nằm trong chướng ngại', không ném",
+      "//": "",
+      "command": "AutoRoute",
+      "config": {
+        "startMm": {
+          "x": -10733,
+          "y": 5816,
+          "z": 9002
+        },
+        "endMm": {
+          "x": -10733,
+          "y": 9000,
+          "z": 9530
+        },
+        "searchMarginMm": 2000,
+        "searchMarginZMm": 1000,
+        "stepMm": 100,
+        "clearanceMm": 100,
+        "allowVertical": true,
+        "obstacleCategories": [
+          "Structural Framing",
+          "Structural Columns",
+          "Walls",
+          "Floors",
+          "Ducts"
+        ],
+        "buildRoute": false
+      },
+      "expect": {
+        "success": false,
+        "maxMs": 60000,
+        "neverContains": [
+          "Exception",
+          "KHÔNG có vật cản"
+        ],
+        "summaryContains": [
+          "trong chướng ngại"
+        ]
+      }
+    }
+  ]
+}
