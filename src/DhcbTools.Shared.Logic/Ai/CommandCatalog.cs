@@ -462,6 +462,7 @@ namespace DhcbTools.Shared.Logic.Ai
             "removeUnplacedViews",
             "removeEmptySheets",
             "allowVertical",
+            "respectOpenings",   // AutoRoute mức D — thiếu dòng này thì form hiện bỏ tick và ghi false đè mặc định true (bắt khi bấm tay 2026-09-05, §38)
             "keepDuctHeight",
             "onlyDefaultNames",
             "depthFirst",
