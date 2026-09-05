@@ -7,7 +7,7 @@
     3. lớp IFC không có trong model mẫu  -> 0 phần tử áp dụng: bộ kiểm phải NÓI RA,
                                             vì "0 không đạt" ở đây không phải là "đạt"
 -->
-<ids xmlns="http://standards.buildingsmart.org/IDS">
+<ids xmlns="http://standards.buildingsmart.org/IDS" xmlns:xs="http://www.w3.org/2001/XMLSchema">
   <info>
     <title>DHCB — bộ kiểm thử IDS</title>
   </info>
@@ -26,7 +26,7 @@
         <entity><name><simpleValue>IfcWall</simpleValue></name></entity>
       </applicability>
       <requirements>
-        <material><value><restriction base="xs:string"><pattern value=".+"/></restriction></value></material>
+        <material><value><xs:restriction base="xs:string"><xs:pattern value=".+"/></xs:restriction></value></material>
       </requirements>
     </specification>
 
