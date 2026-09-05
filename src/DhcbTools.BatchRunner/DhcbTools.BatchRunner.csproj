@@ -5,11 +5,14 @@
       - Revit: ghi %APPDATA%\DHCB\pending-job.json + journal, mở Revit.exe; add-in DhcbTools.Revit tự chạy job rồi thoát.
       - AutoCAD: sinh script .scr, chạy accoreconsole.exe cho từng DWG (không cần UI).
     Sau đó đọc run.jsonl → báo cáo HTML + mã thoát (0/1/2) cho Task Scheduler.
-    net8.0 thuần để build/test được trên CI Linux.
+    net10.0 thuần để build/test được trên CI Linux. Vì sao net10 chứ không net8: .NET 8 hết hỗ trợ
+    10/11/2026, mà đây là thứ DUY NHẤT trong repo chạy bằng runtime .NET riêng trên máy khách (vỏ
+    Revit/AutoCAD chạy trong runtime của phần mềm chủ). Nó không tham chiếu Revit/AutoCAD nên đổi được
+    độc lập với ma trận phiên bản ở Directory.Build.props.
   -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>DhcbTools.BatchRunner</RootNamespace>
     <AssemblyName>DhcbTools.BatchRunner</AssemblyName>
     <Platforms>AnyCPU;x64</Platforms>

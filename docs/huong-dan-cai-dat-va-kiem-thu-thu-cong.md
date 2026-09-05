@@ -77,7 +77,7 @@ dotnet build src\DhcbTools.AutoCAD.Core\DhcbTools.AutoCAD.Core.csproj -c Release
 dotnet build src\DhcbTools.BatchRunner\DhcbTools.BatchRunner.csproj -c Release
 ```
 
-Ra `src\DhcbTools.BatchRunner\bin\Release\net8.0\DhcbTools.BatchRunner.exe`. Copy toàn bộ thư mục này sang
+Ra `src\DhcbTools.BatchRunner\bin\Release\net10.0\DhcbTools.BatchRunner.exe`. Copy toàn bộ thư mục này sang
 `D:\DHCB\bin\` và **copy thêm** `DhcbTools.AutoCAD.Core.dll` (+ `DhcbTools.Core.AutoCAD.dll`, `DhcbTools.Shared.*.dll`)
 vào cùng thư mục để runner tự tìm plugin cho accoreconsole.
 

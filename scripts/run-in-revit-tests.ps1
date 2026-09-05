@@ -215,7 +215,11 @@ $job | ConvertTo-Json -Depth 8 | Set-Content $jobPath -Encoding UTF8
 Write-Host "== Job: $jobPath"
 
 # ── 6. Chạy ──────────────────────────────────────────────────────────────────
-$runner = Join-Path $repo 'src\DhcbTools.BatchRunner\bin\Release\net8.0\DhcbTools.BatchRunner.exe'
+# TFM của BatchRunner hỏi MSBuild, không viết tay: đường dẫn cứng "net8.0" ở đây từng đúng, và nó hỏng
+# IM LẶNG khi project đổi khung — script chỉ báo "không tìm thấy BatchRunner" chứ không nói vì sao.
+$runnerProj = Join-Path $repo 'src\DhcbTools.BatchRunner\DhcbTools.BatchRunner.csproj'
+$runnerTfm = (& dotnet build $runnerProj -getProperty:TargetFramework).Trim()
+$runner = Join-Path $repo "src\DhcbTools.BatchRunner\bin\Release\$runnerTfm\DhcbTools.BatchRunner.exe"
 if (-not (Test-Path $runner)) {
     Stop-WithMessage "Không tìm thấy BatchRunner: $runner (bỏ -SkipBuild để build)"
 }

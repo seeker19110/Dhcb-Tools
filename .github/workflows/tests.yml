@@ -15,7 +15,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Restore
         run: dotnet restore tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj
@@ -61,7 +61,8 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          # Cần cả hai: netstandard2.0/net8.0 build bằng SDK 8; AutoCAD 2026 (net10.0-windows) cần SDK 10.
+          # Cần cả hai: nhánh net48/net8.0-windows (Revit/AutoCAD 2024–2026) build bằng SDK 8;
+          # BatchRunner (net10.0) và nhánh net10.0-windows (AutoCAD 2026+, Revit 2027+) cần SDK 10.
           dotnet-version: |
             8.0.x
             10.0.x
