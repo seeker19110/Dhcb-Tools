@@ -5,11 +5,11 @@ thi công): thay việc **nhập trạng thái lắp đặt/nghiệm thu vào m�
 rồi **vẽ tay biểu đồ tiến độ**. Hai lệnh chạy được từ Ribbon (*Xuất & Báo cáo → Tiến độ thi công*), Bridge/MCP,
 batch đêm và lớp AI như mọi lệnh khác.
 
-> **Trạng thái: thử nghiệm.** Tầng thuần có 41 ca test trên CI, hai lệnh biên dịch xanh với API Revit 2023–2027,
-> có 6 ca kiểm trong `tests/suites/` — nhưng **chưa chạy thật trong Revit**. Riêng **đường ghi** của
-> `ConstructionStatus` (ghi trạng thái vào phần tử có thật) chưa có ca kiểm nào chạy được trên model mẫu, vì mã
-> cấu kiện trong CSV là `ElementId` của đúng file đang mở nên không viết sẵn được vào fixture. Đó là việc đầu
-> tiên khi có máy cài Revit.
+> **Đã chạy thật trong Revit 2024 (2026-09-05).** `ProgressReport` chạy trên cả model kiến trúc lẫn MEP
+> (§28), và **đường ghi** của `ConstructionStatus` nay có ca kiểm tự động trong `revit-write`: ghi thật 3 cửa
+> → ghi lại phải 0 → CSV lùi trạng thái bị chặn → `ProgressReport` ra **1,4 %**, lần đầu tiên một con số
+> **khác 0** trên model thật. Chốt được là nhờ `keyParameter` (xem dưới): mã cấu kiện khớp theo **Mark** nên
+> fixture nằm được trong repo, thay vì phụ thuộc `ElementId` của đúng file đang mở.
 
 ## Hai lệnh, hai chiều
 
@@ -90,6 +90,8 @@ gần như luôn là nhập đè một file cũ, và nó xoá mất một mốc 
 ```json
 {
   "inputPath": "C:/DHCB/hien-truong/2026-09-05.csv",
+  "keyParameter": "Mark",
+  "categories": ["Doors"],
   "statusParameter": "DHCB_Trang_Thai",
   "dateParameter": "DHCB_Ngay_Lap",
   "personParameter": "DHCB_Nguoi_Xac_Nhan",
@@ -131,11 +133,36 @@ Tiêu đề nhận nhiều cách viết (`ElementId`/`Id`/`Mã cấu kiện`, `T
 Lấy danh sách mã cấu kiện để phát cho hiện trường bằng `ParameterExport` trên chính file đang mở — cột đầu của
 file đó là `ElementId`.
 
+### Khớp theo mã cấu kiện của hiện trường, không phải `ElementId`
+
+`ElementId` chính xác tuyệt đối nhưng **chỉ có nghĩa trong đúng file sinh ra nó**: phát hành lại mô hình là
+phải xuất lại danh sách, và bảng nghiệm thu ngoài công trường thì ghi `D-102` chứ không ghi `1544489`. Khai
+`keyParameter` để cột mã trỏ vào một tham số đánh dấu:
+
+```json
+{ "inputPath": "…/nghiem-thu-tuan-36.csv", "keyParameter": "Mark", "categories": ["Doors"] }
+```
+
+```
+Mã cấu kiện,Trạng thái,Ngày,Người xác nhận
+DHCB-001,Đã lắp,03/09/2026,Nguyễn Văn A
+```
+
+- `categories` thu hẹp phạm vi tìm (rỗng = toàn mô hình — chạy được, chỉ chậm hơn).
+- So khớp **không phân biệt hoa thường**; một mã khớp nhiều phần tử thì lệnh **ghi cho tất cả và nói ra**,
+  chứ không im lặng chọn cái đầu tiên.
+- Không phần tử nào trong phạm vi mang giá trị ở tham số khoá → dừng và nói thẳng là **tra sai tên tham số**,
+  không phải "mô hình chưa có cấu kiện nào". Hai câu đó dẫn kỹ sư đi hai hướng khác hẳn nhau.
+- Không khai `keyParameter` thì mọi thứ giữ nguyên như cũ: cột mã là `ElementId`.
+
 ## Còn thiếu
 
-- **Chưa chạy thật trong Revit**, và đường ghi của `ConstructionStatus` chưa có ca kiểm tự động (mã cấu kiện
-  phụ thuộc file). Việc đầu tiên khi có máy: gắn một shared parameter trạng thái vào model mẫu, xuất
-  `ParameterExport` lấy id thật, ghi trạng thái cho vài phần tử, rồi chạy `ProgressReport`.
+- **Ca kiểm ghi thật dùng `Comments` làm tham số trạng thái** vì model mẫu Snowdon không có shared parameter
+  nào cho việc này. Đó là fixture, **không phải khuyến nghị**: dự án thật gắn shared parameter riêng cho các
+  category cần theo dõi (`Comments` là ô ghi chú chung, ai cũng ghi đè được). DHCB **chưa có lệnh tạo/gắn
+  shared parameter** — vẫn là bước làm tay của kỹ sư trước khi dùng hai lệnh này.
+- Đường ghi **theo `ElementId`** (không khai `keyParameter`) vẫn chỉ có test thuần và hai ca đường lỗi đứng
+  sau; ca ghi thật chạy theo `keyParameter`.
 - Chưa đọc phần tử trong **model liên kết** — tiến độ tính trên mô hình đang mở.
 - Chưa có đường ngược lại (xuất mẫu CSV trống theo phạm vi để hiện trường điền). `ParameterExport` làm gần đủ;
   làm thêm khi có ban chỉ huy thật yêu cầu, đúng thứ tự "sau khi có số liệu 9.4".
