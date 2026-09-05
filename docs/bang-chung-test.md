@@ -2239,5 +2239,17 @@ biết nếu có ai viết kịch bản bấm tự động cho form này.
 
 - Tường là hộp bao: muốn tuyến xuyên lỗ chờ thật thì phải đọc hình học/opening của tường — việc của một
   routing mức D, không phải sửa nhỏ.
-- Riser L3 → L4 cùng XY (-15725,1137): chưa chạy trong bộ chính thức (lượt thử đầu bị đẩy ra vì 5 ca đầu
-  còn sai điểm); có shaft hay không vẫn là câu hỏi mở.
+- ~~Riser L3 → L4 cùng XY (-15725,1137): có shaft hay không vẫn là câu hỏi mở.~~ Đã chạy (21:30 ICT), 5 biến
+  thể trên cùng cặp điểm (-15725,1137, z 9000 → z 13056), biên XY 6000, bước 200:
+
+  | Vật cản | Kết quả |
+  |---|---|
+  | chỉ Floors (13) | **tìm được**, 3 đoạn 2 rẽ, 42 ms → **có lỗ sàn** trong 6 m |
+  | chỉ Walls (79) | tìm được, 1 đoạn 0 rẽ — tường không chắn đường lên tại chính XY này |
+  | không Floors (đối chứng) | tìm được, 1 đoạn 0 rẽ |
+  | đủ 4 category, biên 2500 (55) và 6000 (178) | **không nối thông** (9.094 / 135.252 ô; 5.268 / 100.467 ô) |
+
+  Đọc bốn dòng cùng nhau: lỗ sàn có, và tường một mình không chặn, nhưng gộp lại thì kín — đúng hình một
+  **shaft có tường bao quanh**. Kết luận không phải "không có shaft" mà là giới hạn hộp bao tường ở mục trên
+  áp cả vào shaft: muốn đi riser qua shaft, routing phải đọc opening của tường. Hai ca (chỉ Floors: đạt;
+  đủ 4: không nối thông) vào bộ `revit-autoroute`, nay **8 ca**, cả 8 đều đã chạy trong Revit hôm nay.
