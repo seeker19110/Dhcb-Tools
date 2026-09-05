@@ -234,6 +234,89 @@
         ],
         "maxMs": 120000
       }
+    },
+    {
+      "name": "Link DWG nhị phân thật — GHI THẬT, placement \"shared\"",
+      "command": "CadLink",
+      "allowWrite": true,
+      "//": [
+        "§29 chot duong thanh cong cua C4 bang fixture DXF van ban, va ghi lai dung hai cho chua chung minh:",
+        "chua chay voi .dwg nhi phan that, va hai placement con lai chua chay lan nao. Ca nay va hai ca duoi",
+        "lam not. Fixture tuyen-ong.dwg la DWG 2018 that (AC1032), sinh tu chinh DXF do nhung DOI 20 m theo Y",
+        "— nen model line sinh ra tu no la duong MOI, khong trung duong cua ban DXF; 0 moi thi ca sau do."
+      ],
+      "config": {
+        "cadPath": "{suiteFolder}/fixtures/tuyen-ong.dwg",
+        "unit": "mm",
+        "placement": "shared",
+        "dryRun": false
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "summaryContains": [
+          "Đã link",
+          "tuyen-ong.dwg",
+          "shared"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 120000
+      }
+    },
+    {
+      "name": "Model line từ chính DWG đó — đường thành công của C4 trên file nhị phân",
+      "command": "ModelLinesFromCad",
+      "allowWrite": true,
+      "//": "Dung bo loc y het ca DXF: 2 doan thang hang gop thanh 1 + doan doc = 2 duong; doan rac, layer -TEXT va layer RAC bi loai.",
+      "config": {
+        "dwgNameContains": "tuyen-ong.dwg",
+        "includeLayers": [
+          "TUYEN-ONG*"
+        ],
+        "excludeLayers": [
+          "*-TEXT"
+        ],
+        "minLengthMm": 100,
+        "mergeCollinear": true,
+        "dryRun": false
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 2,
+        "summaryContains": [
+          "Đã tạo 2 model line"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 120000
+      }
+    },
+    {
+      "name": "Link bản vẽ với placement \"centered\" — nhánh cuối chưa ai chạy",
+      "command": "CadLink",
+      "allowWrite": true,
+      "//": "Mot file chi link duoc mot lan (chay lai thi bo qua), nen ca nay dung mot ban sao rieng cua fixture.",
+      "config": {
+        "cadPath": "{suiteFolder}/fixtures/tuyen-ong-giua.dxf",
+        "unit": "mm",
+        "placement": "centered",
+        "dryRun": false
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "summaryContains": [
+          "Đã link",
+          "centered"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 120000
+      }
     }
   ]
 }

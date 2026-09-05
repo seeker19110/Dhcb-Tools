@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using Autodesk.Revit.DB;
 using DhcbTools.Core.Checks;
+using DhcbTools.Shared.Logic.Cad;
 
 namespace DhcbTools.Core.MEPF;
 
@@ -103,13 +104,19 @@ public sealed class CadLinkCommand : ICoreCommand<CadLinkConfig>
 
         // Trùng theo TÊN FILE chứ không theo đường dẫn: cùng một bản vẽ chép sang thư mục khác vẫn là
         // cùng bản vẽ, link hai lần là hai bộ hình học chồng nhau mà ModelLinesFromCad đọc thành đường đôi.
+        // So khớp nằm ở CadFileMatch.SameDrawing (tầng thuần, có test) — bản đầu cắt đuôi mở rộng rồi tìm
+        // chuỗi con, nên .dwg bị coi là đã có khi mô hình mới chỉ có .dxf cùng tên.
         var fileName = Path.GetFileName(config.CadPath);
         var existing = new FilteredElementCollector(document).OfClass(typeof(ImportInstance)).Cast<ImportInstance>()
-            .FirstOrDefault(i => RevitCompat.CadFileName(document, i)
-                .IndexOf(Path.GetFileNameWithoutExtension(fileName), StringComparison.OrdinalIgnoreCase) >= 0);
+            .FirstOrDefault(i => SameDrawing(document, i, fileName));
         if (existing != null)
         {
-            result.Summary = $"Đã có \"{fileName}\" trong mô hình (id {RevitCompat.IdValue(existing.Id)}) — bỏ qua, không link lần hai.";
+            // Nói luôn TÊN mà mô hình đang mang: khi lệnh bỏ qua nhầm, đây là dòng duy nhất cho biết nó
+            // đã so với cái gì — nếu không thì chỉ thấy "đã có" cho một bản vẽ chưa bao giờ được link.
+            var existingLinkName = RevitCompat.CadLinkFileName(document, existing);
+            var existingTypeName = RevitCompat.CadFileName(document, existing);
+            result.Summary = $"Đã có \"{fileName}\" trong mô hình (id {RevitCompat.IdValue(existing.Id)}, "
+                             + $"tên đang mang: \"{(existingLinkName.Length > 0 ? existingLinkName : existingTypeName)}\") — bỏ qua, không link lần hai.";
             result.Messages.Add("Muốn nạp bản vẽ mới thì xoá link cũ trong Manage → Manage Links → CAD Formats rồi chạy lại.");
             result.AffectedCount = 0;
             return result;
@@ -232,4 +239,20 @@ public sealed class CadLinkCommand : ICoreCommand<CadLinkConfig>
     }
 
     private static string DescribeUnit(ImportUnit unit) => unit == ImportUnit.Default ? "tự đọc từ file" : unit.ToString();
+
+    /// <summary>
+    /// Bản vẽ đã có trong mô hình có phải chính file sắp link không.
+    /// <para>
+    /// Ưu tiên tên đọc từ <b>đường dẫn file ngoài</b> của bản vẽ link — chỉ tên đó mới mang đuôi mở rộng,
+    /// nên mới phân biệt được <c>.dwg</c> với <c>.dxf</c> cùng tên. Tên element kiểu chỉ dùng khi bản vẽ
+    /// được <i>import</i> (không có file ngoài), và ở đó chấp nhận so theo tên trần.
+    /// </para>
+    /// </summary>
+    private static bool SameDrawing(Document document, Element import, string fileName)
+    {
+        var linkName = RevitCompat.CadLinkFileName(document, import);
+        return linkName.Length > 0
+            ? CadFileMatch.SameDrawing(linkName, fileName)
+            : CadFileMatch.SameDrawing(RevitCompat.CadFileName(document, import), fileName, allowMissingExtension: true);
+    }
 }

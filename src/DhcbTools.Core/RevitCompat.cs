@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Globalization;
 using Autodesk.Revit.DB;
 using DhcbTools.Shared.Logic;
@@ -50,6 +51,41 @@ public static class RevitCompat
 
     /// <summary>Đổi foot² (Room.Area) sang m² — điểm duy nhất, tránh hai hệ số làm tròn khác nhau.</summary>
     public static double SqFtToSqm(double squareFeet) => MepLayout.SquareFeetToSquareMetres(squareFeet);
+
+    /// <summary>
+    /// Tên file <b>có đuôi mở rộng</b> của một bản vẽ link, đọc từ đường dẫn ngoài của
+    /// <c>CADLinkType</c> — ví dụ <c>tuyen-ong.dxf</c>. Rỗng khi bản vẽ được <b>import</b> (không có file
+    /// ngoài) hoặc khi Revit không giải được đường dẫn.
+    /// <para>
+    /// Vì sao cần thêm bên cạnh <see cref="CadFileName"/>: tên element kiểu mà Revit đặt cho bản vẽ link
+    /// <b>không mang đuôi mở rộng</b> ("tuyen-ong"), nên chỉ có nó thì <c>tuyen-ong.dwg</c> và
+    /// <c>tuyen-ong.dxf</c> là một — CadLink bỏ qua bản DWG như thể đã link rồi, mà bản vẽ không bao giờ
+    /// vào mô hình (tìm ra 2026-09-05, <c>docs/bang-chung-test.md</c> §31).
+    /// </para>
+    /// </summary>
+    public static string CadLinkFileName(Document doc, Element import)
+    {
+        try
+        {
+            if (doc.GetElement(import.GetTypeId()) is not CADLinkType type)
+            {
+                return string.Empty;
+            }
+
+            var reference = type.GetExternalFileReference();
+            if (reference == null)
+            {
+                return string.Empty;
+            }
+
+            var path = ModelPathUtils.ConvertModelPathToUserVisiblePath(reference.GetAbsolutePath());
+            return string.IsNullOrWhiteSpace(path) ? string.Empty : Path.GetFileName(path);
+        }
+        catch (Exception)
+        {
+            return string.Empty;
+        }
+    }
 
     /// <summary>
     /// Tên file của một bản vẽ CAD đã import/link, ví dụ <c>tuyen-ong.dxf</c>.

@@ -286,3 +286,36 @@ public class CadCurveSameShapeTests
         Assert.False(CadCurveFilter.SameShape(a, new CadCurve("x", P(0, 0), P(5000, 0), CadCurveKind.Arc, P(2500, 200)), 1.0));
     }
 }
+
+/// <summary>
+/// So tên bản vẽ khi quyết định "đã link rồi thì bỏ qua". Lớp lỗi ở đây không ném ngoại lệ nào: lệnh báo
+/// thành công, bản vẽ không vào mô hình, và lệnh sau đó nói "không tìm thấy bản vẽ CAD nào".
+/// </summary>
+public class CadFileMatchTests
+{
+    [Theory]
+    [InlineData("tuyen-ong.dxf", "C:/fixtures/tuyen-ong.dxf")]
+    [InlineData("TUYEN-ONG.DXF", "C:/khac/tuyen-ong.dxf")]   // khác thư mục, khác hoa thường = vẫn cùng bản vẽ
+    public void CungBanVe(string existing, string candidate) =>
+        Assert.True(CadFileMatch.SameDrawing(existing, candidate));
+
+    // Tên mất đuôi mở rộng (bản vẽ IMPORT, chỉ còn tên element kiểu): nhận, nhưng phải khai rõ ràng.
+    [Fact]
+    public void TenMatDuoiMoRong_ChiNhanKhiBatCoCho() 
+    {
+        Assert.False(CadFileMatch.SameDrawing("tuyen-ong", "C:/fixtures/tuyen-ong.dxf"));
+        Assert.True(CadFileMatch.SameDrawing("tuyen-ong", "C:/fixtures/tuyen-ong.dxf", allowMissingExtension: true));
+        // Có đuôi rồi thì cờ đó không được nới lỏng gì thêm — đây chính là chỗ .dwg bị coi là .dxf.
+        Assert.False(CadFileMatch.SameDrawing("tuyen-ong.dxf", "C:/fixtures/tuyen-ong.dwg", allowMissingExtension: true));
+    }
+
+    [Theory]
+    [InlineData("tuyen-ong.dxf", "C:/fixtures/tuyen-ong.dwg")]      // ĐÚNG LỖI ĐÃ GẶP: .dwg bị coi là đã có
+    [InlineData("tuyen-ong.dxf", "C:/fixtures/tuyen-ong-giua.dxf")] // chiều ngược lại của "chứa chuỗi con"
+    [InlineData("tuyen-ong-giua.dxf", "C:/fixtures/tuyen-ong.dxf")]
+    [InlineData("", "C:/fixtures/tuyen-ong.dxf")]
+    [InlineData("tuyen-ong.dxf", "")]
+    [InlineData(null, null)]
+    public void KhacBanVe(string? existing, string? candidate) =>
+        Assert.False(CadFileMatch.SameDrawing(existing, candidate));
+}
