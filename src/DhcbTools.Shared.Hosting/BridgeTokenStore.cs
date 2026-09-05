@@ -28,6 +28,8 @@ namespace DhcbTools.Shared.Hosting
         /// không chặn khởi động: %APPDATA% vốn đã là thư mục riêng của user.
         /// </para>
         /// </summary>
+        /// <param name="path">Đường dẫn file token; null = <see cref="DefaultPath"/>.</param>
+        /// <param name="log">Nơi ghi cảnh báo khi thu ACL không thành công.</param>
         /// <param name="restrictToOwner">
         /// Bước thu ACL, tiêm được để test đường cảnh báo mà không cần một máy Windows có ACL hỏng thật;
         /// null = <see cref="TryRestrictToOwner"/>.

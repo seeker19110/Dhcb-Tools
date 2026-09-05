@@ -12,6 +12,7 @@ namespace DhcbTools.Shared.Logic.Tests;
 /// Đường HTTP thật của Bridge: mọi mã lỗi mà client có thể gặp (401/429/405/413/415/404/501/500/504)
 /// và đường lệnh chạy nền. Chạy trên loopback với listener thật — cùng thứ chạy trong Revit/AutoCAD.
 /// </summary>
+[Collection(EnvironmentCollection.Name)]
 public class HttpBridgeServerGapTests : IDisposable
 {
     private const string Token = "token-test-du-dai-32-ky-tu-tro-len-nhe";

@@ -6,10 +6,26 @@ using Xunit;
 namespace DhcbTools.Shared.Logic.Tests;
 
 /// <summary>
+/// Gom các lớp test có đụng tới BIẾN MÔI TRƯỜNG của tiến trình để chúng chạy tuần tự.
+/// <para>
+/// Vì sao cần: xUnit chạy các lớp test song song, mà <c>DHCB_BRIDGE_TOKEN</c> là trạng thái dùng chung
+/// của cả tiến trình. Một lớp đặt biến đó trong khi lớp kia đang gọi <c>HttpBridgeServer.Start</c>
+/// (đọc chính biến đó qua <see cref="BridgeTokenStore.LoadOrCreate"/>) thì server nhận nhầm token và
+/// mọi request trong lớp kia trả 401 — một lần đỏ ngẫu nhiên, không tài nào tra ra từ thông báo lỗi.
+/// </para>
+/// </summary>
+[CollectionDefinition(Name)]
+public sealed class EnvironmentCollection
+{
+    public const string Name = "biến môi trường của tiến trình";
+}
+
+/// <summary>
 /// Nhánh còn thiếu của tầng vỏ (hosting): sổ job, kết quả lệnh, log file, phiên bản và kho token.
 /// Đây là phần chạy trong Revit/AutoCAD thật, nên mọi đường lỗi đều phải im lặng chứ không được
 /// làm sập lệnh đang chạy.
 /// </summary>
+[Collection(EnvironmentCollection.Name)]
 public class HostingGapTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "dhcb-hosting-gap-" + Guid.NewGuid().ToString("N"));
@@ -259,20 +275,7 @@ public class HostingGapTests : IDisposable
     [Fact]
     public void DhcbLog_Prune_ChuaCoThuMuc_KhongNem()
     {
-        var appData = Environment.GetEnvironmentVariable("APPDATA");
-        var home = Environment.GetEnvironmentVariable("HOME");
-        var trong = Path.Combine(_dir, "chua-co");
-        try
-        {
-            Environment.SetEnvironmentVariable("APPDATA", trong);
-            Environment.SetEnvironmentVariable("HOME", trong);
-            DhcbLog.Prune("Revit");
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("APPDATA", appData);
-            Environment.SetEnvironmentVariable("HOME", home);
-        }
+        DhcbLog.Prune("Revit", directory: Path.Combine(_dir, "chua-co"));
     }
 
     // ── BridgeTokenStore ────────────────────────────────────────────────────
