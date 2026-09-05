@@ -1,12 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Test chạy trên .NET 8 và KHÔNG tham chiếu RevitAPI/AutoCAD.NET, nên chạy được trên CI Linux
+    Test chạy trên .NET 10 (theo BatchRunner — .NET 8 hết hỗ trợ 10/11/2026) và KHÔNG tham chiếu RevitAPI/AutoCAD.NET, nên chạy được trên CI Linux
     (xem .github/workflows/ci.yml). Logic phụ thuộc Revit/AutoCAD được mô tả trong docs/dac-ta-kiem-thu.md
     ở phần "test thủ công / test cần máy có Revit".
   -->
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Platforms>AnyCPU;x64</Platforms>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <Nullable>enable</Nullable>
