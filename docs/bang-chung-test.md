@@ -1973,3 +1973,75 @@ không mở.
 - Bảng category → lớp IFC là **bảng rút gọn** cho nhóm hay gặp; family lạ phải khai `IfcExportAs`.
 - `minLength`/`maxLength` và `partOf` theo quan hệ IFC đầy đủ chưa hỗ trợ — và lệnh **từ chối file** khi gặp,
   chứ không lặng lẽ bỏ qua.
+
+---
+
+## 33. Bấm tay Ribbon — và một hộp thoại rơi xuống dưới cửa sổ chính (2026-09-05 18:35 ICT)
+
+Cả 113 ca của §30 và mọi ca thêm ở §31–§32 đều chạy qua `RunTests`, tức là qua **bảng lệnh**, không qua
+Ribbon. `RibbonCoverageTests` chốt được rằng mọi lệnh **có đường vào từ vỏ**, nhưng nó đối chiếu mã nguồn với
+mã nguồn — chưa ai **bấm** thử. Lượt này ngồi bấm tay như một kỹ sư: mở Revit 2024, mở model mẫu kiến trúc,
+vào tab **DHCB Tools**, mở panel *Kiểm tra & AI*, bấm nút mới **Kiểm theo IDS**.
+
+### Đường bấm tay chạy đúng
+
+| Bước | Thấy gì |
+|---|---|
+| Mở model | Tab **DHCB Tools** xuất hiện, 6 panel |
+| Panel *Kiểm tra & AI* | Đủ 4 nút: Kiểm tra tham số · **Kiểm theo IDS** · Kiểm tra va chạm · AI offline |
+| Bấm *Kiểm theo IDS* | Form dựng từ `CommandCatalog`: 5 ô (`idsPath`, `outputPath`, `csvPath`, `categories`, `levelName`) + *Xem trước / Chạy thật / Đóng*, nút **Chạy thật khoá** cho tới khi xem trước thành công |
+| Điền đường dẫn, bấm *Xem trước* | `LỆNH IdsValidate \| ok=true \| dryRun=true \| affected=42 \| ms=1227`, file HTML 7.040 byte được ghi |
+
+Chạy **không khai `categories`** nên phạm vi là toàn mô hình: **17.757 phần tử** (bộ ca kiểm chỉ lọc
+Doors + Walls nên ra 1.270), vẫn đúng **42 phần tử không đạt** — cùng nhóm tường kính không khai vật liệu.
+Ô kết quả in đủ ba dòng tổng hợp, trong đó có dòng đáng giá nhất:
+
+```
+Lớp IFC không có trong model mẫu: KHÔNG phần tử nào lọt bộ lọc — con số này nói về bộ lọc
+hoặc về mô hình thiếu nhóm đó, không phải "đạt".
+```
+
+### Lỗi chỉ bấm tay mới thấy: form rơi xuống dưới cửa sổ chính
+
+Bấm *Xem trước* xong, **hộp thoại biến mất**. Revit không nhận thao tác nào — vì form là modal — nên nhìn từ
+ghế kỹ sư thì **Revit treo**. Không có lỗi nào báo, log vẫn ghi lệnh chạy thành công.
+
+Liệt kê cửa sổ cấp cao nhất của tiến trình Revit:
+
+```
+[hien] 1444040   | Autodesk Revit 2024.3 - [Snowdon Towers Sample Architectural.rvt - Sheet: G000 - Cover]
+[hien] 16190764  | DHCB Tools — IdsValidate      ← vẫn mở, chỉ nằm SAU khung chính
+[an]   8914854   | Revit
+[an]   4393776   | Hidden Window
+```
+
+Nguyên nhân nằm ở một dòng gán chủ cửa sổ:
+
+```csharp
+new WindowInteropHelper(window).Owner = Process.GetCurrentProcess().MainWindowHandle;
+```
+
+Tiến trình Revit có **nhiều cửa sổ cấp cao nhất** — hai cái ẩn tên `Revit` và `Hidden Window` như trên — nên
+`Process.MainWindowHandle` không chắc trả về khung chính đang hiện. Chủ sai thì Windows không bảo đảm
+z-order, và cửa sổ con tụt xuống dưới. Sửa: lấy handle từ **chính API Revit**,
+`commandData.Application.MainWindowHandle` — thứ có sẵn từ Revit 2019, biên dịch xanh cho cả 2023–2027.
+
+> Đây đúng loại lỗi mà mọi bộ test tự động của repo **không thể** thấy: `RunTests` không đi qua vỏ WPF,
+> `RibbonCoverageTests` chỉ đối chiếu tên lớp. Nó không làm sai một con số nào — nó chỉ làm người dùng
+> tưởng phần mềm treo.
+
+### Bấm lại sau khi sửa
+
+Cài lại add-in, mở Revit, bấm đúng chuỗi thao tác đó: `LỆNH IdsValidate | ok=true | dryRun=true |
+affected=42 | ms=1120`, file `ribbon-ids-sau-khi-sua.html` (7.040 byte) được ghi, và **form vẫn nằm trên cùng**
+với ô "Kết quả xem trước" hiện danh sách tường thiếu vật liệu, nút *Chạy thật* mở khoá.
+
+### Cái chưa chứng minh
+
+- Mới bấm tay **một lệnh** trên Ribbon (`IdsValidate`). 48 lệnh còn lại vẫn chỉ có `RibbonCoverageTests`
+  đứng sau — cùng một đường mã (`CommandRunner` + `CommandFormWindow`) nên rủi ro thấp, nhưng "thấp" không
+  phải là "đã kiểm".
+- Ngoại lệ ném ra từ lệnh hiện **nguyên văn tiếng Anh của .NET** trong ô kết quả (gặp khi gõ hỏng đường dẫn:
+  *"The given path's format is not supported"*). `VietnameseMessageTests` chỉ soi thông báo trong Core, không
+  soi thông báo của khung .NET lọt qua — chưa sửa trong lượt này.
+- Chưa bấm tay đường **Chạy thật** trên Ribbon: `IdsValidate` chỉ đọc nên không có gì để ghi.
