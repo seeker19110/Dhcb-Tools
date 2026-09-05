@@ -2652,3 +2652,17 @@ sheet. Job trên MEP L04 (167 MB) bằng **runner đã cài**:
 **một** sheet thật, còn bộ IDS mẫu không nhắm MEP nên ba specification đều rỗng. Giá trị thật của lượt này là
 đường IFC chịu được file 285 MB (đọc + kiểm IDS trong gói) và `--max-minutes 40` suýt cắt: xuất IFC MEP cần
 ngân sách riêng, job đêm nên đặt 60–90 phút cho file MEP lớn.
+
+## 46. Installer treo khi cài im lặng — `MsgBox` trong `[Code]` không bị `/SUPPRESSMSGBOXES` tắt (2026-09-06 01:00 ICT)
+
+§45 để lại: `DhcbTools-Setup-1.1.0.exe /VERYSILENT /SUPPRESSMSGBOXES` chép xong nhưng tiến trình không thoát,
+cửa sổ "Setup" trống. Đọc `dhcb-tools.iss`: `CurStepChanged(ssPostInstall)` gọi `MsgBox('Đã cài xong…')` —
+`/SUPPRESSMSGBOXES` chỉ tắt hộp thoại của **chính Inno**, còn `MsgBox` do script gọi vẫn hiện và chờ OK. Cài
+hàng loạt hay từ Task Scheduler sẽ đứng mãi.
+
+Sửa: `if (CurStep = ssPostInstall) and not WizardSilent then`. Không có Inno Setup trên máy nên dựng bằng
+`release.yml` qua `workflow_dispatch` trên nhánh sửa (version `1.1.1-dev`, bước publish chỉ chạy khi có tag
+nên không tạo release). Tải artifact, chạy lại đúng lệnh im lặng: **thoát sau 1 s, mã 0**, không còn tiến
+trình `DhcbTools-Setup*`, add-in Revit 2024 và BatchRunner đều `1.1.1-dev+1b969dd…`. Phát hành v1.1.1 ngay sau
+để kỹ sư nhận installer đã sửa.
+
