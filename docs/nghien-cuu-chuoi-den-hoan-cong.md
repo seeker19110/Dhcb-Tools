@@ -141,7 +141,7 @@ tên GUID chứa `markup.bcf` (bắt buộc) + `.bcfv` (góc nhìn) + ảnh PNG 
 | C1 ✅ | Chuỗi băm nhật ký — `RunLog.Append` gắn, `BatchRunner --verify-log` kiểm | NĐ 207/2026 đòi dấu thời gian **không thể chỉnh sửa ngược** cho nhật ký điện tử | `Evidence/HashChain` — **thuần tuyệt đối**, 24 ca test |
 | C2 | **`AsBuiltStamp`** + bộ hồ sơ hoàn công | Đóng dấu hoàn công + ghép danh mục đang làm tay 100% | `AsBuilt/DossierIndex` (danh mục theo Phụ lục VII) |
 | C3 | **`IdsValidate`** | NĐ 217/2026 bắt nộp dữ liệu BIM; IDS là chuẩn kiểm đọc được bằng máy | `Ids/IdsSpec` + `Ids/IdsEvaluator` (6 loại facet) |
-| C4 | **`ModelLinesFromCad`** | Mắt xích còn thiếu ở chặng 1: `CadLayerMap` map layer, `RouteFromLines` cần model line — không có ai dựng model line từ DWG | `PolylineSimplifier` (**đã có**) + `CadCurveFilter` |
+| C4 ✅ | **`ModelLinesFromCad`** | Mắt xích còn thiếu ở chặng 1: `CadLayerMap` map layer, `RouteFromLines` cần model line — không có ai dựng model line từ DWG | `PolylineSimplifier` (**đã có**) + `CadCurveFilter` |
 
 **C1 — nhật ký bằng chứng, khác biệt lớn nhất mà rẻ nhất.** ✅ **Đã làm 2026-09-04** — xem `roadmap.md` §11.5 và
 [`bang-chung-test.md`](bang-chung-test.md) §23. Batch runner đã ghi `run-HHmmss.jsonl` mỗi lượt; nay mỗi dòng mang
@@ -187,7 +187,7 @@ Revit cho lệnh đó**; và [`progress.md`](progress.md) nói việc có giá t
 | Đợt | Làm gì | Vì sao đúng thời điểm |
 |---|---|---|
 | **Ngay, không cần chờ số liệu** | ~~**A1 `SetoutExport`**~~ ✅ · ~~**B1 `ConstructionStatus`/`ProgressReport`**~~ ✅ — cả hai mã nguồn **2026-09-05**, 🧪 chờ chạy thật · ~~**C1** chuỗi băm nhật ký~~ ✅ **xong 2026-09-04** | Cả ba **chỉ đọc hoặc ghi tham số**, tầng thuần chiếm phần lớn công sức, không phụ thuộc thư viện/template của dự án. Giá trị không phụ thuộc kết quả 9.4 — trắc đạc, chỉ huy trưởng và bộ phận hồ sơ là ba nhóm người **khác** với nhóm đang dùng 43 lệnh hiện có, nên mở thêm được tệp người dùng cho chính vòng 9.4 |
-| **Song song, rẻ** | ~~**B3 BCF**~~ ✅ **xong 2026-09-05** (đầu ra `bcfPath` của `ClashDetection`) · **C4 `ModelLinesFromCad`** | Thuần gần hết; B3 chỉ thêm đầu ra cho lệnh đã chạy thật, C4 nối hai lệnh đã có |
+| **Song song, rẻ** | ~~**B3 BCF**~~ ✅ **xong 2026-09-05** (đầu ra `bcfPath` của `ClashDetection`) · ~~**C4 `ModelLinesFromCad`**~~ ✅ **xong 2026-09-05** | Thuần gần hết; B3 chỉ thêm đầu ra cho lệnh đã chạy thật, C4 nối hai lệnh đã có |
 | **Sau khi có số liệu 9.4/`UsageReport`** | **A2** → **A4** → **A3** → **B2** → **C3** → **C2** | Sáu mục này đắt hoặc phụ thuộc thói quen từng công ty (template view/sheet, thư viện tag, bảng mã định mức, mẫu dấu). Làm trước khi biết kỹ sư thật cần gì là lặp lại đúng sai lầm "bề rộng trước" mà `roadmap.md` đã ghi lại |
 
 Một việc **không phải code, nên làm trước tất cả**: sửa `roadmap.md` §11, khi đó còn căn cứ vào **NĐ 06/2021 đã

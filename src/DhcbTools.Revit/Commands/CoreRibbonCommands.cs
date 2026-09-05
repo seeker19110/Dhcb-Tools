@@ -342,3 +342,12 @@ public sealed class ProgressReportRibbonCommand : IExternalCommand
     public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         => CommandRunner.Run(commandData, "ProgressReport");
 }
+
+/// <summary>Dựng model line từ bản vẽ CAD đã link/import, để RouteFromLines dựng ống theo.</summary>
+[Transaction(TransactionMode.Manual)]
+[Regeneration(RegenerationOption.Manual)]
+public sealed class ModelLinesFromCadRibbonCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        => CommandRunner.Run(commandData, "ModelLinesFromCad");
+}

@@ -265,6 +265,36 @@ theo vị trí cấu hình được (`center`, hoặc toạ độ mm). Bỏ qua 
 
 # Giai đoạn 3 — MEPF (phần còn lại)
 
+## 3.0 `ModelLinesFromCad` — model line từ bản vẽ CAD (đề xuất C4)
+
+Mắt xích trước §3.1: `CadLayerMap` map được layer, `RouteFromLines` dựng được ống từ model line —
+nhưng không ai dựng **model line** từ DWG, nên kỹ sư vẫn vẽ lại tuyến bằng tay đè lên bản vẽ CAD.
+
+**Đầu vào:** DWG đã link/import trong mô hình (`dwgNameContains` lọc theo tên), `includeLayers` /
+`excludeLayers` (wildcard `*` `?` `~` như `CadLayerMap`), `lineStyleName` (đặt trùng `lineStyleName`
+của §3.1 để hai lệnh nối tiếp), `levelName` + `offsetMm`, `minLengthMm`, `weldToleranceMm`,
+`mergeCollinear`, `includeArcs`, `flatten`, `maxLines`, `dryRun` (mặc định **bật**).
+
+**Ba việc quyết định lệnh dùng được hay không, cả ba nằm ở tầng thuần `Shared.Logic.Cad.CadCurveFilter`:**
+
+1. **Đường vẽ chồng hai lần chỉ ra một model line.** Copy giữa các bản vẽ hay để lại hai đường trùng
+   nhau; hai model line trùng thành hai ống chồng nhau mà nhìn mặt bằng không thấy. So trùng theo dung
+   sai, nhận cả trường hợp **vẽ ngược chiều**; cung phải trùng cả điểm giữa (hai cung cong ngược nhau
+   chung hai đầu mút là hai hình khác nhau).
+2. **Bỏ đoạn rác** ngắn hơn `minLengthMm` — dư âm của trim/extend.
+3. **Nối đoạn thẳng hàng nhưng không nối xuyên ngã ba**: chỗ ba đoạn gặp nhau là nhánh rẽ của tuyến,
+   nối qua đó là xoá mất một nhánh.
+
+`flatten` (mặc định bật) ép mọi đường về đúng cao độ tầng + `offsetMm`: mặt bằng CAD hay mang Z rác,
+dựng nguyên Z đó ra là tuyến gãy khúc lên xuống mà nhìn mặt bằng không thấy.
+
+**Chạy lại không sinh bản sao:** đường nào đã có model line trùng hình (cùng line style, hai đầu mút
+trong dung sai) thì bỏ qua và **đếm riêng** — cùng cách chốt idempotent của §12. So trùng ở đây **bỏ
+qua tên layer**, vì model line mang tên line style của Revit chứ không mang tên layer DWG.
+
+Không tìm thấy bản vẽ, hoặc bộ lọc loại hết đường → **`E-PRECOND`** kèm danh sách layer đọc được, chứ
+không báo "thành công, 0 model line" — 0 đường ở đây là câu nói về bộ lọc, không phải về bản vẽ.
+
 ## 3.1 Routing mức A — bán tự động theo tuyến vẽ tay
 
 **Đầu vào:** model line / detail line kỹ sư đã vẽ (chọn theo `LineStyleName` trong config), cộng:
