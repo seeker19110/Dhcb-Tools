@@ -44,6 +44,10 @@ namespace DhcbTools.Shared.Logic
                 ["constructionStatus"] = new[] { "DHCB_Trang_Thai", "Trạng thái thi công", "Trạng thái", "Construction Status", "Status" },
                 ["constructionDate"] = new[] { "DHCB_Ngay_Lap", "Ngày lắp đặt", "Ngày lắp", "Install Date", "Construction Date" },
                 ["constructionBy"] = new[] { "DHCB_Nguoi_Xac_Nhan", "Người xác nhận", "Người lắp đặt", "Installed By", "Verified By" },
+
+                // Mã cấu kiện mà HIỆN TRƯỜNG cầm trên tay (bảng nghiệm thu ghi "D-102", không ghi
+                // ElementId). Mark là chỗ hay dùng nhất vì nó có sẵn ở gần như mọi category.
+                ["constructionKey"] = new[] { "DHCB_Ma_Cau_Kien", "Mã cấu kiện", "Ma cau kien", "Mark" },
             };
 
         private readonly Dictionary<string, List<string>> _synonyms =

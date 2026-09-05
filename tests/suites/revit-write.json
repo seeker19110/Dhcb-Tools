@@ -86,6 +86,121 @@
       }
     },
     {
+      "name": "Trạng thái thi công — GHI THẬT, khớp theo Mark vừa đánh số",
+      "command": "ConstructionStatus",
+      "allowWrite": true,
+      "//": [
+        "Duong ghi cua ConstructionStatus treo tu §28 den §30 vi mot ly do: ma cau kien la ElementId cua",
+        "dung file dang mo nen khong viet san vao fixture duoc. keyParameter go dung cho do — CSV khop theo",
+        "Mark, ma Mark thi chinh ca AutoNumbering o tren vua ghi (DHCB-001..), nen fixture nam duoc trong repo.",
+        "statusParameter dat thang vao 'Comments': model mau khong co shared parameter trang thai nao, va du an",
+        "that thi gan shared parameter rieng — day la fixture, khong phai khuyen nghi.",
+        "CSV co cot Ngay/Nguoi ma model khong co tham so tuong ung: lenh phai GHI DUOC trang thai va NOI RA",
+        "hai cot kia bi bo, chu khong duoc do ca dong."
+      ],
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/trang-thai-theo-mark.csv",
+        "keyParameter": "Mark",
+        "categories": [
+          "Doors"
+        ],
+        "statusParameter": "Comments",
+        "dryRun": false
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 3,
+        "summaryContains": [
+          "đã đổi trạng thái thi công"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 120000
+      }
+    },
+    {
+      "name": "Ghi lại chính CSV đó — phải 0 phần tử đổi, tất cả đã đúng sẵn",
+      "command": "ConstructionStatus",
+      "allowWrite": true,
+      "//": "0 o day la bang chung lan truoc DA COMMIT: transaction bi rollback thi lan nay lai co du 3 phan tu de ghi.",
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/trang-thai-theo-mark.csv",
+        "keyParameter": "Mark",
+        "categories": [
+          "Doors"
+        ],
+        "statusParameter": "Comments",
+        "dryRun": false
+      },
+      "expect": {
+        "success": true,
+        "maxAffected": 0,
+        "summaryContains": [
+          "đã đúng sẵn"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 120000
+      }
+    },
+    {
+      "name": "CSV lùi trạng thái — phải bị chặn, không xoá mốc nghiệm thu đã ghi",
+      "command": "ConstructionStatus",
+      "allowWrite": true,
+      "//": "DHCB-002 dang la 'Da nghiem thu'; CSV cu ghi 'Chua lap'. Ghi de la xoa mat mot moc nghiem thu da ghi nhan.",
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/trang-thai-theo-mark-lui.csv",
+        "keyParameter": "Mark",
+        "categories": [
+          "Doors"
+        ],
+        "statusParameter": "Comments",
+        "dryRun": false
+      },
+      "expect": {
+        "success": true,
+        "maxAffected": 0,
+        "messagesContain": [
+          "lùi trạng thái nên bỏ qua"
+        ],
+        "maxMs": 120000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      }
+    },
+    {
+      "name": "Báo cáo tiến độ — lần đầu tiên % KHÁC 0 trên model thật",
+      "command": "ProgressReport",
+      "//": "Ba muc §28-§30 deu ghi 'tien do % > 0 chua chung minh duoc' vi khong model mau nao mang tham so trang thai. Ca tren vua ghi that 3 cua, nen day la lan dau con so noi ve cong truong chu khong noi ve tham so.",
+      "config": {
+        "outputPath": "{outputFolder}/tien-do-sau-khi-ghi.html",
+        "csvPath": "{outputFolder}/tien-do-sau-khi-ghi.csv",
+        "categories": [
+          "Doors"
+        ],
+        "groupBy": "Level",
+        "statusParameter": "Comments"
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "summaryContains": [
+          "đã lắp trở lên"
+        ],
+        "summaryNotContains": [
+          "Tiến độ 0.0%"
+        ],
+        "filesExist": [
+          "{outputFolder}/tien-do-sau-khi-ghi.html",
+          "{outputFolder}/tien-do-sau-khi-ghi.csv"
+        ],
+        "maxMs": 120000
+      }
+    },
+    {
       "name": "Nhập lại CSV gốc — GHI THẬT, khôi phục Mark cũ",
       "command": "ParameterImport",
       "allowWrite": true,

@@ -391,4 +391,66 @@ public class ProgressTests
         // Nhóm không có chiều dài để trống hai cột cuối thay vì ghi 0 — 0 % và "không đo được" là hai chuyện khác nhau.
         Assert.Equal("Level 2,1,0,0,0,0,1,0.0,0.0,,", lines[2]);
     }
+
+    // ── Mã cấu kiện là CHỮ (Mark) chứ không phải ElementId ────────────────────
+    // Vì sao có chế độ này: ElementId chỉ có nghĩa trong đúng file sinh ra nó, nên bảng nghiệm thu của
+    // hiện trường — vốn ghi "D-102" — không dùng được, và mỗi bản phát hành mô hình lại phải xuất lại
+    // danh sách. Đọc theo khoá chữ thì file của hiện trường sống lâu hơn một bản phát hành.
+
+    [Fact]
+    public void DocCsvTheoKhoaChu_GiuNguyenMaKhongDoiThanhSo()
+    {
+        var result = ProgressCsv.Read(Csv("Mã cấu kiện,Trạng thái", "D-102,Đã lắp"), ProgressCsvKey.Text);
+
+        Assert.True(result.Ok);
+        var row = Assert.Single(result.Rows);
+        Assert.Equal("D-102", row.Key);
+        // ElementId để 0: chế độ này không biết phần tử nào, mô hình mới tra ra.
+        Assert.Equal(0, row.ElementId);
+        Assert.Equal(ConstructionStage.DaLap, row.Stage);
+    }
+
+    [Fact]
+    public void DocCsvTheoKhoaChu_MaLaSoVanDocDuoc_VaVanLaChuoi()
+    {
+        var result = ProgressCsv.Read(Csv("ElementId,TrangThai", "1544489,Đã lắp"), ProgressCsvKey.Text);
+
+        var row = Assert.Single(result.Rows);
+        Assert.Equal("1544489", row.Key);
+        Assert.Equal(0, row.ElementId);
+    }
+
+    [Fact]
+    public void DocCsvTheoKhoaChu_ORongLaLoiCoSoDong_KhongPhaiBoQuaImLang()
+    {
+        var result = ProgressCsv.Read(Csv("Mã cấu kiện,Trạng thái", " ,Đã lắp", "D-1,Đã lắp"), ProgressCsvKey.Text);
+
+        Assert.Single(result.Rows);
+        var error = Assert.Single(result.Errors);
+        Assert.Contains("Dòng 2", error);
+        Assert.Contains("để trống", error);
+    }
+
+    [Fact]
+    public void DocCsvTheoKhoaChu_TrungMaKhongPhanBietHoaThuong_LayDongSauCung()
+    {
+        // "d-102" và "D-102" là cùng một cánh cửa; giữ cả hai thì mô hình bị ghi hai lần, lần sau đè lần trước
+        // mà không ai biết dòng nào thắng.
+        var result = ProgressCsv.Read(
+            Csv("Mã cấu kiện,Trạng thái", "D-102,Đã lắp", "d-102,Đã nghiệm thu"), ProgressCsvKey.Text);
+
+        var row = Assert.Single(result.Rows);
+        Assert.Equal(ConstructionStage.DaNghiemThu, row.Stage);
+        Assert.Contains("đã có ở dòng 2", Assert.Single(result.Errors));
+    }
+
+    [Fact]
+    public void DocCsvTheoElementId_VanGiuMaVaoKey_DeThongBaoNoiDungMotThu()
+    {
+        var result = ProgressCsv.Read(Csv("ElementId,TrangThai", "7,Đã lắp"));
+
+        var row = Assert.Single(result.Rows);
+        Assert.Equal(7, row.ElementId);
+        Assert.Equal("7", row.Key);
+    }
 }

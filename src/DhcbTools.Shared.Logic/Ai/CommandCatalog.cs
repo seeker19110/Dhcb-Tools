@@ -297,6 +297,8 @@ namespace DhcbTools.Shared.Logic.Ai
             new CommandDescriptor("ConstructionStatus", Revit, "Ghi trạng thái thi công (chưa lắp / đang lắp / đã lắp / đã nghiệm thu) từ CSV hiện trường vào mô hình (thử nghiệm)", true, "TrangThaiThiCong", "InstallStatus")
                 .Field("inputPath", "CSV hiện trường: mã cấu kiện + trạng thái, tuỳ chọn ngày / người xác nhận / ghi chú")
                 .Field("statusParameter", "tham số trạng thái (rỗng = từ điển constructionStatus)")
+                .Field("keyParameter", "tham số làm mã cấu kiện trong CSV, ví dụ Mark (rỗng = cột mã là ElementId)")
+                .Field("categories", "category để tìm phần tử khi khớp theo keyParameter (rỗng = toàn mô hình)")
                 .Field("dateParameter", "tham số ngày (rỗng = từ điển constructionDate)")
                 .Field("personParameter", "tham số người xác nhận (rỗng = từ điển constructionBy)")
                 .Field("noteParameter", "tham số ghi chú (rỗng = từ điển comments)")

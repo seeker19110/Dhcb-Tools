@@ -18,6 +18,20 @@ public sealed class ConstructionStatusConfig
     /// <summary>Tên tham số trạng thái của dự án; rỗng = tra theo từ điển khoá <c>constructionStatus</c>.</summary>
     public string? StatusParameter { get; init; }
 
+    /// <summary>
+    /// Tham số dùng làm <b>mã cấu kiện</b> trong CSV (Mark, số hiệu cấu kiện…); rỗng = cột mã là
+    /// ElementId như trước.
+    /// <para>
+    /// Vì sao cần: ElementId chỉ có nghĩa trong đúng file sinh ra nó, nên bảng nghiệm thu của hiện
+    /// trường — vốn ghi "D-102" — không dùng được, và mỗi lần phát hành lại mô hình là phải xuất lại
+    /// danh sách. Khớp theo tham số đánh dấu thì file của hiện trường sống lâu hơn một bản phát hành.
+    /// </para>
+    /// </summary>
+    public string? KeyParameter { get; init; }
+
+    /// <summary>Category để tìm phần tử khi khớp theo <see cref="KeyParameter"/>; rỗng = toàn mô hình.</summary>
+    public List<string> Categories { get; init; } = new List<string>();
+
     /// <summary>Tham số ngày (kiểu Text); rỗng = từ điển <c>constructionDate</c>. Bỏ qua nếu mô hình không có.</summary>
     public string? DateParameter { get; init; }
 
@@ -50,7 +64,10 @@ public sealed class ConstructionStatusCommand : ICoreCommand<ConstructionStatusC
             return CommandResult.Fail($"E-PATH-MISSING: không tìm thấy file CSV \"{config.InputPath}\".");
         }
 
-        var csv = ProgressCsv.Read(CsvText.ReadRecords(config.InputPath).Select(r => r.ToArray()));
+        var byKey = !string.IsNullOrWhiteSpace(config.KeyParameter);
+        var csv = ProgressCsv.Read(
+            CsvText.ReadRecords(config.InputPath).Select(r => r.ToArray()),
+            byKey ? ProgressCsvKey.Text : ProgressCsvKey.ElementId);
         if (!csv.Ok)
         {
             return CommandResult.Fail(csv.FatalError);
@@ -76,6 +93,54 @@ public sealed class ConstructionStatusCommand : ICoreCommand<ConstructionStatusC
             result.Messages.Add(error);
         }
 
+        Dictionary<string, List<Element>>? keyIndex = null;
+        if (byKey)
+        {
+            ICollection<ElementId> categoryIds = new List<ElementId>();
+            if (config.Categories.Count > 0)
+            {
+                categoryIds = ParameterSync.ParameterExportCommand.ResolveCategoryIds(document, config.Categories, out var unknown);
+                if (unknown.Count > 0)
+                {
+                    return CommandResult.Fail("Category không có: " + string.Join(", ", unknown) + ".");
+                }
+            }
+
+            var collector = new FilteredElementCollector(document).WhereElementIsNotElementType();
+            var scope = categoryIds.Count > 0
+                ? collector.WherePasses(new ElementMulticategoryFilter(categoryIds.ToList())).ToElements()
+                : collector.ToElements();
+
+            keyIndex = new Dictionary<string, List<Element>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var element in scope)
+            {
+                var parameter = RevitCompat.LookupInstance(element, "constructionKey", config.KeyParameter);
+                var value = parameter?.AsString();
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    continue;
+                }
+
+                if (!keyIndex.TryGetValue(value!.Trim(), out var list))
+                {
+                    list = new List<Element>();
+                    keyIndex[value.Trim()] = list;
+                }
+
+                list.Add(element);
+            }
+
+            // Không phần tử nào MANG tham số khoá = tra sai tên tham số, không phải "mô hình không có
+            // cấu kiện nào" — hai câu đó dẫn kỹ sư đi hai hướng khác hẳn nhau.
+            if (keyIndex.Count == 0)
+            {
+                return CommandResult.Fail(
+                    $"Không phần tử nào trong phạm vi có giá trị ở tham số khoá \"{config.KeyParameter}\". "
+                    + "Kiểm lại tên tham số (keyParameter) và phạm vi (categories); "
+                    + "đánh số cấu kiện trước bằng AutoNumbering nếu tham số còn trống.");
+            }
+        }
+
         var written = 0;
         var unchanged = 0;
         var missingElement = 0;
@@ -88,78 +153,105 @@ public sealed class ConstructionStatusCommand : ICoreCommand<ConstructionStatusC
 
         foreach (var row in csv.Rows)
         {
-            var element = document.GetElement(RevitCompat.MakeId(row.ElementId));
-            if (element == null)
+            var matches = new List<Element>();
+            if (keyIndex != null)
+            {
+                if (keyIndex.TryGetValue(row.Key, out var found))
+                {
+                    matches.AddRange(found);
+                }
+            }
+            else
+            {
+                var byId = document.GetElement(RevitCompat.MakeId(row.ElementId));
+                if (byId != null)
+                {
+                    matches.Add(byId);
+                }
+            }
+
+            if (matches.Count == 0)
             {
                 missingElement++;
                 if (missingElement <= 20)
                 {
-                    result.Messages.Add($"Dòng {row.Line}: không có phần tử {row.ElementId} trong mô hình.");
+                    result.Messages.Add($"Dòng {row.Line}: không có phần tử {(keyIndex != null ? "\"" + row.Key + "\"" : row.ElementId.ToString())} trong mô hình.");
                 }
 
                 continue;
             }
 
-            var statusParameter = RevitCompat.LookupInstance(element, "constructionStatus", config.StatusParameter);
-            if (statusParameter == null)
+            // Một mã khớp nhiều phần tử là chuyện có thật (Mark trùng giữa hai category): ghi cho TẤT CẢ
+            // và nói ra, chứ không im lặng chọn cái đầu tiên.
+            if (matches.Count > 1)
             {
-                noStatusParameter.Add(row.ElementId);
-                continue;
+                result.Messages.Add($"Dòng {row.Line}: mã \"{row.Key}\" khớp {matches.Count} phần tử — ghi cho cả {matches.Count}.");
             }
 
-            if (statusParameter.IsReadOnly || statusParameter.StorageType != StorageType.String)
+            foreach (var element in matches)
             {
-                result.Messages.Add($"Dòng {row.Line}: tham số trạng thái của phần tử {row.ElementId} "
-                    + (statusParameter.IsReadOnly ? "chỉ đọc (E-PARAM-READONLY)." : "không phải kiểu Text."));
-                continue;
-            }
-
-            var current = statusParameter.AsString() ?? string.Empty;
-            ConstructionStatusValue.TryParse(current, out var currentStage);
-            if (!config.AllowDowngrade && currentStage > row.Stage)
-            {
-                downgradeBlocked++;
-                if (downgradeBlocked <= 20)
+                var label = keyIndex != null ? "\"" + row.Key + "\"" : row.ElementId.ToString();
+                var statusParameter = RevitCompat.LookupInstance(element, "constructionStatus", config.StatusParameter);
+                if (statusParameter == null)
                 {
-                    result.Messages.Add($"Dòng {row.Line}: phần tử {row.ElementId} đang là \"{current}\", "
-                        + $"CSV ghi \"{row.StatusText}\" — lùi trạng thái nên bỏ qua. Đặt allowDowngrade: true nếu đúng là muốn sửa lại.");
+                    noStatusParameter.Add(RevitCompat.IdValue(element.Id));
+                    continue;
                 }
 
-                continue;
-            }
-
-            if (string.Equals(current, row.StatusText, StringComparison.Ordinal))
-            {
-                unchanged++;
-                continue;
-            }
-
-            if (!config.DryRun)
-            {
-                statusParameter.Set(row.StatusText);
-
-                if (row.Date != null)
+                if (statusParameter.IsReadOnly || statusParameter.StorageType != StorageType.String)
                 {
-                    var text = row.Date.Value.ToString(config.DateFormat, System.Globalization.CultureInfo.InvariantCulture);
-                    if (!TrySetText(element, "constructionDate", config.DateParameter, text))
+                    result.Messages.Add($"Dòng {row.Line}: tham số trạng thái của phần tử {label} "
+                        + (statusParameter.IsReadOnly ? "chỉ đọc (E-PARAM-READONLY)." : "không phải kiểu Text."));
+                    continue;
+                }
+
+                var current = statusParameter.AsString() ?? string.Empty;
+                ConstructionStatusValue.TryParse(current, out var currentStage);
+                if (!config.AllowDowngrade && currentStage > row.Stage)
+                {
+                    downgradeBlocked++;
+                    if (downgradeBlocked <= 20)
                     {
-                        dateSkipped++;
+                        result.Messages.Add($"Dòng {row.Line}: phần tử {label} đang là \"{current}\", "
+                            + $"CSV ghi \"{row.StatusText}\" — lùi trạng thái nên bỏ qua. Đặt allowDowngrade: true nếu đúng là muốn sửa lại.");
+                    }
+
+                    continue;
+                }
+
+                if (string.Equals(current, row.StatusText, StringComparison.Ordinal))
+                {
+                    unchanged++;
+                    continue;
+                }
+
+                if (!config.DryRun)
+                {
+                    statusParameter.Set(row.StatusText);
+
+                    if (row.Date != null)
+                    {
+                        var text = row.Date.Value.ToString(config.DateFormat, System.Globalization.CultureInfo.InvariantCulture);
+                        if (!TrySetText(element, "constructionDate", config.DateParameter, text))
+                        {
+                            dateSkipped++;
+                        }
+                    }
+
+                    if (row.Person.Length > 0 && !TrySetText(element, "constructionBy", config.PersonParameter, row.Person))
+                    {
+                        personSkipped++;
+                    }
+
+                    if (row.Note.Length > 0)
+                    {
+                        TrySetText(element, "comments", config.NoteParameter, row.Note);
                     }
                 }
 
-                if (row.Person.Length > 0 && !TrySetText(element, "constructionBy", config.PersonParameter, row.Person))
-                {
-                    personSkipped++;
-                }
-
-                if (row.Note.Length > 0)
-                {
-                    TrySetText(element, "comments", config.NoteParameter, row.Note);
-                }
+                written++;
+                result.WithChanged(RevitCompat.IdValue(element.Id));
             }
-
-            written++;
-            result.WithChanged(row.ElementId);
         }
 
         // Không mã nào khớp phần tử nào = file của mô hình khác (hay của bản sao đã đổi id), không phải

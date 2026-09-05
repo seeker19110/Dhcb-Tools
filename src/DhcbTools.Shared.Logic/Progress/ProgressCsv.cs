@@ -11,6 +11,13 @@ namespace DhcbTools.Shared.Logic.Progress
     {
         public long ElementId { get; set; }
 
+        /// <summary>
+        /// Mã cấu kiện đúng như hiện trường gõ. Ở chế độ <see cref="ProgressCsvKey.ElementId"/> đây là
+        /// chính con số; ở chế độ <see cref="ProgressCsvKey.Text"/> đây là giá trị của một tham số đánh
+        /// dấu (Mark…) và <see cref="ElementId"/> để 0 — mô hình mới biết nó ứng với phần tử nào.
+        /// </summary>
+        public string Key { get; set; } = string.Empty;
+
         public ConstructionStage Stage { get; set; }
 
         /// <summary>Tên chuẩn của trạng thái (chuỗi sẽ ghi vào mô hình).</summary>
@@ -24,6 +31,19 @@ namespace DhcbTools.Shared.Logic.Progress
 
         /// <summary>Số dòng trong file (1-based, tính cả dòng tiêu đề) — để thông báo lỗi chỉ đúng chỗ.</summary>
         public int Line { get; set; }
+    }
+
+    /// <summary>Cột mã cấu kiện của CSV hiện trường trỏ vào cái gì.</summary>
+    public enum ProgressCsvKey
+    {
+        /// <summary>ElementId của đúng file đang mở — chính xác tuyệt đối, nhưng chỉ có nghĩa trong file đó.</summary>
+        ElementId = 0,
+
+        /// <summary>
+        /// Giá trị một tham số đánh dấu (Mark, số hiệu cấu kiện…). Sống được qua các bản phát hành mô hình
+        /// và là thứ hiện trường thật sự cầm trên tay — bảng nghiệm thu ghi "D-102", không ghi 1544489.
+        /// </summary>
+        Text = 1,
     }
 
     /// <summary>Kết quả đọc file CSV hiện trường.</summary>
@@ -67,6 +87,11 @@ namespace DhcbTools.Shared.Logic.Progress
 
         public static ProgressCsvResult Read(IEnumerable<string[]> records)
         {
+            return Read(records, ProgressCsvKey.ElementId);
+        }
+
+        public static ProgressCsvResult Read(IEnumerable<string[]> records, ProgressCsvKey keyKind)
+        {
             var result = new ProgressCsvResult();
             var rows = records?.ToList() ?? new List<string[]>();
             if (rows.Count < 2)
@@ -91,7 +116,9 @@ namespace DhcbTools.Shared.Logic.Progress
             var personColumn = IndexOf(header, PersonHeaders);
             var noteColumn = IndexOf(header, NoteHeaders);
 
-            var seen = new Dictionary<long, int>();
+            // Trùng mã thì lấy dòng SAU CÙNG (hiện trường sửa lại ở cuối file), nhưng vẫn báo — so sánh
+            // không phân biệt hoa thường vì "d-102" và "D-102" là cùng một cánh cửa.
+            var seen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             for (var i = 1; i < rows.Count; i++)
             {
                 var cells = rows[i];
@@ -101,10 +128,19 @@ namespace DhcbTools.Shared.Logic.Progress
                     continue;
                 }
 
-                var idText = Cell(cells, idColumn);
-                if (!long.TryParse(idText.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var id))
+                var idText = Cell(cells, idColumn).Trim();
+                var id = 0L;
+                if (keyKind == ProgressCsvKey.ElementId)
                 {
-                    result.Errors.Add($"Dòng {line}: mã cấu kiện \"{idText}\" không phải số.");
+                    if (!long.TryParse(idText, NumberStyles.Integer, CultureInfo.InvariantCulture, out id))
+                    {
+                        result.Errors.Add($"Dòng {line}: mã cấu kiện \"{idText}\" không phải số.");
+                        continue;
+                    }
+                }
+                else if (idText.Length == 0)
+                {
+                    result.Errors.Add($"Dòng {line}: ô mã cấu kiện để trống — không biết ghi trạng thái vào phần tử nào.");
                     continue;
                 }
 
@@ -134,16 +170,17 @@ namespace DhcbTools.Shared.Logic.Progress
                     date = parsed;
                 }
 
-                if (seen.TryGetValue(id, out var firstLine))
+                if (seen.TryGetValue(idText, out var firstLine))
                 {
-                    result.Errors.Add($"Dòng {line}: mã cấu kiện {id} đã có ở dòng {firstLine} — lấy dòng sau cùng.");
-                    result.Rows.RemoveAll(r => r.ElementId == id);
+                    result.Errors.Add($"Dòng {line}: mã cấu kiện {idText} đã có ở dòng {firstLine} — lấy dòng sau cùng.");
+                    result.Rows.RemoveAll(r => string.Equals(r.Key, idText, StringComparison.OrdinalIgnoreCase));
                 }
 
-                seen[id] = line;
+                seen[idText] = line;
                 result.Rows.Add(new ProgressCsvRow
                 {
                     ElementId = id,
+                    Key = idText,
                     Stage = stage,
                     Date = date,
                     Person = Cell(cells, personColumn).Trim(),
