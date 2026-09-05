@@ -52,10 +52,16 @@ internal static class CommandRunner
             var window = new UI.CommandFormWindow(uiDocument.Document, descriptor, config, ConfigPath(commandName));
 
             // Gắn cửa sổ vào Revit để nó luôn nổi lên trên và Revit không nhận thao tác khi form đang mở.
-            // Dùng handle cửa sổ chính của tiến trình thay vì Autodesk.Windows (AdWindows.dll không được
-            // tham chiếu qua package API, thêm vào chỉ để lấy owner là không đáng).
+            //
+            // Lấy handle từ CHÍNH API Revit (UIApplication.MainWindowHandle), không lấy
+            // Process.MainWindowHandle: tiến trình Revit có nhiều cửa sổ cấp cao nhất (một cái tên "Revit"
+            // ẩn, một "Hidden Window"…), và Process.MainWindowHandle trả về cái Windows tìm thấy trước —
+            // không nhất thiết là khung chính đang hiện. Chủ sai thì z-order không được bảo đảm: bấm lệnh
+            // trên Ribbon, form chạy xong là **rơi xuống dưới cửa sổ chính**, kỹ sư thấy Revit đứng im
+            // (vì form vẫn modal) mà không thấy hộp thoại đâu. Bắt được khi bấm tay Ribbon ngày
+            // 2026-09-05 — xem docs/bang-chung-test.md §33.
             new System.Windows.Interop.WindowInteropHelper(window).Owner =
-                System.Diagnostics.Process.GetCurrentProcess().MainWindowHandle;
+                commandData.Application.MainWindowHandle;
 
             window.ShowDialog();
             return window.Executed ? Result.Succeeded : Result.Cancelled;
