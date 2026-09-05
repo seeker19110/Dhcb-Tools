@@ -142,7 +142,9 @@
       "name": "Tô màu theo tham số",
       "command": "ColorByParameter",
       "config": {
-        "categories": ["Doors"],
+        "categories": [
+          "Doors"
+        ],
         "parameterName": "Mark",
         "dryRun": true
       },
@@ -311,6 +313,60 @@
         "maxMs": 120000,
         "filesExist": [
           "{outputFolder}/rule-check.html"
+        ]
+      }
+    },
+    {
+      "name": "Kiểm mô hình theo file IDS của chủ đầu tư",
+      "command": "IdsValidate",
+      "//": [
+        "Muc 11.1. Ba specification trong fixture nham ba ket cuc khac nhau: co dat co truot (Tag cua cua),",
+        "phan lon dat (vat lieu tuong), va MOT specification khong co phan tu nao ap dung — bao cao phai NOI RA",
+        "cai thu ba thay vi in '0 khong dat' nhu the la dat."
+      ],
+      "config": {
+        "idsPath": "{suiteFolder}/fixtures/yeu-cau-thong-tin.ids",
+        "outputPath": "{outputFolder}/ids-check.html",
+        "csvPath": "{outputFolder}/ids-check.csv",
+        "categories": [
+          "Doors",
+          "Walls"
+        ]
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 120000,
+        "summaryContains": [
+          "specification"
+        ],
+        "messagesContain": [
+          "KHÔNG phần tử nào lọt bộ lọc"
+        ],
+        "filesExist": [
+          "{outputFolder}/ids-check.html",
+          "{outputFolder}/ids-check.csv"
+        ],
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
+      "name": "Báo lỗi rõ khi file IDS không có specification nào",
+      "command": "IdsValidate",
+      "//": "File IDS rong sinh ra bao cao 'khong loi nao' — dung loai no-op im lang ma §27 da gap o duong xuat IFC.",
+      "config": {
+        "idsPath": "{suiteFolder}/fixtures/yeu-cau-thong-tin-rong.ids",
+        "outputPath": "{outputFolder}/ids-rong.html"
+      },
+      "expect": {
+        "success": false,
+        "maxMs": 30000,
+        "summaryContains": [
+          "không có <specification>"
+        ],
+        "neverContains": [
+          "Exception"
         ]
       }
     },
@@ -542,7 +598,10 @@
       "name": "Toạ độ định vị — tim cột + giao trục ra CSV/DXF cho máy toàn đạc",
       "command": "SetoutExport",
       "config": {
-        "categories": ["Structural Columns", "Columns"],
+        "categories": [
+          "Structural Columns",
+          "Columns"
+        ],
         "includeGridIntersections": true,
         "outputPath": "{outputFolder}/setout.csv",
         "dxfPath": "{outputFolder}/setout.dxf"
@@ -584,7 +643,9 @@
       "name": "Báo cáo tiến độ — mẫu số gồm cả cấu kiện chưa ai ghi nhận",
       "command": "ProgressReport",
       "config": {
-        "categories": ["Doors"],
+        "categories": [
+          "Doors"
+        ],
         "groupBy": "Level",
         "statusParameter": "Comments",
         "outputPath": "{outputFolder}/tien-do.html",
@@ -608,7 +669,9 @@
       "name": "Báo cáo tiến độ — E-PARAM-MISSING khi không phần tử nào mang tham số trạng thái",
       "command": "ProgressReport",
       "config": {
-        "categories": ["Doors"],
+        "categories": [
+          "Doors"
+        ],
         "statusParameter": "DHCB_ThamSoKhongTonTai",
         "outputPath": "{outputFolder}/tien-do-sai.html"
       },

@@ -280,6 +280,15 @@ public sealed class ParameterRuleCheckRibbonCommand : IExternalCommand
         => CommandRunner.Run(commandData, "ParameterRuleCheck");
 }
 
+/// <summary>Kiểm mô hình theo file IDS 1.0 của chủ đầu tư / tư vấn thẩm tra.</summary>
+[Transaction(TransactionMode.Manual)]
+[Regeneration(RegenerationOption.Manual)]
+public sealed class IdsValidateRibbonCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        => CommandRunner.Run(commandData, "IdsValidate");
+}
+
 /// <summary>Dò va chạm nội bộ, xuất HTML + 3D view, đọc clash-accepted.json.</summary>
 [Transaction(TransactionMode.Manual)]
 [Regeneration(RegenerationOption.Manual)]

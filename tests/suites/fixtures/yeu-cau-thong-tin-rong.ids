@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- File IDS hợp lệ về XML nhưng KHÔNG khai specification nào: lệnh phải từ chối, vì kiểm xong
+     "không phát hiện gì" trên một bộ quy tắc rỗng là câu nói dối dễ tin nhất. -->
+<ids xmlns="http://standards.buildingsmart.org/IDS">
+  <info>
+    <title>DHCB — bộ IDS rỗng, dùng cho ca kiểm đường lỗi</title>
+  </info>
+  <specifications>
+  </specifications>
+</ids>

@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using Autodesk.Revit.ApplicationServices;
 using Autodesk.Revit.UI;
 using DhcbTools.Core.Updaters;
@@ -152,6 +152,8 @@ public sealed class App : IExternalApplication
         var checks = application.CreateRibbonPanel(TabName, "Kiểm tra & AI");
         Add(checks, path, "DhcbParameterRuleCheck", "Kiểm tra\ntham số", "ParameterRuleCheckRibbonCommand",
             "Đối chiếu tham số với bộ quy tắc trong parameter-rules.json.");
+        Add(checks, path, "DhcbIdsValidate", "Kiểm theo\nIDS", "IdsValidateRibbonCommand",
+            "Kiểm mô hình theo file IDS 1.0 của chủ đầu tư / tư vấn thẩm tra (buildingSMART).");
         Add(checks, path, "DhcbClashDetection", "Kiểm tra\nva chạm", "ClashDetectionRibbonCommand",
             "Dò va chạm nội bộ, xuất HTML + 3D view, đọc clash-accepted.json.");
         checks.AddSeparator();
@@ -293,7 +295,7 @@ public sealed class App : IExternalApplication
         "DhcbSheetTools" or "DhcbSheetRename" or "DhcbRevisionOnSheets" or "DhcbViewportCopy"
             or "DhcbColorByParameter" or "DhcbStyleTools" or "DhcbStylePurge" or "DhcbFamilyAudit"
             => RibbonIcons.Sheets,
-        "DhcbParameterRuleCheck" or "DhcbClashDetection" or "DhcbAiTools" or "DhcbCadLayerMap" or "DhcbSpecToConfig"
+        "DhcbParameterRuleCheck" or "DhcbIdsValidate" or "DhcbClashDetection" or "DhcbAiTools" or "DhcbCadLayerMap" or "DhcbSpecToConfig"
             or "DhcbDictionaryLearn"
             => RibbonIcons.Checks,
         _ => RibbonIcons.Mepf,

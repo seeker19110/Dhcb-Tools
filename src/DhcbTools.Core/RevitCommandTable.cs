@@ -87,6 +87,7 @@ public static class RevitCommandTable
                 "PROGRESSREPORT" => new ProgressReportCommand().Execute(doc, Deserialize<ProgressReportConfig>(configJson)),
 
                 "PARAMETERRULECHECK" => new ParameterRuleCheckCommand().Execute(doc, Deserialize<ParameterRuleCheckConfig>(configJson)),
+                "IDSVALIDATE" => new IdsValidateCommand().Execute(doc, Deserialize<IdsValidateConfig>(configJson)),
                 "CLASHDETECTION" => new ClashDetectionCommand().Execute(doc, Deserialize<ClashDetectionConfig>(configJson)),
 
                 "CADLAYERMAP" => new CadLayerMapCommand().Execute(doc, Deserialize<CadLayerMapConfig>(configJson)),

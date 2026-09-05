@@ -28,7 +28,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 
 ---
 
-## Revit — 48 lệnh
+## Revit — 49 lệnh
 
 | Lệnh | Việc nó làm | Tuần | Bỏ | Chưa | Nếu bỏ: vì sao |
 |---|---|:--:|:--:|:--:|---|
@@ -76,6 +76,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 | `ConstructionStatus` | Ghi trạng thái thi công từ CSV hiện trường vào mô hình *(thử nghiệm)* | ☐ | ☐ | ☐ | |
 | `ProgressReport` | Báo cáo tiến độ: % theo số lượng và chiều dài, gộp theo tầng/hệ, luỹ kế theo tuần *(thử nghiệm)* | ☐ | ☐ | ☐ | |
 | `ParameterRuleCheck` | Kiểm tra tham số thiếu / sai quy tắc đặt tên → HTML | ☐ | ☐ | ☐ | |
+| `IdsValidate` | Kiểm mô hình theo file IDS 1.0 của chủ đầu tư/thẩm tra → HTML + CSV | ☐ | ☐ | ☐ | |
 | `ClashDetection` | Va chạm giữa hai nhóm category → HTML + 3D view | ☐ | ☐ | ☐ | |
 | `CadLayerMap` | AI offline: gợi ý map layer CAD → Revit type, CSV để duyệt | ☐ | ☐ | ☐ | |
 | `SpecToConfig` | AI offline: trích tầng/cao độ/hệ từ thuyết minh → config | ☐ | ☐ | ☐ | |
