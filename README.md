@@ -77,7 +77,7 @@ tools/    autocad-mcp-server/ (MCP + panel web cho Hermes) · mcpb/ (manifest g�
 installer/ dhcb-tools.iss (Inno Setup) · PackageContents.xml
 jobs/     nightly.sample.json · autocad-nightly.sample.json
 configs/  parameter-rules · layer-rules · ai · settings · dictionary (mẫu)
-tests/    DhcbTools.Shared.Logic.Tests (chạy trên CI Linux — số ca xem output CI) + suites/ (ca kiểm chạy trong Revit & AutoCAD)
+tests/    DhcbTools.Shared.Logic.Tests + DhcbTools.BatchRunner.Tests (chạy trên CI Linux — số ca xem output CI) + suites/ (ca kiểm chạy trong Revit & AutoCAD)
 ```
 
 ## Lệnh

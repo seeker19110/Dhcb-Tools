@@ -13,6 +13,7 @@ Revit API và AutoCAD .NET API **không mock được một cách trung thực**
 | Tầng | Chứa gì | Kiểm thử thế nào |
 |---|---|---|
 | `DhcbTools.Shared.Logic` | CSV, số, đánh số, số học MEPF, tên file, HTML, token | **xUnit tự động, chạy trên CI Linux** |
+| `DhcbTools.BatchRunner` (đường CLI) | mã thoát và thông điệp khi **đầu vào hỏng**: .ifc rác, IDS hỏng/rỗng, job hỏng, nhật ký bị sửa, gói bàn giao | **xUnit tự động, chạy trên CI Linux** (`tests/DhcbTools.BatchRunner.Tests`, §47) |
 | `DhcbTools.Core*` | logic có `Document`/`Database` | kịch bản thủ công trên file mẫu (§4), có checklist |
 | `DhcbTools.Revit` / `DhcbTools.AutoCAD` | Ribbon, ExternalCommand, Bridge | kịch bản thủ công (§4.1) |
 

@@ -22,6 +22,9 @@ dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.cspr
 echo "== build BatchRunner"
 dotnet build src/DhcbTools.BatchRunner/DhcbTools.BatchRunner.csproj -nologo -v:q -clp:ErrorsOnly
 
+echo "== test CLI BatchRunner (đầu vào hỏng)"
+dotnet test tests/DhcbTools.BatchRunner.Tests/DhcbTools.BatchRunner.Tests.csproj -nologo -v:q
+
 for proj in src/DhcbTools.Core/DhcbTools.Core.csproj src/DhcbTools.Core.AutoCAD/DhcbTools.Core.AutoCAD.csproj \
             src/DhcbTools.Revit/DhcbTools.Revit.csproj src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj \
             src/DhcbTools.AutoCAD.Core/DhcbTools.AutoCAD.Core.csproj; do
