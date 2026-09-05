@@ -186,6 +186,7 @@
           "Structural Framing"
         ],
         "outputPath": "{outputFolder}/clash.html",
+        "bcfPath": "{outputFolder}/clash.bcf",
         "create3dView": false
       },
       "expect": {
@@ -196,7 +197,8 @@
           "Không có phần tử nhóm B nào để xét"
         ],
         "filesExist": [
-          "{outputFolder}/clash.html"
+          "{outputFolder}/clash.html",
+          "{outputFolder}/clash.bcf"
         ],
         "neverContains": [
           "Exception"
@@ -230,6 +232,43 @@
         "success": false,
         "summaryContains": [
           "line style"
+        ],
+        "maxMs": 60000
+      }
+    },
+    {
+      "name": "Model line từ CAD — xem trước, không tạo gì",
+      "command": "ModelLinesFromCad",
+      "config": {
+        "includeLayers": [
+          "M-*"
+        ],
+        "excludeLayers": [
+          "*-TEXT"
+        ],
+        "dryRun": true
+      },
+      "//": "Model mau HVAC co the khong co DWG nao import — nen success de null: ca hai duong (co ban ve thi dem duoc, khong co thi E-PRECOND noi ro) deu la ket qua dung. Dieu ca nay chot la lenh KHONG NEM EXCEPTION khi doc hinh hoc, va che do xem truoc mac dinh bat nen khong co transaction nao mo ra.",
+      "expect": {
+        "success": null,
+        "maxMs": 120000,
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
+      "name": "Báo lỗi rõ khi không có bản vẽ CAD nào khớp tên",
+      "command": "ModelLinesFromCad",
+      "config": {
+        "dwgNameContains": "DHCB-KHONG-CO-BAN-VE-NAY",
+        "dryRun": true
+      },
+      "//": "Khong tim thay ban ve thi phai dung bang E-PRECOND, khong duoc bao 'thanh cong, 0 model line' — 0 duong o day la cau noi ve BO LOC chu khong phai ve mo hinh.",
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "bản vẽ CAD"
         ],
         "maxMs": 60000
       }

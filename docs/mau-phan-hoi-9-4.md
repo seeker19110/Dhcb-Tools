@@ -28,7 +28,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 
 ---
 
-## Revit — 46 lệnh
+## Revit — 47 lệnh
 
 | Lệnh | Việc nó làm | Tuần | Bỏ | Chưa | Nếu bỏ: vì sao |
 |---|---|:--:|:--:|:--:|---|
@@ -47,6 +47,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 | `HangerAuto` | Đặt hanger theo khoảng cách chuẩn | ☐ | ☐ | ☐ | |
 | `PipeSplitter` | Chia ống/duct theo chiều dài cây | ☐ | ☐ | ☐ | |
 | `ConnectorChecker` | Liệt kê connector MEP hở | ☐ | ☐ | ☐ | |
+| `ModelLinesFromCad` | Dựng model line từ bản vẽ CAD đã link/import (lọc layer, bỏ đoạn rác và đường vẽ chồng, nối đoạn thẳng hàng) để RouteFromLines dựng ống (thử nghiệm) | ☐ | ☐ | ☐ | |
 | `RouteFromLines` | Routing mức A: dựng duct/pipe/tray từ model line vẽ tay | ☐ | ☐ | ☐ | |
 | `DevicePlacement` | Routing mức B: rải thiết bị đầu cuối theo phòng | ☐ | ☐ | ☐ | |
 | `SizingProposal` | Đề xuất kích thước duct/pipe theo lưu lượng → CSV | ☐ | ☐ | ☐ | |

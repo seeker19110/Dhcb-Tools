@@ -265,6 +265,36 @@ theo vị trí cấu hình được (`center`, hoặc toạ độ mm). Bỏ qua 
 
 # Giai đoạn 3 — MEPF (phần còn lại)
 
+## 3.0 `ModelLinesFromCad` — model line từ bản vẽ CAD (đề xuất C4)
+
+Mắt xích trước §3.1: `CadLayerMap` map được layer, `RouteFromLines` dựng được ống từ model line —
+nhưng không ai dựng **model line** từ DWG, nên kỹ sư vẫn vẽ lại tuyến bằng tay đè lên bản vẽ CAD.
+
+**Đầu vào:** DWG đã link/import trong mô hình (`dwgNameContains` lọc theo tên), `includeLayers` /
+`excludeLayers` (wildcard `*` `?` `~` như `CadLayerMap`), `lineStyleName` (đặt trùng `lineStyleName`
+của §3.1 để hai lệnh nối tiếp), `levelName` + `offsetMm`, `minLengthMm`, `weldToleranceMm`,
+`mergeCollinear`, `includeArcs`, `flatten`, `maxLines`, `dryRun` (mặc định **bật**).
+
+**Ba việc quyết định lệnh dùng được hay không, cả ba nằm ở tầng thuần `Shared.Logic.Cad.CadCurveFilter`:**
+
+1. **Đường vẽ chồng hai lần chỉ ra một model line.** Copy giữa các bản vẽ hay để lại hai đường trùng
+   nhau; hai model line trùng thành hai ống chồng nhau mà nhìn mặt bằng không thấy. So trùng theo dung
+   sai, nhận cả trường hợp **vẽ ngược chiều**; cung phải trùng cả điểm giữa (hai cung cong ngược nhau
+   chung hai đầu mút là hai hình khác nhau).
+2. **Bỏ đoạn rác** ngắn hơn `minLengthMm` — dư âm của trim/extend.
+3. **Nối đoạn thẳng hàng nhưng không nối xuyên ngã ba**: chỗ ba đoạn gặp nhau là nhánh rẽ của tuyến,
+   nối qua đó là xoá mất một nhánh.
+
+`flatten` (mặc định bật) ép mọi đường về đúng cao độ tầng + `offsetMm`: mặt bằng CAD hay mang Z rác,
+dựng nguyên Z đó ra là tuyến gãy khúc lên xuống mà nhìn mặt bằng không thấy.
+
+**Chạy lại không sinh bản sao:** đường nào đã có model line trùng hình (cùng line style, hai đầu mút
+trong dung sai) thì bỏ qua và **đếm riêng** — cùng cách chốt idempotent của §12. So trùng ở đây **bỏ
+qua tên layer**, vì model line mang tên line style của Revit chứ không mang tên layer DWG.
+
+Không tìm thấy bản vẽ, hoặc bộ lọc loại hết đường → **`E-PRECOND`** kèm danh sách layer đọc được, chứ
+không báo "thành công, 0 model line" — 0 đường ở đây là câu nói về bộ lọc, không phải về bản vẽ.
+
 ## 3.1 Routing mức A — bán tự động theo tuyến vẽ tay
 
 **Đầu vào:** model line / detail line kỹ sư đã vẽ (chọn theo `LineStyleName` trong config), cộng:
@@ -389,6 +419,15 @@ vùng cho từng va chạm (dùng lại cơ chế của `ConnectorCheckerCommand
 > view khi **chạy thật**, không tạo ở lần xem trước.
 Bỏ qua cặp đã được đánh dấu "chấp nhận" trong file `clash-accepted.json` (khoá là cặp ElementId +
 hash vị trí, để cặp cũ không quay lại báo sau mỗi lần chạy đêm).
+
+**Xuất BCF 2.1** (đề xuất B3 của [`nghien-cuu-chuoi-den-hoan-cong.md`](nghien-cuu-chuoi-den-hoan-cong.md)):
+khai thêm `bcfPath` (ví dụ `C:\...\clash.bcf`, tuỳ chọn `bcfProjectName`) thì ngoài HTML, lệnh ghi một
+file BCF mở thẳng được trong Navisworks / Solibri / BIMcollab — mỗi va chạm là một topic có camera phối
+cảnh nhìn vào tâm va chạm và hai phần tử liên quan (ElementId hai phía, phía link ghi kèm tên link).
+GUID của topic sinh từ chính `key` trong `clash-accepted.json`, nên **xuất lại cùng một va chạm vẫn ra
+đúng topic cũ** thay vì đẻ ra vấn đề mới bên phần mềm điều phối. Toạ độ trong file là **mét** theo chuẩn
+BCF. Ghi BCF hỏng thì chỉ báo trong `Messages`, không làm hỏng lượt quét đã ghi HTML xong.
+**Phần thuần:** `Shared.Logic.Bcf` (`BcfWriter` — zip + XML, không đụng `Document` nào).
 
 ---
 

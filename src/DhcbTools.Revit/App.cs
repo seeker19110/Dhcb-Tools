@@ -96,7 +96,9 @@ public sealed class App : IExternalApplication
         Add(mepf, path, "DhcbConnectorCheck", "Kiểm tra\nConnector hở", "ConnectorCheckerAutoCommand",
             "Tìm và liệt kê connector MEP chưa kết nối. Tạo 3D view khoanh vùng.");
         mepf.AddSeparator();
-        Group(mepf, path, "DhcbRouting", "Đi\ntuyến", "Dựng tuyến ống/duct: theo line, theo phòng, hoặc tự tìm đường.",
+        Group(mepf, path, "DhcbRouting", "Đi\ntuyến", "Dựng tuyến ống/duct: từ bản vẽ CAD, theo line, theo phòng, hoặc tự tìm đường.",
+            ("DhcbModelLinesFromCad", "Model line từ CAD (thử nghiệm)", "ModelLinesFromCadRibbonCommand",
+                "Dựng model line từ DWG đã link/import theo layer, để bước sau đi ống theo line."),
             ("DhcbRouteFromLines", "Đi ống theo line (A)", "RouteFromLinesRibbonCommand",
                 "Dựng ống/duct từ model line vẽ tay (routing mức A)."),
             ("DhcbDevicePlacement", "Rải thiết bị (B)", "DevicePlacementRibbonCommand",

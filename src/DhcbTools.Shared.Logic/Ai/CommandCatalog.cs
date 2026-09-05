@@ -172,6 +172,23 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("lineStyleName", "line style tuyến").Field("elementType", "Duct/Pipe/CableTray/Conduit").Field("typeName", "type").Field("systemType", "hệ")
                 .Field("sizeMm", "{width,height} hoặc {diameter}").Field("offsetMm", "cao độ").Field("dryRun", "xem trước")
                 .Words("routing", "dựng tuyến", "đi ống theo line", "dựng duct", "dựng ống"),
+            // Mắt xích trước RouteFromLines: dựng chính model line mà lệnh trên cần, từ DWG đã link/import.
+            // "(thử nghiệm)" theo nguyên tắc 6 — có ca kiểm nhưng chưa chạy thật trong Revit.
+            new CommandDescriptor("ModelLinesFromCad", Revit, "Dựng model line từ bản vẽ CAD đã link/import (lọc layer, bỏ đoạn rác và đường vẽ chồng, nối đoạn thẳng hàng) để RouteFromLines dựng ống (thử nghiệm)", true, "LineTuCad", "CadToLines")
+                .Field("dwgNameContains", "chỉ đọc bản vẽ CAD có tên chứa chuỗi này (rỗng = mọi DWG trong mô hình)")
+                .Field("includeLayers", "layer lấy đường, hỗ trợ * ? ~ (rỗng = mọi layer)", FieldKind.TextList)
+                .Field("excludeLayers", "layer bỏ, xét sau danh sách lấy (ví dụ *-TEXT, *-DIM)", FieldKind.TextList)
+                .Field("lineStyleName", "line style cho model line — đặt trùng lineStyleName của RouteFromLines")
+                .Field("levelName", "tầng đặt model line (rỗng = tầng thấp nhất)")
+                .Field("offsetMm", "cao độ so với tầng (mm)", FieldKind.Number)
+                .Field("flatten", "ép mọi đường về một cao độ (mặc định bật — Z của mặt bằng CAD thường là rác)", FieldKind.Bool)
+                .Field("minLengthMm", "bỏ đoạn ngắn hơn (mm) — rác trim/extend", FieldKind.Number)
+                .Field("weldToleranceMm", "dung sai gộp đầu mút và so trùng (mm)", FieldKind.Number)
+                .Field("mergeCollinear", "nối các đoạn thẳng hàng nối tiếp thành một", FieldKind.Bool)
+                .Field("includeArcs", "lấy cả cung tròn", FieldKind.Bool)
+                .Field("maxLines", "giới hạn số model line một lượt", FieldKind.Number)
+                .Field("dryRun", "xem trước: đếm nhưng không tạo")
+                .Words("model line từ cad", "dựng line từ dwg", "vẽ lại tuyến từ cad", "cad sang model line", "line từ bản vẽ"),
             new CommandDescriptor("DevicePlacement", Revit, "Routing mức B: rải thiết bị đầu cuối theo phòng", true, "RouteB", "PlaceDevices")
                 .Field("deviceFamily", "family thiết bị").Field("roomFilter", "{levelName, nameContains}").Field("pattern", "{spacingXMm, spacingYMm, marginMm}").Field("dryRun", "xem trước")
                 .Words("rải sprinkler", "rải miệng gió", "đặt thiết bị theo phòng", "sprinkler", "diffuser"),

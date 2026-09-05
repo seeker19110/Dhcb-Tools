@@ -280,4 +280,21 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
    [`tien-do-thi-cong.md`](tien-do-thi-cong.md).
    Lý do làm A1/B1 trước các đề xuất còn lại: chỉ đọc hoặc chỉ ghi tham số, tầng thuần chiếm phần lớn, và cả
    hai mở thêm **nhóm người dùng khác** (tổ trắc đạc, ban chỉ huy công trường) cho chính vòng 9.4.
-10. **Không mở P3** — giữ hướng chiều sâu theo [`roadmap.md`](roadmap.md).
+10. ~~**B3 — BCF cho `ClashDetection`**~~ — xong 2026-09-05: khai `bcfPath` thì lệnh ghi thêm file **BCF 2.1**
+   mở thẳng trong Navisworks/Solibri/BIMcollab, mỗi va chạm một topic có camera nhìn vào tâm. Làm được ngay,
+   không chờ 9.4, vì toàn bộ .bcf là **zip + XML** — tầng thuần `Shared.Logic/Bcf` (21 ca test đọc lại chính
+   file vừa ghi) chiếm gần hết, và nó chỉ **thêm đầu ra cho lệnh đã chạy thật** nên không vướng nguyên tắc 6
+   như một lệnh Core mới. Điều đắt nhất khi làm không phải XML mà là **GUID topic phải ổn định**: sinh từ
+   `key` va chạm (đúng khoá của `clash-accepted.json`), nếu không thì mỗi đêm chạy lại là tư vấn thấy toàn
+   vấn đề mới và nhận xét họ đã ghi nằm lại ở vấn đề cũ. ⬜ Còn: một lượt `revit-mep` để chốt file thật mở
+   được trong phần mềm điều phối (ca kiểm đã có, chỉ kiểm file có sinh ra).
+11. ~~**C4 — `ModelLinesFromCad`**~~ — xong 2026-09-05, khép nhóm "song song, rẻ". Từ nay DWG đã link/import
+   dựng thẳng ra model line theo layer, `RouteFromLines` ăn tiếp — trước đó kỹ sư vẫn **vẽ tay lại tuyến**
+   đè lên bản vẽ CAD, tức là mắt xích duy nhất còn đứt giữa `CadLayerMap` và `RouteFromLines`. Tầng thuần
+   `Cad/CadCurveFilter` (23 ca test) giữ ba điều: **đường vẽ chồng hai lần không thành hai model line**
+   (hai ống chồng nhau thì nhìn mặt bằng không thấy), bỏ đoạn rác trim/extend, và nối đoạn thẳng hàng
+   **nhưng không nối xuyên ngã ba** — nối qua đó là xoá mất một nhánh tuyến. Chạy lại không sinh bản sao
+   (so trùng bỏ qua tên layer, vì model line mang tên line style chứ không mang tên layer DWG).
+   ⬜ Còn: một lượt `revit-mep` trên model **có DWG thật** — ca kiểm hiện tại chốt đường E-PRECOND và
+   đường xem trước không ném exception, còn số đường đọc được thì phải có bản vẽ thật mới biết.
+12. **Không mở P3** — giữ hướng chiều sâu theo [`roadmap.md`](roadmap.md).
