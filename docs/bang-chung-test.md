@@ -1480,3 +1480,108 @@ bằng cách ép `AcadQueryHandler.cs` về LF rồi trả lại CRLF, chạy te
 riêng (mỗi `autocad-<năm>` trỏ đúng `Contents\<năm>`, component khai báo khớp component sử dụng, XML hợp lệ,
 `.iss` và `PackageContents.xml` cùng bộ năm 2024/2025/2026). Installer thật chỉ dựng khi đẩy tag; và chưa ai
 **cài rồi mở AutoCAD 2026** từ gói do installer đặt — §25 chạy trên bundle chép tay.
+
+---
+
+## 27. Kiểm IFC trước nộp — và một đường xuất chưa bao giờ chạy được (2026-09-05 12:40 ICT)
+
+Mục **11.2**. Việc định làm là tầng thuần đọc lại file IFC. Việc thật sự làm được nhiều hơn, vì hai lần
+"chạy trên đồ thật" — một lần trong Revit, một lần trên chính file 91 MB Revit vừa xuất — mỗi lần lại lộ
+ra một lỗi mà bộ test tự viết không thể bắt.
+
+### Lỗi thứ nhất: `BatchExport` định dạng `Ifc` chưa bao giờ tạo ra file nào
+
+Thêm ca kiểm *"Xuất IFC4 — GHI THẬT ra file"* vào `tests/suites/revit-write.json` rồi chạy thật trên
+Revit 2024.3, model `Snowdon Towers Sample Architectural.rvt`:
+
+```
+| Xuất IFC4 — GHI THẬT ra file | BatchExport | ❌ trượt | 52 ms | Xuất xong 0 file(s) (57 bản vẽ × 1 định dạng). 1 lỗi. |
+```
+
+52 mili giây cho một model 300 MB là con số của một lệnh **không làm gì**. Nhưng ca kiểm chỉ nói "mong ảnh
+hưởng ≥ 1 nhưng chỉ 0" — chưa nói vì sao. Thêm `"noErrors": true` vào kỳ vọng rồi chạy lại thì lỗi thật hiện ra:
+
+```
+- mong không có Errors nhưng có 1: [Ifc] Modifying  is forbidden because the document has no open transaction.
+```
+
+Khác PDF/DWG/NWC, **bộ xuất IFC dựng phần tử tạm ngay trong mô hình** rồi mới ghi ra đĩa, nên Revit đòi một
+transaction đang mở. Đường này hỏng **từ ngày viết lệnh** và im lặng suốt vì `catch` trong vòng lặp định dạng
+gom ngoại lệ vào `CommandResult.Errors` nhưng vẫn trả `Ok`: summary đọc lên là *"Xuất xong 0 file(s) … 1 lỗi"*,
+`success` vẫn `true`, và **không ca kiểm nào nhìn vào `Errors`**. Đúng lớp lỗi mà mục 8.1 gọi là *no-op im lặng*
+— chỉ khác là lần này nó nấp sau một danh sách lỗi có ghi chép hẳn hoi mà không ai đọc.
+
+Sửa: bọc `doc.Export` trong transaction rồi **`RollBack`** (file đã nằm trên đĩa; phần tử tạm không được ở lại
+trong mô hình sau một lệnh đáng lẽ chỉ đọc). Chạy lại trọn bộ ghi:
+
+| Lượt | Kết quả | `BatchExport` Ifc |
+|---|---|---|
+| Trước khi sửa | 11 đạt / 1 trượt | 0 file, 52 ms |
+| Sau khi sửa | **12 đạt / 0 trượt** | **1 file, 91.582.143 byte, 164.731 ms** |
+
+Ca kiểm giữ luôn `noErrors: true`, nên lần sau có định dạng nào ném ngoại lệ thì ca đỏ ngay chứ không lọt.
+
+### Lỗi thứ hai: bộ kiểm báo nhầm 106 "mã định danh trùng nhau"
+
+Đọc lại chính file 91 MB đó bằng công cụ vừa viết:
+
+```
+DhcbTools.BatchRunner --verify-ifc "…\Snowdon Towers Sample Architectural.ifc"
+Lược đồ: IFC4 · 925815 thực thể
+[Lỗi] Có 35480 thực thể mang mã định danh rỗng hoặc không hợp lệ: #120, #127, #128 … và 35470 nữa.
+[Lỗi] Có 106 mã định danh trùng nhau: TreadLengthAtInnerSide (#27132 và #27141) …
+```
+
+`TreadLengthAtInnerSide` là **tên một thuộc tính**, không phải mã định danh. Nó lọt vì bộ kiểm nhận dạng mã
+định danh bằng "22 ký tự trong bảng base64 của IFC" — mà tên ấy dài **đúng 22 chữ cái**. Thiếu một ràng buộc:
+22 ký tự × 6 bit = 132 bit cho một số 128 bit, nên **ký tự đầu chỉ chở được 2 bit** và luôn nằm trong `0`–`3`.
+Thêm ràng buộc đó, chạy lại đúng file ấy:
+
+```
+Lược đồ: IFC4 · 925815 thực thể
+Đạt: không có lỗi.
+exit=0   (5,1 giây)
+```
+
+Cả hai dòng báo sai biến mất, và **không có** dòng báo đúng nào biến mất theo. Đây là lý do phải chạy trên file
+thật: 44 ca test trên file mẫu tự viết đều xanh trước lẫn sau khi sửa — file mẫu không có tên thuộc tính nào dài
+đúng 22 ký tự. Ca `NhanDangMaDinhDanhTheoDungDangNenCuaIfc` nay chốt chặn bằng chính chuỗi đã bắt hụt.
+
+> Báo sai nguy hiểm hơn bỏ sót: một bộ kiểm báo 35.480 lỗi giả ở lần chạy đầu tiên thì kỹ sư tắt nó đi, và
+> sau đó nó không bắt được gì nữa.
+
+### Chạy với bộ quy tắc của dự án
+
+Cùng file, thêm `--ifc-spec` khai Pset bắt buộc:
+
+```
+[Lỗi] IFCWALL: 17/1078 phần tử thiếu thuộc tính Pset_WallCommon.LoadBearing: #444302 Parapet Cap Bandstand… và 7 nữa.
+[Lỗi] IFCDOOR: 19/132 phần tử thiếu thuộc tính Pset_DoorCommon.FireRating: #45867 Door-Passage-Single-Flush-Dbl_Acting:36" x 96":742710 … và 9 nữa.
+[Lỗi] IFCSLAB: 17/227 phần tử chưa gán mã phân loại: #26956 Assembled Stair:Stair:620883 Landing 1 … và 7 nữa.
+Không đạt: 3 lỗi.   exit=1
+```
+
+Ba con số này là **thật trên model mẫu của Autodesk**, không phải dựng lên để minh hoạ: 17 bức tường trang trí
+không có `LoadBearing`, 19 cánh cửa không có `FireRating`, 17 chiếu nghỉ cầu thang chưa gán mã phân loại. Đó
+đúng là loại thiếu sót mà bên thẩm tra trả hồ sơ về.
+
+### Mã thoát và tốc độ
+
+| Lệnh | Mã thoát |
+|---|---|
+| File đúng, quy tắc mặc định | 0 |
+| File hỏng cố ý (lệch lược đồ, tham chiếu `#99` không tồn tại, trùng mã, thiếu tên, thiếu Pset) | 1 — in 9 lỗi |
+| Không có file IFC | 2 |
+| Không có file quy tắc | 2 |
+
+**925.815 thực thể / 91 MB đọc và kiểm hết trong 5,1 giây**, bộ đọc STEP viết tay không phụ thuộc thư viện IFC
+nào — đặt được vào cuối job đêm mà không kéo dài đêm batch.
+
+### Cái chưa chứng minh
+
+- **Chưa chạy trên IFC2X3** — model mẫu xuất IFC4. Bộ đọc không phân biệt bản lược đồ (chỉ đọc `FILE_SCHEMA`),
+  nhưng vị trí tham số của `IfcClassificationReference` giữa hai bản có khác nhau một chỗ, mã đã đọc cả hai vị trí
+  mà chưa có file thật để chốt.
+- **Chưa đối chiếu với IfcTester/Solibri** trên cùng một file — việc đó thuộc mục 11.4, và chỉ có nghĩa khi đã
+  chuyển sang khai quy tắc bằng IDS (11.1).
+- **Chưa có file `.ifcZIP`**: bộ đọc chỉ đọc IFC dạng văn bản.

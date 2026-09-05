@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using DhcbTools.Shared.Logic.Ai;
 using DhcbTools.Shared.Logic.Batch;
+using DhcbTools.Shared.Logic.Ifc;
 using Newtonsoft.Json.Linq;
 
 namespace DhcbTools.BatchRunner;
@@ -12,6 +13,7 @@ namespace DhcbTools.BatchRunner;
 ///                           [--accoreconsole "C:\Program Files\Autodesk\AutoCAD 2024\accoreconsole.exe"] [--plugin-dll path]
 ///                           [--report-only] [--analyze]
 ///                           [--verify-log logs/2026-09-04/run-013000.jsonl]
+///                           [--verify-ifc xuat/toa-a.ifc [--ifc-spec configs/ifc-check.json]]
 /// Mã thoát: 0 mọi step OK · 1 có step lỗi/bỏ qua · 2 lỗi cấu hình.
 /// Log: logs/{yyyy-MM-dd}/run-HHmmss.jsonl (mỗi lần chạy một file); --report-only lấy lần mới nhất.
 /// </summary>
@@ -31,6 +33,12 @@ public static class Program
         if (!string.IsNullOrEmpty(opts.VerifyLog))
         {
             return VerifyLog(opts.VerifyLog!);
+        }
+
+        // Kiểm file IFC cũng là việc độc lập: chỉ đọc một file văn bản, không mở Revit/AutoCAD.
+        if (!string.IsNullOrEmpty(opts.VerifyIfc))
+        {
+            return VerifyIfc(opts.VerifyIfc!, opts.IfcSpec);
         }
 
         BatchJob job;
@@ -111,6 +119,51 @@ public static class Program
         var result = RunLog.VerifyFile(path);
         Console.WriteLine(path);
         Console.WriteLine(result.Message);
+        return result.Ok ? 0 : 1;
+    }
+
+    /// <summary>
+    /// <c>--verify-ifc</c>: đọc lại file IFC vừa xuất và đối chiếu với bộ quy tắc (mục 11.2). Mã thoát
+    /// 0 đạt · 1 có lỗi · 2 không có file hay file quy tắc hỏng. Không làm thành lệnh Core vì kiểm một
+    /// file IFC không cần <c>Document</c> nào — cùng lý do với <c>--verify-log</c> ở mục 11.5, và đổi
+    /// lại được thứ chạy trên CI thay vì phải chờ một vòng test trong Revit (nguyên tắc 6).
+    /// </summary>
+    internal static int VerifyIfc(string ifcPath, string? specPath)
+    {
+        if (!File.Exists(ifcPath))
+        {
+            Console.Error.WriteLine("Không có file IFC: " + ifcPath);
+            return 2;
+        }
+
+        IfcCheckSpec spec;
+        if (string.IsNullOrEmpty(specPath))
+        {
+            spec = IfcCheckSpec.Default();
+            Console.WriteLine("Không có --ifc-spec: dùng bộ quy tắc mặc định (lược đồ, IfcProject, mã định danh, tham chiếu).");
+        }
+        else if (!File.Exists(specPath))
+        {
+            Console.Error.WriteLine("Không có file quy tắc: " + specPath);
+            return 2;
+        }
+        else
+        {
+            try
+            {
+                spec = IfcCheckSpec.FromJson(File.ReadAllText(specPath!));
+            }
+            catch (ArgumentException ex)
+            {
+                Console.Error.WriteLine("Lỗi file quy tắc: " + ex.Message);
+                return 2;
+            }
+        }
+
+        // File IFC do Revit xuất là UTF-8; đọc kèm BOM để dòng ISO-10303-21 không bị lệch ký tự đầu.
+        var result = IfcChecker.Check(File.ReadAllText(ifcPath, Encoding.UTF8), spec);
+        Console.WriteLine(ifcPath);
+        Console.WriteLine(result.Render());
         return result.Ok ? 0 : 1;
     }
 
@@ -514,14 +567,18 @@ internal sealed class Options
     public bool Analyze { get; private set; }
     public bool AutoDetectVersion { get; private set; } = true;
     public string? VerifyLog { get; private set; }
+    public string? VerifyIfc { get; private set; }
+    public string? IfcSpec { get; private set; }
 
     public const string Usage = """
         DhcbTools.BatchRunner --job <job.json> [--dry-run] [--log-dir logs] [--max-minutes 480]
                               [--revit-exe <Revit.exe>] [--accoreconsole <accoreconsole.exe>] [--plugin-dll <DhcbTools.AutoCAD.dll>]
                               [--report-only] [--analyze] [--no-autodetect]
         DhcbTools.BatchRunner --verify-log <run-HHmmss.jsonl>
+        DhcbTools.BatchRunner --verify-ifc <file.ifc> [--ifc-spec <quy-tac.json>]
         (Revit: phiên bản tự nhận từ header .rvt; step "PlotPdf" trong job AutoCAD sinh -PLOT ra PDF)
         (--verify-log kiểm chuỗi băm của log đã ghi: 0 nguyên vẹn · 1 hỏng, in ra đúng dòng · 2 không có file)
+        (--verify-ifc đọc lại file IFC vừa xuất: 0 đạt · 1 có lỗi · 2 không có file hay quy tắc hỏng)
         """;
 
     public static Options? Parse(string[] args)
@@ -545,6 +602,8 @@ internal sealed class Options
                     case "--analyze": o.Analyze = true; break;
                     case "--no-autodetect": o.AutoDetectVersion = false; break;
                     case "--verify-log": o.VerifyLog = Next(); break;
+                    case "--verify-ifc": o.VerifyIfc = Next(); break;
+                    case "--ifc-spec": o.IfcSpec = Next(); break;
                     case "-h": case "--help": return null;
                     default:
                         Console.Error.WriteLine("Tham số không biết: " + args[i]);
@@ -558,7 +617,7 @@ internal sealed class Options
             }
         }
 
-        // --verify-log đứng một mình được: nó không chạy job nào cả.
-        return string.IsNullOrEmpty(o.JobPath) && string.IsNullOrEmpty(o.VerifyLog) ? null : o;
+        // --verify-log và --verify-ifc đứng một mình được: chúng không chạy job nào cả.
+        return string.IsNullOrEmpty(o.JobPath) && string.IsNullOrEmpty(o.VerifyLog) && string.IsNullOrEmpty(o.VerifyIfc) ? null : o;
     }
 }
