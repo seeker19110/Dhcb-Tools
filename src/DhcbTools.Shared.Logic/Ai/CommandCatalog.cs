@@ -201,7 +201,7 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("dryRun", "xem trước: đếm nhưng không tạo")
                 .Words("model line từ cad", "dựng line từ dwg", "vẽ lại tuyến từ cad", "cad sang model line", "line từ bản vẽ"),
             new CommandDescriptor("DevicePlacement", Revit, "Routing mức B: rải thiết bị đầu cuối theo phòng", true, "RouteB", "PlaceDevices")
-                .Field("deviceFamily", "family thiết bị").Field("roomFilter", "{levelName, nameContains}").Field("pattern", "{spacingXMm, spacingYMm, marginMm}").Field("dryRun", "xem trước")
+                .Field("deviceFamily", "family thiết bị").Field("roomFilter", "{levelName, nameContains}").Field("pattern", "{spacingXMm, spacingYMm, marginMm}", FieldKind.Json).Field("dryRun", "xem trước")
                 .Words("rải sprinkler", "rải miệng gió", "đặt thiết bị theo phòng", "sprinkler", "diffuser"),
             new CommandDescriptor("SizingProposal", Revit, "Đề xuất kích thước duct/pipe theo lưu lượng → CSV", false, "Sizing")
                 .Field("outputPath", "file CSV").Field("maxPaPerM", "ma sát Pa/m").Field("maxDuctVelocityMs", "vận tốc gió tối đa m/s").Field("maxPipeVelocityMs", "vận tốc nước tối đa m/s")

@@ -253,9 +253,6 @@ internal abstract class FieldEditorBase : IFieldEditor
     protected static IEnumerable<string> SplitList(string text) =>
         text.Split(new[] { ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(p => p.Trim()).Where(p => p.Length > 0);
 
-    /// <summary>Hiển thị lại danh sách đã lưu theo đúng dấu ngăn mà <see cref="SplitList"/> đọc.</summary>
-    protected static string JoinList(JToken value) => string.Join("; ", value.Select(v => v.ToString()));
-
     protected static StackPanel Row(params UIElement[] children)
     {
         var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
@@ -274,8 +271,10 @@ internal sealed class TextEditor : FieldEditorBase
 
     public TextEditor(FieldSpec field, JToken? value) : base(field)
     {
-        _box.Text = value?.Type == JTokenType.Array ? JoinList(value) : value?.ToString() ?? string.Empty;
-        if (Field.IsList)
+        // Ghép bằng ";" CHỈ cho danh sách chuỗi. Trường nhận JSON thô (levels, grids, colors) phải giữ
+        // nguyên hình dáng JSON, nếu không thì hai object thành "{…}; {…}" và đọc lại là hỏng.
+        _box.Text = FormValueText.Display(value, Field.IsList);
+        if (Field.IsList || Field.Kind == FieldKind.Json)
         {
             _box.AcceptsReturn = true;
             _box.TextWrapping = TextWrapping.Wrap;
@@ -299,8 +298,9 @@ internal sealed class TextEditor : FieldEditorBase
                 return new JArray(SplitList(text));
             }
 
-            // Trường nhận object/mảng JSON thô (levels, grids, colors, roomFilter): giữ nguyên cấu trúc.
-            if (text.StartsWith("{", StringComparison.Ordinal) || text.StartsWith("[", StringComparison.Ordinal))
+            // Chỉ trường khai FieldKind.Json mới đọc bằng bộ đọc JSON. Đoán theo ký tự đầu thì mẫu đặt
+            // tên "{Discipline}-{Number}" của SheetRename cũng bị coi là JSON hỏng và chặn người dùng lại.
+            if (Field.Kind == FieldKind.Json)
             {
                 try
                 {
@@ -338,8 +338,10 @@ internal sealed class NumberEditor : FieldEditorBase
                 return null;
             }
 
-            // Invariant: máy tiếng Việt dùng dấu phẩy thập phân, nhưng JSON chỉ nhận dấu chấm.
-            if (double.TryParse(text.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var number))
+            // Đọc ở tầng thuần (có test): dấu phẩy thập phân của máy tiếng Việt, và số nguyên phải ra
+            // JSON số nguyên chứ không phải "1.0" — property int từ chối 1.0.
+            var number = FormValueText.Number(text);
+            if (number != null)
             {
                 return number;
             }
@@ -492,9 +494,7 @@ internal sealed class ChoiceEditor : FieldEditorBase
             _box.Items.Add(choice);
         }
 
-        _box.Text = value?.Type == JTokenType.Array
-            ? JoinList(value)
-            : value?.ToString() ?? string.Empty;
+        _box.Text = FormValueText.Display(value, field.IsList);
     }
 
     public override UIElement Build()
