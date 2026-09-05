@@ -235,6 +235,15 @@ public sealed class RevisionOnSheetsRibbonCommand : IExternalCommand
         => CommandRunner.Run(commandData, "RevisionOnSheets");
 }
 
+/// <summary>Danh mục bản vẽ ra CSV/HTML (mục 11.3).</summary>
+[Transaction(TransactionMode.Manual)]
+[Regeneration(RegenerationOption.Manual)]
+public sealed class SheetIndexRibbonCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        => CommandRunner.Run(commandData, "SheetIndex");
+}
+
 /// <summary>Xoá text style, dimension style, line pattern không dùng.</summary>
 [Transaction(TransactionMode.Manual)]
 [Regeneration(RegenerationOption.Manual)]

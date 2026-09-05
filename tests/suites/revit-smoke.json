@@ -392,6 +392,46 @@
       }
     },
     {
+      "name": "Danh mục bản vẽ ra CSV/HTML (mục 11.3)",
+      "command": "SheetIndex",
+      "//": "Snowdon Architectural có 55 sheet. CSV mang tiêu đề chuẩn de goi ban giao doc lai duoc; sheet chua dat view duoc neu ten thay vi im lang.",
+      "config": {
+        "outputPath": "{outputFolder}/danh-muc-ban-ve.csv",
+        "htmlPath": "{outputFolder}/danh-muc-ban-ve.html"
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 30000,
+        "minAffected": 40,
+        "summaryContains": [
+          "Danh mục",
+          "sheet"
+        ],
+        "filesExist": [
+          "{outputFolder}/danh-muc-ban-ve.csv",
+          "{outputFolder}/danh-muc-ban-ve.html"
+        ],
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
+      "name": "Danh mục bản vẽ — E-PRECOND khi bộ lọc không khớp sheet nào",
+      "command": "SheetIndex",
+      "config": {
+        "outputPath": "{outputFolder}/danh-muc-rong.csv",
+        "sheetNumberContains": "DHCB-KHONG-CO"
+      },
+      "expect": {
+        "success": false,
+        "maxMs": 30000,
+        "summaryContains": [
+          "E-PRECOND"
+        ]
+      }
+    },
+    {
       "name": "Báo lỗi rõ khi file IDS không có specification nào",
       "command": "IdsValidate",
       "//": "File IDS rong sinh ra bao cao 'khong loi nao' — dung loai no-op im lang ma §27 da gap o duong xuat IFC.",

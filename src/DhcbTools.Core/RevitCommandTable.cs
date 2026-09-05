@@ -69,6 +69,7 @@ public static class RevitCommandTable
 
                 "SHEETRENAME" => new SheetRenameCommand().Execute(doc, Deserialize<SheetRenameConfig>(configJson)),
                 "REVISIONONSHEETS" => new RevisionOnSheetsCommand().Execute(doc, Deserialize<RevisionOnSheetsConfig>(configJson)),
+                "SHEETINDEX" => new SheetIndexCommand().Execute(doc, Deserialize<SheetIndexConfig>(configJson)),
                 "WARNINGSEXPORT" => new WarningsExportCommand().Execute(doc, Deserialize<WarningsExportConfig>(configJson)),
                 "STYLEPURGE" => new StylePurgeCommand().Execute(doc, Deserialize<StylePurgeConfig>(configJson)),
                 "COLORBYPARAMETER" => new ColorByParameterCommand().Execute(doc, Deserialize<ColorByParameterConfig>(configJson)),

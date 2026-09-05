@@ -52,7 +52,7 @@ thẳng thực thể (tên lớp so **đúng lớp**, Pset/vật liệu/phân lo
 | Facet IDS | DHCB đọc từ đâu trong Revit |
 |---|---|
 | `entity` (+ `predefinedType`) | `IfcExportAs` (dạng `IfcWall.SOLIDWALL`), rồi bảng category → lớp IFC |
-| `attribute` | `Name`, `Tag` (= Mark), `Description`, `ObjectType`, `GlobalId`; tên khác thì thử như một tham số cùng tên |
+| `attribute` | `Name`, `Tag` (= Mark, rỗng thì = ElementId — đúng như bộ xuất IFC, §43), `Description`, `ObjectType`, `GlobalId`; tên khác thì thử như một tham số cùng tên |
 | `property` | tham số `"Pset_Tên.Prop"`, rồi tham số cùng tên ở instance, rồi ở type — đúng thứ tự bộ xuất IFC lấy giá trị |
 | `classification` | `Assembly Code`, `Keynote`, `ClassificationCode` |
 | `material` | vật liệu của phần tử, kể cả vật liệu lớp cấu tạo |

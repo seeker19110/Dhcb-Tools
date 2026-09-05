@@ -240,6 +240,9 @@ namespace DhcbTools.Shared.Logic.Ai
             new CommandDescriptor("RevisionOnSheets", Revit, "Gán hoặc bỏ một revision trên nhiều sheet", true, "SetRevisions")
                 .Field("revisionSequence", "số thứ tự revision").Field("sheetNumberContains", "lọc sheet").Field("remove", "bỏ thay vì gán").Field("dryRun", "xem trước")
                 .Words("revision", "gán revision", "phát hành", "set revision"),
+            new CommandDescriptor("SheetIndex", Revit, "Danh mục bản vẽ: số, tên, revision hiện hành, ngày phát hành, người vẽ/kiểm ra CSV/HTML", false, "DrawingIndex", "DrawingList")
+                .Field("outputPath", "file CSV danh mục").Field("htmlPath", "file HTML để in (tuỳ chọn)").Field("sheetNumberContains", "lọc sheet").Field("skipPlaceholders", "bỏ sheet giữ chỗ")
+                .Words("danh mục bản vẽ", "danh sách bản vẽ", "sheet index", "drawing list", "mục lục bản vẽ"),
             new CommandDescriptor("StylePurge", Revit, "Liệt kê và xoá style không được tham chiếu: view template, filter, line/fill pattern, text/dim type, material", true, "PurgeStyles", "Wipe")
                 .Field("kinds", "ViewTemplates/Filters/LinePatterns/FillPatterns/TextTypes/DimensionTypes/Materials").Field("keepNameContains", "giữ lại").Field("keepIfUncertain", "không xoá nhóm nào kiểm tham chiếu bị lỗi (mặc định bật)").Field("dryRun", "xem trước")
                 .Words("purge style", "xoá view template thừa", "xoá filter thừa", "dọn style", "wipe"),

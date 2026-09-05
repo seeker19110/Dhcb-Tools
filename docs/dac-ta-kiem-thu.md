@@ -217,6 +217,7 @@ file `test-drawing.dwg` có layer trùng tên, layer rỗng, linetype chỉ dùn
 | `DHCB_RUN` qua accoreconsole | Script từ BatchRunner | run.jsonl có đủ dòng, không hộp thoại |
 | `SheetRename` | 20 sheet, mẫu `A-{Level}-{n:00}` | Số mới đúng thứ tự, không trùng, đổi chéo A↔B không lỗi |
 | `RevisionOnSheets` | Revision 2 lên sheet A-1xx | Đúng sheet, chạy lại không nhân đôi |
+| `SheetIndex` | Model có sheet, một số chưa đặt view | CSV đủ cột tiêu đề chuẩn, số dòng = số sheet, sheet chưa view được nêu tên |
 | `StylePurge` | View template dùng ở 1 view + 3 không dùng | Chỉ xoá 3; `<Solid fill>` không bị đụng |
 | `ColorByParameter` | Tường theo Fire Rating | Mỗi giá trị một màu, chú giải CSV đúng số lượng; `reset` trả về bình thường |
 | `FamilyAudit` | Mẫu `DHCB_{Category:upper}_{Name}` | CSV đủ cột; đổi tên bỏ qua in-place |

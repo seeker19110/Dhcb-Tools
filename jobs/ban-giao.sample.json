@@ -1,0 +1,24 @@
+{
+  "name": "Gói bàn giao đêm — dự án mẫu (mục 11.3)",
+  "app": "revit",
+  "revitVersion": 2024,
+  "stopOnError": false,
+  "saveMode": "None",
+  "outputFolder": "D:/DHCB/ban-giao/{yyyy-MM-dd}",
+  "files": [
+    { "path": "P:/Landmark/ARC.rvt", "detachFromCentral": true }
+  ],
+  "steps": [
+    { "command": "HealthReport",  "config": { "outputPath": "{outputFolder}/{fileName}-health.html" } },
+    { "command": "SheetIndex",    "config": { "outputPath": "{outputFolder}/{fileName}-danh-muc-ban-ve.csv", "htmlPath": "{outputFolder}/{fileName}-danh-muc-ban-ve.html" } },
+    { "command": "BatchExport",   "config": { "outputFolder": "{outputFolder}/pdf/{fileName}", "formats": ["Pdf"], "dryRun": false } },
+    { "command": "BatchExport",   "config": { "outputFolder": "{outputFolder}/ifc", "formats": ["Ifc"], "ifcVersion": "IFC4", "dryRun": false } },
+    { "command": "IdsValidate",   "config": { "idsPath": "D:/DHCB/yeu-cau/chu-dau-tu.ids", "outputPath": "{outputFolder}/{fileName}-ids-revit.html" } }
+  ],
+  "handover": {
+    "projectName": "Landmark — toà ARC",
+    "owner": "Công ty CP Đầu tư Landmark",
+    "contractor": "DHCB",
+    "idsPath": "D:/DHCB/yeu-cau/chu-dau-tu.ids"
+  }
+}

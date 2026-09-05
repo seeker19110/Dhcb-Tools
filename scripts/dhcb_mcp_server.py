@@ -36,7 +36,7 @@ if "--group" in sys.argv:
 GROUPS = {
     "query": ("query", "chat"),
     "data": ("ParameterExport", "ParameterImport", "LayerExport", "LayerImport", "AttributeExport", "AttributeImport", "WarningsExport", "BlockQuantity"),
-    "sheets": ("SheetRename", "RevisionOnSheets", "SheetBatchCreate", "BatchExport"),
+    "sheets": ("SheetRename", "RevisionOnSheets", "SheetBatchCreate", "BatchExport", "SheetIndex"),
     "cleanup": ("RemoveUnusedViews", "StylePurge", "DrawingCleanup", "FamilyAudit", "LayerTranslate"),
     "check": ("HealthReport", "ParameterRuleCheck", "ClashDetection", "ConnectorChecker", "LayerStandardCheck", "XrefAudit", "DrawingCompare"),
     "mep": ("SleeveAuto", "ElevationTag", "HangerAuto", "PipeSplitter", "RouteFromLines", "DevicePlacement", "SizingProposal", "ApplySizing", "SystemColor", "SystemName", "FlowNumbering"),

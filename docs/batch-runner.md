@@ -62,6 +62,12 @@ lượt chạy trong cùng một ngày không giẫm lên nhau.
 
 Mã thoát: `0` mọi step thành công · `1` có step lỗi/bỏ qua · `2` lỗi cấu hình (không đọc được job, không tìm thấy Revit).
 
+## Gói bàn giao (`handover`)
+
+Khai khối `handover` trong job (xem [`goi-ban-giao.md`](goi-ban-giao.md)): sau khi chạy, `outputFolder` có
+`ban-giao.html` (in được, ô ký chủ đầu tư theo Điều 11 NĐ 207/2026) và `ban-giao.json` — băm SHA-256 từng file
+sản phẩm, danh mục bản vẽ từ `SheetIndex`, kết quả `--verify-log` / `--verify-ifc` / `--verify-ids` của chính đêm đó.
+
 ## Chuỗi băm của nhật ký (`--verify-log`)
 
 Mỗi dòng trong `run-HHmmss.jsonl` mang thêm hai trường ở cuối:
