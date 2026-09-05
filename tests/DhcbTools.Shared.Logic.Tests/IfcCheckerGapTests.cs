@@ -82,7 +82,7 @@ public class IfcCheckerGapTests
     [Fact]
     public void KhongKhaiLuocDo_ChiCanhBao()
     {
-        var khongCoSchema = HaiTuong.Replace("FILE_SCHEMA(('IFC4'));\n", string.Empty);
+        var khongCoSchema = HaiTuong.Replace("FILE_SCHEMA(('IFC4'));", string.Empty);
 
         var result = IfcChecker.Check(khongCoSchema, new IfcCheckSpec());
 
