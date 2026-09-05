@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Fixture IDS để ĐỐI CHIẾU DHCB (kiểm trên file IFC, mục 11.4) với IfcTester trên cùng file IFC.
+  Mỗi specification nhắm một loại facet / một kiểu giá trị mà hai bên có thể hiểu khác nhau:
+  boolean (IFCBOOLEAN), số (minInclusive), phân loại theo hệ, vật liệu, partOf, predefinedType, prohibited.
+  Số liệu đối chiếu trên Snowdon Architectural ghi ở bang-chung-test.md §41.
+-->
+<ids xmlns="http://standards.buildingsmart.org/IDS" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <info>
+    <title>DHCB — đối chiếu với IfcTester</title>
+  </info>
+  <specifications>
+    <specification name="01 Cửa loại DOOR phải có Name" ifcVersion="IFC4">
+      <applicability>
+        <entity><name><simpleValue>IFCDOOR</simpleValue></name><predefinedType><simpleValue>DOOR</simpleValue></predefinedType></entity>
+      </applicability>
+      <requirements>
+        <attribute><name><simpleValue>Name</simpleValue></name></attribute>
+      </requirements>
+    </specification>
+
+    <specification name="02 Tường phải có Pset_WallCommon.IsExternal" ifcVersion="IFC4">
+      <applicability>
+        <entity><name><simpleValue>IFCWALL</simpleValue></name></entity>
+      </applicability>
+      <requirements>
+        <property><propertySet><simpleValue>Pset_WallCommon</simpleValue></propertySet><baseName><simpleValue>IsExternal</simpleValue></baseName></property>
+      </requirements>
+    </specification>
+
+    <specification name="03 Tường IsExternal = FALSE (boolean)" ifcVersion="IFC4">
+      <applicability>
+        <entity><name><simpleValue>IFCWALL</simpleValue></name></entity>
+      </applicability>
+      <requirements>
+        <property><propertySet><simpleValue>Pset_WallCommon</simpleValue></propertySet><baseName><simpleValue>IsExternal</simpleValue></baseName><value><simpleValue>FALSE</simpleValue></value></property>
+      </requirements>
+    </specification>
+
+    <specification name="04 Tường FireRating = 2 HR (chuỗi)" ifcVersion="IFC4">
+      <applicability>
+        <entity><name><simpleValue>IFCWALL</simpleValue></name></entity>
+      </applicability>
+      <requirements>
+        <property><propertySet><simpleValue>Pset_WallCommon</simpleValue></propertySet><baseName><simpleValue>FireRating</simpleValue></baseName><value><simpleValue>2 HR</simpleValue></value></property>
+      </requirements>
+    </specification>
+
+    <specification name="05 Tường có mã Uniformat" ifcVersion="IFC4">
+      <applicability>
+        <entity><name><simpleValue>IFCWALL</simpleValue></name></entity>
+      </applicability>
+      <requirements>
+        <classification><system><simpleValue>Uniformat</simpleValue></system></classification>
+      </requirements>
+    </specification>
+
+    <specification name="06 Sàn phải khai vật liệu" ifcVersion="IFC4">
+      <applicability>
+        <entity><name><simpleValue>IFCSLAB</simpleValue></name></entity>
+      </applicability>
+      <requirements>
+        <material/>
+      </requirements>
+    </specification>
+
+    <specification name="07 Cửa phải thuộc một tầng" ifcVersion="IFC4">
+      <applicability>
+        <entity><name><simpleValue>IFCDOOR</simpleValue></name></entity>
+      </applicability>
+      <requirements>
+        <partOf relation="IFCRELCONTAINEDINSPATIALSTRUCTURE"><entity><name><simpleValue>IFCBUILDINGSTOREY</simpleValue></name></entity></partOf>
+      </requirements>
+    </specification>
+
+    <specification name="08 Cột không được có Description (prohibited)" ifcVersion="IFC4">
+      <applicability>
+        <entity><name><simpleValue>IFCCOLUMN</simpleValue></name></entity>
+      </applicability>
+      <requirements>
+        <attribute cardinality="prohibited"><name><simpleValue>Description</simpleValue></name></attribute>
+      </requirements>
+    </specification>
+
+    <specification name="09 Cửa OverallHeight ≥ 7 (số)" ifcVersion="IFC4">
+      <applicability>
+        <entity><name><simpleValue>IFCDOOR</simpleValue></name></entity>
+      </applicability>
+      <requirements>
+        <attribute><name><simpleValue>OverallHeight</simpleValue></name><value><xs:restriction base="xs:double"><xs:minInclusive value="7"/></xs:restriction></value></attribute>
+      </requirements>
+    </specification>
+
+    <specification name="10 Cửa sổ Tag khớp mẫu số" ifcVersion="IFC4">
+      <applicability>
+        <entity><name><simpleValue>IFCWINDOW</simpleValue></name></entity>
+      </applicability>
+      <requirements>
+        <attribute><name><simpleValue>Tag</simpleValue></name><value><xs:restriction base="xs:string"><xs:pattern value="[0-9]+"/></xs:restriction></value></attribute>
+      </requirements>
+    </specification>
+  </specifications>
+</ids>

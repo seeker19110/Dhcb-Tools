@@ -36,6 +36,17 @@ chủ đầu tư/thẩm tra.
 
 Ribbon: *Kiểm tra & AI → Kiểm theo IDS*. Bridge/MCP/batch đêm: lệnh `IdsValidate` như mọi lệnh khác.
 
+**Trên chính file IFC** (mục 11.4, không cần Revit, chạy được trên CI):
+
+```bash
+DhcbTools.BatchRunner --verify-ifc xuat/toa-a.ifc --verify-ids yeu-cau/chu-dau-tu.ids --ids-report bao-cao/ids-ifc.html
+```
+
+Mã thoát 0 = không phần tử nào không đạt, 1 = có, 2 = thiếu file / IDS hỏng. Báo cáo cùng dạng với đường Revit,
+phần tử ghi theo `#id` trong file. Đã đối chiếu 10 specification với IfcTester trên Snowdon: khớp từng con số
+([`bang-chung-test.md`](bang-chung-test.md) §41). Cột "DHCB đọc từ đâu" dưới đây là đường Revit; đường IFC đọc
+thẳng thực thể (tên lớp so **đúng lớp**, Pset/vật liệu/phân loại thừa kế từ kiểu, boolean `.T./.F.` → `TRUE/FALSE`).
+
 ## Hỗ trợ tới đâu
 
 | Facet IDS | DHCB đọc từ đâu trong Revit |

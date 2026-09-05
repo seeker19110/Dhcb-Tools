@@ -2424,3 +2424,59 @@ Ba con số kiểm **y hệt** ca fixture chuẩn (cùng specification), chỉ t
 trong messages và trong HTML (mục "⚠ File IDS lệch chuẩn IDS 1.0" đứng trước bảng tổng hợp). 12 ca test
 thuần `IdsSchemaLintTests`, trong đó một ca chốt hai fixture chuẩn trong repo **không** bị kêu oan.
 
+## 41. `IdsValidate` trên chính file IFC — đối chiếu 10 specification với IfcTester, và một lỗi của IfcTester (2026-09-05 23:30 ICT)
+
+Mục 11.4 hỏi: mở `IdsValidate` sang kiểm **trên file IFC** hay dừng ở mô hình Revit? §39 cho câu trả lời
+gián tiếp — lỗi ánh xạ chỉ lộ khi có bộ tham chiếu độc lập đọc *chính file đã nộp*. Nay bộ tham chiếu đó
+nằm trong DHCB: `IfcIdsElement` (tầng thuần, trên bộ đọc STEP có sẵn của 11.2) dịch thực thể IFC sang
+`IIdsElement`, cùng `IdsEvaluator` với đường Revit; báo cáo HTML/CSV chuyển xuống `IdsReport` để hai đường
+ra **cùng một dạng**. Lệnh: `DhcbTools.BatchRunner --verify-ifc <file.ifc> --verify-ids <yeu-cau.ids> [--ids-report <bao-cao.html>]`.
+
+### Số liệu — Snowdon Architectural IFC4 (91 MB, 925.806 thực thể, 8.592 phần tử IDS nói tới được)
+
+Fixture [`doi-chieu-ifctester.ids`](../tests/suites/fixtures/doi-chieu-ifctester.ids): 10 specification, mỗi cái
+một loại facet/kiểu giá trị. DHCB 3,5 s; IfcTester 0.8.5 mở 4–8 s + kiểm ~1 s.
+
+| # | Specification | DHCB (đạt / áp dụng) | IfcTester | |
+|---|---|---|---|---|
+| 01 | IfcDoor.DOOR có Name (predefinedType) | 132 / 132 | 132 / 132 | khớp |
+| 02 | IfcWall có Pset_WallCommon.IsExternal | 1078 / 1078 | 1078 / 1078 | khớp |
+| 03 | IfcWall IsExternal = FALSE (boolean) | **488** / 1078 | 590 / 1078 với `FALSE`; **488** / 1078 với `false` | khớp — xem dưới |
+| 04 | IfcWall FireRating = "2 HR" (chuỗi) | 293 / 1078 | 293 / 1078 | khớp |
+| 05 | IfcWall có mã Uniformat (classification theo hệ) | 1077 / 1078 | 1077 / 1078 | khớp |
+| 06 | IfcSlab có vật liệu | 217 / 227 | 217 / 227 | khớp |
+| 07 | IfcDoor thuộc IfcBuildingStorey (partOf) | 132 / 132 | 132 / 132 | khớp |
+| 08 | IfcColumn không có Description (prohibited) | 118 / 118 | 118 / 118 | khớp |
+| 09 | IfcDoor OverallHeight ≥ 7 (số, thuộc tính riêng của lớp) | 132 / 132 | 132 / 132 | khớp |
+| 10 | IfcWindow Tag khớp `[0-9]+` (pattern) | 68 / 68 | 68 / 68 | khớp |
+
+Ba lỗi của DHCB lộ ra và đã sửa trong cùng lượt:
+
+1. **Boolean**: `IFCBOOLEAN(.F.)` đọc thành `"F"`, IDS so với `FALSE` → 0/1078. Nay `.T./.F./.U.` →
+   `TRUE/FALSE/UNKNOWN` ở đường IFC.
+2. **Thuộc tính riêng của lớp** (`OverallHeight`, `LongName`, `Elevation`…): chưa có → 0/132. Nay có bảng vị
+   trí cho IfcDoor/IfcWindow/IfcSpace/IfcBuildingStorey/IfcBuilding/IfcSite/IfcProject; tên ngoài bảng vẫn
+   trả `null` (trượt, không âm thầm đạt).
+3. **Số "không đạt" bị cắt theo danh sách**: spec 04 có 785 tường sai nhưng báo cáo ghi "200 phần tử không
+   đạt" vì đếm `Failures.Count` (cắt ở 200). Lỗi này có từ 11.1 và ảnh hưởng cả đường Revit. Nay
+   `Failed = Applicable − Passed`, danh sách cắt ghi rõ "cắt ở 200 trên 785".
+
+Và một **lỗi của IfcTester 0.8.5**: `cast_to_value` chỉ nhận `"true"/"false"` viết thường; `FALSE` viết hoa
+(đúng chuẩn IDS) rơi vào `bool("FALSE")` = True, nên spec 03 bị đảo (590 "đạt" là 590 tường IsExternal =
+True). Đổi fixture sang `false` thì IfcTester ra 488 = DHCB. Ghi lại để không ai "sửa" DHCB cho khớp con số
+sai.
+
+### Quyết định 11.4
+
+Mở sang IFC. Chi phí thấp (một lớp dịch, không lệnh Revit mới), chạy trên CI, và là thứ duy nhất đã bắt được
+cả lỗi ánh xạ (§39) lẫn lỗi đếm (§41). Đường Revit giữ nguyên cho kỹ sư sửa tại chỗ. Giới hạn còn lại:
+`partOf` chưa xét `relation`; thuộc tính ngoài bảng; Solibri chưa có trên máy.
+
+### Kiểm thử
+
+- 24 ca test thuần mới (`IfcIdsElementTests` 15 trên IFC nhỏ dựng tay có đủ kiểu/Pset/vật liệu 5 dạng/phân
+  loại/nest/aggregate vòng, `IdsReportTests` 4, `IdsSchemaLintTests` +5); cổng phủ **100 % dòng** — cổng
+  này đã **đỏ trên main sau #93** (26 dòng `IdsSchemaLint` chưa phủ, tôi chỉ nhìn 5 dòng cuối của
+  `gh pr checks` nên sót), PR này vá luôn.
+- Bộ `smoke` trong Revit 2024 sau khi `IdsValidate` chuyển sang `IdsReport`: **39 đạt / 0 trượt / 1 bỏ qua**,
+  ba ca IDS ra đúng con số cũ.

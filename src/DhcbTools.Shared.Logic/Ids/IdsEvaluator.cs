@@ -82,8 +82,18 @@ namespace DhcbTools.Shared.Logic.Ids
         /// <summary>Số phần tử đạt.</summary>
         public int Passed { get; }
 
-        /// <summary>Phần tử không đạt.</summary>
+        /// <summary>
+        /// Số phần tử không đạt — luôn là <c>Applicable − Passed</c>, kể cả khi <see cref="Failures"/> đã bị cắt ở
+        /// <see cref="IdsEvaluator.MaxFailuresPerSpecification"/>. Trước đây báo cáo đếm theo danh sách đã cắt:
+        /// 785 tường sai FireRating hiện thành "200 không đạt" (lộ khi đối chiếu IfcTester, §41).
+        /// </summary>
+        public int Failed => Applicable - Passed;
+
+        /// <summary>Phần tử không đạt (tối đa <see cref="IdsEvaluator.MaxFailuresPerSpecification"/> phần tử).</summary>
         public IReadOnlyList<IdsFailure> Failures { get; }
+
+        /// <summary>Danh sách <see cref="Failures"/> ngắn hơn số không đạt thật.</summary>
+        public bool FailuresTruncated => Failures.Count < Failed;
 
         /// <summary>
         /// Không phần tử nào lọt applicability. Đây <b>không phải</b> "đạt": nó nói rằng mô hình không có
@@ -107,8 +117,8 @@ namespace DhcbTools.Shared.Logic.Ids
         /// <summary>Số phần tử đã soi.</summary>
         public int ElementCount { get; }
 
-        /// <summary>Tổng số phần tử không đạt.</summary>
-        public int FailureCount => Specifications.Sum(s => s.Failures.Count);
+        /// <summary>Tổng số phần tử không đạt (đếm thật, không phải theo danh sách đã cắt).</summary>
+        public int FailureCount => Specifications.Sum(s => s.Failed);
 
         /// <summary>Số specification không có phần tử nào để kiểm.</summary>
         public int EmptySpecificationCount => Specifications.Count(s => s.NoApplicableElements);
