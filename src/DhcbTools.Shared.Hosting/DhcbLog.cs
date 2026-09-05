@@ -50,7 +50,11 @@ namespace DhcbTools.Shared.Hosting
             Write(app, "LỖI " + context + ": " + exception);
 
         /// <summary>Xoá file log cũ hơn <see cref="RetentionDays"/> ngày. Gọi một lần lúc khởi động.</summary>
-        public static void Prune(string app)
+        /// <param name="deleteFile">
+        /// Bước xoá, tiêm được để test nhánh "file đang bị khoá" mà không cần dựng một file thật không xoá
+        /// được (chỉ Windows mới khoá file đang mở); null = <see cref="File.Delete"/>.
+        /// </param>
+        public static void Prune(string app, Action<string>? deleteFile = null)
         {
             try
             {
@@ -66,7 +70,7 @@ namespace DhcbTools.Shared.Hosting
                     {
                         if (File.GetLastWriteTime(file) < cutoff)
                         {
-                            File.Delete(file);
+                            (deleteFile ?? File.Delete)(file);
                         }
                     }
                     catch (Exception)

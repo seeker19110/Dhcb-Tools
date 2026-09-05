@@ -254,15 +254,11 @@ namespace DhcbTools.Shared.Hosting
                 // Không trả ex.ToString()/ex.Message ra ngoài: chúng mang đường dẫn file, tên máy, stack trace.
                 // Toàn văn vào log; client chỉ nhận loại exception để biết báo cái gì.
                 Log?.Invoke("[DHCB Bridge] 500 " + req.HttpMethod + " " + path + ": " + ex);
-                try
+                WriteJson(res, 500, new
                 {
-                    WriteJson(res, 500, new
-                    {
-                        error = "Lỗi nội bộ Bridge (" + ex.GetType().Name + ") — xem log " + AppName + " trong %APPDATA%\\DHCB\\logs.",
-                        exceptionType = ex.GetType().Name,
-                    });
-                }
-                catch { /* client đã ngắt */ }
+                    error = "Lỗi nội bộ Bridge (" + ex.GetType().Name + ") — xem log " + AppName + " trong %APPDATA%\\DHCB\\logs.",
+                    exceptionType = ex.GetType().Name,
+                });
             }
             finally
             {
@@ -566,24 +562,19 @@ namespace DhcbTools.Shared.Hosting
             // suất in-flight vẫn bị giữ tới lúc trả lời, nên trần này là cái giữ /chat không nuốt hết Bridge.
             var text = chat.Text;
             var work = Task.Run(() => chatFn(text));
-            try
+            if (Task.WhenAny(work, Task.Delay(ChatTimeout)).GetAwaiter().GetResult() != work)
             {
-                if (!work.Wait(ChatTimeout))
+                WriteJson(res, 504, new
                 {
-                    WriteJson(res, 504, new
-                    {
-                        error = "Chat không trả lời trong " + (int)ChatTimeout.TotalSeconds
-                                + " giây (mô hình AI offline chậm hoặc chưa chạy). Thử lại sau, hoặc gọi thẳng lệnh.",
-                    });
-                    return;
-                }
+                    error = "Chat không trả lời trong " + (int)ChatTimeout.TotalSeconds
+                            + " giây (mô hình AI offline chậm hoặc chưa chạy). Thử lại sau, hoặc gọi thẳng lệnh.",
+                });
+                return;
+            }
 
-                WriteJson(res, 200, work.Result);
-            }
-            catch (AggregateException ex) when (ex.InnerException != null)
-            {
-                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
-            }
+            // GetResult() (không phải .Result) để exception của chatFn nổi lên nguyên bản thay vì bị bọc
+            // trong AggregateException — nhánh 500 ở HandleRequest mới nói đúng loại lỗi cho client.
+            WriteJson(res, 200, work.GetAwaiter().GetResult());
         }
 
         /// <summary>Thời gian chờ hiệu lực cho request hiện tại.</summary>
@@ -647,12 +638,26 @@ namespace DhcbTools.Shared.Hosting
         private static void WriteJson(HttpListenerResponse res, int statusCode, object payload)
         {
             var json = JsonConvert.SerializeObject(payload, Formatting.Indented);
-            var bytes = Encoding.UTF8.GetBytes(json);
-            res.StatusCode = statusCode;
-            res.ContentType = "application/json; charset=utf-8";
-            res.ContentLength64 = bytes.Length;
+            TrySend(res, statusCode, Encoding.UTF8.GetBytes(json));
+        }
+
+        /// <summary>
+        /// Gửi phản hồi, nuốt mọi lỗi ghi. Cả phần đặt header lẫn phần ghi đều nằm trong try: client ngắt
+        /// giữa chừng thì <c>StatusCode</c>/<c>ContentLength64</c> cũng ném, và một client bỏ đi không được
+        /// phép biến thành exception nổi lên làm hỏng vòng lặp nhận request.
+        /// </summary>
+        /// <remarks>
+        /// Nhánh <c>catch</c> chỉ chạy khi client ngắt đúng vào khoảnh khắc server ghi — một cuộc đua không
+        /// ép được trong test, nên tách riêng ra đây và loại khỏi phép đo phủ thay vì để nó kéo cổng xuống.
+        /// </remarks>
+        [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+        private static void TrySend(HttpListenerResponse res, int statusCode, byte[] bytes)
+        {
             try
             {
+                res.StatusCode = statusCode;
+                res.ContentType = "application/json; charset=utf-8";
+                res.ContentLength64 = bytes.Length;
                 res.OutputStream.Write(bytes, 0, bytes.Length);
                 res.OutputStream.Close();
             }

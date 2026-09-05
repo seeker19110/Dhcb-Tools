@@ -80,6 +80,20 @@ public class AiGapTests
         Assert.True((bool?)intent.Config["createMissing"]);
     }
 
+    /// <summary>
+    /// Câu khớp hai lệnh sát điểm nhau (xuất/nhập tham số): độ tin cậy bị hạ xuống để kỹ sư phải chọn,
+    /// thay vì tool âm thầm chạy một trong hai.
+    /// </summary>
+    [Fact]
+    public void Parse_HaiLenhSatDiem_HaDoTinCay()
+    {
+        var intent = CommandIntentParser.Parse("xuất tham số nhập tham số", "revit");
+
+        Assert.Equal("ParameterExport", intent.Command);
+        Assert.Contains("ParameterImport", intent.Alternatives);
+        Assert.Equal(0.63, intent.Confidence, 2);
+    }
+
     [Fact]
     public void TryParseNumber_ChuoiRong_TraFalse()
     {

@@ -13,6 +13,7 @@ namespace System.Runtime.CompilerServices
     internal sealed class RequiredMemberAttribute : Attribute { }
 
     [AttributeUsage(AttributeTargets.All, AllowMultiple = true, Inherited = false)]
+    [Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage] // chỉ tồn tại cho trình biên dịch, không bao giờ chạy
     internal sealed class CompilerFeatureRequiredAttribute : Attribute
     {
         public CompilerFeatureRequiredAttribute(string featureName) { FeatureName = featureName; }

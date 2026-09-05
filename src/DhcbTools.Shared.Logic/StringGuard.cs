@@ -6,6 +6,7 @@ namespace System.Diagnostics.CodeAnalysis
     /// <see cref="DhcbTools.Shared.Logic.StringGuard"/> nói được với trình biên dịch.
     /// </summary>
     [AttributeUsage(AttributeTargets.Parameter)]
+    [CodeAnalysis.ExcludeFromCodeCoverage] // polyfill chỉ tồn tại cho trình biên dịch, không bao giờ chạy
     internal sealed class NotNullWhenAttribute : Attribute
     {
         public NotNullWhenAttribute(bool returnValue) => ReturnValue = returnValue;
