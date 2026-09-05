@@ -120,7 +120,11 @@ internal sealed class RevitIdsElement : IIdsElement
             case "name":
                 return _element.Name;
             case "tag":
-                return TextOf(_element, "Mark");
+                // Bộ xuất IFC của Revit ghi Tag = Mark, và khi Mark rỗng thì = ElementId — nên trên file IFC mọi
+                // phần tử đều có Tag. Trước đây đường Revit trả rỗng khi thiếu Mark: dự án A báo 12 cửa "thiếu
+                // Tag" trong khi IfcTester/đường IFC trên chính file xuất ra báo 0 (§43). Muốn bắt "thiếu Mark"
+                // thì khai property/pattern, không phải attribute Tag.
+                return TextOf(_element, "Mark") ?? RevitCompat.IdValue(_element.Id).ToString(System.Globalization.CultureInfo.InvariantCulture);
             case "description":
                 return TextOf(_element, "Description") ?? (_type != null ? TextOf(_type, "Description") : null);
             case "objecttype":

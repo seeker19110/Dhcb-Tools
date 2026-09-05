@@ -2524,3 +2524,65 @@ Cả hai lượt (trước và sau sửa) `BatchRunner --verify-log`: *"Chuỗi 
 sửa hay mất"* — log có dòng lỗi (GRL) xen giữa các dòng thành công, tên file có dấu tiếng Việt và khoảng trắng
 (`1. MO HINH 3D DU AN TRUNG TAM THUONG MAI`), dòng dài nhất mang 40+ thông điệp đề xuất. §24 mới chạy trên
 Snowdon; đây là lần đầu trên dự án thật.
+
+## 43. Gói bàn giao đêm (11.3) chạy thật trên dự án A và lần đầu Task Scheduler tự chạy một job (2026-09-05 23:40 ICT)
+
+Mục 5 của "Việc tiếp theo": ghép mọi lệnh đã có thành **một đầu ra có nghĩa pháp lý** — IFC, PDF, danh mục bản
+vẽ, báo cáo kiểm có dấu thời gian và version, kèm chỗ chủ đầu tư xác nhận (Điều 11 NĐ 207/2026). Mục 8: đây
+là job đầu tiên đáng để `install-nightly-task.ps1` đăng ký thật.
+
+### Mã
+
+- `SheetIndex` (lệnh Core mới, chỉ đọc): số, tên, revision hiện hành, ngày revision/phát hành, người vẽ/kiểm, số
+  view → CSV (tiêu đề là hợp đồng với gói) + HTML. Smoke Snowdon: **55 sheet, 1 chưa đặt view**; bộ lọc không khớp
+  → `E-PRECOND`. Bộ `smoke` 41 đạt / 0 trượt / 1 bỏ qua trên 42 ca.
+- `Shared.Logic/Handover/HandoverPackage` (thuần, 7 ca test, phủ 100 %): băm SHA-256 từng file sản phẩm, đọc
+  danh mục, kiểm chuỗi băm nhật ký, render `ban-giao.html` (in được, hai ô ký) + `ban-giao.json`.
+- `BatchRunner`: khối `handover` trong job → dựng gói sau khi có mã thoát, dùng lại đúng mã `--verify-log`,
+  `--verify-ifc`, `--verify-ids` (đường IFC của 11.4). Gói **không đổi mã thoát** của job.
+
+### Ba lỗi lộ khi chạy thật (đều sửa trong lượt)
+
+1. **`BatchExport` từ chối xuất IFC khi mô hình không có sheet** ("Không tìm thấy bản vẽ nào phù hợp"): ARC L01
+   của dự án A là file mô hình thuần, 0 sheet — gói không bao giờ có IFC. IFC/NWC là xuất cả mô hình; nay chỉ
+   PDF/DWG mới đòi sheet. Sau sửa: IFC4 13,1 MB, 153.803 thực thể, 24 s.
+2. **`BuildHandover` ném "Collection was modified"** ở lần chạy thật đầu: vòng lặp thêm báo cáo IDS vào chính
+   danh sách file đang duyệt. Test thuần không bắt được vì phần này nằm ở BatchRunner. Thêm `.ToList()` và bỏ
+   trùng khi chạy lại bằng `--report-only`.
+3. **Hai đường IDS lệch nhau trên dự án thật**: `IdsValidate` trên Revit báo **12 cửa thiếu Tag**, đường IFC (và
+   IfcTester) trên chính file vừa xuất báo **0** — bộ xuất IFC của Revit điền `Tag = Mark`, Mark rỗng thì
+   `= ElementId`, nên trên IFC mọi phần tử đều có Tag. `RevitIdsElement` nay làm y hệt. Sau sửa: **448 phần tử,
+   0 không đạt** ở Revit = **2906 phần tử, 0 không đạt** ở IFC. (Muốn bắt "thiếu Mark" thì khai property/pattern.)
+
+### Gói `ban-giao.html` của dự án A (ARC L01, bản sao `_upgraded-2024/`, chỉ đọc)
+
+| Mục | Kết quả |
+|---|---|
+| Chuỗi băm nhật ký | nguyên vẹn, 3 dòng (`run-233628.jsonl`) |
+| Kiểm IFC `ifc/…_detached.ifc` | IFC4 · 153.803 thực thể · đạt |
+| Kiểm IDS trên IFC | 2906 phần tử, 3 specification, 0 không đạt, 1 không có phần tử (IfcTank) |
+| Các bước | HealthReport 216 ms · BatchExport IFC 24,2 s · IdsValidate 183 ms — 3/3 thành công |
+| File băm | health.html · ids-revit.html · ifc 13.123.466 B · ids.html (IFC) |
+| Phần mềm | `0.9.0-dev+41dcc33…` (InformationalVersion, có SHA commit) |
+
+Danh mục bản vẽ **trống có ghi rõ** vì file này không có sheet — đúng hành vi, và là lý do job đăng ký đêm chỉ
+giữ ba bước HealthReport / BatchExport IFC / IdsValidate.
+
+### Lần đầu Task Scheduler tự chạy
+
+```
+install-nightly-task.ps1 -Job …\ban-giao-A\job.json -RunnerExe …\DhcbTools.BatchRunner.exe -Time 23:50 -MaxMinutes 30
+Start-ScheduledTask → State Running → Ready sau ~100 s
+LastRunTime 23:36:27 · LastTaskResult 0 · NextRunTime 23:50
+```
+
+Task mở Revit 2024 dưới tài khoản đang đăng nhập, chạy 3 bước, đóng Revit, dựng gói lúc 23:38:08. Mã thoát 0
+đúng nghĩa: trước đó (còn hai bước cần sheet) mã thoát 1 và Task Scheduler ghi `Last Run Result ≠ 0` — cơ chế
+cảnh báo hoạt động. Task giữ lại trên máy này, chạy 23:50 hằng đêm vào `ban-giao-A\logs-nightly`.
+
+### Chưa làm
+
+- Mới 1 dự án thật (roadmap đòi 2 trước khi công bố). Dự án thứ hai cần một mô hình **có sheet** để danh mục
+  bản vẽ và PDF thật sự vào gói — ARC/MEP của dự án A đều là file mô hình thuần.
+- PDF chưa có trong gói của dự án A vì lý do trên; trên Snowdon thì `BatchExport` PDF đã chạy thật từ §27.
+- Chữ ký số thay cho ô ký tay: ngoài phạm vi 11.3.

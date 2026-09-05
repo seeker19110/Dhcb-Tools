@@ -42,13 +42,19 @@ public sealed class BatchExportCommand : ICoreCommand<ExportConfig>
                 sheets = allSheets;
             }
 
-            if (sheets.Count == 0)
+            // IFC/NWC xuất CẢ MÔ HÌNH, không đi qua sheet: một file mô hình thuần (dự án A, ARC L01 — 0 sheet)
+            // vẫn phải xuất được IFC. Trước đây chặn chung "không có bản vẽ" cho mọi định dạng, nên gói bàn
+            // giao của một mô hình không sheet không bao giờ có IFC (bang-chung-test §43).
+            var needsSheets = config.Formats.Any(f => f == Export.ExportFormat.Pdf || f == Export.ExportFormat.Dwg);
+            if (sheets.Count == 0 && needsSheets)
                 return CommandResult.Fail("Không tìm thấy bản vẽ nào phù hợp để xuất.");
 
             if (config.DryRun)
             {
                 var dryResult = CommandResult.Ok(
-                    $"[Xem trước] Tìm thấy {sheets.Count} bản vẽ, {config.Formats.Count} định dạng.",
+                    needsSheets
+                        ? $"[Xem trước] Tìm thấy {sheets.Count} bản vẽ, {config.Formats.Count} định dạng."
+                        : $"[Xem trước] Xuất cả mô hình ra {string.Join(", ", config.Formats)} (không qua sheet).",
                     sheets.Count);
                 foreach (var s in sheets)
                     dryResult.Messages.Add($"  {s.SheetNumber} - {s.Name}");
@@ -72,7 +78,9 @@ public sealed class BatchExportCommand : ICoreCommand<ExportConfig>
                 }
             }
 
-            string summary = $"Xuất xong {totalExported} file(s) ({sheets.Count} bản vẽ × {config.Formats.Count} định dạng).";
+            string summary = needsSheets
+                ? $"Xuất xong {totalExported} file(s) ({sheets.Count} bản vẽ × {config.Formats.Count} định dạng)."
+                : $"Xuất xong {totalExported} file(s) ({string.Join(", ", config.Formats)} — cả mô hình, không qua sheet).";
             if (errors.Count > 0)
                 summary += $" {errors.Count} lỗi.";
 

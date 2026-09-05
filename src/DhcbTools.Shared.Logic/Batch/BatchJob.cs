@@ -49,6 +49,34 @@ namespace DhcbTools.Shared.Logic.Batch
     }
 
     /// <summary>File job của batch runner (mục 1.2). Đọc bằng <see cref="Load"/>; token được thay lúc chạy.</summary>
+    /// <summary>
+    /// Mục 11.3 — gói bàn giao dựng sau khi job chạy xong: <c>ban-giao.html</c> + <c>ban-giao.json</c> trong
+    /// <c>outputFolder</c>, gom IFC/PDF/danh mục bản vẽ với băm SHA-256, kiểm chuỗi băm nhật ký, kiểm IFC
+    /// (và IDS nếu khai) và ô xác nhận của chủ đầu tư theo Điều 11 NĐ 207/2026.
+    /// </summary>
+    public sealed class HandoverOptions
+    {
+        [JsonProperty("enabled")]
+        public bool Enabled { get; set; } = true;
+
+        [JsonProperty("projectName")]
+        public string ProjectName { get; set; } = string.Empty;
+
+        [JsonProperty("owner")]
+        public string Owner { get; set; } = string.Empty;
+
+        [JsonProperty("contractor")]
+        public string Contractor { get; set; } = string.Empty;
+
+        /// <summary>File IDS để kiểm mọi IFC trong thư mục đầu ra; rỗng = chỉ kiểm cấu trúc IFC.</summary>
+        [JsonProperty("idsPath")]
+        public string? IdsPath { get; set; }
+
+        /// <summary>Bộ quy tắc IFC (JSON) cho <c>--verify-ifc</c>; rỗng = bộ mặc định.</summary>
+        [JsonProperty("ifcSpecPath")]
+        public string? IfcSpecPath { get; set; }
+    }
+
     public sealed class BatchJob
     {
         [JsonProperty("name")]
@@ -90,6 +118,10 @@ namespace DhcbTools.Shared.Logic.Batch
 
         [JsonProperty("tokens")]
         public Dictionary<string, string> Tokens { get; set; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Gói bàn giao sau khi chạy (null = không dựng).</summary>
+        [JsonProperty("handover")]
+        public HandoverOptions? Handover { get; set; }
 
         public static BatchJob Parse(string json)
         {
@@ -154,6 +186,11 @@ namespace DhcbTools.Shared.Logic.Batch
             if (SaveMode == SaveMode.SaveAs && string.IsNullOrWhiteSpace(OutputFolder))
             {
                 errors.Add("saveMode=SaveAs cần 'outputFolder'");
+            }
+
+            if (Handover != null && Handover.Enabled && string.IsNullOrWhiteSpace(OutputFolder))
+            {
+                errors.Add("'handover' cần 'outputFolder' — gói bàn giao gom file từ đó");
             }
 
             if (!App.Equals("revit", StringComparison.OrdinalIgnoreCase) && !App.Equals("autocad", StringComparison.OrdinalIgnoreCase))
