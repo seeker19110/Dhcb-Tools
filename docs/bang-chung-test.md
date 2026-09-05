@@ -2586,3 +2586,28 @@ cảnh báo hoạt động. Task giữ lại trên máy này, chạy 23:50 hằn
   bản vẽ và PDF thật sự vào gói — ARC/MEP của dự án A đều là file mô hình thuần.
 - PDF chưa có trong gói của dự án A vì lý do trên; trên Snowdon thì `BatchExport` PDF đã chạy thật từ §27.
 - Chữ ký số thay cho ô ký tay: ngoài phạm vi 11.3.
+
+## 44. Vai kỹ sư test: phá thử những gì vừa merge trong ngày (2026-09-05 23:55 ICT)
+
+Lượt test độc lập sau #93–#96, không nhìn mã trước, chỉ đưa đầu vào xấu và dữ liệu khác Snowdon.
+
+| # | Ca thử | Kết quả |
+|---|---|---|
+| T0 | DHCB vs IfcTester trên **IFC dự án A** (13 MB, file khác hẳn Snowdon), cả hai fixture | 12/13 specification khớp từng số; spec 03 lệch đúng theo lỗi `FALSE` viết hoa của IfcTester (§41): IfcTester "đạt" 354 tường IsExternal = True |
+| T1 | `--verify-ids` không kèm `--verify-ifc` | in usage, mã thoát 2 — chấp nhận được, chưa nói lý do |
+| T2/T3 | IDS không tồn tại / IDS rỗng | mã thoát 2, thông điệp rõ |
+| T4 | IDS lệch chuẩn + `--ids-report` vào thư mục chưa có | 3 cảnh báo kèm dòng, tạo thư mục, có cả .csv |
+| **T5** | `--verify-ifc x.ifc --verify-ids …` với file "hello" | **SẬP** — ngoại lệ chưa bắt, mã thoát 127 (trong khi `--verify-ifc` một mình báo gọn, mã 1) |
+| **T5b** | Job có `handover`, thư mục đầu ra chứa một `.ifc` hỏng, `--report-only` | **SẬP cả runner, đêm đó không có gói bàn giao** |
+| T6 | IDS có `<info>` **sau** `<specifications>` | IfcTester từ chối; lint **không** cảnh báo |
+| T7 | `--report-only` hai lần liên tiếp | 4 file, không trùng |
+| T8 | CSV danh mục 55 sheet của Snowdon đọc lại bằng csv chuẩn | 8 cột đủ, 0 dòng lệch |
+| T9 | ifcVersion "IFC4 IFC2X3", entity `ifcdoor` chữ thường, `xs:enumeration` thiếu value | lint chỉ kêu enumeration — **khớp IfcTester** (hai cái kia IfcTester cũng nhận) |
+
+**Sửa trong lượt:** T5/T5b bắt `IfcParseException` — CLI mã thoát 2 với "Không đọc được file IFC", gói bàn giao
+ghi hai mục *Không đạt* (Kiểm IFC, Kiểm IDS) và vẫn dựng xong (mã thoát 0 vì job không lỗi). T6 lint thêm
+"<info> phải đứng trước <specifications>". Test thuần 1339, phủ 100 %.
+
+**Không sửa:** T1 (nit UX). Nhận xét: cả hai lỗi sập đều ở BatchRunner — nơi cổng phủ 100 % không với tới —
+và đều là đường "đầu vào hỏng"; test thuần không bao giờ đưa file rác vào vì tầng thuần chỉ nhận chuỗi.
+
