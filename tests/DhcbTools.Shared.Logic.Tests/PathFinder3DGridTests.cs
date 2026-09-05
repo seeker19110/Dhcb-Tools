@@ -168,6 +168,109 @@ public class PathFinder3DGridTests
         Assert.True(dongHo.ElapsedMilliseconds < 5000, $"mất {dongHo.ElapsedMilliseconds} ms với 550 vật cản");
     }
 
+    // ── Ngân sách node tự chọn theo cỡ lưới ─────────────────────────────
+
+    /// <summary>
+    /// Lưới nhỏ giữ đúng trần cố định cũ 400.000; lưới to nhận ngân sách bằng số TRẠNG THÁI (ô × 7 hướng)
+    /// nhưng không quá 2 triệu; người gọi đặt tay thì lấy đúng giá trị đó. Ba nhánh, một hàm.
+    /// </summary>
+    [Theory]
+    [InlineData(1_000, null, 400_000)]
+    [InlineData(100_000, null, 700_000)]
+    [InlineData(15_000_000, null, 2_000_000)]
+    [InlineData(15_000_000, 10, 10)]
+    [InlineData(1_000, 5_000_000, 5_000_000)]
+    public void NganSachTuChon_TheoCoLuoi_KepTrongKhoang(long cells, int? datTay, int mongDoi)
+    {
+        var o = new PathFinderOptions { MaxExpandedNodes = datTay };
+        Assert.Equal(mongDoi, o.EffectiveMaxExpandedNodes(cells));
+    }
+
+    /// <summary>
+    /// Hộp 30 × 30 m, một lớp cao độ, ba tường so le buộc tuyến zigzag — bước 100 mm, phạt rẽ 20 mặc định.
+    /// Đo được: tuyến tối ưu cần 459.000 trạng thái, xong trong 0,3 s. Trần cố định cũ 400.000 thua ở đúng
+    /// bài này dù hai điểm nối thông; ngân sách tự chọn theo cỡ bài toán phải tìm được, và kết quả phải nói
+    /// ra ngân sách đã áp dụng. Ca này giữ cả hai vế: cũ thua, mới thắng.
+    /// </summary>
+    [Fact]
+    public void ZigzagBaTuong_TranCoDinhCuThua_NganSachTuChonThang()
+    {
+        var bounds = new Box3(-3000, -3000, 0, 33000, 33000, 0);
+        var walls = new[]
+        {
+            new Box3(8000, -3000, -3000, 8200, 32000, 3000),   // hở phía y lớn
+            new Box3(16000, -2000, -3000, 16200, 33000, 3000), // hở phía y nhỏ
+            new Box3(24000, -3000, -3000, 24200, 32000, 3000), // hở phía y lớn
+        };
+        var start = new Point3(0, 0, 0);
+        var goal = new Point3(30000, 0, 0);
+
+        var cu = PathFinder3D.FindPath(start, goal, walls, bounds, new PathFinderOptions { MaxExpandedNodes = 400_000 });
+        Assert.False(cu.Found);
+        Assert.True(cu.GoalConnected, "ca kiểm phải là bài CÓ lời giải mà trần cũ không với tới");
+
+        var dongHo = Stopwatch.StartNew();
+        var moi = PathFinder3D.FindPath(start, goal, walls, bounds, new PathFinderOptions());
+        dongHo.Stop();
+
+        Assert.Equal((int)Math.Min(2_000_000, moi.GridCells * PathFinderOptions.StatesPerCell), moi.MaxExpandedNodes);
+        Assert.True(moi.Found, moi.Reason);
+        Assert.True(moi.ExpandedNodes > 400_000 && moi.ExpandedNodes <= moi.MaxExpandedNodes, $"mở rộng {moi.ExpandedNodes:N0}");
+        Assert.Equal(6, moi.Turns);
+        Assert.True(dongHo.ElapsedMilliseconds < 10000, $"mất {dongHo.ElapsedMilliseconds} ms");
+
+        // Không điểm nào của tuyến chạm tường (đã nới clearance 100).
+        foreach (var p in DiemTrenTuyen(moi.Polyline, 100))
+        {
+            foreach (var w in walls)
+            {
+                Assert.False(w.Contains(p.X, p.Y, p.Z, 100 - 1e-6), $"tuyến xuyên tường tại ({p.X},{p.Y},{p.Z})");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Cùng bài zigzag nhưng cho đi dọc Z với 21 lớp cao độ: 2 triệu trạng thái vẫn chưa xong (đo: 1,9 s,
+    /// ~200 MB). Thông báo phải chỉ đúng đòn bẩy — số lớp cao độ — chứ không chỉ nói "tăng ngân sách".
+    /// </summary>
+    [Fact]
+    public void HetNganSachKhiChoDiDocZ_ThongBaoChiRaSoLopCaoDo()
+    {
+        var bounds = new Box3(-3000, -3000, -1000, 33000, 33000, 1000);
+        var walls = new[]
+        {
+            new Box3(8000, -3000, -3000, 8200, 32000, 3000),
+            new Box3(16000, -2000, -3000, 16200, 33000, 3000),
+            new Box3(24000, -3000, -3000, 24200, 32000, 3000),
+        };
+
+        // Ngân sách nhỏ để ca kiểm chạy nhanh — điều cần kiểm là nội dung thông báo, không phải con số.
+        var r = PathFinder3D.FindPath(new Point3(0, 0, 0), new Point3(30000, 0, 0), walls, bounds,
+            new PathFinderOptions { MaxExpandedNodes = 50_000, AllowVertical = true });
+
+        Assert.False(r.Found);
+        Assert.True(r.GoalConnected);
+        Assert.Contains("21 lớp cao độ", r.Reason);
+        Assert.Contains("allowVertical", r.Reason);
+
+        var ngang = PathFinder3D.FindPath(new Point3(0, 0, 0), new Point3(30000, 0, 0), walls, bounds,
+            new PathFinderOptions { MaxExpandedNodes = 50_000, AllowVertical = false });
+        Assert.DoesNotContain("lớp cao độ", ngang.Reason);
+    }
+
+    /// <summary>Hết ngân sách thì thông báo phải nêu con số ngân sách đã áp dụng, để kỹ sư biết đặt maxExpandedNodes bao nhiêu.</summary>
+    [Fact]
+    public void HetNganSach_ThongBaoNeuConSoNganSach()
+    {
+        var r = PathFinder3D.FindPath(new Point3(0, 0, 0), new Point3(9000, 9000, 0), Array.Empty<Box3>(), Bounds,
+            new PathFinderOptions { StepMm = 100, MaxExpandedNodes = 10 });
+
+        Assert.False(r.Found);
+        Assert.Equal(10, r.MaxExpandedNodes);
+        Assert.Contains("10", r.Reason);
+        Assert.Contains("maxExpandedNodes", r.Reason);
+    }
+
     /// <summary>Nội suy các ô giữa hai đỉnh polyline — polyline chỉ giữ điểm rẽ nên phải trải lại để kiểm.</summary>
     private static IEnumerable<Point3> DiemTrenTuyen(IReadOnlyList<Point3> polyline, double step)
     {
