@@ -2331,8 +2331,12 @@ Khớp từng con số với lượt batch ở §37. Không bấm *Chạy thật
 
 ### Hai bẫy khi bấm tay, ghi lại cho lần sau
 
-- Nút *Xem trước* **không phản ứng** khi con trỏ còn nằm trong một ô nhập vừa gõ (bấm hai lần liền vẫn
-  không); bấm vào vùng trống của form trước rồi mới bấm nút thì chạy ngay. Không phải lỗi hiển thị, mà
-  nhiều khả năng là lần bấm đầu chỉ làm ô nhập mất focus. Chưa sửa — cần một người bấm tay xác nhận lại
-  trước khi đổi hành vi nút.
+- Nút *Xem trước* có một lần **không phản ứng** (bấm hai lần liền, cách nhau 8 s, ô kết quả không đổi);
+  bấm vào vùng trống rồi bấm nút thì chạy. Mở lại Revit để bisect (22:10): bấm ngay khi form mở, bấm sau
+  khi đổi checkbox, bấm sau khi bấm vào combo, và lặp lại đúng chuỗi lúc bị câm (triple-click combo →
+  Ctrl+A → gõ → đổi checkbox → bấm) — **5/5 lần đều chạy ngay**. Mã của `CommandFormWindow` cũng không có
+  đường nào nuốt cú bấm (không có validation chặn, không có popup giữ chuột). Trong cùng lượt bisect, một
+  ảnh chụp màn hình trả về **đen hoàn toàn** rồi ảnh sau lại bình thường, nên khả năng cao nhất là hai cú
+  bấm đầu rơi vào lúc màn hình/tiến trình chụp trục trặc chứ không phải form. **Không sửa mã** vì không có
+  gì để sửa; nếu ai gặp lại bằng tay thật, ghi lại thao tác ngay trước đó.
 - Ô JSON nhiều dòng co lại sau khi dán (đã ghi §36) — điền `startMm`/`endMm` trước, các ô dưới sau.
