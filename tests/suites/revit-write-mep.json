@@ -127,6 +127,113 @@
         ],
         "maxMs": 300000
       }
+    },
+    {
+      "name": "Link bản vẽ CAD — GHI THẬT, dựng chính fixture cho ca sau",
+      "command": "CadLink",
+      "allowWrite": true,
+      "//": [
+        "Muc C4: khong model mau nao cua Revit co san CAD link, nen duong thanh cong cua",
+        "ModelLinesFromCad khong the kiem tu dong. Ca nay tu dung fixture do ngay trong model ban chep.",
+        "File .dxf van ban de doc duoc trong repo va khong phu thuoc AutoCAD."
+      ],
+      "config": {
+        "cadPath": "{suiteFolder}/fixtures/tuyen-ong.dxf",
+        "unit": "mm",
+        "placement": "origin"
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "summaryContains": [
+          "Đã link"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "noErrors": true,
+        "maxMs": 120000
+      }
+    },
+    {
+      "name": "Link lại chính bản vẽ đó — phải bỏ qua, không link lần hai",
+      "command": "CadLink",
+      "allowWrite": true,
+      "//": "maxAffected 0 + 'Da co' la bang chung lan truoc da COMMIT that: rollback thi model khong co link nao va lan nay lai link duoc.",
+      "config": {
+        "cadPath": "{suiteFolder}/fixtures/tuyen-ong.dxf",
+        "unit": "mm"
+      },
+      "expect": {
+        "success": true,
+        "maxAffected": 0,
+        "summaryContains": [
+          "Đã có"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 60000
+      }
+    },
+    {
+      "name": "Model line từ CAD — GHI THẬT, đường thành công của C4",
+      "command": "ModelLinesFromCad",
+      "allowWrite": true,
+      "//": [
+        "Fixture co y gai: 2 doan thang hang noi duoi nhau (gop thanh 1), 1 doan doc (giu),",
+        "1 doan rac 20 mm (loai boi minLengthMm), 1 doan tren layer -TEXT (loai boi excludeLayers),",
+        "1 doan tren layer RAC (loai boi includeLayers). Ky vong 2 model line: tuyen ngang da gop + tuyen doc."
+      ],
+      "config": {
+        "dwgNameContains": "tuyen-ong",
+        "includeLayers": [
+          "TUYEN-ONG*"
+        ],
+        "excludeLayers": [
+          "*-TEXT"
+        ],
+        "minLengthMm": 100,
+        "mergeCollinear": true,
+        "dryRun": false
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "neverContains": [
+          "Exception"
+        ],
+        "maxMs": 120000
+      }
+    },
+    {
+      "name": "Model line từ CAD lần hai — phải 0 đường mới, không sinh bản sao",
+      "command": "ModelLinesFromCad",
+      "allowWrite": true,
+      "//": "Chong trung cua C4: duong nao da co model line trung thi bo qua. 0 o day chung minh lan truoc ghi that.",
+      "config": {
+        "dwgNameContains": "tuyen-ong",
+        "includeLayers": [
+          "TUYEN-ONG*"
+        ],
+        "excludeLayers": [
+          "*-TEXT"
+        ],
+        "minLengthMm": 100,
+        "mergeCollinear": true,
+        "dryRun": false
+      },
+      "expect": {
+        "success": true,
+        "maxAffected": 0,
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 120000
+      }
     }
   ]
 }

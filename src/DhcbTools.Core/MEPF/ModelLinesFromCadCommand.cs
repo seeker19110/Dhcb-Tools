@@ -64,10 +64,21 @@ public sealed class ModelLinesFromCadCommand : ICoreCommand<ModelLinesFromCadCon
     {
         var result = CommandResult.Ok(string.Empty);
 
-        var imports = new FilteredElementCollector(document).OfClass(typeof(ImportInstance)).Cast<ImportInstance>()
+        var allImports = new FilteredElementCollector(document).OfClass(typeof(ImportInstance)).Cast<ImportInstance>().ToList();
+        var imports = allImports
             .Where(i => string.IsNullOrWhiteSpace(config.DwgNameContains)
-                        || SafeName(i).IndexOf(config.DwgNameContains!, StringComparison.OrdinalIgnoreCase) >= 0)
+                        || RevitCompat.CadFileName(document, i).IndexOf(config.DwgNameContains!, StringComparison.OrdinalIgnoreCase) >= 0)
             .ToList();
+
+        // Lọc không ra thì phải nói mô hình ĐANG có bản vẽ nào — bản trước chỉ bảo "kiểm cả dwgNameContains",
+        // để kỹ sư tự đoán tên, mà tên thật lại nằm ở element kiểu chứ không phải chỗ ai cũng nhìn thấy.
+        if (imports.Count == 0 && allImports.Count > 0)
+        {
+            var names = allImports.Select(i => RevitCompat.CadFileName(document, i))
+                .Where(n => !string.IsNullOrWhiteSpace(n)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(n => n).ToList();
+            result.Messages.Add($"Mô hình có {allImports.Count} bản vẽ CAD nhưng không cái nào khớp \"{config.DwgNameContains}\": "
+                                + (names.Count > 0 ? string.Join(", ", names) : "(không đọc được tên)"));
+        }
 
         if (RevitPrecondition.Blocks(Shared.Logic.Checks.Precondition.NonEmptyInput(
                 CommandName,

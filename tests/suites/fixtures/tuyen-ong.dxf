@@ -1,0 +1,234 @@
+999
+Fixture cho ModelLinesFromCad (C4). DXF R12 toi gian, viet tay de doc duoc trong repo
+999
+va khong phu thuoc AutoCAD. Don vi: milimet. Xem tests/suites/revit-write-mep.json.
+999
+Noi dung co y gai dung nhung truong hop bo loc cua C4 phai xu ly:
+999
+  TUYEN-ONG      : 2 doan thang hang noi duoi nhau (0,0)-(6000,0)-(10000,0)  -> gop thanh 1
+999
+  TUYEN-ONG      : 1 doan doc (10000,0)-(10000,5000)                          -> giu, khong gop
+999
+  TUYEN-ONG      : 1 doan rac dai 20 mm                                       -> bi loai boi minLengthMm
+999
+  TUYEN-ONG-TEXT : 1 doan tren layer ghi chu                                  -> bi loai boi excludeLayers
+999
+  RAC            : 1 doan tren layer khong khai                               -> bi loai boi includeLayers
+  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1009
+  9
+$INSBASE
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$EXTMIN
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$EXTMAX
+ 10
+10000.0
+ 20
+5000.0
+ 30
+0.0
+  9
+$INSUNITS
+ 70
+     4
+  0
+ENDSEC
+  0
+SECTION
+  2
+TABLES
+  0
+TABLE
+  2
+LTYPE
+ 70
+     1
+  0
+LTYPE
+  2
+CONTINUOUS
+ 70
+     0
+  3
+Solid line
+ 72
+    65
+ 73
+     0
+ 40
+0.0
+  0
+ENDTAB
+  0
+TABLE
+  2
+LAYER
+ 70
+     4
+  0
+LAYER
+  2
+0
+ 70
+     0
+ 62
+     7
+  6
+CONTINUOUS
+  0
+LAYER
+  2
+TUYEN-ONG
+ 70
+     0
+ 62
+     3
+  6
+CONTINUOUS
+  0
+LAYER
+  2
+TUYEN-ONG-TEXT
+ 70
+     0
+ 62
+     2
+  6
+CONTINUOUS
+  0
+LAYER
+  2
+RAC
+ 70
+     0
+ 62
+     1
+  6
+CONTINUOUS
+  0
+ENDTAB
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+LINE
+  8
+TUYEN-ONG
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 11
+6000.0
+ 21
+0.0
+ 31
+0.0
+  0
+LINE
+  8
+TUYEN-ONG
+ 10
+6000.0
+ 20
+0.0
+ 30
+0.0
+ 11
+10000.0
+ 21
+0.0
+ 31
+0.0
+  0
+LINE
+  8
+TUYEN-ONG
+ 10
+10000.0
+ 20
+0.0
+ 30
+0.0
+ 11
+10000.0
+ 21
+5000.0
+ 31
+0.0
+  0
+LINE
+  8
+TUYEN-ONG
+ 10
+2000.0
+ 20
+3000.0
+ 30
+0.0
+ 11
+2020.0
+ 21
+3000.0
+ 31
+0.0
+  0
+LINE
+  8
+TUYEN-ONG-TEXT
+ 10
+0.0
+ 20
+2000.0
+ 30
+0.0
+ 11
+4000.0
+ 21
+2000.0
+ 31
+0.0
+  0
+LINE
+  8
+RAC
+ 10
+0.0
+ 20
+4000.0
+ 30
+0.0
+ 11
+4000.0
+ 21
+4000.0
+ 31
+0.0
+  0
+ENDSEC
+  0
+EOF

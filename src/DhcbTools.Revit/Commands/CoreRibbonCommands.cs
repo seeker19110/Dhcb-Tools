@@ -343,6 +343,15 @@ public sealed class ProgressReportRibbonCommand : IExternalCommand
         => CommandRunner.Run(commandData, "ProgressReport");
 }
 
+/// <summary>Link một file CAD vào mô hình — bước Insert → Link CAD, mắt đầu tiên của chuỗi DWG → model line.</summary>
+[Transaction(TransactionMode.Manual)]
+[Regeneration(RegenerationOption.Manual)]
+public sealed class CadLinkRibbonCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        => CommandRunner.Run(commandData, "CadLink");
+}
+
 /// <summary>Dựng model line từ bản vẽ CAD đã link/import, để RouteFromLines dựng ống theo.</summary>
 [Transaction(TransactionMode.Manual)]
 [Regeneration(RegenerationOption.Manual)]
