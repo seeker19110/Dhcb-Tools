@@ -107,7 +107,10 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
-  if CurStep = ssPostInstall then
+  // WizardSilent: /SILENT hay /VERYSILENT. MsgBox do [Code] gọi KHÔNG bị /SUPPRESSMSGBOXES tắt, nên bản
+  // 1.1.0 cài im lặng xong vẫn treo một cửa sổ "Setup" trống chờ bấm OK — Task Scheduler hay script cài
+  // hàng loạt sẽ đứng mãi (bang-chung-test §45/§46).
+  if (CurStep = ssPostInstall) and not WizardSilent then
   begin
     // Revit hỏi "Unsigned Add-In" ở lần mở đầu tiên — nói trước để kỹ sư không tưởng là lỗi.
     MsgBox('Đã cài xong.' + #13#10 + #13#10 +
