@@ -247,6 +247,81 @@
           "trong chướng ngại"
         ]
       }
+    },
+    {
+      "name": "Riser L3 → L4 cùng XY (-15725,1137), chỉ Floors → có LỖ SÀN trong 6 m: tuyến 3 đoạn",
+      "//": "Ba duct giong het nhau o L3/L4/L5 tai cung XY. Chi tinh san thi A* tim duoc duong len (2 lan re) — tuc la co lo san (shaft) trong hop tim kiem.",
+      "command": "AutoRoute",
+      "config": {
+        "startMm": {
+          "x": -15725,
+          "y": 1137,
+          "z": 9000
+        },
+        "endMm": {
+          "x": -15725,
+          "y": 1137,
+          "z": 13056
+        },
+        "searchMarginMm": 6000,
+        "searchMarginZMm": 500,
+        "stepMm": 200,
+        "clearanceMm": 100,
+        "obstacleCategories": [
+          "Floors"
+        ],
+        "buildRoute": false
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 60000,
+        "summaryContains": [
+          "Tuyến"
+        ],
+        "neverContains": [
+          "Exception",
+          "KHÔNG có vật cản"
+        ]
+      }
+    },
+    {
+      "name": "Riser L3 → L4, đủ 4 category → không nối thông: lỗ sàn có nhưng tường shaft (hộp bao) bịt kín",
+      "//": "Ket hop voi ca tren: lo san ton tai, chi Walls thi len thang duoc, nhung ca hai cung luc thi khong — dung kieu shaft co tuong bao quanh. Gioi han hop bao tuong, khong phai khong co shaft.",
+      "command": "AutoRoute",
+      "config": {
+        "startMm": {
+          "x": -15725,
+          "y": 1137,
+          "z": 9000
+        },
+        "endMm": {
+          "x": -15725,
+          "y": 1137,
+          "z": 13056
+        },
+        "searchMarginMm": 6000,
+        "searchMarginZMm": 500,
+        "stepMm": 200,
+        "clearanceMm": 100,
+        "obstacleCategories": [
+          "Structural Framing",
+          "Structural Columns",
+          "Walls",
+          "Floors"
+        ],
+        "buildRoute": false
+      },
+      "expect": {
+        "success": false,
+        "maxMs": 60000,
+        "summaryContains": [
+          "Không có đường đi"
+        ],
+        "neverContains": [
+          "Exception",
+          "KHÔNG có vật cản"
+        ]
+      }
     }
   ]
 }
