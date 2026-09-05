@@ -173,7 +173,20 @@ public static class Program
                 {
                     var specs = IdsSpec.Parse(xml);
                     var warnings = IdsSchemaLint.Check(xml);
-                    var check = IdsEvaluator.Check(specs, IfcIdsModel.Parse(text).Elements());
+                    // IFC hỏng: IfcChecker ở trên đã báo "không đọc được" thành một mục không đạt; ở đây phải
+                    // bắt riêng, nếu không cả runner sập và đêm đó KHÔNG có gói bàn giao nào (§44).
+                    IfcIdsModel model;
+                    try
+                    {
+                        model = IfcIdsModel.Parse(text);
+                    }
+                    catch (IfcParseException ex)
+                    {
+                        input.Checks.Add(new HandoverCheck("Kiểm IDS " + ifc.RelativePath, false, "Không đọc được file IFC: " + ex.Message));
+                        continue;
+                    }
+
+                    var check = IdsEvaluator.Check(specs, model.Elements());
                     var reportName = Path.GetFileNameWithoutExtension(ifc.RelativePath) + "-ids.html";
                     var reportPath = Path.Combine(outputFolder, reportName);
                     File.WriteAllText(reportPath, IdsReport.Html(Path.GetFileName(ifcPath), options.IdsPath!, IdsReport.IfcScopeNote, check, warnings), new UTF8Encoding(true));
@@ -306,7 +319,19 @@ public static class Program
         }
 
         var schemaWarnings = IdsSchemaLint.Check(xml);
-        var model = IfcIdsModel.Parse(File.ReadAllText(ifcPath, Encoding.UTF8));
+        IfcIdsModel model;
+        try
+        {
+            model = IfcIdsModel.Parse(File.ReadAllText(ifcPath, Encoding.UTF8));
+        }
+        catch (IfcParseException ex)
+        {
+            // File rác/hỏng: --verify-ifc một mình báo gọn "Không đọc được file", còn đường này từng ném
+            // ngoại lệ chưa bắt (mã thoát 127) — lộ khi kỹ sư test đưa file "hello" vào (§44).
+            Console.Error.WriteLine("Không đọc được file IFC: " + ex.Message);
+            return 2;
+        }
+
         var elements = model.Elements();
         var check = IdsEvaluator.Check(specifications, elements);
 

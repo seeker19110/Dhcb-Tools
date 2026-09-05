@@ -201,6 +201,14 @@ public class IdsSchemaLintTests
     }
 
     [Fact]
+    public void InfoSauSpecifications_CanhBao()
+    {
+        var xml = "<ids " + Ns + "><specifications>" + GoodSpec + "</specifications><info><title>t</title></info></ids>";
+        Assert.Contains(IdsSchemaLint.Check(xml), w => w.Contains("<info> phải đứng trước <specifications>"));
+        Assert.Empty(IdsSchemaLint.Check(Wrap(GoodSpec)));
+    }
+
+    [Fact]
     public void KhongPhaiXml_TraVeMotDong_KhongNem()
     {
         var warnings = IdsSchemaLint.Check("<ids");

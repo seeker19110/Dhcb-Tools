@@ -95,6 +95,11 @@ namespace DhcbTools.Shared.Logic.Ids
             {
                 sink.Add(root, "thiếu <specifications> bọc ngoài các <specification>");
             }
+            else if (info != null && info.ElementsBeforeSelf().Contains(specifications))
+            {
+                // xs:sequence: <info> rồi mới <specifications>. Đảo lại thì IfcTester từ chối (kỹ sư test, §44).
+                sink.Add(info, "<info> phải đứng trước <specifications>");
+            }
 
             foreach (var spec in root.Descendants().Where(e => Local(e).Equals("specification", StringComparison.OrdinalIgnoreCase)))
             {
