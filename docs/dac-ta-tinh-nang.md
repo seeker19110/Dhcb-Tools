@@ -390,6 +390,15 @@ vùng cho từng va chạm (dùng lại cơ chế của `ConnectorCheckerCommand
 Bỏ qua cặp đã được đánh dấu "chấp nhận" trong file `clash-accepted.json` (khoá là cặp ElementId +
 hash vị trí, để cặp cũ không quay lại báo sau mỗi lần chạy đêm).
 
+**Xuất BCF 2.1** (đề xuất B3 của [`nghien-cuu-chuoi-den-hoan-cong.md`](nghien-cuu-chuoi-den-hoan-cong.md)):
+khai thêm `bcfPath` (ví dụ `C:\...\clash.bcf`, tuỳ chọn `bcfProjectName`) thì ngoài HTML, lệnh ghi một
+file BCF mở thẳng được trong Navisworks / Solibri / BIMcollab — mỗi va chạm là một topic có camera phối
+cảnh nhìn vào tâm va chạm và hai phần tử liên quan (ElementId hai phía, phía link ghi kèm tên link).
+GUID của topic sinh từ chính `key` trong `clash-accepted.json`, nên **xuất lại cùng một va chạm vẫn ra
+đúng topic cũ** thay vì đẻ ra vấn đề mới bên phần mềm điều phối. Toạ độ trong file là **mét** theo chuẩn
+BCF. Ghi BCF hỏng thì chỉ báo trong `Messages`, không làm hỏng lượt quét đã ghi HTML xong.
+**Phần thuần:** `Shared.Logic.Bcf` (`BcfWriter` — zip + XML, không đụng `Document` nào).
+
 ---
 
 # Giai đoạn 5 — Lớp AI

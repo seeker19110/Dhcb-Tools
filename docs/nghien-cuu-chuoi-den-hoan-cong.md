@@ -105,7 +105,7 @@ lệnh này tạo nhiều phần tử nhất trong cả bộ.
 |---|---|---|---|---|
 | B1 ✅ 🧪 | **`ConstructionStatus`** + **`ProgressReport`** — mã nguồn 2026-09-05, chờ chạy thật | Nhập trạng thái lắp đặt/nghiệm thu vào Excel rời, vẽ tay biểu đồ tiến độ | `Progress/StatusRoll` + `WeeklyProgress` + `ConstructionStatusValue` + `ProgressCsv` (gộp theo tầng/hệ/category và theo tuần, % theo số lượng **và** theo chiều dài) — 41 ca test | **Rẻ nhất**: ghép `ParameterImport` + `ColorByParameter` + `snapshot` đã có |
 | B2 | **`QtoExport`** | Bóc khối lượng rồi gõ lại vào phần mềm dự toán | `Qto/QtoMapTable` + `QtoAggregator` | Bảng map category/type → **mã hiệu công tác** để **ngoài repo** (`configs/qto-map.sample.json`), giống `dictionary.json` |
-| B3 | **`BcfExport`** | Chụp màn hình va chạm dán vào Word gửi tư vấn | `Bcf/BcfWriter` — **100% thuần** | Dùng chung cho `ClashDetection`, `ParameterRuleCheck`, `WarningsExport` |
+| B3 ✅ | **BCF 2.1 — đầu ra `bcfPath` của `ClashDetection`** | Chụp màn hình va chạm dán vào Word gửi tư vấn | `Bcf/BcfWriter` — **100% thuần** | Dùng chung cho `ClashDetection`, `ParameterRuleCheck`, `WarningsExport` |
 
 **B1 — trạng thái thi công và báo cáo tiến độ.** ✅ **Đã có mã nguồn 2026-09-05** — xem
 [`tien-do-thi-cong.md`](tien-do-thi-cong.md). Ba điều chốt bằng test vì đó là chỗ báo cáo tiến độ hay nói
@@ -121,7 +121,14 @@ trường (mã cấu kiện → trạng thái/ngày/người) qua `ParameterImpo
 không sinh dự toán. Sai đơn giá là chuyện pháp lý và là việc của người dự toán; giá trị của DHCB là **truy được
 ngược từ từng dòng khối lượng về từng phần tử trong mô hình** — thứ mà bảng Excel gõ tay không làm được.
 
-**B3 — `BcfExport`.** `ClashDetectionCommand` đã giữ đúng dữ liệu cần: `Clash(A, B, Centre, Key, LinkName,
+**B3 — BCF.** ✅ **Đã làm 2026-09-05** — `ClashDetection` nhận thêm `bcfPath` (và `bcfProjectName`), ghi
+BCF 2.1 bằng `Shared.Logic/Bcf` (`BcfWriter`, `BcfIssue` — thuần, 21 ca test đọc lại chính file vừa ghi).
+Không làm thành lệnh Core riêng: dữ liệu đã nằm sẵn trong lệnh **đã chạy thật**, nên thêm đầu ra không
+vướng nguyên tắc 6, còn thêm một lệnh mới thì có. Hai điều chốt bằng test vì hỏng thì không ai thấy ngay:
+**GUID topic sinh từ chính `key` va chạm** (xuất lại lần hai vẫn là vấn đề cũ, không tách nhận xét người
+duyệt đã ghi ra vấn đề mới) và **camera không bao giờ NaN** — kể cả khi nhìn thẳng đứng hoặc hướng nhìn
+là vector 0. Toạ độ đổi foot → **mét** ở đúng một chỗ, vì BCF quy định mét.
+Cơ sở kỹ thuật khi làm: `ClashDetectionCommand` đã giữ đúng dữ liệu cần: `Clash(A, B, Centre, Key, LinkName,
 LinkInstanceId)` — có cặp phần tử, có tâm va chạm để đặt camera. Cấu trúc `.bcf` là zip: mỗi vấn đề một thư mục
 tên GUID chứa `markup.bcf` (bắt buộc) + `.bcfv` (góc nhìn) + ảnh PNG cạnh dài ≤ 1500 px; gốc zip có
 `bcf.version`, `extensions.xml`, tuỳ chọn `project.bcfp`. Toàn bộ là XML + zip nên viết được trong
@@ -180,7 +187,7 @@ Revit cho lệnh đó**; và [`progress.md`](progress.md) nói việc có giá t
 | Đợt | Làm gì | Vì sao đúng thời điểm |
 |---|---|---|
 | **Ngay, không cần chờ số liệu** | ~~**A1 `SetoutExport`**~~ ✅ · ~~**B1 `ConstructionStatus`/`ProgressReport`**~~ ✅ — cả hai mã nguồn **2026-09-05**, 🧪 chờ chạy thật · ~~**C1** chuỗi băm nhật ký~~ ✅ **xong 2026-09-04** | Cả ba **chỉ đọc hoặc ghi tham số**, tầng thuần chiếm phần lớn công sức, không phụ thuộc thư viện/template của dự án. Giá trị không phụ thuộc kết quả 9.4 — trắc đạc, chỉ huy trưởng và bộ phận hồ sơ là ba nhóm người **khác** với nhóm đang dùng 43 lệnh hiện có, nên mở thêm được tệp người dùng cho chính vòng 9.4 |
-| **Song song, rẻ** | **B3 `BcfExport`** · **C4 `ModelLinesFromCad`** | Thuần gần hết; B3 chỉ thêm đầu ra cho lệnh đã chạy thật, C4 nối hai lệnh đã có |
+| **Song song, rẻ** | ~~**B3 BCF**~~ ✅ **xong 2026-09-05** (đầu ra `bcfPath` của `ClashDetection`) · **C4 `ModelLinesFromCad`** | Thuần gần hết; B3 chỉ thêm đầu ra cho lệnh đã chạy thật, C4 nối hai lệnh đã có |
 | **Sau khi có số liệu 9.4/`UsageReport`** | **A2** → **A4** → **A3** → **B2** → **C3** → **C2** | Sáu mục này đắt hoặc phụ thuộc thói quen từng công ty (template view/sheet, thư viện tag, bảng mã định mức, mẫu dấu). Làm trước khi biết kỹ sư thật cần gì là lặp lại đúng sai lầm "bề rộng trước" mà `roadmap.md` đã ghi lại |
 
 Một việc **không phải code, nên làm trước tất cả**: sửa `roadmap.md` §11, khi đó còn căn cứ vào **NĐ 06/2021 đã

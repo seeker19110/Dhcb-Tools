@@ -186,6 +186,7 @@
           "Structural Framing"
         ],
         "outputPath": "{outputFolder}/clash.html",
+        "bcfPath": "{outputFolder}/clash.bcf",
         "create3dView": false
       },
       "expect": {
@@ -196,7 +197,8 @@
           "Không có phần tử nhóm B nào để xét"
         ],
         "filesExist": [
-          "{outputFolder}/clash.html"
+          "{outputFolder}/clash.html",
+          "{outputFolder}/clash.bcf"
         ],
         "neverContains": [
           "Exception"

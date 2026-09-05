@@ -150,7 +150,8 @@ thêm **tệp người dùng khác** (trắc đạc, chỉ huy trưởng) cho ch
 |---|---|---|
 | A1 | **`SetoutExport`** — toạ độ định vị (tim cột, tâm thiết bị/sleeve, giao trục) ra CSV theo thứ tự cột máy toàn đạc (`PNEZD`/`PENZD`…) + DXF điểm, hệ Survey tự kiểm chiều transform, tên điểm ≤ 16 ký tự không trùng | ✅ mã nguồn 2026-09-05: tầng thuần `Shared.Logic/Setout` + `Geometry/GridIntersections` (50 ca test), lệnh Core, Ribbon, 4 ca kiểm trong `revit-smoke`/`revit-mep`, playbook `skills/xuat-toa-do-dinh-vi`. 🧪 **Chưa chạy thật trong Revit** — giữ nhãn *thử nghiệm* theo nguyên tắc 6. Tài liệu: [`toa-do-dinh-vi.md`](toa-do-dinh-vi.md) |
 | B1 | **`ConstructionStatus`** + **`ProgressReport`** — trạng thái lắp đặt/nghiệm thu từ CSV hiện trường (từ vựng Việt/Anh, có hay không dấu đều nhận), % theo **số lượng và chiều dài**, gộp theo tầng/hệ/category, luỹ kế theo tuần → HTML + CSV | ✅ mã nguồn 2026-09-05: tầng thuần `Shared.Logic/Progress` (41 ca test), hai lệnh Core, nút Ribbon, 6 ca kiểm, playbook `skills/theo-doi-tien-do-thi-cong`. 🧪 **Chưa chạy thật**; đường ghi của `ConstructionStatus` chưa có ca kiểm tự động (mã cấu kiện là ElementId của đúng file đang mở nên không viết sẵn vào fixture được). Tài liệu: [`tien-do-thi-cong.md`](tien-do-thi-cong.md) |
-| C4 · B3 | `ModelLinesFromCad` · `BcfExport` (song song, rẻ) | ⬜ |
+| B3 | **BCF 2.1 cho `ClashDetection`** — thêm `bcfPath`: mỗi va chạm một topic (tiêu đề, mô tả, nhãn "trong file"/"với model liên kết", camera phối cảnh nhìn vào tâm, hai phần tử liên quan) | ✅ mã nguồn 2026-09-05: tầng thuần `Shared.Logic/Bcf` (21 ca test, đọc lại chính zip vừa ghi), nối vào lệnh đã chạy thật nên **không thêm lệnh Core mới**; GUID topic sinh từ `key` va chạm nên xuất lại không đẻ vấn đề mới. 🧪 Chờ một lượt `revit-mep` để chốt file mở được trong Navisworks/Solibri |
+| C4 | `ModelLinesFromCad` (song song, rẻ) | ⬜ |
 
 ---
 

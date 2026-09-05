@@ -1,6 +1,7 @@
 ﻿using System.Text;
 using Autodesk.Revit.DB;
 using DhcbTools.Shared.Logic;
+using DhcbTools.Shared.Logic.Bcf;
 using DhcbTools.Shared.Logic.Checks;
 
 namespace DhcbTools.Core.Checks;
@@ -40,6 +41,15 @@ public sealed class ClashDetectionConfig
 
     /// <summary>Xem trước: quét và ghi báo cáo như thường, nhưng không tạo 3D view trong mô hình.</summary>
     public bool DryRun { get; init; } = true;
+
+    /// <summary>
+    /// Ngoài báo cáo HTML, ghi thêm file <b>BCF 2.1</b> (đề xuất B3) để mở thẳng trong Navisworks /
+    /// Solibri / BIMcollab — nơi tổ điều phối thật sự duyệt va chạm. Rỗng = không ghi.
+    /// </summary>
+    public string? BcfPath { get; init; }
+
+    /// <summary>Tên dự án ghi vào <c>project.bcfp</c>; rỗng = lấy tên file Revit.</summary>
+    public string? BcfProjectName { get; init; }
 
     /// <summary>Giới hạn số va chạm báo (0 = không giới hạn).</summary>
     public int MaxResults { get; init; } = 2000;
@@ -186,6 +196,7 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
 
     Done:
         WriteHtml(document, config, clashes, skippedAccepted);
+        WriteBcf(document, config, clashes, result);
 
         if (config.Create3dView && clashes.Count > 0)
         {
@@ -380,6 +391,47 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
 
         return null;
     }
+
+    /// <summary>
+    /// Xuất BCF 2.1. Toạ độ BCF là **mét**, còn Revit đo bằng foot — quy đổi ở đúng một chỗ này.
+    /// GUID của topic sinh từ chính <c>key</c> đã dùng cho clash-accepted.json, nên xuất lại cùng một
+    /// va chạm vẫn ra đúng vấn đề cũ trong phần mềm điều phối chứ không đẻ ra vấn đề mới.
+    /// </summary>
+    private static void WriteBcf(Document doc, ClashDetectionConfig config, List<Clash> clashes, CommandResult result)
+    {
+        if (string.IsNullOrWhiteSpace(config.BcfPath)) return;
+
+        try
+        {
+            var issues = new List<BcfIssue>();
+            foreach (var c in clashes)
+            {
+                var bDesc = c.LinkName == null ? $"{RevitCompat.IdValue(c.B.Id)}" : $"{RevitCompat.IdValue(c.B.Id)} (link \"{c.LinkName}\")";
+                var issue = new BcfIssue(BcfWriter.GuidFromKey(c.Key), $"{c.A.Category?.Name} × {c.B.Category?.Name} — {c.A.Name}")
+                {
+                    Description = $"Va chạm {RevitCompat.IdValue(c.A.Id)} ({c.A.Category?.Name}) × {bDesc} ({c.B.Category?.Name})"
+                                  + $" tại ({RevitCompat.FtToMm(c.Centre.X):F0}, {RevitCompat.FtToMm(c.Centre.Y):F0}, {RevitCompat.FtToMm(c.Centre.Z):F0}) mm. key={c.Key}",
+                    Target = new BcfPoint(FtToM(c.Centre.X), FtToM(c.Centre.Y), FtToM(c.Centre.Z)),
+                    Author = "DHCB Tools",
+                };
+                issue.Labels.Add(c.LinkName == null ? "Trong file" : "Với model liên kết");
+                issue.Components.Add(new BcfComponent(RevitCompat.IdValue(c.A.Id).ToString(), null, doc.Title));
+                issue.Components.Add(new BcfComponent(RevitCompat.IdValue(c.B.Id).ToString(), null, c.LinkName ?? doc.Title));
+                issues.Add(issue);
+            }
+
+            BcfWriter.WriteFile(config.BcfPath!, issues, new BcfProject { Name = string.IsNullOrWhiteSpace(config.BcfProjectName) ? doc.Title : config.BcfProjectName });
+            result.Messages.Add($"Đã ghi BCF {BcfWriter.Version}: {issues.Count} vấn đề → \"{config.BcfPath}\".");
+        }
+        catch (Exception ex)
+        {
+            // Báo cáo HTML đã ghi xong; hỏng phần BCF không được biến cả lượt quét thành thất bại,
+            // nhưng cũng không được im — người dùng đang chờ một file để mở bên Navisworks.
+            result.Messages.Add("Không ghi được file BCF: " + ex.Message);
+        }
+    }
+
+    private static double FtToM(double feet) => RevitCompat.FtToMm(feet) / 1000.0;
 
     private static void WriteHtml(Document doc, ClashDetectionConfig config, List<Clash> clashes, int skipped)
     {
