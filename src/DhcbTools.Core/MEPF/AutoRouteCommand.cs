@@ -69,6 +69,15 @@ public sealed class AutoRouteConfig
     /// <summary>Chỉ xét link có tên chứa một trong các chuỗi này (rỗng = mọi link đã nạp).</summary>
     public List<string> LinkNameContains { get; init; } = new List<string>();
 
+    /// <summary>
+    /// Routing mức D (mặc định bật): tường/sàn/mái có lỗ mở (shaft, opening, lỗ chờ) thì lỗ được đục
+    /// khỏi hộp bao — tuyến chui qua lỗ được, và CHỈ qua lỗ. Tắt thì về mức C: mọi tường là rào kín.
+    /// </summary>
+    public bool RespectOpenings { get; init; } = true;
+
+    /// <summary>Coi cửa đi/cửa sổ cũng là lỗ mở (mặc định tắt — duct không đi qua cửa).</summary>
+    public bool IncludeDoorsWindows { get; init; } = false;
+
     public bool DryRun { get; init; } = true;
 }
 
@@ -127,6 +136,81 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
         return new Outline(new XYZ(minX, minY, minZ), new XYZ(maxX, maxY, maxZ));
     }
 
+    /// <summary>
+    /// Thêm một phần tử vào danh sách vật cản. Mức D: nếu là vật chủ (tường/sàn/mái/trần) và
+    /// <see cref="AutoRouteConfig.RespectOpenings"/> bật thì các insert của nó — shaft, opening, lỗ chờ,
+    /// (tuỳ chọn) cửa — được đục khỏi hộp bao bằng <see cref="BoxSubtract"/>; hộp bao của tường vì thế
+    /// thành vài mảnh quanh lỗ. Trả về <c>true</c> nếu phần tử có hộp bao (đếm là một vật cản).
+    /// </summary>
+    private static bool AddObstacle(Element e, Transform? transform, AutoRouteConfig config, List<Box3> obstacles, List<string> openingLog)
+    {
+        var box = BoxOf(e, transform);
+        if (box == null) return false;
+
+        if (config.RespectOpenings && e is HostObject host)
+        {
+            var holes = new List<Box3>();
+            ICollection<ElementId> inserts;
+            try
+            {
+                inserts = host.FindInserts(addRectOpenings: true, includeShadows: false, includeEmbeddedWalls: false, includeSharedEmbeddedInserts: true);
+            }
+            catch (Exception)
+            {
+                inserts = Array.Empty<ElementId>();
+            }
+
+            foreach (var id in inserts)
+            {
+                var insert = e.Document.GetElement(id);
+                if (insert == null) continue;
+                var cat = insert.Category == null ? 0 : RevitCompat.IdValue(insert.Category.Id);
+                var isDoorOrWindow = cat == (long)BuiltInCategory.OST_Doors || cat == (long)BuiltInCategory.OST_Windows;
+                if (isDoorOrWindow && !config.IncludeDoorsWindows) continue;
+                // Tường nhúng (curtain wall trong tường chủ) không phải lỗ để đi qua; liên kết kết cấu
+                // (Structural Connections) gắn vào tường cũng về qua FindInserts nhưng là thép đặc, không phải lỗ.
+                if (insert is Wall || cat == (long)BuiltInCategory.OST_StructConnections) continue;
+
+                var hole = BoxOf(insert, transform);
+                // Chỉ tính lỗ thật sự nằm trên vật chủ trong hộp tìm kiếm — insert ở đầu kia của bức tường
+                // dài không phải lỗ để đi qua ở đây.
+                if (hole == null || !BoxSubtract.Overlaps(hole, box)) continue;
+                holes.Add(hole);
+                openingLog.Add($"{insert.Category?.Name ?? "?"} {hole.MaxX - hole.MinX:F0}×{hole.MaxY - hole.MinY:F0}×{hole.MaxZ - hole.MinZ:F0} "
+                             + $"tại ({(hole.MinX + hole.MaxX) / 2:F0},{(hole.MinY + hole.MaxY) / 2:F0},{(hole.MinZ + hole.MaxZ) / 2:F0}) "
+                             + $"trên {e.Category?.Name ?? "?"} {RevitCompat.IdValue(e.Id)}");
+            }
+
+            if (holes.Count > 0)
+            {
+                obstacles.AddRange(BoxSubtract.Minus(box, holes));
+                return true;
+            }
+        }
+
+        obstacles.Add(box);
+        return true;
+    }
+
+    /// <summary>Dòng chi tiết chung cho cả hai nhánh: từng link đóng góp bao nhiêu vật cản, và lỗ mở nào đã đục (mức D, tối đa 30 dòng).</summary>
+    private static void AppendObstacleDetails(CommandResult result, List<string> linkSummary, List<string> openingLog)
+    {
+        foreach (var line in linkSummary)
+        {
+            result.Messages.Add("  Link — " + line);
+        }
+
+        foreach (var line in openingLog.Take(30))
+        {
+            result.Messages.Add("  Lỗ mở — " + line);
+        }
+
+        if (openingLog.Count > 30)
+        {
+            result.Messages.Add($"  … và {openingLog.Count - 30} lỗ mở nữa.");
+        }
+    }
+
     private static readonly BuiltInCategory[] DefaultObstacles =
     {
         BuiltInCategory.OST_StructuralFraming, BuiltInCategory.OST_StructuralColumns, BuiltInCategory.OST_Walls, BuiltInCategory.OST_Floors,
@@ -149,15 +233,14 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
         var outline = new Outline(new XYZ(RevitCompat.MmToFt(bounds.MinX), RevitCompat.MmToFt(bounds.MinY), RevitCompat.MmToFt(bounds.MinZ)),
                                   new XYZ(RevitCompat.MmToFt(bounds.MaxX), RevitCompat.MmToFt(bounds.MaxY), RevitCompat.MmToFt(bounds.MaxZ)));
         var obstacles = new List<Box3>();
+        var openingLog = new List<string>();
+        var inDocument = 0;
         foreach (var e in new FilteredElementCollector(document).WhereElementIsNotElementType()
                      .WherePasses(new ElementMulticategoryFilter(catIds.ToList()))
                      .WherePasses(new BoundingBoxIntersectsFilter(outline)).ToElements())
         {
-            var box = BoxOf(e, null);
-            if (box != null) obstacles.Add(box);
+            if (AddObstacle(e, null, config, obstacles, openingLog)) inDocument++;
         }
-
-        var inDocument = obstacles.Count;
 
         // Dầm, cột, tường nằm ở model kết cấu/kiến trúc LIÊN KẾT. Không đọc chúng thì A* chạy trong một
         // không gian trống rỗng và luôn "tìm được tuyến" — tuyến xuyên thẳng qua dầm.
@@ -170,6 +253,7 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
         }
 
         var linkSummary = new List<string>();
+        var inLinks = 0;
         if (config.IncludeLinkedModels)
         {
             foreach (var linkInstance in new FilteredElementCollector(document).OfClass(typeof(RevitLinkInstance)).Cast<RevitLinkInstance>())
@@ -205,43 +289,42 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
                              .WherePasses(new ElementMulticategoryFilter(idsLink.ToList()))
                              .WherePasses(new BoundingBoxIntersectsFilter(inLinkCoords)).ToElements())
                 {
-                    var box = BoxOf(e, transform);
-                    if (box == null) continue;
-                    obstacles.Add(box);
-                    added++;
+                    if (AddObstacle(e, transform, config, obstacles, openingLog)) added++;
                 }
                 linkSummary.Add($"{linkInstance.Name}: {added} vật cản");
+                inLinks += added;
             }
         }
-
-        var inLinks = obstacles.Count - inDocument;
 
         var path = PathFinder3D.FindPath(start, goal, obstacles, bounds, new PathFinderOptions
         {
             StepMm = config.StepMm, ClearanceMm = config.ClearanceMm, TurnPenalty = config.TurnPenalty, AllowVertical = config.AllowVertical,
             NearObstaclePenalty = config.NearObstaclePenalty, MaxExpandedNodes = config.MaxExpandedNodes,
         });
-        var source = $"{inDocument} trong file + {inLinks} từ model liên kết";
+        var elements = inDocument + inLinks;
+        var source = $"{inDocument} trong file + {inLinks} từ model liên kết"
+                     + (config.RespectOpenings ? $", {openingLog.Count} lỗ mở đã đục" : ", mức C: không đục lỗ mở");
         if (!path.Found)
         {
             // `path.Reason` đã nói rõ thua vì bị bịt kín hay vì hết ngân sách — hai thứ cần cách chữa khác
             // hẳn nhau, nên đừng nuốt mất; kèm cỡ lưới để người đọc biết bước lưới có hợp với hộp không.
-            return CommandResult.Fail(
-                $"Không tìm được tuyến ({path.Reason}). Đã xét {obstacles.Count} chướng ngại ({source}), "
+            var fail = CommandResult.Fail(
+                $"Không tìm được tuyến ({path.Reason}). Đã xét {elements} chướng ngại ({source}), "
                 + $"lưới {path.GridCells:N0} ô bước {config.StepMm:F0} mm, mở rộng {path.ExpandedNodes:N0}/{path.MaxExpandedNodes:N0} node.");
+            // Thua thì càng cần biết đã đục lỗ nào — kỹ sư đối chiếu ngay "lỗ có nhưng không đúng chỗ" với
+            // "không có lỗ nào", hai kết luận dẫn tới hai việc khác nhau (sửa điểm, hay vẽ lỗ chờ vào model).
+            AppendObstacleDetails(fail, linkSummary, openingLog);
+            return fail;
         }
 
         var segments = PolylineSimplifier.ToSegments(path.Polyline);
         var result = CommandResult.Ok(string.Empty);
-        result.Messages.Add($"{obstacles.Count} chướng ngại trong hộp tìm kiếm ({source}), {path.ExpandedNodes} node, {path.Turns} lần rẽ, {segments.Count} đoạn, tổng {PolylineSimplifier.Length(path.Polyline) / 1000:F1} m.");
-        foreach (var line in linkSummary)
-        {
-            result.Messages.Add("  Link — " + line);
-        }
+        result.Messages.Add($"{elements} chướng ngại trong hộp tìm kiếm ({source}), {path.ExpandedNodes} node, {path.Turns} lần rẽ, {segments.Count} đoạn, tổng {PolylineSimplifier.Length(path.Polyline) / 1000:F1} m.");
+        AppendObstacleDetails(result, linkSummary, openingLog);
 
         // Tuyến đi qua một không gian TRỐNG là kết quả vô nghĩa nhưng trông y hệt kết quả tốt — nói ra
         // ngay, đừng để người đọc tự đoán vì sao tuyến thẳng băng.
-        if (obstacles.Count == 0)
+        if (elements == 0)
         {
             result.Messages.Add(config.IncludeLinkedModels
                 ? "KHÔNG có vật cản nào trong hộp tìm kiếm, kể cả từ model liên kết — tuyến này chỉ là đường nối hai điểm. Kiểm lại link đã nạp chưa."
@@ -253,7 +336,7 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
         {
             // Số vật cản phải nằm trong Summary chứ không chỉ Messages: báo cáo batch chỉ in Summary, mà
             // "tuyến đẹp" tìm trong không gian trống là kết quả vô nghĩa trông y hệt kết quả tốt.
-            result.Summary = $"[Xem trước] Tuyến {segments.Count} đoạn, {path.Turns} lần rẽ, né {obstacles.Count} vật cản ({source}).";
+            result.Summary = $"[Xem trước] Tuyến {segments.Count} đoạn, {path.Turns} lần rẽ, né {elements} vật cản ({source}).";
             result.AffectedCount = segments.Count;
             return result;
         }
@@ -283,7 +366,7 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
             tx.Commit();
         }
 
-        result.Summary = $"Đã vẽ {created} model line (line style \"{config.LineStyleName}\"), né {obstacles.Count} vật cản ({source}).";
+        result.Summary = $"Đã vẽ {created} model line (line style \"{config.LineStyleName}\"), né {elements} vật cản ({source}).";
         result.AffectedCount = created;
 
         if (config.BuildRoute)

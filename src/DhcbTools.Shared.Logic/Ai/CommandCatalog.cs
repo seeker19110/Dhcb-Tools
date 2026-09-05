@@ -263,10 +263,13 @@ namespace DhcbTools.Shared.Logic.Ai
             new CommandDescriptor("SystemBom", Revit, "BOM theo hệ/spool: ống theo mét + số cây, fitting/phụ kiện theo số lượng → CSV", false, "Bom", "Spool")
                 .Field("outputPath", "file CSV").Field("systemContains", "lọc hệ").Field("spoolParameter", "tham số spool").Field("stockLengthMm", "chiều dài cây")
                 .Words("bom", "bảng khối lượng", "spool", "khối lượng ống", "bill of material"),
-            new CommandDescriptor("AutoRoute", Revit, "Routing mức C: A* né chướng ngại giữa 2 điểm → model line → (tuỳ chọn) dựng duct/pipe", true, "RouteC", "PathFind")
+            new CommandDescriptor("AutoRoute", Revit, "Routing mức C/D: A* né chướng ngại giữa 2 điểm, chui qua lỗ mở của tường/sàn → model line → (tuỳ chọn) dựng duct/pipe", true, "RouteC", "RouteD", "PathFind")
                 .Field("startMm", "{x,y,z}").Field("endMm", "{x,y,z}").Field("searchMarginMm", "biên hộp tìm theo mặt bằng (mặc định 3000)")
                 .Field("searchMarginZMm", "biên hộp theo cao độ (mặc định 1000 — mỗi lớp Z thêm là thêm ngần ấy lần việc tìm)")
                 .Field("obstacleCategories", "chướng ngại")
+                // Mức D: lỗ mở (shaft/opening/lỗ chờ) được đục khỏi hộp bao tường/sàn; tắt là về mức C — mọi tường là rào kín.
+                .Field("respectOpenings", "chui qua lỗ mở của tường/sàn (mặc định bật; tắt = mức C, mọi tường là rào kín)", FieldKind.Bool)
+                .Field("includeDoorsWindows", "coi cửa đi/cửa sổ cũng là lỗ mở (mặc định tắt)", FieldKind.Bool)
                 // Các nút chỉnh A* — trước đây có trong Config nhưng không lên form, kỹ sư chỉ sửa được bằng tay file JSON.
                 .Field("stepMm", "bước lưới (mặc định 100)").Field("clearanceMm", "khoảng hở tới vật cản (mặc định 100)")
                 .Field("turnPenalty", "phạt mỗi lần rẽ, tính bằng số bước (mặc định 20)", FieldKind.Number)
