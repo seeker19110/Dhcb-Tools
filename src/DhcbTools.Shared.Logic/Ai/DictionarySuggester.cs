@@ -210,6 +210,17 @@ namespace DhcbTools.Shared.Logic.Ai
                         }
 
                         score = Adjust(score, key, candidate);
+                        if (HasQualifier(candidate.Name, synonym))
+                        {
+                            // Tên thật CHỨA TRỌN tên đồng nghĩa nhưng còn thêm chữ: "Join Status" ⊃ "Status",
+                            // "Cable Tray Bottom Elevation" ⊃ "Bottom Elevation". Chữ thêm vào là một từ hạn
+                            // định, và từ hạn định đổi nghĩa: "Join Status" là trạng thái nối dầm của Revit,
+                            // không phải trạng thái thi công — trên dự án thật A nó được chấm 0,78 và sẽ được
+                            // GHI nếu tắt dryRun, rồi ProgressReport đọc nó ra tiến độ mà không ai biết (§42).
+                            // Vẫn đề xuất, nhưng dưới ngưỡng tự nhận: kỹ sư phải nhìn tận mắt.
+                            score = Math.Min(score, ReviewThreshold - 0.01);
+                        }
+
                         if (score > bestScore)
                         {
                             bestScore = score;
@@ -236,6 +247,14 @@ namespace DhcbTools.Shared.Logic.Ai
             }
 
             return result;
+        }
+
+        /// <summary>Tên thật gồm mọi token của tên đồng nghĩa và còn thêm token khác (từ hạn định).</summary>
+        internal static bool HasQualifier(string candidate, string synonym)
+        {
+            var a = Tokenize(candidate);
+            var b = Tokenize(synonym);
+            return b.Count > 0 && a.Count > b.Count && !b.Except(a, StringComparer.OrdinalIgnoreCase).Any();
         }
 
         /// <summary>Hiệu chỉnh điểm theo dữ liệu thật: tham số rỗng toàn dự án và sai kiểu bị hạ điểm.</summary>

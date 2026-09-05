@@ -43,6 +43,35 @@ public class DictionarySuggesterTests
         Assert.Equal("Cao độ đáy ống", s.Name);
     }
 
+    /// <summary>
+    /// Dự án thật A (§42): "Join Status" (Structural Framing, Integer, 67/67 có giá trị) chấm 0,78 cho khoá
+    /// constructionStatus vì chứa trọn "Status" — nhưng đó là trạng thái nối dầm của Revit. Tên có từ hạn định
+    /// phải rơi xuống mức "kỹ sư xem", không được tự ghi.
+    /// </summary>
+    [Fact]
+    public void TenCoTuHanDinh_JoinStatus_ChiDeXuatDeXem_KhongTuNhan()
+    {
+        var suggestions = DictionarySuggester.Suggest(
+            new[] { "constructionStatus", "bottomElevation" },
+            ParameterDictionary.BuiltinOnly(),
+            new[] { P("Join Status", "Integer", 67, 67, "Structural Framing"), P("Cable Tray Bottom Elevation", "Double", 110, 110, "Pipe Accessories") });
+
+        Assert.All(suggestions, s =>
+        {
+            Assert.Equal(SuggestionStatus.DeXuat, s.Status);
+            Assert.True(s.NeedsReview, s.Key + " " + s.Confidence);
+            Assert.True(s.Confidence < DictionarySuggester.ReviewThreshold);
+        });
+
+        // Tên khớp đúng tên đồng nghĩa (không thêm chữ) thì vẫn tự nhận được.
+        var exact = Assert.Single(DictionarySuggester.Suggest(
+            new[] { "constructionStatus" }, ParameterDictionary.BuiltinOnly(), new[] { P("Trang thai thi cong", "String", 50, 60) }));
+        Assert.False(exact.NeedsReview);
+        Assert.True(DictionarySuggester.HasQualifier("Join Status", "Status"));
+        Assert.False(DictionarySuggester.HasQualifier("Status", "Join Status"));
+        Assert.False(DictionarySuggester.HasQualifier("Status", ""));
+    }
+
     /// <summary>Không có gì giống thì phải nói "không thấy" — đề xuất bừa còn tệ hơn báo thiếu.</summary>
     [Fact]
     public void KhongCoUngVienNaoGiong_ThiBaoKhongThay_ChuKhongDeXuatBua()

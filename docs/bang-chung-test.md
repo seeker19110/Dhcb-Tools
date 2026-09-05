@@ -2480,3 +2480,47 @@ cả lỗi ánh xạ (§39) lẫn lỗi đếm (§41). Đường Revit giữ ngu
   `gh pr checks` nên sót), PR này vá luôn.
 - Bộ `smoke` trong Revit 2024 sau khi `IdsValidate` chuyển sang `IdsReport`: **39 đạt / 0 trượt / 1 bỏ qua**,
   ba ca IDS ra đúng con số cũ.
+
+## 42. `DictionaryLearn` chạy thật trên dự án A — "Join Status" suýt thành trạng thái thi công; chuỗi băm trên log dự án thật (2026-09-05 23:20 ICT)
+
+Mục 4 và mục 8 của "Việc tiếp theo" để lại hai việc cần **dữ liệu dự án thật** mà Snowdon không thay được:
+`DictionaryLearn` có đề xuất đúng tên của một dự án Việt không, và chuỗi băm có liền trên log của dự án thật
+không. Bản sao `_upgraded-2024/` của dự án A (8 file, 7–167 MB, §20) còn trên máy, nên chạy được không cần người.
+
+### Job
+
+`saveMode: None`, `detachFromCentral: true`, một bước `DictionaryLearn` với `dryRun: true`, `outputPath` trỏ vào
+thư mục kết quả — không đụng file gốc, không đụng `%APPDATA%\DHCB\dictionary.json`. 8 file, 37 ms (GRL) tới 8,2 s
+(MEP L03); GRL thất bại đúng như phải (file lưới/trục, không có phần tử thuộc category nào).
+
+### Phát hiện: tên có từ hạn định được chấm đủ điểm để tự ghi
+
+| File | Đề xuất **[Ghi]** (trước sửa) | Điểm | Thật ra là |
+|---|---|---|---|
+| ARC L01–L03 | `constructionStatus` → **"Join Status"** (Structural Framing, Integer, 67/67 có giá trị) | 0,78 | trạng thái **nối dầm** của Revit |
+| ARC L01–L03 | `bottomElevation` → "Elevation at Bottom" (Floors) | 0,83 | cao độ đáy sàn — tạm được |
+| MEP L01–L03 | `bottomElevation` → "Lower End Bottom Elevation" (Pipes) | 0,78 | cao độ đáy **đầu thấp** của ống |
+| MEP L04 | `bottomElevation` → **"Cable Tray Bottom Elevation"** (Pipe Accessories) | 0,78 | cao độ đáy **máng cáp** |
+
+"Join Status" là ca nguy hiểm: điểm 0,78 > ngưỡng tự nhận 0,7, nên với `dryRun: false` nó **được ghi** vào từ
+điển, rồi `ProgressReport` đọc "Join Status" (0/1/2 của Revit) ra phần trăm tiến độ mà không ai biết — đúng lớp
+lỗi "chạy xong, báo số, số sai" mà cả bộ này sinh ra để chặn. Nguyên nhân trong `NameScore`: tên thật chứa **trọn**
+tên đồng nghĩa ("Status") nên `covered = 1`, và Jaccard 0,5 chỉ kéo xuống 0,725; cộng 0,05 vì tham số có giá trị
+là qua ngưỡng. Snowdon không lộ vì thư viện tiếng Anh chuẩn của nó rơi vào "đã có".
+
+**Sửa** (`DictionarySuggester.HasQualifier`): tên thật gồm mọi token của tên đồng nghĩa **và còn thêm token** →
+điểm bị chặn ở 0,69, tức vẫn đề xuất nhưng thành **[Xem]**, không tự ghi. Từ hạn định đổi nghĩa ("Join",
+"Cable Tray", "Lower End") — máy không biết từ nào vô hại, nên đẩy về kỹ sư. Chạy lại cùng job sau khi cài bản
+sửa: cả 8 file **0 khoá sẽ ghi**, mọi dòng trên thành `[Xem] … (0.69)`, `NeedsReview = true` trong CSV. Test thuần
+chốt "Join Status"/"Cable Tray Bottom Elevation" phải cần xem, và tên khớp đúng đồng nghĩa vẫn tự nhận.
+
+Điều đáng giữ: **tên tham số thật của dự án Việt này không có khoá thi công nào** (`constructionStatus`,
+`constructionDate`, `constructionBy` đều "Thiếu" ở MEP; ở ARC chỉ có lỗi giả). Nghĩa là mục 9 "shared parameter
+cho trạng thái thi công" là điều kiện tiên quyết thật, không phải việc phụ.
+
+### Chuỗi băm trên log dự án thật (mục 8)
+
+Cả hai lượt (trước và sau sửa) `BatchRunner --verify-log`: *"Chuỗi băm nguyên vẹn: 8 dòng, không dòng nào bị
+sửa hay mất"* — log có dòng lỗi (GRL) xen giữa các dòng thành công, tên file có dấu tiếng Việt và khoảng trắng
+(`1. MO HINH 3D DU AN TRUNG TAM THUONG MAI`), dòng dài nhất mang 40+ thông điệp đề xuất. §24 mới chạy trên
+Snowdon; đây là lần đầu trên dự án thật.
