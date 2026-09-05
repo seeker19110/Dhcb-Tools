@@ -18,6 +18,12 @@ public class BoxSubtractTests
         => x > b.MinX && x < b.MaxX && y > b.MinY && y < b.MaxY && z > b.MinZ && z < b.MaxZ;
 
     [Fact]
+    public void HopNull_NemLoiRoRang()
+    {
+        Assert.Throws<ArgumentNullException>(() => BoxSubtract.Minus(null!, Array.Empty<Box3>()));
+    }
+
+    [Fact]
     public void KhongCoLo_TraVeChinhHop()
     {
         var box = new Box3(0, 0, 0, 1000, 200, 3000);
