@@ -58,7 +58,7 @@ Có sẵn hai bộ:
 | [`autocad-smoke.json`](../tests/suites/autocad-smoke.json) | Data Extraction and Multileaders Sample (kèm AutoCAD) | Đủ **15/15 lệnh AutoCAD**: layer, attribute, text, chuẩn layer, trục, xref, block, so bản vẽ, dọn dẹp, map layer |
 | [`revit-write.json`](../tests/suites/revit-write.json) · [`autocad-write.json`](../tests/suites/autocad-write.json) | Bản chép của model/bản vẽ mẫu | **Đường ghi thật** — xem mục dưới |
 
-Các bộ cộng lại phủ **đủ 46/46 lệnh Revit** có ca kiểm (43 đã chạy thật; `SetoutExport`, `ConstructionStatus`, `ProgressReport` thêm 2026-09-05 chờ lượt chạy đầu) — `SuiteCoverageTests` (chạy trên CI, không cần Revit) đỏ ngay
+Các bộ cộng lại phủ **đủ 49/49 lệnh Revit** có ca kiểm, và tính đến 2026-09-05 **cả 49 đã chạy thật** ít nhất một lượt trên Revit 2024 (`SetoutExport`, `ConstructionStatus`, `ProgressReport`, `CadLink`, `ModelLinesFromCad`, `IdsValidate` là những cái mới nhất) — `SuiteCoverageTests` (chạy trên CI, không cần Revit) đỏ ngay
 khi thêm lệnh mới mà quên ca kiểm, nên con số này không trôi khỏi tài liệu được nữa.
 
 Cả ba model đều đi kèm Revit (`C:\Program Files\Autodesk\Revit 2024\Samples`), nên không cần chuẩn bị gì thêm.
