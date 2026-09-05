@@ -1,6 +1,6 @@
 # DHCB Tools — Bằng chứng Build & Test
 
-**Khoảng thời gian:** 2026-09-02 → 2026-09-04 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
+**Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
 **Nguồn:** nhiều PR liên tiếp trên `main` (bắt đầu từ `fix/toan-bo-danh-gia`,
 [PR #21](https://github.com/seeker19110/Dhcb-Tools/pull/21)); mỗi mục dưới đây ghi ngày giờ riêng của lần đo đó.
 
@@ -1746,3 +1746,230 @@ C4 bỏ được nhãn 🧪 sau §28 còn treo lại một mục.
 > ở Revit 2026+, đúng thứ `RevitCompat.IdValue` sinh ra để tránh. Máy chỉ có Revit 2024 nên
 > `check-build.sh` chạy mặc định là xanh; nhánh 2026/2027 phải chạy tay
 > (`REVIT_VERSION=2027 ./scripts/check-build.sh`) trước khi mở PR, hoặc chấp nhận một vòng CI đỏ.
+
+---
+
+## 30. Quét hồi quy trọn cả hai phần mềm sau #75 — bảy bộ, 113 ca, không một ca trượt (2026-09-05 16:10 ICT)
+
+§29 khép mắt cuối của C4 rồi merge; sau đó còn ba PR nữa (#73 cổng coverage, #74 bỏ guard `liend`,
+#75 sửa test IFC đỏ trên checkout CRLF). Ba cái đó **chỉ đụng vào test và CI**, nên đúng loại thay đổi
+dễ được cho qua mà không ai chạy lại đường thật. Lượt này chạy lại **toàn bộ** trên máy có Revit và
+AutoCAD, từ build sạch cho tới file IFC xuất ra rồi kiểm ngược.
+
+**Máy đo:** Windows 11 · AutoCAD 2026 · Revit 2024 · .NET SDK 8.0.424 + 10.0.400 · HEAD `8db5119`,
+worktree sạch.
+
+### Kết quả
+
+| Bước | Lệnh | Kết quả |
+|---|---|---|
+| Build solution | `dotnet build Dhcb-Tools.sln -c Release` | ✅ 9 project, **0 lỗi / 0 warning** |
+| Test thuần C# | `dotnet test …Shared.Logic.Tests` | ✅ **1188 đạt / 0 trượt** (5 s) |
+| Test thuần Python | `python -m pytest tools/autocad-mcp-server -q` | ✅ **149 đạt** + 10 subtest (0,77 s) |
+| AutoCAD 2026 — smoke | `run-in-autocad-tests.ps1` | ✅ **18 / 18** |
+| AutoCAD 2026 — ghi thật | `-Suite write -AllowWrites` | ✅ **5 / 5** |
+| Revit 2024 — smoke (Architectural) | `run-in-revit-tests.ps1` | ✅ **36 đạt / 0 trượt / 1 bỏ qua** |
+| Revit 2024 — MEP (HVAC) | `-Suite mep` | ✅ **26 / 26** |
+| Revit 2024 — cấp thoát nước | `-Suite plumbing` | ✅ **8 / 8** |
+| Revit 2024 — ghi thật (Architectural) | `-Suite write -AllowWrites` | ✅ **12 / 12** |
+| Revit 2024 — ghi thật MEP (HVAC) | `-Suite write-mep -AllowWrites` | ✅ **8 / 8** |
+| Kiểm ngược file IFC vừa xuất | `--verify-ifc` | ✅ IFC4, **925.815 thực thể**, mã thoát 0 |
+
+Cộng lại: **113 ca chạy bên trong Revit/AutoCAD thật, 112 đạt, 1 bỏ qua có lý do** (`SleeveAuto` trên model
+kiến trúc — model đó không có hệ MEP, ca nằm ở bộ `revit-mep`). Không ca nào trượt, nên §30 không có mục
+"lỗi thật lộ ra" như các mục trước — đây là lượt xác nhận, không phải lượt phát hiện.
+
+### Hai thứ chỉ lượt chạy thật mới chốt được
+
+**Ghi lần hai luôn phải bằng 0.** Bảy lệnh ghi được chạy hai lần liên tiếp trên cùng bản chép, và lần hai
+đều trả 0 kèm lý do:
+
+```
+ParameterImport   141 giá trị  → 0 giá trị
+LevelSetup        2 tầng       → 0 tầng      [Bỏ qua, đã có] DHCB-WRITE-L1, DHCB-WRITE-L2
+SheetBatchCreate  2 sheet      → 0 sheet
+HangerAuto        1120 hanger  → 0           Bỏ qua, đã có hanger: 1120 vị trí
+SleeveAuto        435 sleeve   → 0           Bỏ qua, đã có sleeve: 552 vị trí
+CadLink           1 bản vẽ     → 0           Đã có "tuyen-ong.dxf" (id 1544489)
+ModelLinesFromCad 2 model line → 0           2 đã có
+```
+
+Số 0 ở lần hai đồng thời là bằng chứng lần một **đã commit thật** — nếu transaction bị rollback thì lần hai
+lại tạo đủ chừng ấy phần tử nữa. Đây là thứ test thuần không nói được: `HangerAuto` chạy 69,8 s trên 1053
+phần tử MEP, còn lần hai chỉ 59 ms vì chỉ cần soi trạng thái đã có.
+
+**IFC đi trọn vòng.** `BatchExport` xuất IFC4 mất **133,5 s** (57 bản vẽ), rồi `--verify-ifc` mở lại chính
+file đó bằng bộ quy tắc mặc định (lược đồ, `IfcProject`, mã định danh, tham chiếu) và đọc được 925.815
+thực thể, không lỗi. Chuỗi *xuất → kiểm* của §27 nay chạy được từ một máy sạch, không cần thao tác tay.
+
+### Ba con số ✅ mà đọc kỹ vẫn là đường lỗi
+
+Xanh không có nghĩa là lệnh làm được việc — như §28 đã dặn. Ba ca dưới đây **đạt** vì chúng chốt rằng lệnh
+**biết từ chối cho ra hồn**, chứ không phải vì lệnh chạy thành công:
+
+| Ca | Thực chất |
+|---|---|
+| `AutoRoute` (Architectural và HVAC, bước 100 mm) | Không tìm được tuyến. Nhưng thông báo định lượng: *"điểm đầu chỉ ra tới 80.216 ô trống (HVAC: 79.701) — tuyến không tồn tại, tăng ngân sách cũng vô ích"*. Đây là hành vi §19 dựng ra, đo lại vẫn đúng |
+| `ClashDetection` với nhóm category rỗng | `E-PRECOND` — chặn thay vì trả "0 va chạm", đúng bài học §16 |
+| `ProgressReport` thiếu tham số trạng thái | `E-PARAM-MISSING` kèm danh sách tên đã thử và cách khai vào `dictionary.json` |
+
+### Cái chưa chứng minh — không đổi so với §29
+
+Lượt này **không** đụng tới ba khoảng trống đã ghi, và cũng không tạo thêm cái mới:
+
+- **`ModelLinesFromCad` với `.dwg` nhị phân thật** — fixture vẫn là DXF văn bản; `placement: shared`/`centered`
+  vẫn chưa chạy lần nào.
+- **Đường ghi của `ConstructionStatus`** — vẫn chỉ có hai đường lỗi (`E-PATH-MISSING`, `E-PRECOND`).
+- **Tiến độ % > 0** — hai model mẫu vẫn không có phần tử nào mang tham số trạng thái, nên bảng vẫn 0/142 và
+  0/1599.
+- **Revit 2026/2027** — máy chỉ có Revit 2024, nên toàn bộ §30 nói về 2024. Nhánh mới vẫn phải
+  `REVIT_VERSION=2027 ./scripts/check-build.sh` chạy tay như ghi chú cuối §29.
+
+> Ổ C: còn ~30 GB sau lượt chạy. Bộ `write`/`write-mep` chép cả sáu model liên kết (≈313 MB/lượt), script tự
+> dọn 728 MB lượt cũ trước khi chạy — chạy trọn bảy bộ nối đuôi trên ổ gần đầy thì phải hạ `-KeepRuns`.
+
+---
+
+## 31. Ba khoảng trống của §30 — và một lệnh báo "đã có" cho bản vẽ chưa bao giờ vào mô hình (2026-09-05 17:45 ICT)
+
+§30 kết bằng danh sách "cái chưa chứng minh". Lượt này đóng ba mục trong đó. Hai trong ba **lộ ra lỗi thật**
+khi viết ca kiểm — đúng như §29: thứ đắt giá không phải ca xanh, mà là ca đỏ đầu tiên.
+
+### `.NET 8` hết hỗ trợ 10/11/2026
+
+`DhcbTools.BatchRunner` là thứ **duy nhất** trong repo chạy bằng runtime .NET riêng trên máy khách (vỏ
+Revit/AutoCAD chạy trong runtime của phần mềm chủ), nên nó là chỗ duy nhất cái mốc đó có hậu quả thật. Nay
+`net10.0`; bộ test đi theo.
+
+Kèm theo là một lớp lỗi đã gặp: **ba chỗ viết tay `net8.0` vào đường dẫn `bin`** — `release.yml` khi đóng gói,
+và hai script chạy ca kiểm. Đúng cái đã sửa cho `build-revit`/`build-autocad`, và nó hỏng **im lặng**:
+`Copy-Item` vào thư mục không tồn tại thì gói phát hành thiếu đúng cái `.exe`, không lỗi nào nổi lên. Cả ba
+nay hỏi MSBuild bằng `-getProperty:TargetFramework`.
+
+| Kiểm sau khi đổi | Kết quả |
+|---|---|
+| `dotnet test` trên `net10.0` | ✅ 1188 đạt |
+| `run-in-autocad-tests.ps1` (script tự hỏi TFM) | ✅ 18/18 qua accoreconsole |
+| `--verify-ifc` · `--verify-log` | ✅ mã thoát 0 cả hai |
+
+### Đường ghi `ConstructionStatus` — treo ba mục bằng chứng, gỡ bằng một tính năng
+
+§28, §29, §30 đều khép lại với cùng một dòng: *"mã cấu kiện trong CSV là `ElementId` của đúng file đang mở nên
+không viết sẵn vào fixture được"*. Nhìn kỹ thì đó **không phải chuyện của bộ test**. `ElementId` chỉ có nghĩa
+trong file sinh ra nó, nên mỗi lần phát hành lại mô hình là hiện trường phải nhận một danh sách mã mới — mà
+bảng nghiệm thu ngoài công trường thì ghi `D-102`, không ghi `1544489`.
+
+Nay khai `keyParameter` (ví dụ `"Mark"`) thì cột mã trỏ vào một tham số đánh dấu. Fixture nằm được trong repo,
+và bộ `revit-write` có chuỗi bốn ca ghi thật đặt ngay sau ca `AutoNumbering` (Mark lúc đó là `DHCB-001`…):
+
+| Ca | ms | Summary |
+|---|---:|---|
+| Trạng thái thi công — GHI THẬT, khớp theo Mark | 429 | **3 phần tử đã đổi** trạng thái |
+| Ghi lại chính CSV đó | 33 | 0 đổi, **3 đã đúng sẵn** — bằng chứng lần trước đã commit |
+| CSV lùi trạng thái — phải bị chặn | 34 | 0 đổi, *"lùi trạng thái nên bỏ qua"* |
+| Báo cáo tiến độ | 171 | **`Tiến độ 1.4% đã lắp trở lên (2/142 cấu kiện)`** |
+
+**1,4 %** là lần đầu con số tiến độ nói về *công trường* chứ không nói về *tham số*: ba mục trước đều 0/142 vì
+model mẫu không mang tham số trạng thái nào. Ranh giới phải nói kèm: ca kiểm dùng `Comments` làm tham số trạng
+thái vì Snowdon không có shared parameter cho việc này — **fixture, không phải khuyến nghị**.
+
+> `SuiteCoverageTests` bắt đúng một thiếu sót khi soạn ca (`summaryNotContains: ["Xem trước"]` của một ca ghi)
+> **trước khi** Revit kịp chạy. Đó là giá trị của bộ test đối chiếu mã nguồn với ca kiểm: nó đỏ trong 5 giây,
+> thay vì để một lượt chạy 3 phút xanh nhầm.
+
+### `.dwg` nhị phân và hai `placement` — ca kiểm mới, lỗi cũ lộ ra
+
+§29 để lại: chưa chạy với DWG nhị phân thật, `placement: shared`/`centered` chưa chạy lần nào. Thêm fixture
+`tuyen-ong.dwg` (DWG 2018 `AC1032`, sinh từ chính DXF nhưng **dời 20 m theo Y** để model line sinh ra là đường
+*mới*, không trùng đường của bản DXF) và ba ca kiểm. Lượt chạy đầu: **9 đạt / 2 trượt**.
+
+```
+Đã có "tuyen-ong.dwg" trong mô hình (id 1544489) — bỏ qua, không link lần hai.
+```
+
+Id 1544489 là **bản DXF**. `CadLink` so tên bằng cách **cắt đuôi mở rộng rồi tìm chuỗi con**, nên với nó
+`tuyen-ong.dwg` và `tuyen-ong.dxf` là một. Hậu quả **không có lỗi nào báo**: lệnh nói thành công, bản vẽ không
+bao giờ vào mô hình, rồi `ModelLinesFromCad` báo `E-PRECOND: không tìm thấy bản vẽ CAD` — đọc hai dòng đó thì
+kỹ sư tin là mình khai sai `dwgNameContains`. Chiều ngược lại cũng sai: `tuyen-ong-giua.dxf` **chứa**
+`tuyen-ong`.
+
+Ba lượt sửa mới trúng, và cái chỉ mặt thủ phạm là một dòng thông báo:
+
+| Lượt | Sửa gì | Kết quả |
+|---|---|---|
+| 1 | So đúng cả tên, nhưng vẫn cho phép lùi về **tên trần** | vẫn trượt — tên kiểu Revit đặt cho bản vẽ link **không mang đuôi** |
+| 2 | Thêm `RevitCompat.CadLinkFileName` đọc tên **có đuôi** từ đường dẫn ngoài của `CADLinkType` | vẫn trượt — nhánh lùi về tên trần vẫn chạy trước |
+| 3 | In luôn **tên mô hình đang mang** vào thông báo "đã có" → thấy `"tuyen-ong.dxf"`; bỏ hẳn nhánh lùi khi đã đọc được tên có đuôi | ✅ **11/11** |
+
+Bài học lặp lại của §29: khi một lệnh **từ chối làm gì đó**, thông báo phải nói nó đã so với cái gì. Ba lượt
+chạy Revit tiêu tốn chỉ vì câu "đã có" không kèm bằng chứng.
+
+| Ca mới | ms | Summary |
+|---|---:|---|
+| Link DWG nhị phân — `placement: shared` | 362 | `Đã link "tuyen-ong.dwg" … đặt theo shared` |
+| Model line từ chính DWG đó | 12 | **`Đã tạo 2 model line`** |
+| Link với `placement: centered` | 998 | `Đã link "tuyen-ong-giua.dxf" … đặt theo centered` |
+
+### Cái chưa chứng minh
+
+- **`placement: shared` mới chỉ chạy trên model không khai toạ độ chung lệch gốc** — nó không ném lỗi, nhưng
+  chỗ `shared` thật sự khác `origin` thì chưa có model nào để thấy.
+- `ConstructionStatus` **theo `ElementId`** (không khai `keyParameter`) vẫn chỉ có test thuần và hai ca đường
+  lỗi đứng sau.
+- **DHCB chưa có lệnh tạo/gắn shared parameter**, nên bước chuẩn bị cho B1 ở dự án thật vẫn là thao tác tay.
+
+---
+
+## 32. `IdsValidate` — và một dòng roadmap tự nhận là đã có mã (2026-09-05 18:05 ICT)
+
+Rà lại roadmap sau §31 thì thấy mục **11.1** viết, ở **thì hiện tại**:
+
+> *"Phần đánh giá thuần ở `Shared.Logic/Ids` (`IdsSpec` + `IdsEvaluator`, 6 loại facet), có test"*
+
+`src/DhcbTools.Shared.Logic/Ids` **không tồn tại**. `grep IdsEvaluator` toàn repo: **0 kết quả**. Đúng lớp lỗi
+*"tài liệu nói một đằng, mã làm một nẻo"* mà §1 dựng bốn bộ test đối chiếu mã nguồn để bắt — nhưng chúng soi
+catalog, Ribbon và bộ ca kiểm, **không soi roadmap**. Lượt này làm cho câu đó thành sự thật, thay vì sửa câu
+chữ cho khớp thực tế.
+
+### Tầng thuần trước, Revit sau
+
+`Shared.Logic/Ids` — `IdsSpec` (đọc XML IDS 1.0) + `IdsEvaluator` (đánh giá) — **34 ca test, phủ 100% dòng**.
+Ba quyết định đáng ghi lại:
+
+| Quyết định | Vì sao |
+|---|---|
+| `xs:pattern` **neo hai đầu** khi so | XSD khớp *toàn bộ* chuỗi, Regex .NET khớp *một đoạn*. Không neo thì `AB-01-rác` đạt quy tắc `AB-\d\d` — quy tắc đặt tên mất hiệu lực mà báo cáo vẫn xanh |
+| Gặp thứ chưa hỗ trợ thì **từ chối file** | Facet lạ, ràng buộc `minLength`, file không có `<specification>`, specification không có `<requirements>`. Bỏ qua im lặng là in ra dấu ✓ cho một quy tắc chưa từng được kiểm, và người đọc không có cách nào biết |
+| Tên facet khai bằng **mẫu** thì facet đó **trượt** | Không suy ngược được tên thuộc tính từ một biểu thức. Trả "đạt" ở đó là bịa ra một kết luận |
+
+### Chạy thật — Revit 2024, Snowdon Architectural: 38 đạt / 0 trượt / 1 bỏ qua
+
+```
+Kiểm 1270 phần tử theo 3 specification: 42 phần tử không đạt ở 1 specification,
+1 specification không có phần tử nào để kiểm → ids-check.html
+```
+
+Đọc từ chính `ids-check.csv` (43 dòng), không đọc từ summary: 42 phần tử không đạt đều là **tường kính**
+(`Glazing Wall - Stair`…) không khai vật liệu, mỗi dòng nói rõ *cần gì* —
+`thiếu/sai: cần vật liệu khớp mẫu ".+"`. Cửa đạt hết vì model mẫu có sẵn Mark.
+
+Specification thứ ba trong fixture cố ý nhắm `IfcTank` — lớp **không có** trong model mẫu — và nó được
+**đánh dấu riêng** (`0 phần tử — không kiểm được gì`), đếm riêng trong summary, thay vì in "0 không đạt" như
+thể đã đạt. Đúng bài học §16: số 0 ở đó nói về **bộ lọc**, không nói về mô hình.
+
+### Ranh giới ghi ngay trong báo cáo, không chỉ trong tài liệu
+
+DHCB đọc mô hình theo **ánh xạ Revit → IFC** (`IfcExportAs` instance → type, bảng category → lớp IFC, tham số
+đóng vai property). Đó là cùng ánh xạ bộ xuất IFC dùng, **không phải chính file IFC** — nên kết luận là *"mô
+hình sẽ đạt khi xuất"*. Câu đó nằm trong chính file HTML, chứ không nằm riêng ở tài liệu mà người đọc báo cáo
+không mở.
+
+### Cái chưa chứng minh
+
+- **Chưa đối chiếu với IfcTester hay Solibri** trên cùng một file IDS. Mà "ba phần mềm ra cùng kết luận" mới
+  chính là *mục đích* của IDS — chừng nào chưa đối chiếu, DHCB mới chứng minh được vế "kiểm được", chưa chứng
+  minh được vế "cùng kết luận".
+- Fixture IDS là **file viết tay tối giản**; chưa chạy với một file IDS thật của chủ đầu tư.
+- Bảng category → lớp IFC là **bảng rút gọn** cho nhóm hay gặp; family lạ phải khai `IfcExportAs`.
+- `minLength`/`maxLength` và `partOf` theo quan hệ IFC đầy đủ chưa hỗ trợ — và lệnh **từ chối file** khi gặp,
+  chứ không lặng lẽ bỏ qua.

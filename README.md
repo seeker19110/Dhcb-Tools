@@ -61,7 +61,7 @@ src/
 │   ├── Updaters/                  # ElevationUpdater (IUpdater, tắt mặc định)
 │   ├── Ai/                        # CadLayerMap, SpecToConfig, DictionaryLearn
 │   └── Batch/                     # BatchJobRunner (mở → chạy step → lưu → đóng)
-├── DhcbTools.Revit/               # Vỏ Revit: Ribbon 6 panel phủ đủ 46 lệnh, Bridge 8765, hook batch
+├── DhcbTools.Revit/               # Vỏ Revit: Ribbon 6 panel phủ đủ 49 lệnh, Bridge 8765, hook batch
 │                                  #   (pending-job.json), ElevationUpdater, WPF AutoNumbering
 ├── DhcbTools.Core.AutoCAD/        # Core AutoCAD: AcadCommandTable, LayerSync, DrawingCleanup, AutoNumbering, Attributes,
 │                                  #   Text (TextReplace), Standards (LayerStandardCheck, GridExtract, XrefAudit, CadLayerMap), Query

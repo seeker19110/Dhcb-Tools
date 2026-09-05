@@ -9,7 +9,7 @@
 >
 > **Ba lệnh mới nhất chưa chạy thật:** cả ba có tầng thuần (50 + 41 ca test), lệnh Core, nút Ribbon và ca kiểm
 > trong `tests/suites/`, nhưng **chưa chạy lần nào trong Revit** — mang nhãn *thử nghiệm* theo nguyên tắc 6.
-> Con số "đã chạy thật" dưới đây vì thế là **43/46**.
+> Con số "đã chạy thật" dưới đây vì thế là **49/49** (cập nhật 2026-09-05).
 >
 > **Đã kiểm trên Revit thật:** 43/43 lệnh Revit *của vòng đó* có ít nhất một ca kiểm chạy trong Revit, chia ba bộ theo
 > model mẫu (kiến trúc / HVAC / cấp thoát nước) — xem [Kiểm thử](#kiểm-thử) và
@@ -60,11 +60,11 @@
 | Giai đoạn 7 P1 — khoảng trống so với tool thị trường ([`nghien-cuu-tool-thi-truong-va-ke-hoach.md`](nghien-cuu-tool-thi-truong-va-ke-hoach.md)) | ✅ Mã nguồn (PR #11): SheetRename, RevisionOnSheets, StylePurge, ColorByParameter, FamilyAudit, WarningsExport, checkset ngưỡng; batch autodetect phiên bản Revit + PlotPdf; AI structured outputs + ≤ 8 ứng viên; MCP read-only/nhóm. ⬜ Phần AutoCAD (LayerTranslate, DrawingCompare, BlockQuantity, AttributeIncrement, purge text/dim/regapp) **chưa có mã nguồn** |
 | Giai đoạn 7 P2 | ✅ Mã nguồn (PR #12): SlopePipes, PipeKick, SystemBom, AutoRoute, ScheduleExport, ViewportCopy; vỏ `DhcbTools.AutoCAD.Core` (chỉ AcDbMgd/AcCoreMgd) cho accoreconsole; map năm AutoCAD → package (2026.1+ là .NET 10) |
 | Hướng dẫn cài đặt & kiểm thử thủ công | ✅ (PR #13) [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md) — checklist R1–R48, C1–C17, B1–B12, M1–M4 |
-| Kiểm thử tự động | ✅ Bộ test xUnit (`Shared.Logic` + `Shared.Hosting`), gồm bốn bộ đối chiếu mã nguồn với nhau: `RibbonCoverageTests` (vỏ Revit ↔ bảng lệnh), `CatalogFieldTests` (catalog ↔ property config thật), `SuiteCoverageTests` (46/46 lệnh có ca kiểm chạy trong Revit), `VietnameseMessageTests` (không còn thông báo tiếng Anh trong Core) |
+| Kiểm thử tự động | ✅ Bộ test xUnit (`Shared.Logic` + `Shared.Hosting`), gồm bốn bộ đối chiếu mã nguồn với nhau: `RibbonCoverageTests` (vỏ Revit ↔ bảng lệnh), `CatalogFieldTests` (catalog ↔ property config thật), `SuiteCoverageTests` (49/49 lệnh có ca kiểm chạy trong Revit), `VietnameseMessageTests` (không còn thông báo tiếng Anh trong Core) |
 | CI | ✅ `tests.yml` (test + check-build bằng API package, ubuntu) — xanh |
 | CD | ✅ đóng gói Release thật (Revit 2023/2024/2025, **AutoCAD 2024/2025/2026**) + GitHub Release khi đẩy tag (`release.yml`, windows-latest). AutoCAD 2026 là nhánh .NET 10, installer đặt vào `DhcbTools.bundle\Contents6` |
 
-Toàn bộ 61 lệnh đã có mã nguồn và biên dịch xanh với API package. **43/46 lệnh Revit đã chạy thật ít nhất
+Toàn bộ 64 lệnh đã có mã nguồn và biên dịch xanh với API package. **49/49 lệnh Revit đã chạy thật ít nhất
 một lần trong Revit 2024.3** (ba lệnh chặng thi công là phần chưa) và **15/15 lệnh AutoCAD** đã có ca kiểm tự
 động qua `accoreconsole` (§10).
 Việc có giá trị nhất lúc này là **9.4 — đưa cho một nhóm kỹ sư dùng thật**; phản hồi của họ quyết định
@@ -79,7 +79,7 @@ nhưng file không có trong repo — CI bắt được vì bảng lệnh và ca
 
 | Nhóm | Tài liệu nói | Thực tế trong repo |
 |---|---|---|
-| Vỏ Revit (Ribbon) | 6 panel, đủ lệnh MEPF, đăng ký `ElevationUpdater`, hook batch `pending-job.json` | ✅ `App.cs` có **6 panel**, phủ đủ **46/46** lệnh (nút phẳng + nút xổ xuống), có `BatchStartupHook` và đăng ký `ElevationUpdater` (mặc định tắt). ⬜ AI chat WPF vẫn chưa có — lớp AI dùng qua Bridge `/chat` và `dhcb_agent.py` |
+| Vỏ Revit (Ribbon) | 6 panel, đủ lệnh MEPF, đăng ký `ElevationUpdater`, hook batch `pending-job.json` | ✅ `App.cs` có **6 panel**, phủ đủ **49/49** lệnh (nút phẳng + nút xổ xuống), có `BatchStartupHook` và đăng ký `ElevationUpdater` (mặc định tắt). ⬜ AI chat WPF vẫn chưa có — lớp AI dùng qua Bridge `/chat` và `dhcb_agent.py` |
 
 ### Lệnh AutoCAD — nay đã đủ 15 lệnh có mã nguồn
 
@@ -135,7 +135,7 @@ giản hoá so với đặc tả gốc.
 
 ### Ribbon Revit
 6 panel, đúng tên trong `src/DhcbTools.Revit/App.cs`: **Nền tảng · Xuất & Báo cáo · Khởi tạo dự án · MEPF ·
-Hồ sơ & Style · Kiểm tra & AI** — phủ đủ 46 lệnh (nút phẳng + nút xổ xuống). `CommandRunner` đọc config JSON ở
+Hồ sơ & Style · Kiểm tra & AI** — phủ đủ 49 lệnh (nút phẳng + nút xổ xuống). `CommandRunner` đọc config JSON ở
 `%APPDATA%\DHCB\configs\revit\<Lệnh>.json` → chạy xem trước (`dryRun`) → hỏi xác nhận → chạy thật.
 Còn thiếu: **AI chat dạng WPF** — lớp AI hiện dùng qua Bridge `/chat` và `dhcb_agent.py`.
 
@@ -256,7 +256,7 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
    log là hợp đồng giữa hai thời điểm cách nhau 30 ngày). ⬜ Số liệu chỉ bắt đầu tích từ bản cài kế tiếp.
 7. Rồi tới **9.4 — đưa cho một nhóm kỹ sư dùng thật**; phản hồi của họ quyết định giai đoạn 10/11 đi sâu
    vào đâu. **Mẫu thu phản hồi đã có**: [`mau-phan-hoi-9-4.md`](mau-phan-hoi-9-4.md) — bảng tick
-   *dùng hằng tuần / bấm rồi bỏ / chưa dùng* cho đủ 46 lệnh Revit + 15 lệnh AutoCAD, kèm bốn câu hỏi mở.
+   *dùng hằng tuần / bấm rồi bỏ / chưa dùng* cho đủ 49 lệnh Revit + 15 lệnh AutoCAD, kèm bốn câu hỏi mở.
    `PhanHoiFormTests` đối chiếu danh sách lệnh trong mẫu với `CommandCatalog` hai chiều nên mẫu không trôi.
    Còn thiếu: phát hành v1.1 và chọn nhóm kỹ sư — cả hai đều là việc của người, không phải của mã.
 8. ~~Chuỗi băm cho nhật ký batch (11.5)~~ — xong, **đã chạy thật cả hai đường (§24)**: đêm batch Revit
@@ -271,12 +271,15 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
    §20 — §24 mới chạy trên model mẫu Snowdon Towers.
 9. **Ba lệnh chặng thi công — chạy thật trong Revit.** `SetoutExport` (A1), `ConstructionStatus` và
    `ProgressReport` (B1) đều đã có mã nguồn, tầng thuần có test, nút Ribbon và ca kiểm; việc còn lại là một
-   vòng `run-in-revit-tests.ps1 -Suite smoke` rồi `-Suite mep`. Hai việc **không** làm được bằng ca kiểm khai
-   báo, phải làm tay: **đối chiếu một điểm định vị bằng Spot Coordinate** trên model có khai toạ độ chung
-   thật, và **đường ghi của `ConstructionStatus`** — gắn shared parameter trạng thái vào bản chép model mẫu,
-   lấy `ElementId` thật bằng `ParameterExport`, ghi trạng thái cho vài phần tử rồi chạy `ProgressReport`
-   (mã cấu kiện chỉ có nghĩa trong đúng file sinh ra nó nên không viết sẵn vào fixture được). Hai việc đó
-   quyết định gỡ hay giữ nhãn *thử nghiệm*. Chi tiết: [`toa-do-dinh-vi.md`](toa-do-dinh-vi.md) ·
+   vòng `run-in-revit-tests.ps1 -Suite smoke` rồi `-Suite mep`. ✅ **Đã chạy thật 2026-09-05** (§28, §31): `SetoutExport` 260 điểm trên model kiến trúc
+   và 546 điểm trên model HVAC; `ProgressReport` chạy trên cả hai. Đường ghi của `ConstructionStatus` cũng
+   **đã chạy thật** sau khi thêm `keyParameter` — CSV khớp theo **Mark** thay vì `ElementId`, nên fixture nằm
+   được trong repo: ghi 3 cửa → ghi lại phải 0 → CSV lùi trạng thái bị chặn → `ProgressReport` ra **1,4 %**,
+   lần đầu con số tiến độ nói về công trường chứ không nói về tham số. ⬜ Còn **một việc phải làm tay**:
+   **đối chiếu một điểm định vị bằng Spot Coordinate** trên model có khai toạ độ chung thật. Và một ranh giới phải nói rõ: ca kiểm ghi thật dùng
+   `Comments` làm tham số trạng thái vì model mẫu không có shared parameter nào cho việc này — đó là
+   **fixture, không phải khuyến nghị**; dự án thật gắn shared parameter riêng, mà DHCB **chưa có lệnh
+   tạo/gắn shared parameter**. Chi tiết: [`toa-do-dinh-vi.md`](toa-do-dinh-vi.md) ·
    [`tien-do-thi-cong.md`](tien-do-thi-cong.md).
    Lý do làm A1/B1 trước các đề xuất còn lại: chỉ đọc hoặc chỉ ghi tham số, tầng thuần chiếm phần lớn, và cả
    hai mở thêm **nhóm người dùng khác** (tổ trắc đạc, ban chỉ huy công trường) cho chính vòng 9.4.
@@ -286,8 +289,9 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
    file vừa ghi) chiếm gần hết, và nó chỉ **thêm đầu ra cho lệnh đã chạy thật** nên không vướng nguyên tắc 6
    như một lệnh Core mới. Điều đắt nhất khi làm không phải XML mà là **GUID topic phải ổn định**: sinh từ
    `key` va chạm (đúng khoá của `clash-accepted.json`), nếu không thì mỗi đêm chạy lại là tư vấn thấy toàn
-   vấn đề mới và nhận xét họ đã ghi nằm lại ở vấn đề cũ. ⬜ Còn: một lượt `revit-mep` để chốt file thật mở
-   được trong phần mềm điều phối (ca kiểm đã có, chỉ kiểm file có sinh ra).
+   vấn đề mới và nhận xét họ đã ghi nằm lại ở vấn đề cũ. ✅ **Đã chạy thật 2026-09-05** trong `revit-mep`: `clash.bcf` 9.897 byte, **7 topic**, đọc lại bằng thư
+   viện zip thấy đủ `bcf.version` + `project.bcfp` + mỗi topic một `markup.bcf`/`viewpoint.bcfv` (§28).
+   ⬜ Còn: **mở thử trong Navisworks/Solibri thật** — việc của người, không phải của mã.
 11. ~~**C4 — `ModelLinesFromCad`**~~ — xong 2026-09-05, khép nhóm "song song, rẻ". Từ nay DWG đã link/import
    dựng thẳng ra model line theo layer, `RouteFromLines` ăn tiếp — trước đó kỹ sư vẫn **vẽ tay lại tuyến**
    đè lên bản vẽ CAD, tức là mắt xích duy nhất còn đứt giữa `CadLayerMap` và `RouteFromLines`. Tầng thuần
@@ -295,6 +299,18 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
    (hai ống chồng nhau thì nhìn mặt bằng không thấy), bỏ đoạn rác trim/extend, và nối đoạn thẳng hàng
    **nhưng không nối xuyên ngã ba** — nối qua đó là xoá mất một nhánh tuyến. Chạy lại không sinh bản sao
    (so trùng bỏ qua tên layer, vì model line mang tên line style chứ không mang tên layer DWG).
-   ⬜ Còn: một lượt `revit-mep` trên model **có DWG thật** — ca kiểm hiện tại chốt đường E-PRECOND và
-   đường xem trước không ném exception, còn số đường đọc được thì phải có bản vẽ thật mới biết.
-12. **Không mở P3** — giữ hướng chiều sâu theo [`roadmap.md`](roadmap.md).
+   ✅ **Đã chạy thật 2026-09-05** (§29, §31): bộ ghi MEP tự dựng fixture bằng lệnh mới **`CadLink`**,
+   chạy được cả **DXF văn bản** lẫn **DWG 2018 nhị phân**, và cả ba cách đặt (`origin`, `shared`, `centered`).
+   Kết quả: **`Đã tạo 2 model line`** đúng con số fixture gài, lần hai 0 mới / 2 đã có. Hai lỗi thật lộ ra và
+   đã sửa: `dwgNameContains` chưa bao giờ khớp một bản vẽ **link** (tên file nằm ở `CADLinkType` chứ không
+   ở `ImportInstance.Name`), và `CadLink` so tên **cắt đuôi mở rộng rồi tìm chuỗi con** nên coi `.dwg` là
+   `.dxf` cùng tên — báo "đã có" cho một bản vẽ chưa bao giờ vào mô hình, không lỗi nào nổi lên.
+12. **Mục 11.1 — `IdsValidate`** ✅ 2026-09-05: đọc file **IDS 1.0** của chủ đầu tư/thẩm tra rồi kiểm thẳng
+   trên mô hình Revit. Tầng thuần `Shared.Logic/Ids` (34 ca test, phủ 100% dòng), lệnh Core, nút Ribbon,
+   2 ca kiểm smoke. Chạy thật: *1270 phần tử, 3 specification, 42 không đạt, 1 specification không có phần
+   tử nào để kiểm*. Trước PR này, roadmap mô tả tầng `Shared.Logic/Ids` ở **thì hiện tại** trong khi thư mục
+   đó chưa tồn tại — bốn bộ test đối chiếu mã nguồn không soi tới roadmap. ⬜ Còn: **đối chiếu kết quả với
+   IfcTester/Solibri** trên cùng một file IDS.
+13. **`.NET 8` hết hỗ trợ 10/11/2026** — `BatchRunner` và bộ test đã lên **net10.0** (2026-09-05), và ba chỗ
+   còn viết tay `net8.0` vào đường dẫn `bin` nay hỏi MSBuild (`-getProperty:TargetFramework`).
+14. **Không mở P3** — giữ hướng chiều sâu theo [`roadmap.md`](roadmap.md).
