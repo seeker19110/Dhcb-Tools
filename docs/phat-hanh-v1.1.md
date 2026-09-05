@@ -1,7 +1,8 @@
-# Phát hành v1.1.0 và nhóm kỹ sư dùng thật (mục 9.4)
+# Phát hành v1.1 và nhóm kỹ sư dùng thật (mục 9.4)
 
-Tag `v1.1.0` đẩy ngày 2026-09-06; `release.yml` đóng gói và đăng lên GitHub Releases:
-<https://github.com/seeker19110/Dhcb-Tools/releases/tag/v1.1.0>. Gói gồm `DhcbTools-Setup-1.1.0.exe`
+**Bản cho kỹ sư cài: `v1.1.1`** — <https://github.com/seeker19110/Dhcb-Tools/releases/tag/v1.1.1>
+(v1.1.0 cùng ngày có installer treo khi cài im lặng, §46; mã add-in giống hệt). `release.yml` đóng gói và
+đăng lên GitHub Releases. Gói gồm `DhcbTools-Setup-1.1.1.exe`
 (Inno Setup, cài add-in Revit 2023–2025, AutoCAD 2024–2026 và BatchRunner vào
 `%LOCALAPPDATA%\Programs\DHCB Tools`) và các zip rời cho từng phiên bản.
 
@@ -20,7 +21,7 @@ Tag `v1.1.0` đẩy ngày 2026-09-06; `release.yml` đóng gói và đăng lên 
 
 ## Cài cho kỹ sư
 
-1. Chạy `DhcbTools-Setup-1.1.0.exe` (không cần quyền admin; cài vào hồ sơ người dùng).
+1. Chạy `DhcbTools-Setup-1.1.1.exe` (không cần quyền admin; cài vào hồ sơ người dùng).
 2. Mở Revit → hộp "Unsigned Add-In" chọn *Always Load*. Tab **DHCB** xuất hiện.
 3. Hướng dẫn kiểm thử tay nằm trong gói: `huong-dan-cai-dat-va-kiem-thu-thu-cong.md`.
 
