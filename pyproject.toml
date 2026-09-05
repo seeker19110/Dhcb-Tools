@@ -15,5 +15,19 @@ autocad-panel = ["fastmcp==4.0.2"]
 dev = ["pytest>=8,<10", "pyflakes>=3,<4"]
 
 [tool.pytest.ini_options]
-testpaths = ["tools/autocad-mcp-server"]
+testpaths = ["tools/autocad-mcp-server", "tests/python"]
 python_files = ["test_*.py"]
+
+# Cổng coverage: phần Python phải phủ 100% câu lệnh (xem .github/workflows/tests.yml). Đặt ngưỡng ở
+# đây thay vì trong lệnh CI để chạy ở máy và chạy trên CI cho cùng một kết quả.
+[tool.coverage.run]
+source = ["scripts", "tools/autocad-mcp-server"]
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+exclude_also = [
+    # Khối chạy-như-script: chỉ chạy khi gọi thẳng file, không có gì để kiểm ở đó.
+    "if __name__ == .__main__.:",
+]
+omit = ["*/test_*.py"]

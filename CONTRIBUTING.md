@@ -22,8 +22,8 @@ Hai workflow trong [`.github/workflows/`](.github/workflows/):
 
 | Job | Máy | Làm gì |
 |---|---|---|
-| `logic-tests` | ubuntu-latest | `dotnet restore/build/test` bộ `DhcbTools.Shared.Logic.Tests` (Release), tải kết quả `.trx` lên artifact `test-results` |
-| `check-build` | ubuntu-latest, ma trận `2027` / `2026` / `2025` / `2024` / `2023` | Build `BatchRunner` + biên dịch Core và cả bốn vỏ (Revit, AutoCAD, AutoCAD core-only) bằng API package NuGet với `UseWPF=false`. `2026`/`2027` là đường **.NET 10** (AutoCAD ≥ 2026, Revit ≥ 2027), cần cả SDK 8 lẫn 10. Riêng nhánh `2025` còn chạy `py_compile` cho `scripts/*.py` + `tools/autocad-mcp-server/*.py`, `unittest discover` cho gateway panel, và một bước kiểm cú pháp JavaScript trong `panel.html` |
+| `logic-tests` | ubuntu-latest | `dotnet restore/build/test` bộ `DhcbTools.Shared.Logic.Tests` (Release) **kèm cổng phủ 100% dòng** (`scripts/check-coverage.py`), tải kết quả `.trx` lên artifact `test-results` |
+| `check-build` | ubuntu-latest, ma trận `2027` / `2026` / `2025` / `2024` / `2023` | Build `BatchRunner` + biên dịch Core và cả bốn vỏ (Revit, AutoCAD, AutoCAD core-only) bằng API package NuGet với `UseWPF=false`. `2026`/`2027` là đường **.NET 10** (AutoCAD ≥ 2026, Revit ≥ 2027), cần cả SDK 8 lẫn 10. Riêng nhánh `2025` còn chạy `py_compile` cho `scripts/*.py` + `tools/autocad-mcp-server/*.py`, `unittest discover` cho gateway panel **và cho `tests/python/`, kèm cổng phủ 100% câu lệnh**, và một bước kiểm cú pháp JavaScript trong `panel.html` |
 | `build-wpf-windows` | windows-latest, ma trận Revit `2027` / `2026` / `2025` / `2024` / `2023` | Build **thật có WPF** vỏ Revit — bật WPF thì SDK bỏ `System.IO` khỏi implicit usings, nên job Linux ở trên không bắt được lỗi đó. `2027` là bản WPF đầu tiên trên net10.0-windows |
 
 Ma trận ba phiên bản là cố ý: lỗi chỉ xảy ra trên net48 (`Dictionary.GetValueOrDefault`) hoặc chỉ trên
@@ -75,17 +75,25 @@ là quy ước tự giác. Xem xét thêm gate ở Giai đoạn 0 nếu thấy c
 Chạy trước những gì CI sẽ chạy, để không phải đợi một vòng đỏ (không cần cài Revit/AutoCAD):
 
 ```bash
-dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj -c Release
+dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj -c Release \
+  --collect:"XPlat Code Coverage" --results-directory ./coverage
+python3 scripts/check-coverage.py ./coverage   # cổng phủ 100% dòng — chỉ đúng file:dòng nếu thiếu
 ./scripts/check-build.sh      # biên dịch toàn bộ Core + vỏ bằng API package NuGet (Revit/AutoCAD 2025)
 ```
 
 Có sửa phần Python (`scripts/`, `tools/autocad-mcp-server/`) thì chạy thêm — CI cũng chạy hai việc này:
 
 ```bash
-pip install -r requirements-dev.txt          # pytest + pyflakes + fastmcp
-python3 -m pytest tools/autocad-mcp-server -q
-python3 -m pyflakes scripts/*.py tools/autocad-mcp-server/*.py
+pip install -r requirements-dev.txt          # pytest + coverage + pyflakes + fastmcp
+python3 -m coverage run -m pytest -q         # tools/autocad-mcp-server + tests/python
+python3 -m coverage report                   # đỏ nếu phủ < 100% câu lệnh
+python3 -m pyflakes scripts/*.py tools/autocad-mcp-server/*.py tests/python/*.py
 ```
+
+**Cả hai tầng đều có ngưỡng phủ 100%**: thêm code mà không thêm test thì CI đỏ. Nhánh thật sự không
+chạy được trên CI (mã chỉ có trên Windows, đua giữa hai luồng) thì đánh dấu `[ExcludeFromCodeCoverage]`
+/ `# pragma: no cover` **kèm lý do ngay tại chỗ** — xem `docs/dac-ta-kiem-thu.md` §2.0 để biết danh
+sách hiện có và những chỗ đã được tiêm seam để test thay vì loại trừ.
 
 Trên Windows có cài Revit/AutoCAD, build thật (kèm WPF) cho phiên bản đang dùng:
 

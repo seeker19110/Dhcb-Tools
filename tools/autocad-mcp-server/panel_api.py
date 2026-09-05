@@ -231,7 +231,9 @@ def extract_json(text: str) -> dict[str, Any]:
     if start < 0 or end <= start:
         raise ValueError("AI response did not contain a JSON object")
     parsed = json.loads(candidate[start:end + 1])
-    if not isinstance(parsed, dict):
+    # Lát cắt luôn bắt đầu bằng "{" và kết thúc bằng "}", nên json.loads hoặc trả dict hoặc ném —
+    # guard này là lớp phòng thủ thừa, giữ lại phòng khi cách cắt ở trên đổi. Không đo phủ được.
+    if not isinstance(parsed, dict):  # pragma: no cover
         raise ValueError("AI response must be a JSON object")
     return parsed
 

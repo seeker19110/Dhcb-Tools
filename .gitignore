@@ -14,3 +14,8 @@ dist/
 
 # Worktree tạm của agent (Claude Code) — không phải mã nguồn
 .claude/worktrees/
+
+# Dữ liệu đo phủ (coverage.py và coverlet) — sinh ra mỗi lần chạy test, không đưa vào repo.
+.coverage
+coverage/
+TestResults/

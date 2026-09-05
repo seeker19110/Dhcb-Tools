@@ -23,8 +23,18 @@ jobs:
       - name: Build
         run: dotnet build tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj --no-restore -c Release
 
-      - name: Test
-        run: dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj --no-build -c Release --logger "trx;LogFileName=test-results.trx"
+      # Ngưỡng 100% dòng là cổng, không phải mục tiêu phấn đấu: nhánh nào thật sự không chạy được
+      # trên CI Linux (icacls chỉ có trên Windows, polyfill attribute, đua "client ngắt giữa chừng")
+      # đã được đánh dấu [ExcludeFromCodeCoverage] kèm lý do ngay tại chỗ. Thêm code không có test
+      # thì job này đỏ và báo đúng dòng nào chưa chạy.
+      # Ngưỡng phủ NHÁNH không đặt: một số nhánh phụ thuộc nền tảng (net48 vs net8) không cùng lúc
+      # đo được ở một lần chạy — xem docs/dac-ta-kiem-thu.md.
+      - name: Test (ngưỡng phủ 100% dòng)
+        run: |
+          dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj --no-build -c Release \
+            --logger "trx;LogFileName=test-results.trx" \
+            --collect:"XPlat Code Coverage" --results-directory ./coverage
+          python3 scripts/check-coverage.py ./coverage
 
       - name: Tải kết quả test
         if: always()
@@ -69,15 +79,19 @@ jobs:
               -p:UseWPF=false -c Release
           done
 
-      - name: Kiểm tra script Python
+      - name: Kiểm tra script Python (ngưỡng phủ 100% câu lệnh)
         if: matrix.version == '2025'   # không phụ thuộc TFM, chạy một lần là đủ
         run: |
           # test_panel_api.py nhập server.py để kiểm cổng xác nhận của MCP, mà server.py cần fastmcp.
           # Không cài thì bộ test không chạy nổi một ca nào (ImportError) — CI đỏ đúng vì lý do đó.
           python3 -m pip install --quiet -r tools/autocad-mcp-server/requirements.txt
+          python3 -m pip install --quiet coverage
           python3 -m py_compile scripts/dhcb_agent.py scripts/dhcb_mcp_server.py scripts/dhcb_ai.py \
             tools/autocad-mcp-server/server.py tools/autocad-mcp-server/panel_api.py
-          python3 -m unittest discover -s tools/autocad-mcp-server -p 'test_*.py'
+          # Ngưỡng 100% câu lệnh (fail_under trong pyproject.toml) — cùng con số khi chạy ở máy.
+          python3 -m coverage run -m unittest discover -s tools/autocad-mcp-server -p 'test_*.py'
+          python3 -m coverage run --append -m unittest discover -s tests/python -p 'test_*.py'
+          python3 -m coverage report
 
       - name: Kiểm tra JavaScript panel AutoCAD
         if: matrix.version == '2025'   # không phụ thuộc TFM, chạy một lần là đủ
