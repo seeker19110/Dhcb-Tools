@@ -2045,3 +2045,86 @@ với ô "Kết quả xem trước" hiện danh sách tường thiếu vật li�
   *"The given path's format is not supported"*). `VietnameseMessageTests` chỉ soi thông báo trong Core, không
   soi thông báo của khung .NET lọt qua — chưa sửa trong lượt này.
 - Chưa bấm tay đường **Chạy thật** trên Ribbon: `IdsValidate` chỉ đọc nên không có gì để ghi.
+
+---
+
+## 34. Bấm tay đủ 47 nút Ribbon — bốn lớp lỗi làm lệnh không chạy được từ giao diện (2026-09-05 20:20 ICT)
+
+§33 mới bấm **một** nút. Lượt này bấm **hết**: 47 nút của 6 panel (49 lệnh Revit trừ `RunTests` và
+`UsageReport` — hai công cụ nội bộ cố ý không có nút), mỗi nút mở form, điền sẵn config, bấm *Xem trước*,
+đọc kết quả.
+
+Để bấm được thật chứ không chỉ mở form rỗng, config của từng lệnh được nạp sẵn vào
+`%APPDATA%\DHCB\configs\revit\<Lệnh>.json` — lấy thẳng từ chính các bộ ca kiểm trong `tests/suites/`, nên
+điều kiện đầu vào giống hệt lượt chạy tự động.
+
+> Kết quả tổng: **47/47 nút mở được form và điều phối được lệnh** — nhưng chỉ sau khi sửa **bốn lỗi** mà
+> **không bộ test nào của repo có thể thấy**, vì cả 113 ca của §30 lẫn mọi ca thêm sau đó đều đi qua
+> `RunTests` — tức qua **bảng lệnh**, gửi JSON đúng kiểu, **không đi qua form WPF**.
+
+### Bốn lỗi, cùng một gốc: form dựng ô nhập theo *tên trường*, không theo *kiểu property*
+
+| # | Lệnh gặp đầu tiên | Triệu chứng | Gốc |
+|---|---|---|---|
+| 1 | `ParameterExport` | `Error converting value "Mark; Comments" to type List<string>` | `parameterNames` chứa chữ "parameter" → đoán là **một** tham số, mà config là **danh sách**. Ngược lại `AutoNumbering.category` là **một** chuỗi nhưng chứa "categor" → đoán là danh sách |
+| 2 | `GridSetup`, `LevelSetup`, `SystemColor` | *"grids trông như JSON nhưng không đọc được"* | Mọi mảng đều bị **ghép bằng `"; "`** khi đổ vào ô, nên hai object thành `{…}; {…}` — không còn là JSON |
+| 3 | `AutoRoute`, `RouteFromLines` | *"startMm phải là số, đang nhập `{ "x": 0, "y": 0, "z": 3000 }`"* | `startMm`/`endMm`/`sizeMm` là **điểm/kích thước dạng object**, nhưng hậu tố `Mm` làm luật đoán ra Number |
+| 4 | `RevisionOnSheets` | `Input string '1.0' is not a valid integer` | Ô số luôn ghi ra **số thực**; property `int` từ chối `1.0` |
+
+Và một lỗi thứ năm cùng họ, ngược chiều: `SheetRename` bị **chặn oan** — mẫu đặt tên
+`{Discipline}-{Number}` bắt đầu bằng `{` nên form tưởng là JSON hỏng. Sửa bằng cách phân biệt theo **kiểu
+trường** (`FieldKind.Json` mới) chứ không theo ký tự đầu của chuỗi.
+
+Mỗi lỗi đều **không ném ngoại lệ nào ra ngoài**: lệnh chỉ đơn giản không chạy, và người dùng đọc được một
+câu tiếng Anh của Newtonsoft. Bộ ca kiểm vẫn xanh suốt vì nó không bao giờ đi qua ô nhập.
+
+### Cái quan trọng hơn bản vá: hai bộ chặn mới trong `CatalogFieldTests`
+
+Sửa từng chỗ thì lần sau thêm lệnh lại sai lại. Nay có hai test đối chiếu **catalog ↔ lớp Config thật**
+(đọc mã nguồn, chạy trên CI Linux, không cần Revit):
+
+| Bộ chặn | Chốt điều gì |
+|---|---|
+| `TruongDanhSachCua…_KhopVoiConfigThat` | property là `List<string>` ⟺ trường là danh sách. Bắt được đúng 4 chỗ lệch có thật ngay lần chạy đầu |
+| `TruongDoiTuongCua…_LaOJsonTho` | property là **một đối tượng riêng** (`PointMm`, `RouteSizeMm`, `DevicePatternConfig`…) thì trường phải là `FieldKind.Json` |
+
+Kèm theo, ba mảnh logic của form được **tách xuống tầng thuần** để có test: `FormValueText.Display`
+(đổ giá trị vào ô), `FormValueText.Number` (đọc ô số — số nguyên phải ra số nguyên), và tính số ít/số nhiều
+của `FieldSpec.IsList`. Tổng cộng **1277 ca test**, phủ 100% dòng.
+
+### Bấm hết 47 nút — kết quả
+
+Chín lệnh có **luồng riêng**, không dùng form động, và cũng đã bấm tay: `ParameterImport` (chọn file CSV →
+hỏi xem trước → chạy), `RemoveUnusedViews` (liệt kê 90 view thừa, OK/Cancel), `AutoNumbering` (form riêng
+có ô "chỉ xem trước"), `HealthReport` (chạy thẳng, không hỏi gì).
+
+Vài kết quả đọc thẳng từ màn hình, trên model mẫu kiến trúc:
+
+| Lệnh | Kết quả trên form |
+|---|---|
+| `ParameterExport` | 142 phần tử, 2 tham số → CSV |
+| `AutoNumbering` | *[Xem trước] Sẽ đánh số 141 phần tử "Doors" vào tham số "Mark"* |
+| `HealthReport` | 34 cảnh báo, 91 view chưa đặt, 533 connector hở, 2 in-place family |
+| `ScheduleExport` | 36/36 schedule |
+| `SetoutExport` | 260 điểm định vị |
+| `ParameterRuleCheck` | 1484 giá trị + 6 ngưỡng, 987 vi phạm |
+| `ClashDetection` | 93 va chạm |
+| `IdsValidate` | 17.757 phần tử, 3 specification, 42 không đạt |
+| `StylePurge` · `FamilyAudit` | 38 style thừa · 286 family |
+| `DictionaryLearn` | soi 332 tên tham số trên 18 category |
+
+Nhóm MEPF chạy trên model **kiến trúc** nên phần lớn trả lời "không có phần tử MEP" / "không tìm thấy
+family" — đó là **đường lỗi có thật và nói rõ**, và cũng là bằng chứng nút bấm đi đến đúng lệnh;
+`ConnectorChecker` vẫn ra **533 connector hở trên 364 phần tử** vì model kiến trúc có sẵn ống nước.
+
+### Cái chưa chứng minh
+
+- **Chưa bấm đường *Chạy thật* trên Ribbon** cho lệnh nào — cả lượt này chỉ bấm *Xem trước*, để không
+  ghi vào model mẫu. Đường ghi đã có bộ `revit-write`/`revit-write-mep` đứng sau, nhưng đó là qua bảng
+  lệnh, không qua form.
+- **Nhóm MEPF chưa bấm tay trên model HVAC**, nên con số thật của `SleeveAuto`/`HangerAuto`/`SizingProposal`
+  từ Ribbon vẫn chưa thấy.
+- Ngoại lệ .NET vẫn hiện **nguyên văn tiếng Anh** trong ô kết quả (`VietnameseMessageTests` chỉ soi Core).
+- `overwriteExisting` của `FamilyLoader` hiện là **ô chữ** chứ không phải ô tick — luật đoán bool không có
+  tiền tố "overwrite". Không sai kết quả (Newtonsoft đọc được "true"), nhưng lệch với các lệnh khác.
+- Thông báo của `PipeKick`/`FlowNumbering` in id dạng **`0.0`** thay vì `0` khi ô số để trống mặc định.

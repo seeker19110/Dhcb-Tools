@@ -46,14 +46,15 @@ public class FieldKindTests
 
     /// <summary>
     /// Bẫy dễ sập nhất của luật tiền tố: "category" bắt đầu bằng "cat" nhưng không phải bool,
-    /// còn "keepNameContains" bắt đầu bằng "keep" + chữ hoa nhưng là chuỗi lọc.
+    /// còn "keepNameContains" bắt đầu bằng "keep" + chữ hoa nên luật tiền tố đoán Bool — trong khi
+    /// property thật là <c>List&lt;string&gt;</c> (nó đánh lừa cả luật hậu tố "Contains" nữa).
     /// </summary>
     [Theory]
     [InlineData("category", FieldKind.Category)]
     [InlineData("categories", FieldKind.Category)]
     [InlineData("categoriesA", FieldKind.Category)]
     [InlineData("obstacleCategories", FieldKind.Category)]
-    [InlineData("keepNameContains", FieldKind.Text)]
+    [InlineData("keepNameContains", FieldKind.TextList)]
     [InlineData("checkOnly", FieldKind.Bool)]
     public void TienTo_KhongDuocBatNham(string name, FieldKind expected) =>
         Assert.Equal(expected, FieldKindGuess.Of(name));
@@ -76,8 +77,8 @@ public class FieldKindTests
     [InlineData("grids")]
     [InlineData("colors")]
     [InlineData("roomFilter")]
-    public void TruongJsonTho_LaText(string name) =>
-        Assert.Equal(FieldKind.Text, FieldKindGuess.Of(name));
+    public void TruongJsonTho_LaJson(string name) =>
+        Assert.Equal(FieldKind.Json, FieldKindGuess.Of(name));
 
     [Theory]
     [InlineData("formats")]
@@ -161,4 +162,30 @@ public class FieldKindTests
         Assert.Equal("number", (string?)properties["spacingMm"]!["type"]);
         Assert.Equal("string", (string?)properties["hangerFamilyName"]!["type"]);
     }
+
+    /// <summary>
+    /// Một giá trị hay nhiều giá trị — thứ quyết định form ghi JSON ra chuỗi hay ra mảng. Cùng một
+    /// <see cref="FieldKind"/> mà tên số ít/số nhiều thì khác nhau; đoán sai là lệnh không chạy được từ
+    /// Ribbon (§34).
+    /// </summary>
+    [Theory]
+    [InlineData("categories", true)]
+    [InlineData("categoriesA", true)]          // không kết thúc bằng "s" nhưng vẫn là danh sách
+    [InlineData("obstacleCategories", true)]
+    [InlineData("mepCategories", true)]
+    [InlineData("parameterNames", true)]
+    [InlineData("formats", true)]
+    [InlineData("keepNameContains", true)]     // TextList thì luôn là danh sách, bất kể tên
+    [InlineData("category", false)]
+    [InlineData("parameterName", false)]
+    [InlineData("statusParameter", false)]
+    [InlineData("levelName", false)]
+    [InlineData("days", false)]
+    [InlineData("outputPath", false)]
+    public void SoItSoNhieu_QuyetDinhGhiMangHayGhiChuoi(string name, bool expected) =>
+        Assert.Equal(expected, new FieldSpec(name, "mô tả", FieldKindGuess.Of(name)).IsList);
+
+    [Fact]
+    public void TenRong_KhongNem_VaKhongPhaiDanhSach() =>
+        Assert.False(new FieldSpec(string.Empty, "mô tả", FieldKind.Category).IsList);
 }

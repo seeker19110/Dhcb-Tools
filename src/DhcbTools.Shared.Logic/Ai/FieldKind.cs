@@ -41,6 +41,17 @@ namespace DhcbTools.Shared.Logic.Ai
 
         /// <summary>Tên family/type → combo lấy từ mô hình đang mở.</summary>
         FamilyType,
+
+        /// <summary>
+        /// Object/mảng-object JSON thô (<c>levels</c>, <c>grids</c>, <c>colors</c>, điểm <c>{x,y,z}</c>):
+        /// form hiện ô nhiều dòng và đọc lại bằng bộ đọc JSON.
+        /// <para>
+        /// Phải là một KIỂU RIÊNG chứ không dựa vào "chuỗi bắt đầu bằng dấu ngoặc": mẫu đặt tên của
+        /// <c>SheetRename</c> là <c>{Discipline}-{Number}</c> — bắt đầu bằng "{" nhưng không phải JSON,
+        /// và bản trước chặn thẳng người dùng lại (bắt được khi bấm tay 2026-09-05, §34).
+        /// </para>
+        /// </summary>
+        Json,
     }
 
     /// <summary>Một trường config: tên khoá JSON, mô tả cho người dùng, và kiểu để dựng ô nhập.</summary>
@@ -51,6 +62,7 @@ namespace DhcbTools.Shared.Logic.Ai
             Name = name;
             Description = description;
             Kind = kind;
+            IsList = kind == FieldKind.TextList || (IsChoiceKind(kind) && LooksPlural(name));
         }
 
         public string Name { get; }
@@ -59,8 +71,46 @@ namespace DhcbTools.Shared.Logic.Ai
 
         public FieldKind Kind { get; }
 
-        /// <summary>Kiểu này có phải là danh sách nhiều giá trị không (ảnh hưởng cách ghi JSON).</summary>
-        public bool IsList => Kind == FieldKind.TextList || Kind == FieldKind.Category;
+        /// <summary>
+        /// Trường này nhận <b>nhiều</b> giá trị hay <b>một</b> — quyết định form ghi JSON ra mảng hay ra
+        /// chuỗi.
+        /// <para>
+        /// Không suy được từ mỗi <see cref="Kind"/>: cùng là combo lấy từ mô hình, <c>categories</c> là
+        /// danh sách còn <c>category</c> là một; <c>parameterNames</c> là danh sách còn <c>parameterName</c>
+        /// là một. Trước đây mọi <c>Category</c> đều bị coi là danh sách và mọi <c>Parameter</c> đều
+        /// không, nên form gửi mảng vào property <c>string</c> (và ngược lại) — Newtonsoft ném ngay và
+        /// lệnh <b>không chạy được từ Ribbon</b>, trong khi bộ ca kiểm gửi JSON đúng kiểu nên vẫn xanh.
+        /// Tìm ra khi bấm tay 2026-09-05, xem <c>docs/bang-chung-test.md</c> §34.
+        /// </para>
+        /// </summary>
+        public bool IsList { get; }
+
+        private static bool IsChoiceKind(FieldKind kind) =>
+            kind == FieldKind.Category || kind == FieldKind.Parameter || kind == FieldKind.Level
+            || kind == FieldKind.View || kind == FieldKind.FamilyType;
+
+        /// <summary>
+        /// Tên trường có nói rằng nó chứa nhiều giá trị không. <c>categoriesA</c>/<c>categoriesB</c> không
+        /// kết thúc bằng "s" nên phải bắt riêng chuỗi "categories"; <c>parameterNames</c> bắt bằng hậu tố
+        /// "Names".
+        /// </summary>
+        private static bool LooksPlural(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                return false;
+            }
+
+            if (name.IndexOf("categories", StringComparison.OrdinalIgnoreCase) >= 0
+                || name.EndsWith("Names", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            return name.EndsWith("s", StringComparison.Ordinal)
+                   && !name.EndsWith("ss", StringComparison.Ordinal)
+                   && !name.EndsWith("Contains", StringComparison.Ordinal);
+        }
 
         public override string ToString() => Name + ":" + Kind;
     }
@@ -82,6 +132,8 @@ namespace DhcbTools.Shared.Logic.Ai
                 ["find"] = FieldKind.Text,
                 ["replace"] = FieldKind.Text,
                 ["prefix"] = FieldKind.Text,
+                // "pattern" là mẫu CHUỖI ở TextReplace/SheetRename nhưng là OBJECT ở DevicePlacement —
+                // cùng một tên, hai kiểu, nên chỗ kia phải khai thẳng FieldKind.Json trong catalog.
                 ["pattern"] = FieldKind.Text,
                 ["namePattern"] = FieldKind.Text,      // mẫu tên, không phải tên view
                 ["renamePattern"] = FieldKind.Text,
@@ -94,10 +146,13 @@ namespace DhcbTools.Shared.Logic.Ai
                 ["names"] = FieldKind.TextList,
 
                 // Trường nhận object/mảng-object JSON: form hiện ô JSON thô, không phải combo chọn.
-                ["levels"] = FieldKind.Text,           // [{name, elevationMm}]
-                ["grids"] = FieldKind.Text,            // [{name, positionMm, orientation}]
-                ["colors"] = FieldKind.Text,           // {tên hệ: #RRGGBB}
-                ["roomFilter"] = FieldKind.Text,
+                ["sizeMm"] = FieldKind.Json,          // RouteSizeMm {width, height} — cũng bị hậu tố "Mm" đoán nhầm
+                ["startMm"] = FieldKind.Json,         // PointMm {x, y, z} — hậu tố "Mm" làm luật số đoán nhầm
+                ["endMm"] = FieldKind.Json,           // PointMm {x, y, z}
+                ["levels"] = FieldKind.Json,           // [{name, elevationMm}]
+                ["grids"] = FieldKind.Json,            // [{name, positionMm, orientation}]
+                ["colors"] = FieldKind.Json,           // {tên hệ: #RRGGBB}
+                ["roomFilter"] = FieldKind.Json,
 
                 // Bool mà luật tiền tố không bắt được (chữ sau tiền tố không viết hoa).
                 ["create3dView"] = FieldKind.Bool,     // "create" + '3'
@@ -105,10 +160,11 @@ namespace DhcbTools.Shared.Logic.Ai
                 ["reset"] = FieldKind.Bool,            // "xoá override"
 
                 // Chuỗi lọc, không phải bool — "keep" + chữ hoa nên luật tiền tố đoán nhầm.
-                ["keepNameContains"] = FieldKind.Text,
+                ["keepNameContains"] = FieldKind.TextList,   // List<string>: "keep" + hậu tố "Contains" đánh lừa cả hai luật
                 ["lowerEnd"] = FieldKind.Text,         // "End|Start"
                 ["onlyCommands"] = FieldKind.TextList,
                 ["outputFolder"] = FieldKind.FolderPath,
+                ["days"] = FieldKind.Number,          // số ngày, không phải danh sách (hậu tố "s")
                 ["elementId"] = FieldKind.Number,
                 ["sourceElementId"] = FieldKind.Number,
                 ["startNumber"] = FieldKind.Number,
