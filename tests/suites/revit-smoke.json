@@ -355,6 +355,43 @@
       }
     },
     {
+      "name": "IDS lệch chuẩn XSD: vẫn kiểm, nhưng cảnh báo IfcTester/Solibri sẽ từ chối",
+      "command": "IdsValidate",
+      "//": [
+        "§39 để lại: fixture cũ viết <restriction> không thuộc xs: và thiếu ifcVersion — DHCB kiểm bình thường,",
+        "IfcTester 0.8.5 từ chối mở. Đúng việc là CẢNH BÁO chứ không chặn: cùng bộ specification với",
+        "yeu-cau-thong-tin.ids nên kết quả kiểm phải y hệt, chỉ thêm khối cảnh báo kèm số dòng."
+      ],
+      "config": {
+        "idsPath": "{suiteFolder}/fixtures/yeu-cau-thong-tin-lech-chuan.ids",
+        "outputPath": "{outputFolder}/ids-lech-chuan.html",
+        "categories": [
+          "Doors",
+          "Walls"
+        ]
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 120000,
+        "summaryContains": [
+          "3 specification",
+          "0 phần tử không đạt",
+          "file IDS lệch chuẩn ở"
+        ],
+        "messagesContain": [
+          "IfcTester/Solibri có thể từ chối",
+          "<restriction> phải thuộc namespace XML Schema",
+          "thiếu thuộc tính ifcVersion"
+        ],
+        "filesExist": [
+          "{outputFolder}/ids-lech-chuan.html"
+        ],
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
       "name": "Báo lỗi rõ khi file IDS không có specification nào",
       "command": "IdsValidate",
       "//": "File IDS rong sinh ra bao cao 'khong loi nao' — dung loai no-op im lang ma §27 da gap o duong xuat IFC.",
