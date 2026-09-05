@@ -88,10 +88,11 @@ internal sealed class RevitIdsElement : IIdsElement
     {
         get
         {
-            var declared = TextOf(_element, "IfcExportAs") ?? (_type != null ? TextOf(_type, "IfcExportAs") : null);
-            if (!string.IsNullOrWhiteSpace(declared) && declared!.Contains('.'))
+            var declared = TextOf(_element, "IfcExportAs") ?? (_type != null ? TextOf(_type, "IfcExportAs") : null) ?? string.Empty;
+            var dot = declared.IndexOf('.');
+            if (dot >= 0)
             {
-                return declared.Substring(declared.IndexOf('.') + 1).Trim();
+                return declared.Substring(dot + 1).Trim();
             }
 
             return TextOf(_element, "IfcExportType") ?? (_type != null ? TextOf(_type, "IfcExportType") ?? string.Empty : string.Empty);
@@ -104,7 +105,8 @@ internal sealed class RevitIdsElement : IIdsElement
     /// </summary>
     public string? Attribute(string name)
     {
-        switch ((name ?? string.Empty).Trim().ToLowerInvariant())
+        var key = (name ?? string.Empty).Trim();
+        switch (key.ToLowerInvariant())
         {
             case "name":
                 return _element.Name;
@@ -119,7 +121,7 @@ internal sealed class RevitIdsElement : IIdsElement
             default:
                 // Thuộc tính lạ: thử luôn như một tham số cùng tên, rồi mới chịu thua. Trả rỗng khác
                 // hẳn trả "" ngầm hiểu là đạt — IdsValue.Accepts coi rỗng là KHÔNG đạt.
-                return TextOf(_element, name) ?? (_type != null ? TextOf(_type, name) : null);
+                return key.Length == 0 ? null : TextOf(_element, key) ?? (_type != null ? TextOf(_type, key) : null);
         }
     }
 
