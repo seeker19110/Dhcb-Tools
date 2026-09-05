@@ -253,6 +253,19 @@ internal abstract class FieldEditorBase : IFieldEditor
     protected static IEnumerable<string> SplitList(string text) =>
         text.Split(new[] { ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(p => p.Trim()).Where(p => p.Length > 0);
 
+    /// <summary>
+    /// Ô nhập đủ cao để bấm trúng và đọc được: TextBox/ComboBox mặc định của WPF chỉ ~20 px, trên màn
+    /// hình 1389 × 868 của kỹ sư trông như một vạch mảnh — kỹ sư báo "ô nhập số nhỏ" khi bấm tay 2026-09-05.
+    /// </summary>
+    protected static T Input<T>(T control) where T : System.Windows.Controls.Control
+    {
+        control.MinHeight = 30;
+        control.FontSize = 13;
+        control.Padding = new Thickness(6, 4, 6, 4);
+        control.VerticalContentAlignment = VerticalAlignment.Center;
+        return control;
+    }
+
     protected static StackPanel Row(params UIElement[] children)
     {
         var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
@@ -267,7 +280,7 @@ internal abstract class FieldEditorBase : IFieldEditor
 
 internal sealed class TextEditor : FieldEditorBase
 {
-    private readonly TextBox _box = new();
+    private readonly TextBox _box = Input(new TextBox());
 
     public TextEditor(FieldSpec field, JToken? value) : base(field)
     {
@@ -319,7 +332,7 @@ internal sealed class TextEditor : FieldEditorBase
 
 internal sealed class NumberEditor : FieldEditorBase
 {
-    private readonly TextBox _box = new();
+    private readonly TextBox _box = Input(new TextBox());
 
     public NumberEditor(FieldSpec field, JToken? value) : base(field)
     {
@@ -353,7 +366,7 @@ internal sealed class NumberEditor : FieldEditorBase
 
 internal sealed class BoolEditor : FieldEditorBase
 {
-    private readonly CheckBox _box = new();
+    private readonly CheckBox _box = new() { FontSize = 13, MinHeight = 26, VerticalContentAlignment = VerticalAlignment.Center };
 
     public BoolEditor(FieldSpec field, JToken? value) : base(field)
     {
@@ -374,7 +387,7 @@ internal sealed class BoolEditor : FieldEditorBase
 
 internal sealed class PathEditor : FieldEditorBase
 {
-    private readonly TextBox _box = new();
+    private readonly TextBox _box = Input(new TextBox());
     private readonly bool _folder;
 
     public PathEditor(FieldSpec field, JToken? value, bool folder) : base(field)
@@ -485,7 +498,7 @@ internal sealed class PathEditor : FieldEditorBase
 /// </summary>
 internal sealed class ChoiceEditor : FieldEditorBase
 {
-    private readonly ComboBox _box = new() { IsEditable = true };
+    private readonly ComboBox _box = Input(new ComboBox { IsEditable = true });
 
     public ChoiceEditor(FieldSpec field, JToken? value, IReadOnlyList<string> choices) : base(field)
     {
