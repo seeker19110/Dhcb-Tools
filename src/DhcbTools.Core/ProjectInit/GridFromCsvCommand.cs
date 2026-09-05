@@ -58,7 +58,7 @@ public sealed class GridFromCsvCommand : ICoreCommand<GridFromCsvConfig>
             if (!File.Exists(config.LevelCsvPath)) return CommandResult.Fail($"Không tìm thấy \"{config.LevelCsvPath}\".");
             // Đọc theo RFC 4180 (CsvText.ReadRecords): ô có nháy được phép chứa dấu phẩy và xuống dòng —
             // ReadAllLines + SplitLine cắt nhầm đúng những ô mà CsvText.Escape ghi ra.
-            var rows = CsvText.ReadRecords(config.LevelCsvPath).ToList();
+            var rows = CsvText.ReadRecords(config.LevelCsvPath!).ToList();
             for (var i = 1; i < rows.Count; i++)
             {
                 var cells = rows[i];
