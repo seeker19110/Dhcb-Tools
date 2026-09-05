@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using System;
+using System.Globalization;
 using Autodesk.Revit.DB;
 using DhcbTools.Shared.Logic;
 
@@ -49,6 +50,40 @@ public static class RevitCompat
 
     /// <summary>Đổi foot² (Room.Area) sang m² — điểm duy nhất, tránh hai hệ số làm tròn khác nhau.</summary>
     public static double SqFtToSqm(double squareFeet) => MepLayout.SquareFeetToSquareMetres(squareFeet);
+
+    /// <summary>
+    /// Tên file của một bản vẽ CAD đã import/link, ví dụ <c>tuyen-ong.dxf</c>.
+    /// <para>
+    /// Không dùng được <c>ImportInstance.Name</c>: với bản vẽ <b>link</b>, thuộc tính đó không mang tên
+    /// file — tên file nằm ở **element kiểu** (<c>CADLinkType</c>) và ở **category** mà Revit sinh riêng
+    /// cho từng bản vẽ. Vòng chạy thật 2026-09-05 sập đúng chỗ này: <c>ModelLinesFromCad</c> có tham số
+    /// <c>dwgNameContains</c> nhưng lọc theo <c>Name</c> nên **không bao giờ khớp** một bản vẽ link, và
+    /// lệnh báo E-PRECOND "không tìm thấy bản vẽ CAD" ngay khi bản vẽ nằm sờ sờ trong mô hình
+    /// (<c>docs/bang-chung-test.md</c> §29). Thử theo thứ tự: kiểu → category → tên phần tử.
+    /// </para>
+    /// </summary>
+    public static string CadFileName(Document doc, Element import)
+    {
+        string Safe(Func<string?> read)
+        {
+            try { return read() ?? string.Empty; }
+            catch (Exception) { return string.Empty; }
+        }
+
+        var typeName = Safe(() => doc.GetElement(import.GetTypeId())?.Name);
+        if (!string.IsNullOrWhiteSpace(typeName))
+        {
+            return typeName;
+        }
+
+        var categoryName = Safe(() => import.Category?.Name);
+        if (!string.IsNullOrWhiteSpace(categoryName))
+        {
+            return categoryName;
+        }
+
+        return Safe(() => import.Name);
+    }
 
     /// <summary>Tìm Level theo tên (không phân biệt hoa thường).</summary>
     public static Level? FindLevel(Document doc, string? name)

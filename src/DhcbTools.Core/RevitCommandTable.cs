@@ -77,6 +77,7 @@ public static class RevitCommandTable
                 "SLOPEPIPES" => new SlopePipesCommand().Execute(doc, Deserialize<SlopePipesConfig>(configJson)),
                 "PIPEKICK" => new PipeKickCommand().Execute(doc, Deserialize<PipeKickConfig>(configJson)),
                 "SYSTEMBOM" => new SystemBomCommand().Execute(doc, Deserialize<SystemBomConfig>(configJson)),
+                "CADLINK" => new CadLinkCommand().Execute(doc, Deserialize<CadLinkConfig>(configJson)),
                 "MODELLINESFROMCAD" => new ModelLinesFromCadCommand().Execute(doc, Deserialize<ModelLinesFromCadConfig>(configJson)),
                 "AUTOROUTE" => new AutoRouteCommand().Execute(doc, Deserialize<AutoRouteConfig>(configJson)),
                 "SCHEDULEEXPORT" => new ScheduleExportCommand().Execute(doc, Deserialize<ScheduleExportConfig>(configJson)),

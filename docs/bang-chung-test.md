@@ -1662,3 +1662,82 @@ có 6 ca `Theory` + một ca dựng đúng hình dáng dữ liệu Snowdon, ch�
   mã cấu kiện trong CSV là ElementId của đúng file đang mở nên không viết sẵn vào fixture được.
 - **Tiến độ % > 0** — cả hai model mẫu không có phần tử nào mang tham số trạng thái, nên bảng luôn 0/142 và
   0/1599. Cột "chưa ghi nhận" thì đúng, nhưng đường "đã lắp / đã nghiệm thu" chỉ có test thuần đứng sau.
+
+---
+
+## 29. Fixture CAD cho C4 — và tham số `dwgNameContains` chưa bao giờ khớp một bản vẽ link (2026-09-05 13:00 ICT)
+
+§28 khép lại với đúng một việc còn thiếu: **đường thành công của `ModelLinesFromCad` không có cách nào kiểm
+tự động**, vì không model mẫu nào của Revit có sẵn CAD link, và `RunTests` chỉ chạy được lệnh trong
+`RevitCommandTable` — mà "link một file DWG" không phải lệnh DHCB nào. Lượt này làm nốt.
+
+### Cách làm: để bộ ca kiểm tự dựng fixture
+
+Thêm lệnh Core **`CadLink`** (link file DWG/DXF vào view mặt bằng của một tầng) rồi để chính bộ ghi dựng
+fixture ngay trong model bản chép:
+
+```
+CadLink            → link tuyen-ong.dxf          → 1 bản vẽ
+CadLink lần hai    → phải bỏ qua                 → 0
+ModelLinesFromCad  → dựng model line             → n
+ModelLinesFromCad  → lần hai phải 0, "n đã có"   → 0
+```
+
+`CadLink` không phải lệnh đẻ ra để phục vụ test: kỹ sư đang bấm Insert → Link CAD cho **từng tầng, từng
+model**, và batch đêm thì không ai bấm được — thiếu nó thì chuỗi DWG → model line → `RouteFromLines` đứt
+ngay ở mắt đầu tiên.
+
+Fixture là **DXF văn bản** ([`tests/suites/fixtures/tuyen-ong.dxf`](../tests/suites/fixtures/tuyen-ong.dxf))
+chứ không phải DWG nhị phân: đọc được ngay trong repo, review được từng dòng, và không bắt máy chạy test phải
+có AutoCAD. Nội dung cố ý gài đúng những gì bộ lọc của C4 phải xử lý:
+
+| Trong file | Phải ra sao |
+|---|---|
+| 2 đoạn thẳng hàng nối đuôi nhau trên `TUYEN-ONG` | gộp thành **1** |
+| 1 đoạn dọc trên `TUYEN-ONG` | giữ, **không** gộp với đoạn ngang |
+| 1 đoạn rác dài 20 mm | bị `minLengthMm` loại |
+| 1 đoạn trên `TUYEN-ONG-TEXT` | bị `excludeLayers` loại |
+| 1 đoạn trên `RAC` | bị `includeLayers` loại |
+
+→ kỳ vọng **2 model line**.
+
+### Lượt chạy thứ nhất: 5 đạt / 3 trượt — và lỗi thật lộ ra
+
+`CadLink` **link được** (kể cả file DXF), nhưng ba ca sau đổ:
+
+```
+Link lại chính bản vẽ đó — phải bỏ qua: mong ảnh hưởng ≤ 0 nhưng tới 1
+  (thực tế: Đã link "tuyen-ong.dxf" vào view "Parking"…)   ← link lần hai, không nhận ra đã có
+Model line từ CAD: E-PRECOND: không tìm thấy bản vẽ CAD có tên chứa "tuyen-ong" nào trong mô hình
+```
+
+Bản vẽ **nằm sờ sờ trong mô hình** mà C4 báo không tìm thấy. Nguyên nhân chung cho cả hai: với bản vẽ
+**link**, `ImportInstance.Name` **không mang tên file** — tên file nằm ở **element kiểu** (`CADLinkType`) và
+ở category Revit sinh riêng cho từng bản vẽ. Hệ quả: tham số `dwgNameContains` của C4 — có trong catalog, có
+trong Ribbon, có trong tài liệu — **chưa bao giờ khớp một bản vẽ link**. Ai dùng nó sẽ nhận E-PRECOND và tin
+rằng mô hình không có CAD.
+
+Sửa ở một chỗ dùng chung, `RevitCompat.CadFileName`: thử kiểu → category → tên phần tử. Kèm theo, khi lọc
+không ra mà mô hình **có** bản vẽ, lệnh nay **in ra tên những bản vẽ đang có** thay vì chỉ bảo "kiểm cả
+dwgNameContains" rồi để kỹ sư tự đoán một cái tên nằm ở chỗ không ai nhìn thấy.
+
+### Lượt chạy thứ hai: 8 đạt / 0 trượt
+
+| Ca | Kết quả |
+|---|---|
+| Link bản vẽ CAD — GHI THẬT | ✅ 934 ms — `Đã link "tuyen-ong.dxf" vào view "Parking" của tầng "Parking" (đơn vị Millimeter, đặt theo origin)` |
+| Link lại chính bản vẽ đó | ✅ 6 ms — `Đã có "tuyen-ong.dxf" trong mô hình (id 1544489) — bỏ qua` |
+| **Model line từ CAD — đường thành công của C4** | ✅ 78 ms — **`Đã tạo 2 model line (style "DHCB-Route") ở tầng "Parking"`** |
+| Model line từ CAD lần hai | ✅ 7 ms — `Đã tạo 0 model line…; 2 đã có` |
+
+**Đúng 2** — hai đoạn thẳng hàng đã gộp, đoạn dọc giữ nguyên, ba đoạn rác/sai layer bị loại. Con số 0 ở ca
+cuối là bằng chứng lượt trước **đã commit thật**: transaction bị rollback thì lần này lại tạo đúng 2 cái nữa.
+
+C4 bỏ được nhãn 🧪 sau §28 còn treo lại một mục.
+
+### Cái chưa chứng minh
+
+- **Chưa chạy với file `.dwg` thật** — fixture là DXF. Cùng một đường code (`DWGImportOptions`, `Document.Link`)
+  nên rủi ro thấp, nhưng DWG đời mới có thể bị Revit từ chối; lệnh đã có thông báo riêng cho tình huống đó,
+  và **thông báo đó chưa ai thấy chạy**.
+- **`placement: shared` và `centered`** chưa chạy lần nào — ca kiểm chỉ dùng `origin`.

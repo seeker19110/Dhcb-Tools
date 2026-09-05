@@ -172,6 +172,17 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("lineStyleName", "line style tuyến").Field("elementType", "Duct/Pipe/CableTray/Conduit").Field("typeName", "type").Field("systemType", "hệ")
                 .Field("sizeMm", "{width,height} hoặc {diameter}").Field("offsetMm", "cao độ").Field("dryRun", "xem trước")
                 .Words("routing", "dựng tuyến", "đi ống theo line", "dựng duct", "dựng ống"),
+            // Mắt đầu tiên của chuỗi: đưa chính bản vẽ CAD vào mô hình. Không có lệnh này thì chuỗi
+            // DWG → model line → ống đứt ngay ở batch đêm, và đường thành công của ModelLinesFromCad
+            // không có cách nào kiểm tự động (bang-chung-test.md §29).
+            new CommandDescriptor("CadLink", Revit, "Link file DWG/DXF vào view mặt bằng của một tầng (bước Insert → Link CAD), để ModelLinesFromCad đọc được", true, "LinkCad", "InsertCad")
+                .Field("cadPath", "đường dẫn file .dwg hoặc .dxf", FieldKind.FilePath)
+                .Field("levelName", "tầng đặt bản vẽ (rỗng = tầng thấp nhất)")
+                .Field("unit", "đơn vị file CAD: auto, mm, cm, m, inch, ft")
+                .Field("placement", "cách đặt: origin (gốc dự án), shared (toạ độ chung), centered")
+                .Field("thisViewOnly", "chỉ hiện trong view được đặt vào", FieldKind.Bool)
+                .Field("dryRun", "xem trước: kiểm file/tầng/view nhưng không đưa gì vào mô hình", FieldKind.Bool)
+                .Words("link cad", "insert cad", "chèn bản vẽ", "link dwg", "chèn dwg"),
             // Mắt xích trước RouteFromLines: dựng chính model line mà lệnh trên cần, từ DWG đã link/import.
             // "(thử nghiệm)" theo nguyên tắc 6 — có ca kiểm nhưng chưa chạy thật trong Revit.
             new CommandDescriptor("ModelLinesFromCad", Revit, "Dựng model line từ bản vẽ CAD đã link/import (lọc layer, bỏ đoạn rác và đường vẽ chồng, nối đoạn thẳng hàng) để RouteFromLines dựng ống (thử nghiệm)", true, "LineTuCad", "CadToLines")
