@@ -109,7 +109,7 @@ public sealed class CadLinkCommand : ICoreCommand<CadLinkConfig>
                 .IndexOf(Path.GetFileNameWithoutExtension(fileName), StringComparison.OrdinalIgnoreCase) >= 0);
         if (existing != null)
         {
-            result.Summary = $"Đã có \"{fileName}\" trong mô hình (id {existing.Id.IntegerValue}) — bỏ qua, không link lần hai.";
+            result.Summary = $"Đã có \"{fileName}\" trong mô hình (id {RevitCompat.IdValue(existing.Id)}) — bỏ qua, không link lần hai.";
             result.Messages.Add("Muốn nạp bản vẽ mới thì xoá link cũ trong Manage → Manage Links → CAD Formats rồi chạy lại.");
             result.AffectedCount = 0;
             return result;
@@ -144,7 +144,7 @@ public sealed class CadLinkCommand : ICoreCommand<CadLinkConfig>
             }
 
             tx.Commit();
-            result.ChangedIds.Add(linkedId.IntegerValue);
+            result.ChangedIds.Add(RevitCompat.IdValue(linkedId));
             result.Summary = $"Đã link \"{fileName}\" vào view \"{view.Name}\" của tầng \"{level.Name}\" "
                              + $"(đơn vị {DescribeUnit(unit)}, đặt theo {config.Placement.ToLowerInvariant()}).";
             result.AffectedCount = 1;

@@ -1741,3 +1741,8 @@ C4 bỏ được nhãn 🧪 sau §28 còn treo lại một mục.
   nên rủi ro thấp, nhưng DWG đời mới có thể bị Revit từ chối; lệnh đã có thông báo riêng cho tình huống đó,
   và **thông báo đó chưa ai thấy chạy**.
 - **`placement: shared` và `centered`** chưa chạy lần nào — ca kiểm chỉ dùng `origin`.
+
+> **Ghi thêm cho lần sau:** CI bắt được một lỗi mà máy này không bắt — `ElementId.IntegerValue` không còn
+> ở Revit 2026+, đúng thứ `RevitCompat.IdValue` sinh ra để tránh. Máy chỉ có Revit 2024 nên
+> `check-build.sh` chạy mặc định là xanh; nhánh 2026/2027 phải chạy tay
+> (`REVIT_VERSION=2027 ./scripts/check-build.sh`) trước khi mở PR, hoặc chấp nhận một vòng CI đỏ.
