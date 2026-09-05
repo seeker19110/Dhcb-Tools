@@ -89,7 +89,7 @@ namespace DhcbTools.Shared.Logic.Setout
 
                 if (options.MaxNameLength > 0 && name.Length > options.MaxNameLength)
                 {
-                    name = name.Substring(0, options.MaxNameLength);
+                    name = Shorten(name, options.MaxNameLength);
                     plan.Truncated++;
                 }
 
@@ -117,7 +117,8 @@ namespace DhcbTools.Shared.Logic.Setout
 
             if (plan.Truncated > 0)
             {
-                plan.Notes.Add(plan.Truncated + " tên điểm bị cắt còn " + options.MaxNameLength + " ký tự (giới hạn tên điểm của máy toàn đạc) — rút ngắn namePattern nếu cần phân biệt.");
+                plan.Notes.Add(plan.Truncated + " tên điểm dài quá " + options.MaxNameLength
+                    + " ký tự (giới hạn tên điểm của máy toàn đạc) nên đã bỏ bớt phần giữa, giữ cả đầu lẫn đuôi và đánh dấu \"..\" — rút ngắn namePattern nếu muốn tên đọc liền mạch.");
             }
 
             if (plan.Renamed > 0)
@@ -195,6 +196,41 @@ namespace DhcbTools.Shared.Logic.Setout
             var parts = text!.Replace(',', ';').Replace('"', '\'')
                 .Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             return string.Join(" ", parts);
+        }
+
+        /// <summary>
+        /// Rút tên về <paramref name="maxLength"/> ký tự bằng cách <b>bỏ ở giữa</b>, giữ cả đầu lẫn đuôi,
+        /// đánh dấu chỗ bỏ bằng <c>..</c>.
+        /// <para>
+        /// Vì sao không cắt đuôi: tên điểm gần như luôn là tên ghép — giao trục là <c>TrụcA-TrụcB</c>,
+        /// mẫu thường dùng là <c>{Level}-{Grid}</c> — nên <b>phần phân biệt nằm ở đuôi</b>, còn phần đầu
+        /// (tầng, block) giống nhau ở hàng trăm điểm. Vòng chạy thật trên Snowdon Towers 2026-09-05 cho ra
+        /// <c>Block_35_Left-Bl</c>, <c>Block_35_Left-B.</c>, <c>Block_35_Left-X_</c>: đúng 16 ký tự, đúng
+        /// là duy nhất, nhưng trên máy toàn đạc thì trắc đạc không biết đó là giao trục nào —
+        /// tên duy nhất mà không đọc được thì cũng chọn nhầm điểm như tên trùng.
+        /// </para>
+        /// <para>
+        /// Dấu <c>..</c> nằm trong bộ ký tự mà <see cref="Sanitize"/> cho phép, nên tên rút gọn vẫn nạp
+        /// được vào máy.
+        /// </para>
+        /// </summary>
+        internal static string Shorten(string name, int maxLength)
+        {
+            if (maxLength <= 0 || name.Length <= maxLength)
+            {
+                return name;
+            }
+
+            // Quá ngắn để chứa cả dấu ..: không còn chỗ cho đuôi, đành cắt đuôi như cũ.
+            if (maxLength < 5)
+            {
+                return name.Substring(0, maxLength);
+            }
+
+            var keep = maxLength - 2;
+            var head = (keep + 1) / 2;      // lẻ thì ưu tiên phần đầu
+            var tail = keep - head;
+            return name.Substring(0, head) + ".." + name.Substring(name.Length - tail, tail);
         }
 
         private static string Unique(string name, HashSet<string> used, int maxLength)
