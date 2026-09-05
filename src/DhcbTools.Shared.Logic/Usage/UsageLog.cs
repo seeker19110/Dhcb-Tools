@@ -50,8 +50,10 @@ namespace DhcbTools.Shared.Logic.Usage
             RealRuns = entries.Count(e => !e.DryRun);
             TotalAffected = entries.Sum(e => (long)e.Affected);
             MedianMs = Median(entries.Select(e => e.Ms).ToList());
-            First = entries.Min(e => e.When);
-            Last = entries.Max(e => e.When);
+            // Danh sách rỗng: trả số liệu 0 thay vì ném "Sequence contains no elements" — dựng UsageStat
+            // cho một lệnh chưa có lần chạy nào là chuyện bình thường, không đáng phải bắt exception.
+            First = entries.Count == 0 ? default : entries.Min(e => e.When);
+            Last = entries.Count == 0 ? default : entries.Max(e => e.When);
         }
 
         public string App { get; }
