@@ -69,8 +69,16 @@ A-1,1000.000,2000.000,5.400,Grids Level 1
 mã → phần tử (tầng sắp theo số tự nhiên, `Level 2` trước `Level 10`). Token: `{Code}`, `{Category}`,
 `{Family}`, `{Type}`, `{Level}`, `{Mark}`, `{Id}`, `{Kind}`, `{n}`; giao trục dùng `gridNamePattern` mặc định
 `{Grid}` → `A-1`. Tên được **làm sạch cho máy**: bỏ dấu tiếng Việt, khoảng trắng → `_`, bỏ dấu phẩy/nháy;
-cắt còn `maxNameLength` (mặc định 16 — giới hạn Leica/Trimble); **không bao giờ có hai điểm cùng tên** (trùng
+rút về `maxNameLength` (mặc định 16 — giới hạn Leica/Trimble); **không bao giờ có hai điểm cùng tên** (trùng
 thì thêm `_2`, `_3` và ghi chú trong thông báo).
+
+Tên dài quá giới hạn thì **bỏ bớt ở giữa**, giữ cả đầu lẫn đuôi, đánh dấu `..`:
+`Block_35_Left-B.1` → `Block_3..eft-B.1`. Lý do không cắt đuôi: tên điểm gần như luôn là tên ghép —
+giao trục là `TrụcA-TrụcB`, mẫu hay dùng là `{Level}-{Grid}` — nên **phần phân biệt nằm ở đuôi**, còn
+phần đầu giống nhau ở hàng trăm điểm. Vòng chạy thật trên Snowdon Towers cho ra `Block_35_Left-Bl`,
+`Block_35_Left-B.`, `Block_35_Left-X_`: đúng 16 ký tự, đúng là duy nhất, mà trắc đạc không biết đó là
+giao trục nào — tên duy nhất mà không đọc được thì cũng chọn nhầm điểm như tên trùng
+([`bang-chung-test.md`](bang-chung-test.md) §28).
 
 ## DXF điểm
 

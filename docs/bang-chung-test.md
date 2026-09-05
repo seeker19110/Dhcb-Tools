@@ -1585,3 +1585,80 @@ nào — đặt được vào cuối job đêm mà không kéo dài đêm batch.
 - **Chưa đối chiếu với IfcTester/Solibri** trên cùng một file — việc đó thuộc mục 11.4, và chỉ có nghĩa khi đã
   chuyển sang khai quy tắc bằng IDS (11.1).
 - **Chưa có file `.ifcZIP`**: bộ đọc chỉ đọc IFC dạng văn bản.
+
+---
+
+## 28. Bốn tính năng mới bỏ nhãn *thử nghiệm* — và một cái vẫn phải giữ (2026-09-05 12:45 ICT)
+
+A1/B1/B3/C4 vào repo hai PR trước đều mang nhãn 🧪 *chưa chạy thật trong Revit* theo **nguyên tắc 6**.
+Lượt này chạy trọn hai bộ ca kiểm trên Revit 2024.3 để bỏ nhãn — bỏ được ba, cái thứ tư phải giữ nguyên,
+và lý do giữ đáng ghi lại hơn cả ba cái bỏ được.
+
+| Bộ | Model | Kết quả |
+|---|---|---|
+| `revit-smoke` | Snowdon Towers Sample Architectural | **36 đạt / 0 trượt / 1 bỏ qua** trên 37 ca |
+| `revit-mep` | Snowdon Towers Sample HVAC | **26 đạt / 0 trượt** trên 26 ca |
+
+### Ba cái bỏ được nhãn — vì file sinh ra có nội dung thật
+
+| Đề xuất | Chạy ra gì |
+|---|---|
+| **A1 `SetoutExport`** | Kiến trúc: **260 điểm** (118 tim cột + 142 giao trục), CSV 12.710 byte + DXF 46.351 byte có `POINT` và `TEXT` trên layer `DHCB-GRD`. HVAC: **545 điểm** thiết bị. Toạ độ là toạ độ Survey thật (`417595.626, 78691.085, 237.896`), không phải toạ độ nội bộ Revit |
+| **B1 `ProgressReport`** | Kiến trúc: 142 cấu kiện, 9 nhóm theo tầng. HVAC: **1599 cấu kiện, 185 nhóm theo hệ**, có cả % theo chiều dài. HTML 42.796 byte |
+| **B3 BCF cho `ClashDetection`** | `clash.bcf` 9.897 byte, **7 topic**, mở lại bằng thư viện zip thấy đủ `bcf.version` + `project.bcfp` + mỗi topic một `markup.bcf` và `viewpoint.bcfv`. Nhãn *"Với model liên kết"* và tên model liên kết nằm đúng trong `Description` |
+
+Con số đọc từ chính file, không đọc từ summary — đó là khác biệt giữa "ca xanh" và "tính năng chạy được".
+
+### Cái phải giữ nhãn: **C4 `ModelLinesFromCad`**
+
+Hai ca kiểm đều **xanh**, nhưng đọc kỹ thì cả hai dừng ở đường lỗi:
+
+```
+E-PRECOND: ModelLinesFromCad không tìm thấy bản vẽ CAD đã import/link nào trong mô hình…
+E-PRECOND: ModelLinesFromCad không tìm thấy bản vẽ CAD có tên chứa "DHCB-KHONG-CO-BAN-VE-NAY"…
+```
+
+Model mẫu HVAC **không có bản vẽ CAD nào import hay link**, nên đường thành công của C4 chưa từng chạy một
+lần nào. Ca kiểm vẫn đúng — nó chốt rằng lệnh **báo rõ** thay vì trả "0 model line" như thể bình thường —
+nhưng nó không chứng minh lệnh làm được việc. Giữ 🧪, và việc còn thiếu là **một model fixture có sẵn một
+DWG được link**: `RunTests` chỉ chạy lệnh trong `RevitCommandTable`, mà "link một file DWG" không phải lệnh
+DHCB nào, nên không dựng được fixture đó bằng chính bộ ca kiểm.
+
+> Đây đúng là chỗ dễ tự lừa: ba dòng "✅ đạt" cạnh nhau, mà một dòng chỉ chứng minh lệnh biết từ chối.
+
+### Lỗi thật lộ ra: tên điểm định vị bị cắt mất đúng phần phân biệt
+
+Nhìn `setout.csv` của lượt đầu:
+
+```
+Block_35_Left-Bl
+Block_35_Left-X_
+Block_35_Left-B.
+Block_35_Left-E
+```
+
+Đủ 16 ký tự (giới hạn tên điểm của Leica/Trimble), đủ **duy nhất** — nên mọi ca kiểm đều xanh. Nhưng tên
+giao trục là `TrụcA-TrụcB`, mà `SetoutPlanner` cắt **đuôi**: phần đầu (`Block 35 Left`) giống nhau ở hàng
+trăm điểm thì được giữ, phần đuôi — tên trục thứ hai, thứ duy nhất phân biệt — thì bị nuốt. Trên máy toàn
+đạc, trắc đạc không biết `Block_35_Left-Bl` là giao trục nào. **Tên duy nhất mà không đọc được thì cũng
+chọn nhầm điểm như tên trùng** — đúng cái rủi ro mà A1 sinh ra để tránh.
+
+Sửa: bỏ ở **giữa**, giữ cả đầu lẫn đuôi, đánh dấu `..` (nằm trong bộ ký tự máy nhận). Chạy lại đúng bộ đó:
+
+| | Trước | Sau |
+|---|---|---|
+| Tên 6 điểm đầu | `Block_35_Left-Bl`, `Block_35_Left-X_`, `Block_35_Left-E`… | `Block_3.._Facade`, `Block_3..-X_Axis`, `Block_35_Left-E`… |
+| Hậu tố `_2`/`_3` vô nghĩa (tên đụng nhau sau khi cắt) | **21** | **10** |
+| Số điểm / số tên duy nhất | 142 / 142 | 142 / 142 |
+
+Hậu tố `_N` không mất hẳn — vẫn còn 10 chỗ hai giao trục rút gọn về cùng một tên — nhưng đó là giới hạn
+thật của 16 ký tự, và ghi chú của lệnh nói thẳng cách xử lý (rút ngắn `namePattern`). `SetoutPlanner.Shorten`
+có 6 ca `Theory` + một ca dựng đúng hình dáng dữ liệu Snowdon, chốt rằng bản cắt đuôi cũ **làm ba tên còn hai**.
+
+### Cái chưa chứng minh
+
+- **C4 `ModelLinesFromCad`** — như trên.
+- **Đường ghi của `ConstructionStatus`** — smoke mới chốt hai đường lỗi (`E-PATH-MISSING`, `E-PRECOND`);
+  mã cấu kiện trong CSV là ElementId của đúng file đang mở nên không viết sẵn vào fixture được.
+- **Tiến độ % > 0** — cả hai model mẫu không có phần tử nào mang tham số trạng thái, nên bảng luôn 0/142 và
+  0/1599. Cột "chưa ghi nhận" thì đúng, nhưng đường "đã lắp / đã nghiệm thu" chỉ có test thuần đứng sau.
