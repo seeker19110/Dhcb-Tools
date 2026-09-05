@@ -66,15 +66,14 @@ public sealed class ModelLinesFromCadCommand : ICoreCommand<ModelLinesFromCadCon
 
         var allImports = new FilteredElementCollector(document).OfClass(typeof(ImportInstance)).Cast<ImportInstance>().ToList();
         var imports = allImports
-            .Where(i => string.IsNullOrWhiteSpace(config.DwgNameContains)
-                        || RevitCompat.CadFileName(document, i).IndexOf(config.DwgNameContains!, StringComparison.OrdinalIgnoreCase) >= 0)
+            .Where(i => string.IsNullOrWhiteSpace(config.DwgNameContains) || NameMatches(document, i, config.DwgNameContains!))
             .ToList();
 
         // Lọc không ra thì phải nói mô hình ĐANG có bản vẽ nào — bản trước chỉ bảo "kiểm cả dwgNameContains",
         // để kỹ sư tự đoán tên, mà tên thật lại nằm ở element kiểu chứ không phải chỗ ai cũng nhìn thấy.
         if (imports.Count == 0 && allImports.Count > 0)
         {
-            var names = allImports.Select(i => RevitCompat.CadFileName(document, i))
+            var names = allImports.Select(i => DisplayName(document, i))
                 .Where(n => !string.IsNullOrWhiteSpace(n)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(n => n).ToList();
             result.Messages.Add($"Mô hình có {allImports.Count} bản vẽ CAD nhưng không cái nào khớp \"{config.DwgNameContains}\": "
                                 + (names.Count > 0 ? string.Join(", ", names) : "(không đọc được tên)"));
@@ -380,5 +379,23 @@ public sealed class ModelLinesFromCadCommand : ICoreCommand<ModelLinesFromCadCon
         }
 
         return existing;
+    }
+
+    /// <summary>
+    /// Tên đem đi so khớp: ưu tiên tên file có đuôi mở rộng (đọc từ đường dẫn ngoài của bản vẽ link),
+    /// lùi về tên element kiểu khi bản vẽ được import chứ không link.
+    /// </summary>
+    private static string DisplayName(Document document, Element import)
+    {
+        var linked = RevitCompat.CadLinkFileName(document, import);
+        return linked.Length > 0 ? linked : RevitCompat.CadFileName(document, import);
+    }
+
+    // Khớp cả tên có đuôi lẫn tên kiểu: Revit đặt tên kiểu KHÔNG mang đuôi mở rộng, nên người khai
+    // "tuyen-ong.dxf" — đúng tên file họ nhìn thấy — sẽ không khớp gì nếu chỉ so với tên kiểu.
+    private static bool NameMatches(Document document, Element import, string needle)
+    {
+        return DisplayName(document, import).IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0
+               || RevitCompat.CadFileName(document, import).IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0;
     }
 }
