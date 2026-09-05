@@ -28,7 +28,13 @@ namespace DhcbTools.Shared.Hosting
         /// không chặn khởi động: %APPDATA% vốn đã là thư mục riêng của user.
         /// </para>
         /// </summary>
-        public static string LoadOrCreate(string? path = null, Action<string>? log = null)
+        /// <param name="path">Đường dẫn file token; null = <see cref="DefaultPath"/>.</param>
+        /// <param name="log">Nơi ghi cảnh báo khi thu ACL không thành công.</param>
+        /// <param name="restrictToOwner">
+        /// Bước thu ACL, tiêm được để test đường cảnh báo mà không cần một máy Windows có ACL hỏng thật;
+        /// null = <see cref="TryRestrictToOwner"/>.
+        /// </param>
+        public static string LoadOrCreate(string? path = null, Action<string>? log = null, Func<string, bool>? restrictToOwner = null)
         {
             var fromEnv = Environment.GetEnvironmentVariable(EnvironmentVariable);
             if (!string.IsNullOrWhiteSpace(fromEnv))
@@ -57,7 +63,7 @@ namespace DhcbTools.Shared.Hosting
             try
             {
                 File.WriteAllText(temp, token);
-                if (!TryRestrictToOwner(temp))
+                if (!(restrictToOwner ?? TryRestrictToOwner)(temp))
                 {
                     log?.Invoke("[DHCB Bridge] CẢNH BÁO: không thu được quyền file token về chủ sở hữu (" + file
                                 + ") — file vẫn dùng được, quyền theo thư mục cha.");
@@ -82,15 +88,21 @@ namespace DhcbTools.Shared.Hosting
         /// Thu quyền file về chủ sở hữu (Windows: xoá kế thừa ACL, chỉ giữ user hiện tại). Trả <c>true</c>
         /// khi đã thu xong hoặc nền tảng không cần (không phải Windows); <c>false</c> khi icacls lỗi.
         /// </summary>
+        /// <remarks>
+        /// Chỉ làm việc thật trên Windows (icacls), nên CI Linux không chạy qua được — loại khỏi phép đo
+        /// phủ thay vì để một nhánh không đo được kéo cả cổng coverage xuống. Đường cảnh báo "thu ACL hỏng"
+        /// vẫn có test, qua tham số <c>restrictToOwner</c> của <see cref="LoadOrCreate"/>.
+        /// </remarks>
+        [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
         private static bool TryRestrictToOwner(string file)
         {
+            if (Environment.OSVersion.Platform != PlatformID.Win32NT)
+            {
+                return true;
+            }
+
             try
             {
-                if (Environment.OSVersion.Platform != PlatformID.Win32NT)
-                {
-                    return true;
-                }
-
                 // Dùng icacls để không phải tham chiếu System.Security.AccessControl (không có trong netstandard2.0 đầy đủ).
                 var user = Environment.UserDomainName + "\\" + Environment.UserName;
                 var psi = new System.Diagnostics.ProcessStartInfo("icacls",

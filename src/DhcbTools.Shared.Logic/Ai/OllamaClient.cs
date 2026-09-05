@@ -45,13 +45,10 @@ namespace DhcbTools.Shared.Logic.Ai
             {
                 return new LocalAiSettings();
             }
-            catch (IOException)
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
             {
-                // File đang bị khoá/đọc dở: coi như chưa cấu hình, không làm hỏng lệnh đang chạy.
-                return new LocalAiSettings();
-            }
-            catch (UnauthorizedAccessException)
-            {
+                // File đang bị khoá/đọc dở, hoặc không có quyền đọc: coi như chưa cấu hình,
+                // không làm hỏng lệnh đang chạy.
                 return new LocalAiSettings();
             }
         }
@@ -234,12 +231,10 @@ namespace DhcbTools.Shared.Logic.Ai
                         return 0.5;
                 }
             }
-            catch (OverflowException)
+            catch (Exception ex) when (ex is OverflowException || ex is FormatException || ex is InvalidCastException)
             {
-                return 0.5;
-            }
-            catch (FormatException)
-            {
+                // InvalidCastException là ca thật: số nguyên JSON quá lớn cho double (Newtonsoft giữ
+                // dưới dạng BigInteger) làm Value<double>() ném chứ không phải OverflowException.
                 return 0.5;
             }
         }

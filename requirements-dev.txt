@@ -5,3 +5,5 @@
 -r tools/autocad-mcp-server/requirements.txt
 pytest>=8,<10
 pyflakes>=3,<4
+# Cổng phủ 100% câu lệnh (ngưỡng ở [tool.coverage.report] trong pyproject.toml).
+coverage>=7,<8

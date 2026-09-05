@@ -30,6 +30,42 @@ dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.cspr
 
 CI chạy đúng lệnh này trên mỗi push/PR (`.github/workflows/tests.yml`).
 
+### 2.0 Cổng phủ 100% dòng
+
+Cả hai tầng test tự động đều có **ngưỡng phủ 100% dòng**, kiểm ngay trong CI. Thêm code mà không
+thêm test thì job đỏ và nói đúng file:dòng nào chưa chạy.
+
+```bash
+# C# — tầng logic thuần + vỏ hosting
+dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj \
+  --collect:"XPlat Code Coverage" --results-directory ./coverage
+python3 scripts/check-coverage.py ./coverage
+
+# Python — scripts/ và tools/autocad-mcp-server/
+pip install -r requirements-dev.txt
+python3 -m coverage run -m pytest && python3 -m coverage report
+```
+
+Ngưỡng Python nằm ở `fail_under` trong `pyproject.toml`, ngưỡng C# ở
+[`scripts/check-coverage.py`](../scripts/check-coverage.py), nên chạy ở máy và chạy trên CI cho
+cùng một con số.
+
+**Đo dòng, không đo nhánh.** Phủ nhánh hiện ở khoảng 93 % (C#): một số nhánh phụ thuộc nền tảng
+(net48 vs net8) hoặc thời điểm (đua giữa hai luồng) không cùng lúc đo được trong một lần chạy.
+
+**Ba chỗ được loại khỏi phép đo**, mỗi chỗ đánh dấu `[ExcludeFromCodeCoverage]` / `# pragma: no cover`
+kèm lý do ngay tại chỗ — danh sách này chỉ được dài thêm khi có lý do tương đương:
+
+| Chỗ | Vì sao không đo được |
+|---|---|
+| `BridgeTokenStore.TryRestrictToOwner` | gọi `icacls`, chỉ chạy trên Windows; đường cảnh báo khi thu ACL hỏng vẫn có test qua tham số `restrictToOwner` |
+| `HttpBridgeServer.TrySend` | nhánh `catch` chỉ chạy khi client ngắt đúng lúc server ghi — một cuộc đua không ép được |
+| Polyfill attribute (`Polyfills.cs`, `StringGuard.cs`) | chỉ tồn tại cho trình biên dịch trên net48, không bao giờ chạy |
+
+Những nhánh chỉ xảy ra khi IO hỏng thì **không** loại trừ, mà tiêm được để test:
+`BridgeTokenStore.LoadOrCreate(restrictToOwner:)`, `DhcbLog.Prune(deleteFile:)`,
+`OllamaClient(settings, transport)`, `TestExpectation.Evaluate(fileExists:)`.
+
 ### 2.1 `CsvTextTests` — đọc/ghi CSV
 
 Bọc ô chỉ khi cần; nhân đôi dấu nháy; tách ô có dấu phẩy trong nháy; ô rỗng ở cuối dòng; dòng rỗng;

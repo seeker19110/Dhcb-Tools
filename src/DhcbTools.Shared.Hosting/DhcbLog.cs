@@ -50,23 +50,34 @@ namespace DhcbTools.Shared.Hosting
             Write(app, "LỖI " + context + ": " + exception);
 
         /// <summary>Xoá file log cũ hơn <see cref="RetentionDays"/> ngày. Gọi một lần lúc khởi động.</summary>
-        public static void Prune(string app)
+        /// <param name="app">Tên ứng dụng ("Revit", "AutoCAD", "BatchRunner").</param>
+        /// <param name="deleteFile">
+        /// Bước xoá, tiêm được để test nhánh "file đang bị khoá" mà không cần dựng một file thật không xoá
+        /// được (chỉ Windows mới khoá file đang mở); null = <see cref="File.Delete"/>.
+        /// </param>
+        /// <param name="directory">
+        /// Thư mục log; null = <see cref="DefaultDirectory"/>. Tiêm được để test không phải sửa biến môi
+        /// trường của cả tiến trình — <c>APPDATA</c>/<c>HOME</c> là trạng thái dùng chung, sửa nó thì test
+        /// chạy song song ảnh hưởng lẫn nhau và kết quả khác nhau giữa Windows với Linux.
+        /// </param>
+        public static void Prune(string app, Action<string>? deleteFile = null, string? directory = null)
         {
             try
             {
-                if (!Directory.Exists(DefaultDirectory))
+                var folder = directory ?? DefaultDirectory;
+                if (!Directory.Exists(folder))
                 {
                     return;
                 }
 
                 var cutoff = DateTime.Now.AddDays(-RetentionDays);
-                foreach (var file in Directory.GetFiles(DefaultDirectory, app + "-*.log"))
+                foreach (var file in Directory.GetFiles(folder, app + "-*.log"))
                 {
                     try
                     {
                         if (File.GetLastWriteTime(file) < cutoff)
                         {
-                            File.Delete(file);
+                            (deleteFile ?? File.Delete)(file);
                         }
                     }
                     catch (Exception)
