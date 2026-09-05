@@ -324,6 +324,57 @@ public class IdsEvaluatorTests
         Assert.Equal("Cửa có Tag", failure.Specification);
     }
 
+    /// <summary>
+    /// Tường kính xuất IFC thành IfcCurtainWall — trong IFC4 KHÔNG phải con của IfcWall. Specification
+    /// "IfcWall phải có vật liệu" không được áp lên nó: đối chiếu IfcTester 2026-09-05 (§39) lộ 42 lỗi
+    /// giả vì Revit gộp cả tường kính vào category Walls. Luật thuần chốt: tên lớp so đúng, không suy
+    /// "CurtainWall chứa Wall".
+    /// </summary>
+    [Fact]
+    public void TuongKinh_LaIfcCurtainWall_KhongLotSpecificationIfcWall()
+    {
+        var specs = Spec(
+            "<specification name=\"Tường có vật liệu\"><applicability><entity><name><simpleValue>IfcWall</simpleValue></name></entity></applicability>"
+            + "<requirements><material/></requirements></specification>");
+        var wall = new FakeIdsElement { IfcEntity = "IfcWall", Label = "1 — Walls" };
+        wall.MaterialNames.Add("Concrete");
+        var curtain = new FakeIdsElement { IfcEntity = "IfcCurtainWall", Label = "2 — Walls \"Glazing Wall - Stair\"" };
+
+        var result = IdsEvaluator.Check(specs, new IIdsElement[] { wall, curtain });
+        var spec = Assert.Single(result.Specifications);
+        Assert.Equal(1, spec.Applicable);
+        Assert.Equal(1, spec.Passed);
+        Assert.Empty(spec.Failures);
+    }
+
+    /// <summary>
+    /// Fixture IDS trong repo phải là IDS 1.0 HỢP LỆ theo XSD (IfcTester mở được): restriction/pattern
+    /// thuộc namespace xs:. Bộ đọc của ta bỏ qua namespace nên không tự phát hiện — test này đọc đúng file
+    /// fixture và chốt cả hai điều: có prefix xs: và vẫn đọc ra được mẫu ".+".
+    /// </summary>
+    [Fact]
+    public void FixtureIds_DungNamespaceXs_VaVanDocDuocRestriction()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "Dhcb-Tools.sln")))
+        {
+            dir = dir.Parent;
+        }
+
+        var path = Path.Combine(dir!.FullName, "tests", "suites", "fixtures", "yeu-cau-thong-tin.ids");
+        var xml = File.ReadAllText(path);
+        Assert.Contains("xmlns:xs=\"http://www.w3.org/2001/XMLSchema\"", xml);
+        Assert.Contains("<xs:restriction", xml);
+        Assert.DoesNotContain("<restriction", xml.Replace("<xs:restriction", string.Empty));
+
+        var specs = IdsSpec.Parse(xml);
+        Assert.Equal(3, specs.Count);
+        var material = Assert.Single(specs[1].Requirements);
+        Assert.Equal(IdsFacetKind.Material, material.Kind);
+        Assert.True(material.Value.Accepts("Concrete"));   // mẫu ".+" đã đọc được qua xs:restriction
+        Assert.False(material.Value.Accepts(string.Empty));
+    }
+
     [Fact]
     public void KhongPhanTuNaoLotBoLoc_KhongPhaiLaDat()
     {

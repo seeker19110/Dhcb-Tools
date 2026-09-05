@@ -322,7 +322,8 @@
       "//": [
         "Muc 11.1. Ba specification trong fixture nham ba ket cuc khac nhau: co dat co truot (Tag cua cua),",
         "phan lon dat (vat lieu tuong), va MOT specification khong co phan tu nao ap dung — bao cao phai NOI RA",
-        "cai thu ba thay vi in '0 khong dat' nhu the la dat."
+        "cai thu ba thay vi in '0 khong dat' nhu the la dat.",
+        "Doi chieu IfcTester 0.8.5 tren chinh file IFC xuat tu model nay (§39): 132 cua dat, 1078 IfcWall dat, IfcTank rong. Truoc do DHCB bao 42 tuong KINH thieu vat lieu — tuong kinh xuat ra IfcCurtainWall, khong phai IfcWall, nen 42 loi do la loi gia cua anh xa. Chot '0 phan tu khong dat' de loi gia khong quay lai im lang."
       ],
       "config": {
         "idsPath": "{suiteFolder}/fixtures/yeu-cau-thong-tin.ids",
@@ -337,7 +338,9 @@
         "success": true,
         "maxMs": 120000,
         "summaryContains": [
-          "specification"
+          "3 specification",
+          "0 phần tử không đạt",
+          "1 specification không có phần tử nào"
         ],
         "messagesContain": [
           "KHÔNG phần tử nào lọt bộ lọc"

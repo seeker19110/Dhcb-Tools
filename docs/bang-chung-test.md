@@ -2340,3 +2340,47 @@ Khớp từng con số với lượt batch ở §37. Không bấm *Chạy thật
   bấm đầu rơi vào lúc màn hình/tiến trình chụp trục trặc chứ không phải form. **Không sửa mã** vì không có
   gì để sửa; nếu ai gặp lại bằng tay thật, ghi lại thao tác ngay trước đó.
 - Ô JSON nhiều dòng co lại sau khi dán (đã ghi §36) — điền `startMm`/`endMm` trước, các ô dưới sau.
+
+## 39. `IdsValidate` đối chiếu với IfcTester trên cùng file IDS — 42 lỗi giả và một fixture sai chuẩn (2026-09-05 22:35 ICT)
+
+Mục 12 của "Việc tiếp theo" để lại: *đối chiếu kết quả với IfcTester/Solibri trên cùng một file IDS*.
+IfcTester 0.8.5 (buildingSMART/IfcOpenShell) cài được trên Python 3.14 của máy này, và file IFC của
+Snowdon Architectural đã có sẵn từ bộ ghi (91 MB, IFC4, 132 IfcDoor · 1078 IfcWall · 60 IfcCurtainWall).
+Hai phát hiện, cả hai đều là lỗi của ta.
+
+### 1. Fixture IDS của ta không hợp lệ theo XSD IDS 1.0
+
+IfcTester từ chối ngay khi mở: `<restriction>` và `<pattern>` phải thuộc namespace `xs:`
+(`http://www.w3.org/2001/XMLSchema`), ta viết chúng trong namespace IDS. Bộ đọc của DHCB **bỏ qua
+namespace** khi so tên thẻ (cố ý, để file IDS "ngoài đời" khai kiểu gì cũng đọc được) nên không phát hiện —
+nghĩa là một IDS viết theo kiểu của ta chạy được ở DHCB nhưng bị mọi công cụ chuẩn từ chối. Sửa hai fixture
+sang `xs:restriction`/`xs:pattern`; bộ đọc của ta vẫn đọc được (test thuần chốt).
+
+### 2. 42 tường không đạt là lỗi giả của ánh xạ Revit → IFC
+
+| | DHCB `IdsValidate` (trước) | IfcTester trên IFC | DHCB (sau) |
+|---|---|---|---|
+| Cửa phải có Tag | 132 đạt, 0 không đạt | 132 / 132 đạt | 132 đạt |
+| Tường phải khai vật liệu | **42 không đạt** ("Glazing Wall - Stair") | **1078 / 1078 đạt** | 0 không đạt |
+| IfcTank | không có phần tử | applicable = 0 | không có phần tử |
+
+"Glazing Wall - Stair" là **tường kính (curtain wall)**. Bộ xuất IFC của Revit ghi nó thành `IfcCurtainWall`,
+và trong IFC4 lớp đó **không phải con của `IfcWall`** — IfcTester đúng khi không đem nó ra kiểm.
+`RevitIdsElement` của ta ánh xạ cả category *Walls* → `IfcWall`, nên 42 tường kính (không có lớp cấu tạo,
+`GetMaterialIds` rỗng) thành 42 lỗi. Con số khớp tuyệt đối: 1078 IfcWall + 60 IfcCurtainWall = **1138** =
+số tường ta đã kiểm (1270 − 132 cửa). Sửa: `WallType.Kind == Curtain` → `IfcCurtainWall`. Bộ `smoke` chạy lại
+trong Revit 2024: **38 đạt / 0 trượt / 1 bỏ qua**, IdsValidate ra *"0 phần tử không đạt ở 0 specification,
+1 specification không có phần tử nào để kiểm"* — khớp IfcTester ở cả ba dòng. Expectation của ca này nay
+chốt "0 phần tử không đạt" để lỗi giả không quay lại im lặng.
+
+Điều đáng ghi hơn con số: **một lỗi ánh xạ chỉ lộ khi có bộ tham chiếu độc lập**. 34 ca test thuần và
+2 ca trong Revit đều xanh với 42 lỗi giả, vì cả hai cùng tin ánh xạ của ta. IfcTester chạy trên *chính file
+IFC ta xuất ra* là thứ duy nhất không tin.
+
+### Chưa làm
+
+- Solibri không có trên máy; đối chiếu này mới với IfcTester.
+- `IdsValidate` chưa kiểm file IDS theo XSD — một IDS sai chuẩn vẫn "chạy được" ở DHCB. Việc đúng là
+  cảnh báo (không chặn) khi file lệch chuẩn, để kỹ sư biết trước khi nộp cho thẩm tra.
+- Fixture nay có spec 2 **toàn đạt**, không còn ca "phần lớn đạt" như ý ban đầu; muốn có ca không đạt thật
+  thì cần một tường Revit thật sự thiếu vật liệu, model mẫu không có.

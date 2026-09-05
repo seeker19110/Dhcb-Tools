@@ -78,6 +78,15 @@ internal sealed class RevitIdsElement : IIdsElement
                 return string.Empty;
             }
 
+            // Tường kính: bộ xuất IFC của Revit ghi IfcCurtainWall, và trong IFC4 lớp đó KHÔNG phải con của
+            // IfcWall. Gộp chung theo category Walls thì specification "IfcWall phải có vật liệu" áp cả lên
+            // tường kính (không có lớp cấu tạo) → 42 lỗi giả trên Snowdon, trong khi IfcTester trên chính file
+            // IFC xuất ra báo 0. Đối chiếu 2026-09-05, §39.
+            if (_element is Wall wall && wall.WallType?.Kind == WallKind.Curtain)
+            {
+                return "IfcCurtainWall";
+            }
+
             var id = RevitCompat.IdValue(_element.Category.Id);
             return IfcByCategory.TryGetValue((BuiltInCategory)id, out var mapped) ? mapped : string.Empty;
         }
