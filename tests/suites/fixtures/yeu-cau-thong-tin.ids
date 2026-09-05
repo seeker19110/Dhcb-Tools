@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Fixture IDS 1.0 cho lệnh IdsValidate. Viết tay, tối giản, đọc được ngay trong repo.
+  Ba specification cố ý nhắm ba kết cục khác nhau trên model mẫu Snowdon:
+    1. cửa phải có Tag (Mark)            -> có phần tử đạt và có phần tử không đạt
+    2. tường phải có vật liệu            -> phần lớn đạt
+    3. lớp IFC không có trong model mẫu  -> 0 phần tử áp dụng: bộ kiểm phải NÓI RA,
+                                            vì "0 không đạt" ở đây không phải là "đạt"
+-->
+<ids xmlns="http://standards.buildingsmart.org/IDS">
+  <info>
+    <title>DHCB — bộ kiểm thử IDS</title>
+  </info>
+  <specifications>
+    <specification name="Cửa phải có mã hiệu (Tag)" ifcVersion="IFC4">
+      <applicability>
+        <entity><name><simpleValue>IfcDoor</simpleValue></name></entity>
+      </applicability>
+      <requirements>
+        <attribute><name><simpleValue>Tag</simpleValue></name></attribute>
+      </requirements>
+    </specification>
+
+    <specification name="Tường phải khai vật liệu" ifcVersion="IFC4">
+      <applicability>
+        <entity><name><simpleValue>IfcWall</simpleValue></name></entity>
+      </applicability>
+      <requirements>
+        <material><value><restriction base="xs:string"><pattern value=".+"/></restriction></value></material>
+      </requirements>
+    </specification>
+
+    <specification name="Lớp IFC không có trong model mẫu" ifcVersion="IFC4">
+      <applicability>
+        <entity><name><simpleValue>IfcTank</simpleValue></name></entity>
+      </applicability>
+      <requirements>
+        <attribute><name><simpleValue>Name</simpleValue></name></attribute>
+      </requirements>
+    </specification>
+  </specifications>
+</ids>
