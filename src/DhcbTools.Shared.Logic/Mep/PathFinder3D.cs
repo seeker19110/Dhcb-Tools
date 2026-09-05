@@ -46,8 +46,35 @@ namespace DhcbTools.Shared.Logic.Mep
         /// <summary>Cho phép đi theo Z (đổi cao độ). Tắt để buộc tuyến nằm ngang một cao độ.</summary>
         public bool AllowVertical { get; set; } = true;
 
-        /// <summary>Giới hạn số ô mở rộng để không thành "hố đen thời gian" (mục 6.1).</summary>
-        public int MaxExpandedNodes { get; set; } = 400_000;
+        /// <summary>
+        /// Giới hạn số trạng thái mở rộng để không thành "hố đen thời gian" (mục 6.1). <c>null</c> (mặc định)
+        /// = tự chọn theo cỡ bài toán: số trạng thái của lưới (ô × 7 hướng tới, vì phạt rẽ tách trạng thái
+        /// theo hướng), kẹp trong [<see cref="AutoBudgetMin"/>, <see cref="AutoBudgetMax"/>].
+        /// <para>
+        /// Trước đây cố định 400.000 bất kể lưới to nhỏ. Đo trên hộp 30 × 30 m một lớp cao độ, ba tường so le:
+        /// tuyến tối ưu cần 459.000 trạng thái — trần cũ thua ở 400.000 dù hai điểm nối thông và cả bài toán
+        /// chỉ mất 0,3 s. Hết ngân sách sớm hơn 15 % so với chỗ có lời giải là kiểu thất bại tệ nhất: không
+        /// nói gì về mô hình, chỉ nói về một hằng số.
+        /// </para>
+        /// </summary>
+        public int? MaxExpandedNodes { get; set; }
+
+        /// <summary>Sàn ngân sách tự động — bằng trần cố định cũ, để lưới nhỏ không bị siết chặt hơn trước.</summary>
+        public const int AutoBudgetMin = 400_000;
+
+        /// <summary>
+        /// Trần ngân sách tự động. Mỗi trạng thái mở rộng giữ một mục trong bảng đã thăm và một số trong hàng
+        /// đợi; đo được ~100 byte/trạng thái, nên 2 triệu là ~200 MB tạm thời — chấp nhận được trong tiến
+        /// trình Revit, cao hơn thì không. Muốn hơn thì đặt tay <see cref="MaxExpandedNodes"/>.
+        /// </summary>
+        public const int AutoBudgetMax = 2_000_000;
+
+        /// <summary>Số hướng tới một trạng thái có thể mang: 6 trục + "chưa có hướng" ở điểm đầu.</summary>
+        public const int StatesPerCell = 7;
+
+        /// <summary>Ngân sách thật sự dùng cho một lưới <paramref name="gridCells"/> ô.</summary>
+        public int EffectiveMaxExpandedNodes(long gridCells)
+            => MaxExpandedNodes ?? (int)Math.Max(AutoBudgetMin, Math.Min(AutoBudgetMax, gridCells * StatesPerCell));
 
         /// <summary>
         /// Trần số ô của lưới (không phải số ô mở rộng). Lưới được raster hoá trước nên bộ nhớ tỉ lệ với số
@@ -64,6 +91,9 @@ namespace DhcbTools.Shared.Logic.Mep
         public List<Point3> Polyline { get; } = new List<Point3>();
 
         public int ExpandedNodes { get; set; }
+
+        /// <summary>Ngân sách node mở rộng đã áp dụng (tự chọn theo lưới hoặc do người gọi đặt).</summary>
+        public int MaxExpandedNodes { get; set; }
 
         public int Turns { get; set; }
 
@@ -126,6 +156,8 @@ namespace DhcbTools.Shared.Logic.Mep
 
             var cells = (long)size[0] * size[1] * size[2];
             result.GridCells = cells;
+            var budget = options.EffectiveMaxExpandedNodes(cells);
+            result.MaxExpandedNodes = budget;
             if (cells > options.MaxCells)
             {
                 result.Reason = $"Hộp tìm kiếm quá lớn so với bước lưới: {cells:N0} ô (trần {options.MaxCells:N0}) — tăng bước lưới hoặc thu hẹp hộp.";
@@ -149,42 +181,46 @@ namespace DhcbTools.Shared.Logic.Mep
             }
 
             // Trạng thái = (ô, hướng tới) để tính phạt rẽ đúng.
-            var open = new PriorityQueue<(int[] Cell, int Dir)>();
-            var gScore = new Dictionary<long, double>();
-            var cameFrom = new Dictionary<long, (long Prev, int[] Cell)>();
+            // Mỗi trạng thái chỉ là một số nguyên (chỉ số ô × 7 + hướng); ô suy ngược bằng OccupancyGrid.FromIndex
+            // khi cần. Không cấp phát int[] cho từng node trong hàng đợi lẫn bảng đã thăm — với ngân sách
+            // 2 triệu node thì đó là hàng triệu mảng nhỏ, đo được ~85 MB cho 460.000 node ở bản cũ.
+            var open = new PriorityQueue<long>();
+            var visited = new Dictionary<long, (double G, long Prev)>();
 
-            long Key(int[] c, int dir) => ((long)grid.Index(c) * 7) + (dir + 1);
+            long Key(int index, int dir) => ((long)index * 7) + (dir + 1);
 
-            var startKey = Key(s, -1);
-            gScore[startKey] = 0;
-            open.Enqueue((s, -1), Heuristic(s, -1, g, options.TurnPenalty));
+            var startKey = Key(grid.Index(s), -1);
+            visited[startKey] = (0, -1);
+            open.Enqueue(startKey, Heuristic(s, -1, g, options.TurnPenalty));
             var expanded = 0;
 
             while (open.Count > 0)
             {
-                var (cell, dir) = open.Dequeue();
-                var currentKey = Key(cell, dir);
+                var currentKey = open.Dequeue();
+                var cell = grid.FromIndex((int)(currentKey / 7));
+                var dir = (int)(currentKey % 7) - 1;
                 expanded++;
-                if (expanded > options.MaxExpandedNodes)
+                if (expanded > budget)
                 {
                     result.ExpandedNodes = expanded;
                     Diagnose(grid, s, goalIndex, options.AllowVertical, result);
-                    result.Reason = "Vượt giới hạn " + options.MaxExpandedNodes + " ô — thu hẹp hộp tìm kiếm hoặc tăng bước lưới."
+                    result.Reason = $"Vượt giới hạn {budget:N0} ô mở rộng — thu hẹp hộp tìm kiếm, tăng bước lưới, hoặc đặt maxExpandedNodes cao hơn."
                         + (result.GoalConnected
                             ? " Hai điểm CÓ nối thông nhau (flood-fill), nên đây là hết ngân sách chứ không phải bị chặn."
-                            : $" Hai điểm KHÔNG nối thông nhau: điểm đầu chỉ ra tới {result.ReachableCells:N0} ô trống — tuyến không tồn tại, tăng ngân sách cũng vô ích.");
+                            : $" Hai điểm KHÔNG nối thông nhau: điểm đầu chỉ ra tới {result.ReachableCells:N0} ô trống — tuyến không tồn tại, tăng ngân sách cũng vô ích.")
+                        + VerticalHint(options, size[2]);
                     return result;
                 }
 
                 if (cell[0] == g[0] && cell[1] == g[1] && cell[2] == g[2])
                 {
-                    Reconstruct(currentKey, s, cameFrom, searchBounds, step, result);
+                    Reconstruct(currentKey, visited, grid, searchBounds, step, result);
                     result.Found = true;
                     result.ExpandedNodes = expanded;
                     return result;
                 }
 
-                var currentG = gScore[currentKey];
+                var currentG = visited[currentKey].G;
                 for (var d = 0; d < Directions.Length; d++)
                 {
                     if (!options.AllowVertical && Directions[d][2] != 0)
@@ -215,16 +251,15 @@ namespace DhcbTools.Shared.Logic.Mep
                         cost += options.NearObstaclePenalty;
                     }
 
-                    var nextKey = Key(next, d);
+                    var nextKey = Key(nextIndex, d);
                     var tentative = currentG + cost;
-                    if (gScore.TryGetValue(nextKey, out var existing) && existing <= tentative)
+                    if (visited.TryGetValue(nextKey, out var existing) && existing.G <= tentative)
                     {
                         continue;
                     }
 
-                    gScore[nextKey] = tentative;
-                    cameFrom[nextKey] = (currentKey, next);
-                    open.Enqueue((next, d), tentative + Heuristic(next, d, g, options.TurnPenalty));
+                    visited[nextKey] = (tentative, currentKey);
+                    open.Enqueue(nextKey, tentative + Heuristic(next, d, g, options.TurnPenalty));
                 }
             }
 
@@ -234,6 +269,17 @@ namespace DhcbTools.Shared.Logic.Mep
                 + "nới `searchMarginMm`, hoặc chọn hai điểm trong cùng không gian trần kỹ thuật.";
             return result;
         }
+
+        /// <summary>
+        /// Số lớp cao độ là hệ số nhân của không gian tìm kiếm: A* trên lưới phải "tràn" qua mọi ô có chi phí
+        /// ước lượng thấp hơn tuyến tối ưu, và mỗi lớp Z thêm vào là tràn thêm chừng ấy lần. Đo trên hộp
+        /// 30 × 30 m ba tường so le: một lớp thì 460.000 node xong trong 0,4 s; 61 lớp thì 20 triệu node,
+        /// 30 s, 1,8 GB vẫn chưa xong. Khi hết ngân sách mà đang cho đi dọc Z, nói thẳng đây là đòn bẩy lớn nhất.
+        /// </summary>
+        private static string VerticalHint(PathFinderOptions options, int zLayers)
+            => options.AllowVertical && zLayers > 1
+                ? $" Lưới đang có {zLayers} lớp cao độ — tuyến nằm ngang thì tắt allowVertical, hoặc thu searchMarginZMm về đúng khoảng trần kỹ thuật."
+                : string.Empty;
 
         /// <summary>
         /// Flood-fill 6 hướng từ điểm đầu trên đúng lưới đã raster hoá — bỏ qua phạt rẽ và mọi ngân sách.
@@ -279,17 +325,14 @@ namespace DhcbTools.Shared.Logic.Mep
             result.GoalConnected = seen[goalIndex];
         }
 
-        private static void Reconstruct(long key, int[] startCell, Dictionary<long, (long Prev, int[] Cell)> cameFrom, Box3 b, double step, PathResult result)
+        private static void Reconstruct(long key, Dictionary<long, (double G, long Prev)> visited, OccupancyGrid grid, Box3 b, double step, PathResult result)
         {
             var cells = new List<int[]>();
-            var k = key;
-            while (cameFrom.TryGetValue(k, out var entry))
+            for (var k = key; k >= 0; k = visited[k].Prev)
             {
-                cells.Add(entry.Cell);
-                k = entry.Prev;
+                cells.Add(grid.FromIndex((int)(k / 7)));
             }
 
-            cells.Add(startCell);
             cells.Reverse();
 
             // Rút gọn: giữ điểm đầu, điểm cuối và điểm đổi hướng.
@@ -393,6 +436,14 @@ namespace DhcbTools.Shared.Logic.Mep
             public int Count { get; }
 
             public int Index(int[] c) => (c[0] * _strideX) + (c[1] * _strideY) + c[2];
+
+            /// <summary>Nghịch đảo của <see cref="Index"/>.</summary>
+            public int[] FromIndex(int index)
+            {
+                var x = index / _strideX;
+                var rest = index - (x * _strideX);
+                return new[] { x, rest / _strideY, rest % _strideY };
+            }
 
             public bool IsBlocked(int index) => _blocked[index];
 

@@ -264,7 +264,18 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("outputPath", "file CSV").Field("systemContains", "lọc hệ").Field("spoolParameter", "tham số spool").Field("stockLengthMm", "chiều dài cây")
                 .Words("bom", "bảng khối lượng", "spool", "khối lượng ống", "bill of material"),
             new CommandDescriptor("AutoRoute", Revit, "Routing mức C: A* né chướng ngại giữa 2 điểm → model line → (tuỳ chọn) dựng duct/pipe", true, "RouteC", "PathFind")
-                .Field("startMm", "{x,y,z}").Field("endMm", "{x,y,z}").Field("searchMarginMm", "biên hộp tìm").Field("obstacleCategories", "chướng ngại").Field("lineStyleName", "line style").Field("buildRoute", "dựng luôn").Field("dryRun", "xem trước")
+                .Field("startMm", "{x,y,z}").Field("endMm", "{x,y,z}").Field("searchMarginMm", "biên hộp tìm theo mặt bằng (mặc định 3000)")
+                .Field("searchMarginZMm", "biên hộp theo cao độ (mặc định 1000 — mỗi lớp Z thêm là thêm ngần ấy lần việc tìm)")
+                .Field("obstacleCategories", "chướng ngại")
+                // Các nút chỉnh A* — trước đây có trong Config nhưng không lên form, kỹ sư chỉ sửa được bằng tay file JSON.
+                .Field("stepMm", "bước lưới (mặc định 100)").Field("clearanceMm", "khoảng hở tới vật cản (mặc định 100)")
+                .Field("turnPenalty", "phạt mỗi lần rẽ, tính bằng số bước (mặc định 20)", FieldKind.Number)
+                .Field("nearObstaclePenalty", "phạt đi sát vật cản (mặc định 2, 0 = tắt)", FieldKind.Number)
+                .Field("allowVertical", "cho đổi cao độ")
+                .Field("maxExpandedNodes", "trần ô A* mở rộng (rỗng = tự chọn theo lưới)", FieldKind.Number)
+                .Field("includeLinkedModels", "xét vật cản ở model liên kết (mặc định bật)", FieldKind.Bool)
+                .Field("linkNameContains", "chỉ link có tên chứa (rỗng = mọi link)", FieldKind.TextList)
+                .Field("lineStyleName", "line style").Field("buildRoute", "dựng luôn").Field("dryRun", "xem trước")
                 .Words("tự động tìm tuyến", "auto route", "pathfinding", "né va chạm", "routing tự động"),
             new CommandDescriptor("ScheduleExport", Revit, "Xuất schedule ra CSV đúng cột/hàng đang hiển thị", false, "ExportSchedules")
                 .Field("outputFolder", "thư mục").Field("nameContains", "lọc tên").Field("names", "danh sách tên")

@@ -21,8 +21,15 @@ public sealed class AutoRouteConfig
 
     public required PointMm EndMm { get; init; }
 
-    /// <summary>Biên hộp tìm kiếm quanh hai điểm (mm).</summary>
+    /// <summary>Biên hộp tìm kiếm quanh hai điểm theo mặt bằng X/Y (mm).</summary>
     public double SearchMarginMm { get; init; } = 3000;
+
+    /// <summary>
+    /// Biên hộp theo cao độ Z (mm), tách khỏi biên mặt bằng. Số lớp cao độ là HỆ SỐ NHÂN của không gian A*
+    /// tìm: cùng một hộp 30 × 30 m, một lớp cần 460.000 node, 61 lớp (biên 3 m, bước 100) thì 20 triệu node
+    /// vẫn chưa xong. Tuyến đi trong trần kỹ thuật chỉ cần lên xuống trong khoảng ~1 m, nên mặc định 1000.
+    /// </summary>
+    public double SearchMarginZMm { get; init; } = 1000;
 
     public double StepMm { get; init; } = 100;
 
@@ -30,7 +37,16 @@ public sealed class AutoRouteConfig
 
     public double TurnPenalty { get; init; } = 20;
 
+    /// <summary>Phạt mỗi bước đi sát vật cản (trong vùng 2×clearance) — ưu tiên tuyến "thoáng". 0 = tắt.</summary>
+    public double NearObstaclePenalty { get; init; } = 2;
+
     public bool AllowVertical { get; init; } = true;
+
+    /// <summary>
+    /// Trần số ô A* được mở rộng. Rỗng = tự chọn theo cỡ lưới (xem <see cref="PathFinderOptions.MaxExpandedNodes"/>).
+    /// Chỉ đặt tay khi thông báo "hết ngân sách" nói rõ hai điểm CÓ nối thông nhau.
+    /// </summary>
+    public int? MaxExpandedNodes { get; init; }
 
     /// <summary>Category chướng ngại (rỗng = Structural Framing, Structural Columns, Walls, Floors, Ducts, Pipes, Cable Trays).</summary>
     public List<string> ObstacleCategories { get; init; } = new List<string>();
@@ -122,8 +138,9 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
         var start = new Point3(config.StartMm.X, config.StartMm.Y, config.StartMm.Z);
         var goal = new Point3(config.EndMm.X, config.EndMm.Y, config.EndMm.Z);
         var m = config.SearchMarginMm;
-        var bounds = new Box3(Math.Min(start.X, goal.X) - m, Math.Min(start.Y, goal.Y) - m, Math.Min(start.Z, goal.Z) - m,
-                              Math.Max(start.X, goal.X) + m, Math.Max(start.Y, goal.Y) + m, Math.Max(start.Z, goal.Z) + m);
+        var mz = config.SearchMarginZMm;
+        var bounds = new Box3(Math.Min(start.X, goal.X) - m, Math.Min(start.Y, goal.Y) - m, Math.Min(start.Z, goal.Z) - mz,
+                              Math.Max(start.X, goal.X) + m, Math.Max(start.Y, goal.Y) + m, Math.Max(start.Z, goal.Z) + mz);
 
         ICollection<ElementId> catIds = config.ObstacleCategories.Count > 0
             ? ParameterSync.ParameterExportCommand.ResolveCategoryIds(document, config.ObstacleCategories, out _)
@@ -202,6 +219,7 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
         var path = PathFinder3D.FindPath(start, goal, obstacles, bounds, new PathFinderOptions
         {
             StepMm = config.StepMm, ClearanceMm = config.ClearanceMm, TurnPenalty = config.TurnPenalty, AllowVertical = config.AllowVertical,
+            NearObstaclePenalty = config.NearObstaclePenalty, MaxExpandedNodes = config.MaxExpandedNodes,
         });
         var source = $"{inDocument} trong file + {inLinks} từ model liên kết";
         if (!path.Found)
@@ -210,7 +228,7 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
             // hẳn nhau, nên đừng nuốt mất; kèm cỡ lưới để người đọc biết bước lưới có hợp với hộp không.
             return CommandResult.Fail(
                 $"Không tìm được tuyến ({path.Reason}). Đã xét {obstacles.Count} chướng ngại ({source}), "
-                + $"lưới {path.GridCells:N0} ô bước {config.StepMm:F0} mm, mở rộng {path.ExpandedNodes} node.");
+                + $"lưới {path.GridCells:N0} ô bước {config.StepMm:F0} mm, mở rộng {path.ExpandedNodes:N0}/{path.MaxExpandedNodes:N0} node.");
         }
 
         var segments = PolylineSimplifier.ToSegments(path.Polyline);

@@ -2128,3 +2128,50 @@ family" — đó là **đường lỗi có thật và nói rõ**, và cũng là 
 - `overwriteExisting` của `FamilyLoader` hiện là **ô chữ** chứ không phải ô tick — luật đoán bool không có
   tiền tố "overwrite". Không sai kết quả (Newtonsoft đọc được "true"), nhưng lệch với các lệnh khác.
 - Thông báo của `PipeKick`/`FlowNumbering` in id dạng **`0.0`** thay vì `0` khi ô số để trống mặc định.
+
+## 35. `AutoRoute` — ngân sách A* cố định 400.000 thua ở bài có lời giải, và 61 lớp cao độ không ai gọi tới (2026-09-05 20:45 ICT)
+
+Đọc lại `AutoRouteCommand` sau §34 để trả lời một câu đơn giản: *cấu hình mặc định có tự chạy được không?*
+Câu trả lời là không, vì ba lý do, và cả ba đều đo được bằng test thuần trước khi vào Revit.
+
+### Ba thứ đo được ở tầng thuần
+
+| | Đo trên hộp 30 × 30 m, ba tường so le, bước 100 mm | Trước | Sau |
+|---|---|---|---|
+| 1 | **Ngân sách node** — một lớp cao độ, tuyến tối ưu cần **459.115** trạng thái, xong trong **0,3 s** | trần cố định 400.000 → *"hết ngân sách"* dù hai điểm nối thông | tự chọn theo cỡ bài toán (ô × 7 hướng, kẹp 400.000–2.000.000) → **tìm được, 6 lần rẽ, 252 ms** |
+| 2 | **Lớp cao độ** — cùng bài, cho đi dọc Z với biên Z = biên mặt bằng = 3 m (61 lớp) | **20 triệu** node, **30 s**, **1,8 GB** vẫn chưa xong | biên Z tách riêng `searchMarginZMm`, mặc định **1000** (21 lớp); hết ngân sách thì thông báo chỉ thẳng *"lưới đang có N lớp cao độ — tắt allowVertical hoặc thu searchMarginZMm"* |
+| 3 | **Bộ nhớ mỗi node** — hàng đợi và bảng đã thăm giữ một `int[]` cho mỗi trạng thái | ~85 MB cho 460.000 node | trạng thái là một số nguyên (`ô × 7 + hướng`), ô suy ngược khi cần → **~71 MB** cùng bài; ~100 byte/node nên trần 2 triệu là ~200 MB tạm thời |
+
+Lý do 1 là kiểu thất bại tệ nhất: hết ngân sách sớm hơn chỗ có lời giải **15 %**, và câu báo lỗi không nói
+gì về mô hình, chỉ nói về một hằng số. Lý do 2 mới là "hố đen" thật: số lớp Z là **hệ số nhân** của không
+gian A* phải tràn qua, và biên 3 m theo Z là vô nghĩa với tuyến đi trong trần kỹ thuật ~1 m — nhưng mặc định
+cũ lấy đúng một `searchMarginMm` cho cả ba trục nên không ai chọn con số 61 đó cả.
+
+Ngoài ra `NearObstaclePenalty`, `stepMm`, `clearanceMm`, `turnPenalty`, `allowVertical`,
+`includeLinkedModels`, `linkNameContains` có trong Config nhưng **không có trong catalog**, nên form Ribbon
+(§34) không dựng ô cho chúng — kỹ sư muốn chỉnh phải mở file JSON. Nay cả chín nút chỉnh lên form, và
+`maxExpandedNodes` để trống là tự chọn.
+
+Bốn ca kiểm mới trong `PathFinder3DGridTests` giữ cả hai vế của bảng trên (cũ thua, mới thắng) chứ không
+chỉ chốt "mới thắng"; bộ Shared.Logic **1285 đạt / 0 trượt**.
+
+### Chạy thật — Revit 2024, Snowdon HVAC: 26 đạt / 0 trượt / 0 bỏ qua
+
+Hai ca song sinh `AutoRoute` của §19 đo lại trên cùng hai điểm (0,0,3000) → (12000,6000,3000):
+
+| Bước lưới | §19 | Lượt này |
+|---|---|---|
+| 500 mm | 82 ms, lưới 12.025 ô, tới được 782 ô | **57 ms**, lưới **4.625** ô, tới được 474 ô |
+| 100 mm | 815 ms, lưới 1.335.961 ô, **chạm trần 400.001** rồi flood-fill mới nói "không nối thông" (79.701 ô) | **136 ms**, lưới **459.921** ô, A* **tự cạn hàng đợi ở 319.088/2.000.000** — kết luận "không có đường đi" đến từ chính phép tìm, không cần flood-fill cứu; tới được 42.435 ô |
+
+Lưới nhỏ đi 2,9 lần là do biên Z 1000 thay vì 3000; kết luận không đổi — hai điểm vẫn bị sàn/tường của
+model liên kết bao kín, đúng như §19 đã chứng minh. Điều mới là ở bước 100 mm bộ tìm đường nay **kết thúc
+bằng chứng cứ của chính nó** thay vì bằng một hằng số.
+
+### Cái chưa chứng minh
+
+- **Chưa có tuyến thật nào ra khỏi Snowdon HVAC** — vẫn là vì hai điểm mẫu bị bao kín, không phải vì bộ tìm
+  đường. Chọn hai điểm trong cùng khoang trần kỹ thuật vẫn là việc của người có nghề (§19).
+- Bài zigzag 21 lớp cao độ **vẫn không xong trong 2 triệu node** ở tầng thuần (1,9 s, ~200 MB). Trên model
+  thật sàn/trần là vật cản nên số lớp *hữu dụng* ít hơn nhiều, nhưng chưa đo trên tuyến thật nào cần lên xuống.
+- Chín ô mới trên form `AutoRoute` chưa **bấm tay** — chỉ qua `CatalogFieldTests` (kiểu ô khớp kiểu property).
