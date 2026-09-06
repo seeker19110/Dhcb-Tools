@@ -2787,3 +2787,12 @@ Shared.Logic **1367 → 1487 ca**, phủ 100 %. Rà `catch`: 7 khối rỗng đ�
 ### Còn mở
 Phần còn lại của `Core` (~12.000 dòng) vẫn ngoài cổng phủ. Ưu tiên tách tiếp theo cùng cách: `SlopePipes`, `HangerCommand`, `StyleCommands`, `AcadQueryHandler`.
 
+## 50. Tách tiếp bốn lệnh — ClashDetection, HangerAuto, PipeSplitter, ElevationTag (2026-09-06 09:30 ICT)
+
+Cùng cách §49. | PR | Tầng thuần | Ca | Revit thật (`mep`, 26 ca) |
+|---|---|---|---|
+| #108 | `Checks/ClashReport` + DTO `ClashRecord`: `IntersectionCentre`, `MakeKey` (hậu tố `#link<id>` để hai va chạm khác link không gộp), `Notes` trần 500, `Summary` kèm cơ sở "vì sao 0", `ViewNote`, `Html`, `BcfIssues` (mm → m đúng một chỗ) | 12 | 26/26 — **7 va chạm với link = §22** |
+| #109 | `HangerPlanner` (ngưỡng/góc xoay, Summary), `PipeSplitPlanner` (Pipe/Duct cắt được, CableTray/Conduit chỉ báo cáo), `ElevationTagPlanner` (`NothingWritten`: 0/N là lỗi); gộp ba bản `BelongsToLevel` trùng vào `RevitCompat` | 19 | hai lượt 26/26 — 1120 hanger, 44 điểm cắt, 1053 phần tử cao độ |
+
+Shared.Logic 1487 → **1519**, phủ 100 %. Đã đọc `StyleCommands` (504 dòng): gần như toàn thu thập tham chiếu qua API Revit, tách không lợi — dừng. Ứng viên còn lại: `AcadQueryHandler` (687 dòng, cần accoreconsole để đối chiếu).
+
