@@ -23,6 +23,10 @@ namespace DhcbTools.Shared.Logic.Batch
         [JsonProperty("success")]
         public bool Success { get; set; }
 
+        /// <summary>Lệnh chạy xong nhưng chỉ xử lý được một phần đối tượng (ví dụ 3/5 schedule xuất được) — khác đúng/sai nhị phân của <see cref="Success"/>.</summary>
+        [JsonProperty("partialSuccess", NullValueHandling = NullValueHandling.Ignore, DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public bool PartialSuccess { get; set; }
+
         [JsonProperty("affected")]
         public int Affected { get; set; }
 
@@ -162,12 +166,15 @@ namespace DhcbTools.Shared.Logic.Batch
             return entries;
         }
 
-        /// <summary>Mã thoát theo mục 1.4: 0 mọi step thành công; 1 có step lỗi hoặc bị bỏ qua.</summary>
+        /// <summary>
+        /// Mã thoát theo mục 1.4: 0 mọi step thành công trọn vẹn; 1 có step lỗi, bị bỏ qua, hoặc chỉ
+        /// thành công <b>một phần</b> — báo cáo đêm không được im lặng gọi "OK" thứ chưa xong hết.
+        /// </summary>
         public static int ExitCode(IEnumerable<RunLogEntry> entries)
         {
             foreach (var e in entries)
             {
-                if (!e.Success || e.Skipped)
+                if (!e.Success || e.Skipped || e.PartialSuccess)
                 {
                     return 1;
                 }

@@ -24,7 +24,8 @@ namespace DhcbTools.Shared.Logic.Batch
                 byKey[e.File + KeySeparator + e.Command] = e; // lần chạy sau ghi đè lần trước
             }
 
-            var ok = entries.Count(e => e.Success && !e.Skipped);
+            var ok = entries.Count(e => e.Success && !e.PartialSuccess && !e.Skipped);
+            var partial = entries.Count(e => e.Success && e.PartialSuccess && !e.Skipped);
             var failed = entries.Count(e => !e.Success && !e.Skipped);
             var skipped = entries.Count(e => e.Skipped);
 
@@ -33,13 +34,14 @@ namespace DhcbTools.Shared.Logic.Batch
               .Append(HtmlText.Escape(jobName)).Append(" — DHCB batch</title><style>")
               .Append("body{font-family:Segoe UI,Arial,sans-serif;margin:24px;color:#222}")
               .Append("table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:6px 10px;vertical-align:top}")
-              .Append("th{background:#f3f3f3}.ok{background:#d9f2d9}.fail{background:#f8d0d0}.skip{background:#eee;color:#666}")
+              .Append("th{background:#f3f3f3}.ok{background:#d9f2d9}.partial{background:#fbeeb5}.fail{background:#f8d0d0}.skip{background:#eee;color:#666}")
               .Append("details summary{cursor:pointer}pre{white-space:pre-wrap;font-size:12px;margin:4px 0 0}")
               .Append(".kpi{display:inline-block;margin-right:24px}")
               .Append("</style></head><body>");
             sb.Append("<h1>").Append(HtmlText.Escape(jobName)).Append("</h1>");
             sb.Append("<p>Tạo lúc ").Append(generatedAt.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)).Append(" · ")
               .Append("<span class=\"kpi\">Thành công: ").Append(ok).Append("</span>")
+              .Append("<span class=\"kpi\">Một phần: ").Append(partial).Append("</span>")
               .Append("<span class=\"kpi\">Lỗi: ").Append(failed).Append("</span>")
               .Append("<span class=\"kpi\">Bỏ qua: ").Append(skipped).Append("</span></p>");
 
@@ -61,7 +63,7 @@ namespace DhcbTools.Shared.Logic.Batch
                         continue;
                     }
 
-                    var cls = e.Skipped ? "skip" : e.Success ? "ok" : "fail";
+                    var cls = e.Skipped ? "skip" : !e.Success ? "fail" : e.PartialSuccess ? "partial" : "ok";
                     sb.Append("<td class=\"").Append(cls).Append("\"><details><summary>")
                       .Append(HtmlText.Escape(e.Summary))
                       .Append(" <small>(").Append(e.ElapsedMs).Append(" ms)</small></summary>");

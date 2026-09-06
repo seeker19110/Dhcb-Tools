@@ -479,7 +479,7 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
                 }
             }
         }
-        catch (System.Exception) { }
+        catch (System.Exception) { } // hình học không đọc được → rơi về null, người gọi dùng bbox thay
         return null;
     }
 

@@ -415,6 +415,7 @@ public static class RevitCompat
         }
         catch (Exception)
         {
+            // Phần tử không có type hợp lệ (system family, phần tử vừa xoá…) — tra tiếp ở instance là đủ.
         }
 
         if (type != null)

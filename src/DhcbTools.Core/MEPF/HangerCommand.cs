@@ -232,7 +232,7 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
             if (tangent.GetLength() > 1e-9)
                 return tangent.Normalize();
         }
-        catch (System.Exception) { }
+        catch (System.Exception) { } // curve không tính được đạo hàm tại điểm này — rơi về trục X mặc định
         return XYZ.BasisX;
     }
 }

@@ -112,10 +112,14 @@ tốt cho việc này nhưng viết cho agent, không cho người.
 
 ### 4.7 Nợ kỹ thuật cụ thể, nhỏ nhưng nên đóng trước khi có người dùng
 
-- `ScheduleExport` thành công một phần vẫn `Success=true` → báo cáo đêm hiện OK giả. Nên có trạng thái thứ ba
-  (*một phần*) trong `CommandResult` thay vì ép về đúng/sai.
+- ~~`ScheduleExport` thành công một phần vẫn `Success=true` → báo cáo đêm hiện OK giả.~~ ✅ 2026-09-06:
+  `CommandResult`/`RunLogEntry` có thêm `PartialSuccess`; `ScheduleExport` bật cờ này khi `0 < done <
+  tổng`, và trả `Success=false` khi `done=0` (trước đây báo `Success=true` cả khi xuất được **0** schedule).
+  `BatchReport` có ô màu vàng riêng ("Một phần"), `RunLog.ExitCode` trả 1 khi có step một phần — báo cáo
+  đêm không còn im lặng gọi "OK" cho việc chưa xong hết. Xem `bang-chung-test.md` §66.
 - Batch Revit thoát bằng `Environment.Exit`; `RvtFileInfo` đọc phiên bản bằng quét chuỗi 2 MB đầu file.
-- 6 khối `catch {}` rỗng còn lại trong `src/` (đã giảm, chưa hết).
+- ~~6 khối `catch {}` rỗng còn lại trong `src/`~~ ✅ 2026-09-06: cả 6 nay có bình luận giải thích lý do im
+  lặng (đúng quy ước đã áp dụng cho 40+ khối khác từ §61) — xem `bang-chung-test.md` §66.
 - `AutoRoute` mức C: đã đo được 1,00× trên 8/9 tuyến, nhưng vẫn phải chuẩn bị điểm bằng `SetoutExport` và bỏ
   Ducts khỏi `obstacleCategories` bằng tay — chưa phải một nút.
 
