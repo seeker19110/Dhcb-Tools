@@ -5,6 +5,7 @@ using DhcbTools.Core.Updaters;
 using DhcbTools.Revit.Batch;
 using DhcbTools.Revit.Bridge;
 using DhcbTools.Shared.Hosting;
+using DhcbTools.Shared.Logic.Ai;
 #if !DHCB_NO_WPF
 using DhcbTools.Revit.UI;
 #endif
@@ -253,9 +254,31 @@ public sealed class App : IExternalApplication
 
     private static PushButtonData Push(string path, string id, string text, string className, string tip)
     {
-        var data = new PushButtonData(id, text, path, Ns + className) { ToolTip = tip };
+        var data = new PushButtonData(id, text, path, Ns + className) { ToolTip = TierNote(className, tip) };
         Decorate(data, id);
         return data;
+    }
+
+    /// <summary>
+    /// Thêm ghi chú "bậc thử nghiệm" vào tooltip cho lệnh chưa nằm trong danh sách 12–15 lệnh <c>Endorsed()</c>
+    /// (đánh giá 2026-09-06 §5, Chân trời 1): phần lớn 64 lệnh của dự án đã chạy thật trong Revit nhưng chưa có
+    /// bằng chứng từ người dùng ngoài tác giả cần đến, nên Ribbon phải nói rõ ràng buộc đó thay vì để mọi nút
+    /// trông ngang hàng nhau. Đoán tên lệnh Core từ tên class theo quy ước đặt tên trong repo
+    /// (<c>XxxRibbonCommand</c>/<c>XxxCommand</c> ↔ <c>CommandCatalog</c> tên <c>Xxx</c>); không khớp được thì bỏ
+    /// qua, không chặn Ribbon vì một ghi chú thiếu.
+    /// </summary>
+    private static string TierNote(string className, string tip)
+    {
+        var name = className.EndsWith("RibbonCommand", StringComparison.Ordinal)
+            ? className.Substring(0, className.Length - "RibbonCommand".Length)
+            : className.EndsWith("Command", StringComparison.Ordinal)
+                ? className.Substring(0, className.Length - "Command".Length)
+                : className;
+
+        var descriptor = CommandCatalog.Find(CommandCatalog.Revit, name);
+        return descriptor != null && !descriptor.Supported
+            ? tip + " (Bậc thử nghiệm — chưa có ≥ 2 kỹ sư dùng hằng tuần xác nhận giá trị.)"
+            : tip;
     }
 
     /// <summary>

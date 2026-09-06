@@ -88,6 +88,20 @@ public class RibbonCoverageTests
         Assert.Equal(6, Regex.Matches(app, @"CreateRibbonPanel\(").Count);
     }
 
+    /// <summary>
+    /// Ribbon phải có một điểm gắn ghi chú "bậc thử nghiệm" — không kiểm được nội dung tooltip thật (cần
+    /// Revit dựng <c>PushButtonData</c>), nhưng đọc mã nguồn để chắc <c>TierNote</c> tồn tại và được gọi
+    /// từ <c>Push</c>, tránh trường hợp ai đó xoá lời gọi mà không xoá luôn hàm (code chết) hoặc ngược lại
+    /// (Ribbon lại hiện lệnh thử nghiệm như hỗ trợ mà không ai biết).
+    /// </summary>
+    [Fact]
+    public void RibbonCoDiemGanGhiChuBacLenh()
+    {
+        var app = File.ReadAllText(Path.Combine(RepoRoot(), "src", "DhcbTools.Revit", "App.cs"));
+        Assert.Contains("TierNote(className, tip)", app, StringComparison.Ordinal);
+        Assert.Contains("descriptor.Supported", app, StringComparison.Ordinal);
+    }
+
     /// <summary>Hai thứ README hứa mà vỏ từng thiếu: đăng ký updater và hook batch.</summary>
     [Fact]
     public void VoRevit_CoUpdaterVaHookBatch()

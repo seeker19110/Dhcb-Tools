@@ -372,4 +372,32 @@ public class CommandCatalogTests
         Assert.NotNull(tool["inputSchema"]!["properties"]!["category"]);
         Assert.True((bool)tool["writesModel"]!);
     }
+
+    /// <summary>
+    /// Bậc "hỗ trợ" (đánh giá 2026-09-06 §5, Chân trời 1): đúng danh sách 14 lệnh có giá trị rõ qua vòng
+    /// đóng vai kỹ sư, không nhiều hơn không ít — thêm/bớt lệnh vào bậc này phải là quyết định có chủ ý,
+    /// không phải lỗi gõ nhầm <c>.Endorsed()</c>.
+    /// </summary>
+    [Fact]
+    public void BacHoTro_DungDanhSachDaChot()
+    {
+        var expected = new[]
+        {
+            "WarningsExport", "HealthReport", "SheetRename", "RevisionOnSheets", "BatchExport",
+            "ClashDetection", "HangerAuto", "SlopePipes", "IdsValidate", "ParameterRuleCheck",
+            "SetoutExport", "LayerStandardCheck", "AttributeIncrement", "BlockQuantity",
+        };
+
+        var actual = CommandCatalog.AllFor(CommandCatalog.Revit).Concat(CommandCatalog.AllFor(CommandCatalog.AutoCad))
+            .Where(c => c.Supported).Select(c => c.Name).OrderBy(n => n, StringComparer.Ordinal).ToList();
+
+        Assert.Equal(expected.OrderBy(n => n, StringComparer.Ordinal), actual);
+    }
+
+    /// <summary>Mặc định một lệnh mới là bậc thử nghiệm — phải gọi <c>.Endorsed()</c> có chủ ý mới lên bậc hỗ trợ.</summary>
+    [Fact]
+    public void MacDinh_LaBacThuNghiem()
+    {
+        Assert.False(CommandCatalog.Find(CommandCatalog.Revit, "SheetIndex")!.Supported);
+    }
 }

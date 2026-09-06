@@ -128,18 +128,21 @@ chuyển được, (3) không thêm lệnh khi chưa có người đòi.
 
 Mục tiêu duy nhất: **5 kỹ sư ở 2 công ty dùng 4 tuần, số liệu từ `UsageReport`, không phải từ tác giả.**
 
-- **Đóng băng số lệnh.** Chỉ sửa lỗi và ma sát do người dùng thật báo. Chia catalog thành hai bậc công khai:
-  *hỗ trợ* (khoảng 12–15 lệnh có giá trị rõ theo vòng đóng vai: `WarningsExport`, `HealthReport`, `SheetRename`,
-  `RevisionOnSheets`, `BatchExport`, `ClashDetection`+BCF, `HangerAuto`, `SlopePipes`, `IdsValidate`,
-  `ParameterRuleCheck`, `SetoutExport`, `LayerStandardCheck`, `AttributeIncrement`, `BlockQuantity`) và *thử
-  nghiệm* (phần còn lại, có nhãn trên Ribbon).
+- **Đóng băng số lệnh.** Chỉ sửa lỗi và ma sát do người dùng thật báo. ✅ 2026-09-06: catalog đã có hai bậc
+  công khai — `CommandDescriptor.Supported` (fluent `.Endorsed()`), đúng 14 lệnh: `WarningsExport`,
+  `HealthReport`, `SheetRename`, `RevisionOnSheets`, `BatchExport`, `ClashDetection` (+BCF), `HangerAuto`,
+  `SlopePipes`, `IdsValidate`, `ParameterRuleCheck`, `SetoutExport`, `LayerStandardCheck`,
+  `AttributeIncrement`, `BlockQuantity`; Ribbon (`App.cs`) tự thêm ghi chú "Bậc thử nghiệm" vào tooltip cho
+  lệnh còn lại. Quyết định *có đóng băng thêm lệnh mới hay không* vẫn chờ chốt ở mục 6.
 - **Gói nhập môn cho người, không cho agent:** một dự án mẫu Việt (có sheet, có MEP, có shared parameter thi
   công) đi kèm bản cài; một trang A4 mỗi vai (kiến trúc, MEP, BIM manager, AutoCAD); một video 15 phút.
   Viết lại README theo thứ tự *kỹ sư cài → bấm 3 lệnh → thấy kết quả*, đẩy Bridge/MCP/AI xuống mục riêng.
 - **Sẵn sàng phân phối:** chọn giấy phép (đề xuất mã mở lõi thuần theo MIT/Apache, vỏ và installer giữ quyền
-  hoặc cũng mở — quyết ở mục 6), ký DLL bằng chứng chỉ thật, `CommandResult` có trạng thái *một phần*.
-- **Gom tài liệu:** giữ `bang-chung-test.md` làm phụ lục; thêm một `docs/tong-quan.md` ≤ 3 trang là cửa vào duy
-  nhất; đặt quy ước "mỗi PR tối đa một mục mới trong progress".
+  hoặc cũng mở — quyết ở mục 6), ký DLL bằng chứng chỉ thật, ✅ `CommandResult` có trạng thái *một phần*
+  (`PartialSuccess`, 2026-09-06 — xem §4.7).
+- **Gom tài liệu:** giữ `bang-chung-test.md` làm phụ lục; ✅ `docs/tong-quan.md` (1 trang, 2026-09-06) là cửa
+  vào duy nhất cho người ngoài, README trỏ tới ngay dòng đầu; đặt quy ước "mỗi PR tối đa một mục mới trong
+  progress".
 - **Chỉ số:** ≥ 5 người dùng có tên, ≥ 3 lệnh được dùng ≥ 3 ngày/tuần bởi ≥ 2 người, ≥ 10 lỗi/ma sát do người
   ngoài báo và đã đóng.
 
