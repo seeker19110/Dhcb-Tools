@@ -50,14 +50,14 @@ class DonKetQuaTests(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def test_mac_dinh_chi_xem_truoc_khong_xoa(self):
-        r = _run("-Root", str(self.tmp))
+        r = _run("-Root", str(self.tmp), "-JournalDir", "")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("Xem trước", r.stdout)
         self.assertTrue((self.old).exists())
         self.assertTrue((self.mid / "ban-chep").exists())
 
     def test_apply_giu_moi_nhat_xoa_ban_chep_luot_giua_xoa_ca_luot_qua_cu(self):
-        r = _run("-Root", str(self.tmp), "-Apply")
+        r = _run("-Root", str(self.tmp), "-JournalDir", "", "-Apply")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         # lượt mới nhất của bộ mep: nguyên vẹn kể cả bản chép
         self.assertTrue((self.new1 / "ban-chep" / "model.rvt").exists())
@@ -71,6 +71,23 @@ class DonKetQuaTests(unittest.TestCase):
         self.assertTrue((self.other_suite / "ban-chep").exists())
         # thư mục không theo mẫu: không đụng
         self.assertTrue((self.keep_dir / "job.json").exists())
+
+    def test_journal_giu_n_cap_moi_nhat(self):
+        jd = self.tmp / "appdata-dhcb"
+        jd.mkdir()
+        for n in range(1, 8):
+            for suffix in ("txt", "worker1.log"):
+                p = jd / f"journal.{n:04d}.{suffix}"
+                p.write_bytes(b"j" * 100)
+                os.utime(p, (1_700_000_000 + n * 60, 1_700_000_000 + n * 60))
+        r = _run("-Root", str(self.tmp), "-JournalDir", str(jd), "-KeepJournals", "2", "-Apply")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        left = sorted(p.name for p in jd.iterdir())
+        self.assertEqual(left, ["journal.0006.txt", "journal.0006.worker1.log", "journal.0007.txt", "journal.0007.worker1.log"])
+
+    def test_journal_dir_rong_khong_dung(self):
+        r = _run("-Root", str(self.tmp), "-JournalDir", "", "-Apply")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
     def test_khong_co_thu_muc_thi_ma_thoat_2(self):
         r = _run("-Root", str(self.tmp / "khong-co"))

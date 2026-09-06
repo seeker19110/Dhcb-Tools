@@ -42,7 +42,7 @@ public sealed class SheetIndexCommand : ICoreCommand<SheetIndexConfig>
             .ToList();
 
         var precondition = Precondition.NonEmptyInput(
-            CommandName, "sheet trong mô hình", sheets.Count,
+            CommandName, "sheet", sheets.Count,
             "Mô hình không có sheet nào (hoặc sheetNumberContains lọc hết) — danh mục rỗng không phải là danh mục.");
         var blocked = CommandResult.Ok(string.Empty);
         if (RevitPrecondition.Blocks(precondition, blocked))

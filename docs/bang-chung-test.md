@@ -3004,3 +3004,38 @@ hình học Revit (trọng tâm solid, transform Survey) — không tách thêm.
 `AutoRouteCommand` 412 → 367 dòng, `RouteFromLinesCommand` 407 → 401 (phần Revit là dựng Duct/fitting, đúng chỗ của
 nó). Shared.Logic 1567 → **1595 ca**, mã mới phủ 100 %. Chuỗi giữ nguyên từng ký tự: chạy lại **`autoroute` 13/13**
 và **`write-mep` 15/15** trên Revit 2024.3, Summary trùng §55 tới từng số (3,48×, 2 fitting OK, 403 ms so với 433 ms).
+
+## 57. Đóng vai sáu kỹ sư thay nhóm 9.4 — một lỗi câm ở runner AutoCAD, AutoRoute lần đầu trên dự án thật (2026-09-06 12:40 ICT)
+
+Điểm (1) của §54 là việc của người; user bảo làm thay cả kỹ sư. Sáu vai của [`phat-hanh-v1.1.md`](phat-hanh-v1.1.md)
+mỗi vai một job (`DHCB-test-results/dong-vai-2026-09-06/vai*.json`, `saveMode: None`), bấm đúng lệnh *nên thử tuần
+đầu* trên dữ liệu của vai — dự án A hoặc mẫu. Bản điền mẫu: [`phan-hoi-dong-vai-2026-09-06.md`](phan-hoi-dong-vai-2026-09-06.md).
+
+| Vai | Kết quả | Vướng |
+|---|---|---|
+| 1–2 kiến trúc | Snowdon Arch 5/5 (SheetIndex 55 sheet, SheetRename 44/55, Revision 43/55, PDF 55, Health); A ARC L02 4/5 | `SheetIndex` trên model không sheet: `E-PRECOND` đúng nhưng câu lặp *"sheet trong mô hình nào trong mô hình"* — sửa |
+| 3–4 MEP (A MEP L02) | HangerAuto 4769, Clash 479 + BCF, SlopePipes 2738/2582, SetoutExport 2322 đầu duct, ConnectorChecker 1040 hở; **AutoRoute lần đầu trên dự án thật: 7,9 m = 1,00× Manhattan, 1 rẽ, né 1 dầm ở link ARC** | `SleeveAuto` thiếu family (dự án không có); `ConnectorChecker` không nhận `outputPath` |
+| 5 BIM manager (A ARC L01) | IdsValidate 4537 phần tử 0 lỗi + 1 spec rỗng, RuleCheck 48 vi phạm, DictionaryLearn 3 cần xem/6 thiếu, UsageReport 247 lần/49 lệnh | — |
+| 6 AutoCAD | LayerCheck, BlockQuantity 24, DrawingCompare, LayerExport; AttributeIncrement ba lượt như người thật rồi ghi thật 10/10 (`REF`), AttributeExport đọc lại `P-001…` | **lỗi câm của runner** (dưới) |
+
+### Lỗi thật: `--plugin-dll` tương đối → NETLOAD hỏng → runner nói "0 OK, 0 lỗi"
+
+Lượt đầu của vai 6 truyền `--plugin-dll src\...\DhcbTools.AutoCAD.Core.dll`. accoreconsole: *"Unable to load src\...
+assembly."*, rồi mọi `DHCB_RUN` là *Unknown command*, thoát mã 0. Runner: **"Kết thúc, mã thoát 1: 0 OK, 0 lỗi, 0 bỏ qua"**
+— mã 1 nhưng không dòng nào trong `run.jsonl` nói vì sao; báo cáo HTML trống. Đây là lớp lỗi NO-OP im lặng mà §10 đã
+gọi tên. Sửa hai tầng: runner `Path.GetFullPath(plugin)`; và sau mỗi file, nếu output có "Unable to load … assembly"
+(`AcadScriptGen.NetloadFailure`, 1 ca thuần) hoặc số dòng `run.jsonl` không tăng dù script có step, ghi một dòng
+`NETLOAD` lỗi kèm tên DLL và đường dẫn log. Chạy lại đúng lệnh cũ: **8 OK / 2 lỗi thật của cấu hình**.
+
+### Cải tiến từ vướng của người: lỗi phải nói cái CÓ THẬT
+
+- `AttributeIncrement`/`AutoNumbering` sai tên block: *"Không tìm thấy Block "\*"… Block có trong bản vẽ (5 tên): AMB006 ×10,
+  AVE_RENDER ×8, AMB013 ×4, …"* (`Shared.Logic/Cad/BlockMessages`, 3 ca).
+- Xem trước của `AttributeIncrement` nay đếm block không có tag cần ghi: *"10/10 block không có attribute "TAG" — tag có
+  thật: MAKE/MODEL, REF, SERVICE, SIZE, TYPE. Chạy thật sẽ bỏ qua."* Trước đó xem trước nói "Sẽ gán 10 giá trị" và chỉ
+  chạy thật mới lộ — xem trước như thế vô nghĩa.
+
+### Con số tổng
+24 lệnh *Tuần*, 1 *Bỏ* có lý do (`SleeveAuto` — thiếu family), 3 lỗi mã sửa trong vòng, 2 cải tiến thông báo.
+Cái vòng này **không** trả lời được: "có dùng tiếp không" — vẫn cần người thật hai tuần. Dọn `%APPDATA%\DHCB`: 280
+journal Revit 115 MB, `don-ket-qua.ps1` nay dọn luôn (giữ 10 cặp mới nhất).

@@ -1,5 +1,6 @@
 using Autodesk.AutoCAD.DatabaseServices;
 using DhcbTools.Shared.Logic;
+using DhcbTools.Shared.Logic.Cad;
 
 namespace DhcbTools.Core.AutoCAD.AutoNumbering;
 
@@ -63,6 +64,8 @@ internal static class BlockNumbering
             SymbolUtilityServices.GetBlockModelSpaceId(database), OpenMode.ForRead);
 
         var items = new List<NumberingItem<ObjectId>>();
+        // Đếm mọi block trong Model Space để khi sai tên thì nói được bản vẽ CÓ block gì (§57).
+        var present = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
         foreach (ObjectId entityId in modelSpace)
         {
@@ -71,7 +74,9 @@ internal static class BlockNumbering
                 continue;
             }
 
-            if (!string.Equals(AcadHelpers.EffectiveBlockName(transaction, blockRef), request.BlockName, StringComparison.OrdinalIgnoreCase))
+            var name = AcadHelpers.EffectiveBlockName(transaction, blockRef);
+            present[name] = present.TryGetValue(name, out var n) ? n + 1 : 1;
+            if (!string.Equals(name, request.BlockName, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
@@ -82,7 +87,7 @@ internal static class BlockNumbering
         if (items.Count == 0)
         {
             transaction.Abort();
-            return CommandResult.Fail($"Không tìm thấy Block \"{request.BlockName}\" trong Model Space.");
+            return CommandResult.Fail(BlockMessages.BlockNotFound(request.BlockName, present.ToList()));
         }
 
         var ordered = NumberingPlanner.Order(items, request.Direction, request.RowTolerance);
@@ -103,13 +108,39 @@ internal static class BlockNumbering
 
         if (request.DryRun)
         {
-            transaction.Abort();
             var preview = CommandResult.Ok(request.PreviewSummary(plan.Count), plan.Count);
+            // Xem trước phải nói trước block nào KHÔNG có attribute cần ghi — chạy thật mới lộ thì xem trước vô nghĩa (§57).
+            var missingAttr = 0;
+            var tagsPresent = new List<string>();
+            foreach (var (refId, _) in plan)
+            {
+                var br = (BlockReference)transaction.GetObject(refId, OpenMode.ForRead);
+                var has = false;
+                foreach (ObjectId attId in br.AttributeCollection)
+                {
+                    var att = (AttributeReference)transaction.GetObject(attId, OpenMode.ForRead);
+                    tagsPresent.Add(att.Tag);
+                    if (string.IsNullOrEmpty(request.AttributeTag) || string.Equals(att.Tag, request.AttributeTag, StringComparison.OrdinalIgnoreCase))
+                    {
+                        has = true;
+                    }
+                }
+
+                if (!has) missingAttr++;
+            }
+
+            var warning = BlockMessages.AttributeMissingWarning(missingAttr, plan.Count, request.AttributeTag, tagsPresent);
+            if (warning != null)
+            {
+                preview.Messages.Add(warning);
+            }
+
             foreach (var (refId, value) in plan)
             {
                 preview.Messages.Add($"{AcadHelpers.HandleOf(refId)}: \"{value}\"");
             }
 
+            transaction.Abort();
             return preview;
         }
 
