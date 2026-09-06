@@ -3106,4 +3106,4 @@ MEPF, README/progress/mẫu phản hồi (51 lệnh Revit), hai ca kiểm.
 
 Đây là lần đầu `SleeveAuto`/`HangerAuto` chạy trọn với family **do DHCB cung cấp** thay vì mượn `HeatRecoveryUnit` của
 model mẫu. Chưa chứng minh: đặt lên mặt tường **trong cùng file** (Snowdon để tường ở link nên đường host-vào-mặt chưa
-chạy với family này); Revit 2026 chưa chạy bộ `write-mep` sau thay đổi này.
+chạy với family này). **Revit 2026:** `write-mep` **19/19** ngay sau đó (13:03) — FamilyStarter 1.822 ms, SleeveAuto DHCB_Sleeve 455 → 0, HangerAuto 1125, trùng 2024.3.
