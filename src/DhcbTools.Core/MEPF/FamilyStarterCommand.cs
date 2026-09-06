@@ -83,7 +83,9 @@ public sealed class FamilyStarterCommand : ICoreCommand<FamilyStarterConfig>
                 try
                 {
                     Build(document.Application, template, key, rfa);
-                    result.Messages.Add($"{name}: đã dựng → {rfa}");
+                    result.Messages.Add($"{name}: đã dựng → {rfa}" + (key == "Sleeve"
+                        ? (LastLabelError == null ? " (đường kính do Nominal Width điều khiển)" : $" (hình cố định — không gắn được nhãn tham số: {LastLabelError})")
+                        : string.Empty));
                 }
                 catch (Exception ex)
                 {
@@ -180,8 +182,11 @@ public sealed class FamilyStarterCommand : ICoreCommand<FamilyStarterConfig>
                     var ext = fam.FamilyCreate.NewExtrusion(true, profile, sketch, RevitCompat.MmToFt(300));
                     ext.get_Parameter(BuiltInParameter.EXTRUSION_START_PARAM)?.Set(RevitCompat.MmToFt(-150));
                     ext.get_Parameter(BuiltInParameter.EXTRUSION_END_PARAM)?.Set(RevitCompat.MmToFt(150));
-                    AddLengthParameter(fam, "Nominal Width", 100);
+                    var width = AddLengthParameter(fam, "Nominal Width", 100);
                     AddLengthParameter(fam, "Nominal Height", 100);
+                    // Tham số điều khiển hình học (§62): kích thước đường kính gắn nhãn Nominal Width lên cung của
+                    // sketch. Không gắn được (API/template khác) thì family vẫn dùng được với hình cố định — ghi lại.
+                    LabelDiameter(fam, ext, width);
                 }
                 else
                 {
@@ -210,7 +215,7 @@ public sealed class FamilyStarterCommand : ICoreCommand<FamilyStarterConfig>
         }
     }
 
-    private static void AddLengthParameter(Document fam, string name, double defaultMm)
+    private static FamilyParameter AddLengthParameter(Document fam, string name, double defaultMm)
     {
         var fm = fam.FamilyManager;
 #if REVIT2023_OR_GREATER
@@ -221,6 +226,37 @@ public sealed class FamilyStarterCommand : ICoreCommand<FamilyStarterConfig>
         if (fm.CurrentType != null)
         {
             fm.Set(p, RevitCompat.MmToFt(defaultMm));
+        }
+
+        return p;
+    }
+
+    /// <summary>Đường kính = Nominal Width: kích thước đường kính trên cung sketch của extrusion, gắn nhãn tham số.</summary>
+    internal static string? LastLabelError;
+
+    private static void LabelDiameter(Document fam, Extrusion ext, FamilyParameter width)
+    {
+        LastLabelError = null;
+        try
+        {
+            var view = new FilteredElementCollector(fam).OfClass(typeof(ViewPlan)).Cast<ViewPlan>().FirstOrDefault(v => !v.IsTemplate);
+            if (view == null) { LastLabelError = "family không có view mặt bằng"; return; }
+            Reference? arcRef = null;
+            foreach (CurveArray loop in ext.Sketch.Profile)
+            {
+                foreach (Curve c in loop)
+                {
+                    if (c is Arc && c.Reference != null) { arcRef = c.Reference; break; }
+                }
+                if (arcRef != null) break;
+            }
+            if (arcRef == null) { LastLabelError = "không lấy được tham chiếu cung sketch"; return; }
+            var dim = fam.FamilyCreate.NewDiameterDimension(view, arcRef, new XYZ(RevitCompat.MmToFt(120), RevitCompat.MmToFt(120), 0));
+            dim.FamilyLabel = width;
+        }
+        catch (Exception ex)
+        {
+            LastLabelError = ex.Message;
         }
     }
 

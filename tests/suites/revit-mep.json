@@ -553,6 +553,27 @@
           "Exception"
         ]
       }
+    },
+    {
+      "name": "ConnectorChecker với danh sách đã chấp nhận — 1 khoá bị bỏ qua, đếm riêng (§62)",
+      "command": "ConnectorChecker",
+      "config": {
+        "create3dView": false,
+        "acceptedPath": "{suiteFolder}/fixtures/connector-accepted.json",
+        "outputPath": "{outputFolder}/connectors-accepted.csv"
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 120000,
+        "summaryContains": [
+          "Tìm thấy 36 connector hở",
+          "(1 đã chấp nhận, bỏ qua)"
+        ],
+        "filesExist": [
+          "{outputFolder}/connectors-accepted.csv"
+        ]
+      },
+      "//": "Khoa 1365188@-106,-22,52 lay tu cot Key cua CSV lan chay §61 (Mechanical Equipment L2, connector dien). 37 - 1 = 36."
     }
   ]
 }

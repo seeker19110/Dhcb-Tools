@@ -28,4 +28,10 @@ public sealed class ConnectorCheckerConfig
     /// cho người khác; rỗng = chỉ Messages (§58).
     /// </summary>
     public string? OutputPath { get; init; }
+
+    /// <summary>
+    /// File JSON "đã chấp nhận" (cùng định dạng <c>clash-accepted.json</c>: danh sách {key, note, by}); connector có
+    /// khoá trong đó bị bỏ qua và đếm riêng. Khoá lấy ở cột Key của CSV (§62).
+    /// </summary>
+    public string? AcceptedPath { get; init; }
 }
