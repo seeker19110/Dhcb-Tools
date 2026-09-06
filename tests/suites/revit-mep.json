@@ -15,11 +15,18 @@
       "name": "Kiểm connector hở",
       "command": "ConnectorChecker",
       "config": {
-        "create3dView": false
+        "create3dView": false,
+        "outputPath": "{outputFolder}/connectors.csv"
       },
       "expect": {
         "success": true,
-        "maxMs": 120000
+        "maxMs": 120000,
+        "filesExist": [
+          "{outputFolder}/connectors.csv"
+        ],
+        "summaryContains": [
+          "CSV"
+        ]
       }
     },
     {
@@ -415,7 +422,10 @@
       "name": "Toạ độ định vị — tâm thiết bị cơ, miệng gió, cột PENZDI theo mm",
       "command": "SetoutExport",
       "config": {
-        "categories": ["Mechanical Equipment", "Air Terminals"],
+        "categories": [
+          "Mechanical Equipment",
+          "Air Terminals"
+        ],
         "columns": "PENZDI",
         "unit": "mm",
         "includeHeader": false,
@@ -439,7 +449,9 @@
       "name": "Toạ độ định vị — E-PRECOND khi không Id nào có trong mô hình",
       "command": "SetoutExport",
       "config": {
-        "elementIds": [999999999],
+        "elementIds": [
+          999999999
+        ],
         "outputPath": "{outputFolder}/setout-rong.csv"
       },
       "//": "File rong khong duoc ghi ra roi bao thanh cong: 0 diem la cau noi ve dau vao, khong phai ve mo hinh.",
@@ -494,6 +506,30 @@
           "Exception"
         ]
       }
+    },
+    {
+      "name": "HangerAuto sai tên family → lỗi phải liệt kê family có thật trong mô hình (§58)",
+      "command": "HangerAuto",
+      "config": {
+        "hangerFamilyName": "DHCB_Hanger_KhongTonTai",
+        "spacingMm": 3000
+      },
+      "expect": {
+        "success": false,
+        "maxMs": 30000,
+        "summaryContains": [
+          "Family có trong mô hình (",
+          "instance)",
+          "Khai tên family hoặc"
+        ],
+        "neverContains": [
+          "Exception"
+        ],
+        "summaryNotContains": [
+          "Round Elbow"
+        ]
+      },
+      "//": "Vai MEP §57 phai chay FamilyAudit rieng de tra ten; nay loi tu liet ke (8 ung vien), fitting bi day xuong cuoi nen Round Elbow 738 instance khong duoc len dau."
     }
   ]
 }

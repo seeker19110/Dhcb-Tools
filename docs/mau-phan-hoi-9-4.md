@@ -46,7 +46,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 | `ElevationTag` | Điền cao độ đáy/đỉnh/tim vào tham số MEP | ☐ | ☐ | ☐ | |
 | `HangerAuto` | Đặt hanger theo khoảng cách chuẩn | ☐ | ☐ | ☐ | |
 | `PipeSplitter` | Chia ống/duct theo chiều dài cây | ☐ | ☐ | ☐ | |
-| `ConnectorChecker` | Liệt kê connector MEP hở | ☐ | ☐ | ☐ | |
+| `ConnectorChecker` | Liệt kê connector MEP hở, tuỳ chọn CSV theo tầng/domain | ☐ | ☐ | ☐ | |
 | `CadLink` | Link file DWG/DXF vào view mặt bằng của một tầng (bước Insert → Link CAD), để ModelLinesFromCad đọc được | ☐ | ☐ | ☐ | |
 | `ModelLinesFromCad` | Dựng model line từ bản vẽ CAD đã link/import (lọc layer, bỏ đoạn rác và đường vẽ chồng, nối đoạn thẳng hàng) để RouteFromLines dựng ống | ☐ | ☐ | ☐ | |
 | `RouteFromLines` | Routing mức A: dựng duct/pipe/tray từ model line vẽ tay | ☐ | ☐ | ☐ | |

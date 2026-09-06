@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Mechanical;
+using DhcbTools.Shared.Logic.Mep;
 
 namespace DhcbTools.Core.MEPF;
 
@@ -24,20 +25,29 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
         // Build report lines
         var reportLines = new List<string>();
         var elementIds = new HashSet<ElementId>();
+        var rows = new List<OpenConnectorRow>();
 
         foreach (var info in openConnectors)
         {
-            var xMm = RevitCompat.FtToMm(info.Origin.X);
-            var yMm = RevitCompat.FtToMm(info.Origin.Y);
-            var zMm = RevitCompat.FtToMm(info.Origin.Z);
-            reportLines.Add(
-                $"Element {RevitCompat.IdValue(info.ElementId)} at ({xMm:F1},{yMm:F1},{zMm:F1}) mm - {info.Domain}");
+            var row = new OpenConnectorRow(RevitCompat.IdValue(info.ElementId), info.Category, RevitCompat.FtToMm(info.Origin.X),
+                RevitCompat.FtToMm(info.Origin.Y), RevitCompat.FtToMm(info.Origin.Z), info.Domain, info.Shape, info.Level);
+            rows.Add(row);
+            reportLines.Add(ConnectorReport.MessageLine(row));
             elementIds.Add(info.ElementId);
+        }
+
+        string? csvPath = null;
+        if (!string.IsNullOrWhiteSpace(config.OutputPath))
+        {
+            csvPath = config.OutputPath!;
+            var dir = System.IO.Path.GetDirectoryName(csvPath);
+            if (!string.IsNullOrEmpty(dir)) System.IO.Directory.CreateDirectory(dir);
+            System.IO.File.WriteAllText(csvPath, ConnectorReport.Csv(rows), DhcbTools.Shared.Logic.CsvText.Utf8WithBom);
         }
 
         if (openConnectors.Count == 0)
         {
-            return CommandResult.Ok("Không tìm thấy connector hở nào trong mô hình.", 0);
+            return CommandResult.Ok("Không tìm thấy connector hở nào trong mô hình." + (csvPath == null ? string.Empty : $" CSV (chỉ tiêu đề): \"{csvPath}\"."), 0);
         }
 
         // 2. Tuỳ chọn tạo/cập nhật 3D view — chỉ khi không phải xem trước.
@@ -67,7 +77,7 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
             }
         }
 
-        var summary = $"Tìm thấy {openConnectors.Count} connector hở trên {elementIds.Count} phần tử.";
+        var summary = ConnectorReport.Summary(openConnectors.Count, elementIds.Count, csvPath);
         var result = CommandResult.Ok(summary, openConnectors.Count);
         result.Messages.AddRange(reportLines);
         return result;
@@ -75,12 +85,36 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
+    /// <summary>Tên tầng của phần tử qua LevelId / tham số Reference Level; rỗng nếu không có.</summary>
+    private static string LevelNameOf(Document doc, Element elem)
+    {
+        try
+        {
+            var id = elem.LevelId;
+            if (id == null || id == ElementId.InvalidElementId)
+            {
+                var p = elem.get_Parameter(BuiltInParameter.RBS_START_LEVEL_PARAM) ?? elem.get_Parameter(BuiltInParameter.FAMILY_LEVEL_PARAM);
+                if (p != null) id = p.AsElementId();
+            }
+
+            return id != null && id != ElementId.InvalidElementId ? (doc.GetElement(id)?.Name ?? string.Empty) : string.Empty;
+        }
+        catch (System.Exception)
+        {
+            return string.Empty;
+        }
+    }
+
     private sealed class ConnectorInfo
     {
         public required ElementId ElementId { get; set; }
         public required XYZ Origin { get; set; }
         public required string Domain { get; set; }
         public required string Shape { get; set; }
+
+        public required string Category { get; set; }
+
+        public required string Level { get; set; }
     }
 
     private List<ConnectorInfo> FindOpenConnectors(Document doc, ConnectorCheckerConfig config)
@@ -159,6 +193,8 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
                         Origin = connector.Origin,
                         Domain = domainStr,
                         Shape = connector.Shape.ToString(),
+                        Category = elem.Category?.Name ?? "?",
+                        Level = LevelNameOf(doc, elem),
                     });
                 }
             }

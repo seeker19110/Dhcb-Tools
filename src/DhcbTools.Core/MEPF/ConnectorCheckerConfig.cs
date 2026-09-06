@@ -22,4 +22,10 @@ public sealed class ConnectorCheckerConfig
 
     /// <summary>Name of the 3D view to create/reuse.</summary>
     public string ViewName { get; init; } = "DHCB - Open Connectors";
+
+    /// <summary>
+    /// CSV liệt kê từng connector hở (ElementId, Category, Level, Domain, Shape, X/Y/Z mm) — để giao việc sửa
+    /// cho người khác; rỗng = chỉ Messages (§58).
+    /// </summary>
+    public string? OutputPath { get; init; }
 }

@@ -3039,3 +3039,28 @@ gọi tên. Sửa hai tầng: runner `Path.GetFullPath(plugin)`; và sau mỗi f
 24 lệnh *Tuần*, 1 *Bỏ* có lý do (`SleeveAuto` — thiếu family), 3 lỗi mã sửa trong vòng, 2 cải tiến thông báo.
 Cái vòng này **không** trả lời được: "có dùng tiếp không" — vẫn cần người thật hai tuần. Dọn `%APPDATA%\DHCB`: 280
 journal Revit 115 MB, `don-ket-qua.ps1` nay dọn luôn (giữ 10 cặp mới nhất).
+
+## 58. Hai điểm vướng của vai MEP — lỗi thiếu family tự liệt kê family có thật, `ConnectorChecker` ra CSV (2026-09-06 12:45 ICT)
+
+Câu hỏi mở số 2 và 3 của [`phan-hoi-dong-vai-2026-09-06.md`](phan-hoi-dong-vai-2026-09-06.md).
+
+**`FamilyCandidates` (`Shared.Logic/Mep`, 6 ca):** `SleeveAuto`/`HangerAuto` không tìm thấy family thì lỗi kèm tối đa 8 ứng
+viên *"Family: Type (Category, N instance)"* từ `RevitCompat.FamilySymbolCandidates` (mọi FamilySymbol + số instance). Xếp:
+tên chứa từ khoá của tên đã khai → category ưu tiên (phụ kiện ống/gió, Generic Models, Supports) → số instance; **fitting
+và họ chú thích bị đẩy xuống cuối**. Hai luật cuối không có từ đầu — bộ `mep` chạy lượt một lộ *"Round Elbow: 1.5 D (Duct
+Fittings, 738 instance)"* đứng đầu danh sách gợi ý hanger, lượt hai lộ *Title Blocks* và *Generic Annotations*; mỗi lượt
+thêm một luật kèm ca thuần. Lượt ba trên Snowdon HVAC (97 type): Air Terminals và HeatRecoveryUnit lên đầu, đúng thứ đặt
+được vào mô hình. Ca mới trong `revit-mep`: `HangerAuto` với tên không tồn tại → `success: false`, Summary phải có *"Family
+có trong mô hình ("* và không có *"Round Elbow"*.
+
+**`ConnectorReport` (5 ca):** `ConnectorChecker` thêm `outputPath` → CSV `ElementId,Category,Level,Domain,Shape,X_mm,Y_mm,Z_mm`
+(UTF-8 BOM, mở Excel lọc theo tầng/domain để chia việc); Summary kèm đường dẫn. Hai ca `ConnectorChecker` trong `mep`/`plumbing`
+nay khai `outputPath` + `filesExist`. Catalog thêm trường, `CatalogFieldTests` đối chiếu với config thật.
+
+| Bộ (Revit 2024.3) | Kết quả |
+|---|---|
+| `mep` | **27/27** (26 cũ + ca family sai tên); ConnectorChecker 37 hở → CSV |
+| `plumbing` | **8/8**; ConnectorChecker 33 hở / 32 phần tử → CSV |
+
+Chưa làm: family sleeve/hanger mẫu kèm bộ cài (câu hỏi 3) — cần dựng trong trình soạn family; vai MEP vẫn phải nạp family
+của dự án trước khi `SleeveAuto` chạy được.

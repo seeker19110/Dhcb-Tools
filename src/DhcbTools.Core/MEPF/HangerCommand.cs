@@ -28,8 +28,9 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
         var symbol = RevitCompat.FindFamilySymbol(document, config.HangerFamilyName);
         if (symbol == null)
         {
-            return CommandResult.Fail(
-                $"Không tìm thấy FamilySymbol \"{config.HangerFamilyName}\" trong mô hình.");
+            // Lỗi phải nói mô hình CÓ family gì — vai MEP §57 phải chạy FamilyAudit riêng để tra tên (§58).
+            return CommandResult.Fail(FamilyCandidates.NotFoundMessage(config.HangerFamilyName,
+                RevitCompat.FamilySymbolCandidates(document), new[] { "Pipe Accessories", "Duct Accessories", "Generic Models", "Supports" }));
         }
 
         // 2. Collect MEP elements
