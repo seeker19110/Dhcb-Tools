@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using DhcbTools.Shared.Logic.Ids;
 using Xunit;
@@ -240,20 +241,43 @@ public class IfcIdsElementTests
         Assert.Equal(0, Assert.Single(IdsEvaluator.Check(specs, Model().Elements()).Specifications).Passed);
     }
 
+    /// <summary>Tổ tiên "chuỗi trộn" (không khai relation) — đúng hành vi trước khi có quan hệ theo tên.</summary>
+    private static List<string> Mixed(IIdsElement element) =>
+        element.PartOf.Where(p => p.Relation == null).Select(p => p.Entity).ToList();
+
     [Fact]
     public void ThuocVe_LongTrongCua_NhomKhongCoTang_VaVongAggregateKhongTreo()
     {
         var model = Model();
-        // Phụ kiện lồng trong cửa: tổ tiên là cửa → tầng → toà → site → dự án.
-        var proxy = Element(model, 19).PartOf.ToList();
+        // Phụ kiện lồng trong cửa: tổ tiên là cửa → tầng → toà → site → dự án — đi qua NESTS rồi
+        // CONTAINEDINSPATIALSTRUCTURE rồi hai lượt AGGREGATES, chỉ chuỗi TRỘN mới đi hết được.
+        var proxy = Mixed(Element(model, 19));
         Assert.Equal(new[] { "IFCDOOR", "IFCBUILDINGSTOREY", "IFCBUILDING", "IFCSITE", "IFCPROJECT" }, proxy);
 
         // Cột chỉ thuộc hệ, không nằm trong tầng nào.
-        Assert.Equal(new[] { "IFCSYSTEM" }, Element(model, 17).PartOf.ToList());
+        Assert.Equal(new[] { "IFCSYSTEM" }, Mixed(Element(model, 17)));
 
         // Hai tổ hợp aggregate lẫn nhau: dừng ở guard, không treo, không trùng tên.
-        var asm = Element(model, 96).PartOf.ToList();
+        var asm = Mixed(Element(model, 96));
         Assert.Equal(new[] { "IFCELEMENTASSEMBLY" }, asm);
+    }
+
+    [Fact]
+    public void ThuocVe_TheoDungMotQuanHe_KhongRoiVeQuanHeKhac()
+    {
+        var model = Model();
+        var door = Element(model, 13).PartOf.ToList();
+
+        // Cửa NẰM TRONG tầng qua IfcRelContainedInSpatialStructure — đúng quan hệ IDS chờ khi khai
+        // relation="IFCRELCONTAINEDINSPATIALSTRUCTURE" trên facet partOf.
+        Assert.Contains((IdsRelations.ContainedInSpatialStructure, "IFCBUILDINGSTOREY"), door);
+        // KHÔNG phải qua IfcRelAggregates — đó là quan hệ nối site/building/storey với nhau, không phải
+        // của cửa với tầng. Trước bản sửa này, cả hai bị gộp chung nên không phân biệt được.
+        Assert.DoesNotContain((IdsRelations.Aggregates, "IFCBUILDINGSTOREY"), door);
+
+        // Cửa vào hệ qua IfcRelAssignsToGroup, không phải qua CONTAINEDINSPATIALSTRUCTURE.
+        Assert.Contains((IdsRelations.AssignsToGroup, "IFCSYSTEM"), door);
+        Assert.DoesNotContain((IdsRelations.ContainedInSpatialStructure, "IFCSYSTEM"), door);
     }
 
     [Fact]
@@ -273,10 +297,10 @@ public class IfcIdsElementTests
     public void ThuocVe_TenLop_CuaTangToaNhaVaHe()
     {
         var model = Model();
-        var wall = Element(model, 11).PartOf.ToList();
+        var wall = Mixed(Element(model, 11));
         Assert.Equal(new[] { "IFCBUILDINGSTOREY", "IFCBUILDING", "IFCSITE", "IFCPROJECT" }, wall);
 
-        var door = Element(model, 13).PartOf.ToList();
+        var door = Mixed(Element(model, 13));
         Assert.Contains("IFCBUILDINGSTOREY", door);
         Assert.Contains("IFCSYSTEM", door);
         Assert.DoesNotContain("IFCSYSTEM", wall);

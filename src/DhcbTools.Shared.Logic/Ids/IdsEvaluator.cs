@@ -34,8 +34,15 @@ namespace DhcbTools.Shared.Logic.Ids
         /// <summary>Tên vật liệu.</summary>
         IEnumerable<string> Materials { get; }
 
-        /// <summary>Tên nhóm/hệ/tầng mà phần tử thuộc về.</summary>
-        IEnumerable<string> PartOf { get; }
+        /// <summary>
+        /// Tổ tiên "thuộc về" (tên nhóm/hệ/tầng…), mỗi mục gắn quan hệ IFC đã dùng để tới đó.
+        /// <see cref="Relation"/> <c>null</c> nghĩa là tới được bằng cấu trúc quan hệ IFC hợp lệ bất kỳ,
+        /// đi qua trộn lẫn nhiều loại quan hệ (đúng khi facet <c>partOf</c> không khai <c>relation</c>).
+        /// Một quan hệ cụ thể chỉ xuất hiện khi tới được bằng <b>đúng một loại</b> quan hệ đó xuyên suốt —
+        /// theo <c>partof-facet.md</c> của buildingSMART: "if specified only the given type must be
+        /// evaluated (recursively)".
+        /// </summary>
+        IEnumerable<(string? Relation, string Entity)> PartOf { get; }
     }
 
     /// <summary>Một phần tử không đạt, kèm câu nói rõ thiếu gì.</summary>
@@ -207,7 +214,14 @@ namespace DhcbTools.Shared.Logic.Ids
                     return element.Materials.Any(material => facet.Value.Accepts(material));
 
                 default:
-                    return element.PartOf.Any(parent => facet.Value.Accepts(parent));
+                    // facet.Relation null: chấp nhận entry nào cũng được (relation bất kỳ, kể cả entry
+                    // "trộn" tự Relation null của IfcIdsElement). Có khai relation: chỉ entry ĐÚNG quan hệ
+                    // đó — không rơi về entry "trộn", vì entry trộn không chứng minh được đúng MỘT loại
+                    // quan hệ đã dùng xuyên suốt như buildingSMART đòi.
+                    return facet.Relation == null
+                        ? element.PartOf.Any(parent => facet.Value.Accepts(parent.Entity))
+                        : element.PartOf.Any(parent => string.Equals(parent.Relation, facet.Relation, StringComparison.OrdinalIgnoreCase)
+                                                        && facet.Value.Accepts(parent.Entity));
             }
         }
 

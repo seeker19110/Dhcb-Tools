@@ -195,20 +195,32 @@ internal sealed class RevitIdsElement : IIdsElement
         }
     }
 
-    /// <summary>Tầng và hệ mà phần tử thuộc về.</summary>
-    public IEnumerable<string> PartOf
+    /// <summary>
+    /// Tầng và hệ mà phần tử thuộc về — tên thật (<c>"Tầng 1"</c>, <c>"HT-01"</c>), không phải tên lớp IFC
+    /// (<c>IFCBUILDINGSTOREY</c>): kỹ sư đọc báo cáo trên Revit cần thấy tên quen thuộc, và đây là chỗ
+    /// khác với <see cref="IfcIdsElement"/> đã ghi rõ ở <c>kiem-ids.md</c> ("Giới hạn"), không phải lỗi cần sửa.
+    /// <para>
+    /// Quan hệ gắn theo mỗi mục là quan hệ IFC <b>gần đúng nhất</b> mà tầng/hệ Revit ánh xạ tới khi bộ xuất
+    /// IFC chạy: Level → <see cref="IdsRelations.ContainedInSpatialStructure"/>, hệ (System Name/
+    /// Classification) → <see cref="IdsRelations.AssignsToGroup"/>. Nhờ vậy facet <c>partOf</c> khai
+    /// <c>relation</c> cụ thể vẫn lọc đúng trên Revit, không chỉ trên đường IFC.
+    /// </para>
+    /// </summary>
+    public IEnumerable<(string? Relation, string Entity)> PartOf
     {
         get
         {
             if (_document.GetElement(_element.LevelId) is Level level)
             {
-                yield return level.Name;
+                yield return (null, level.Name);
+                yield return (IdsRelations.ContainedInSpatialStructure, level.Name);
             }
 
             var system = TextOf(_element, "System Name") ?? TextOf(_element, "System Classification");
             if (!string.IsNullOrWhiteSpace(system))
             {
-                yield return system!;
+                yield return (null, system!);
+                yield return (IdsRelations.AssignsToGroup, system!);
             }
         }
     }

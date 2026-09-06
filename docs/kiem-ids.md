@@ -56,7 +56,7 @@ thẳng thực thể (tên lớp so **đúng lớp**, Pset/vật liệu/phân lo
 | `property` | tham số `"Pset_Tên.Prop"`, rồi tham số cùng tên ở instance, rồi ở type — đúng thứ tự bộ xuất IFC lấy giá trị |
 | `classification` | `Assembly Code`, `Keynote`, `ClassificationCode` |
 | `material` | vật liệu của phần tử, kể cả vật liệu lớp cấu tạo |
-| `partOf` | tầng và `System Name` / `System Classification` |
+| `partOf` | tầng và `System Name` / `System Classification` — tên thật (`"Tầng 1"`), không phải tên lớp IFC như đường IFC (mục "Còn thiếu"). Khai `relation` thì tầng khớp `IFCRELCONTAINEDINSPATIALSTRUCTURE`, hệ khớp `IFCRELASSIGNSTOGROUP`; không khai vẫn khớp cả hai như trước |
 
 Ràng buộc giá trị: `simpleValue`, `xs:enumeration`, `xs:pattern` (**neo hai đầu** — XSD khớp toàn bộ chuỗi,
 không neo thì `AB-01-rác` cũng đạt quy tắc `AB-\d\d`), `minInclusive` / `maxInclusive` / `minExclusive` /
@@ -110,5 +110,15 @@ như fixture cố ý gài. Bằng chứng: [`bang-chung-test.md`](bang-chung-tes
   xạ tường kính). Solibri không có trên máy.
 - **Tên facet khai bằng `xs:pattern`** (ví dụ "mọi property khớp `Fire.*`") không suy ngược ra tên được, nên
   facet đó **trượt** thay vì âm thầm coi như đạt.
-- Ràng buộc độ dài chuỗi (`minLength`/`maxLength`) và `partOf` theo quan hệ IFC đầy đủ chưa hỗ trợ.
+- Ràng buộc độ dài chuỗi (`minLength`/`maxLength`) chưa hỗ trợ.
+- ✅ **`partOf` theo quan hệ IFC** (thuộc tính `relation` của facet, `ids.xsd` 1.0, tài liệu
+  `Documentation/UserManual/partof-facet.md` của buildingSMART/IDS): đường IFC nay tính riêng năm chuỗi thuần
+  (`IFCRELAGGREGATES`, `IFCRELASSIGNSTOGROUP`, `IFCRELCONTAINEDINSPATIALSTRUCTURE`, `IFCRELNESTS`, cặp gộp
+  `IFCRELVOIDSELEMENT`/`IFCRELFILLSELEMENT`) — khai `relation` thì chỉ chuỗi đúng loại đó mới khớp, không rơi
+  về chuỗi trộn nhiều loại như trước; không khai vẫn như cũ (test mới: `ThuocVe_TheoDungMotQuanHe_KhongRoiVeQuanHeKhac`,
+  `PartOf_KhaiRelation_ChiNhanDungMotLoaiQuanHe_KhongRoiVeChuoiTron`, `PartOf_DocThuocTinhRelation_VaMoTaKemTheo`,
+  `PartOf_RelationLa_KhongThuoc5GiaTri_TuChoiFile` — cùng ba ca cũ về vòng lặp hai chiều aggregate của §16 vẫn
+  giữ nguyên kết luận). Đường Revit khớp gần đúng hai trong năm loại (tầng ↔ `CONTAINEDINSPATIALSTRUCTURE`, hệ ↔
+  `ASSIGNSTOGROUP`) vì Revit không có đối tượng quan hệ IFC thật để đọc — **chưa chạy thật trong Revit**, chỉ có
+  test thuần trên CI.
 - Bảng category → lớp IFC là **bảng rút gọn** cho nhóm hay gặp; family lạ thì khai `IfcExportAs` để chắc chắn.
