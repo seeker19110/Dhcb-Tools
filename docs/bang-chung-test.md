@@ -3305,6 +3305,8 @@ chèn vào giữa — 8 `<param>` trỏ vào hư không, còn `NetloadFailure` t
 | `run-in-revit-tests.ps1 -Suite mep` (Revit 2024.3) | **29 đạt / 0 trượt** trên 29 ca |
 | `run-in-revit-tests.ps1 -Suite mep` (Revit **2026**) | **29 đạt / 0 trượt** trên 29 ca |
 | `run-in-revit-tests.ps1 -Suite smoke` (Revit **2026**) | **41 đạt / 0 trượt / 1 bỏ qua** trên 42 ca |
+| `run-in-revit-tests.ps1 -Suite plumbing` (Revit 2024.3) | **8 đạt / 0 trượt** trên 8 ca |
+| `run-in-revit-tests.ps1 -Suite plumbing` (Revit **2026**) | **8 đạt / 0 trượt** trên 8 ca |
 
 Trong lượt `mep`, `SleeveAuto` cho *"[Xem trước] Sẽ đặt 445 sleeve"* **không kèm** dòng cảnh báo mới — tức trên mô
 hình này mọi phần tử MEP đều đọc được solid và ghi chú không nổ bừa. Đó là phần kiểm mà một ca test thuần không làm
@@ -3322,5 +3324,11 @@ số đã ghi ở §51** cho model mẫu 2026, tức đây là khác biệt củ
 không phụ thuộc model mẫu — 142 phần tử, 1.270 phần tử IDS, 987 vi phạm, 55 sheet, 93 va chạm, 260 điểm định vị —
 trùng nguyên.
 
-**Chốt hai phiên bản.** §64 có bằng chứng đủ trên **cả Revit 2024.3 và 2026**, hai bộ `smoke` + `mep`:
-**140 ca chạy thật, 0 trượt**.
+Bộ `plumbing` chạy trên cả hai phiên bản: **8/8** mỗi bên. Các chỗ lệch cũng đã có tiền lệ: `SlopePipes`
+1.794 / 1.706 / 1.732 ở 2024.3 và **1.796 / 1.708 / 1.734** ở 2026 (model mẫu 2026 hơn hai ống — §51), `ConnectorChecker`
+33 hở / 32 phần tử ở 2024.3 và **35 / 34** ở 2026 (§59). `PipeSplitter` 143 phần tử / 189 điểm cắt và `SystemBom`
+352 dòng trùng nguyên ở cả hai.
+
+**Chốt hai phiên bản.** §64 có bằng chứng đủ trên **cả Revit 2024.3 và 2026**, ba bộ `smoke` + `mep` + `plumbing`:
+**156 ca chạy thật, 0 trượt**. Mọi chỗ lệch giữa hai phiên bản đều đối chiếu được với con số đã ghi ở §51/§59 cho
+model mẫu, không chỗ nào là khác biệt của mã.
