@@ -307,6 +307,7 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("namePattern", "mẫu tên điểm ≤ 16 ký tự: {Code}{n:000}, {Level}-{Mark}, {Kind}…")
                 .Field("descriptionPattern", "mẫu mô tả: {Category} {Level} {Type} {Family} {Id}")
                 .Field("curvePoints", "phần tử dạng đường (dầm, tường, ống): Ends | Mid | Both", FieldKind.Text)
+                .Field("pointMode", "cột/thiết bị đặt theo điểm: Centre (tâm hình học, mặc định) | Insertion (điểm chèn family — họ Off Center lệch tim tới 305 mm)", FieldKind.Text)
                 .Field("includeGridIntersections", "thêm giao điểm các trục thẳng (A-1, B-2…)", FieldKind.Bool)
                 .Field("utf8Bom", "ghi BOM UTF-8 để Excel đọc tiếng Việt (để máy đọc: tắt)", FieldKind.Bool)
                 .Words("toạ độ định vị", "setout", "stake out", "máy toàn đạc", "trắc đạc", "toạ độ tim cột", "xuất toạ độ", "cắm mốc"),

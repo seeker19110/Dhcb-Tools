@@ -56,6 +56,9 @@ exec SetoutExport {
 - Ghi chú *"tên điểm bị cắt còn 16 ký tự"* hoặc *"tên trùng đã thêm hậu tố"* — đổi `namePattern`
   (ví dụ `{Level}-{Mark}`) nếu kỹ sư cần tên đúng như bản vẽ.
 - Ghi chú *"lấy tâm hộp bao"* — những phần tử đó không có điểm đặt rõ ràng, kiểm tay trước khi cắm.
+- Ghi chú *"N phần tử có điểm chèn family lệch tâm hình học (tối đa … mm)"* — file đang lấy **tâm hình
+  học** (`pointMode: "Centre"`, mặc định). Nếu kỹ sư muốn đúng điểm chèn family (ví dụ bản vẽ ghi kích thước
+  tới điểm chèn), chạy lại với `"pointMode": "Insertion"` và nói rõ trong báo cáo.
 
 ### 3. Đối chiếu ngược một điểm
 

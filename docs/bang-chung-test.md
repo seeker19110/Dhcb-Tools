@@ -2849,3 +2849,52 @@ vỏ Revit chạy trên phần mềm thật — trước đó nó chỉ có CI b
   Cần một ca trong `revit-write-mep` trên một ống thẳng đủ dài của Snowdon HVAC/Plumbing.
 - Revit 2025 và 2027: chưa có trên máy. 2027 vẫn chỉ build.
 - Hai việc của người: nhóm kỹ sư dùng thật (9.4) và đối chiếu một điểm `SetoutExport` bằng máy toàn đạc.
+
+## 52. Tự đối chiếu `SetoutExport` thay kỹ sư — Autodesk IFC làm trọng tài, lộ cột "Off Center" lệch tim 305 mm (2026-09-06 10:45 ICT)
+
+§51 để lại một việc "của người": đối chiếu một điểm định vị bằng Spot Coordinate. User bảo tự làm thay kỹ sư.
+Spot Coordinate qua giao diện không đi tới nơi (công cụ *Report Shared Coordinates* bắt vào tường của model link
+Site thay vì giao trục, và khi tool còn treo thì Bridge không nhận truy vấn), nên chọn một đường **độc lập với mã
+DHCB và độc lập với giao diện**: xuất chính model đó ra **IFC 2x3 bằng bộ xuất của Autodesk** (`BatchExport`,
+`formats: ["Ifc"]`, 180 MB) rồi đọc lại IFCSITE / IFCGRID / IFCCOLUMN bằng script mới
+`scripts/doi-chieu-setout-ifc.py` (23 ca test, phủ 100 %; fixture IFC viết tay có site xoay 90°, trục cong, cột
+mapped-item / Boolean / B-rep / profile thiếu).
+
+### Ba tầng kết quả
+
+| Tầng | Kết quả | Ý nghĩa |
+|---|---|---|
+| Gốc Survey | IFCSITE đặt tại **E=417622.267 N=78713.983 Z=237.896 m, xoay 26,0156°** — trùng **từng chữ số** với dòng *"Site … gốc nội bộ"* mà `SetoutExport` in ra | Phép biến đổi Survey ↔ Internal đúng (chiều xoay, gốc, cao độ). Trước đó còn kiểm lại bằng số học độc lập: quay 260 điểm từ `internal-mm.csv` bằng đúng góc/gốc → lệch tối đa 1,2 mm so với `survey.csv` (làm tròn 3 số lẻ) |
+| 142 giao trục | so với giao của các IFCGRIDAXIS: **trung vị 0,4 mm, lớn nhất 0,7 mm, 0 điểm > 5 mm** | Phần trắc đạc dùng nhiều nhất là đúng |
+| 118 tim cột | lượt đầu (điểm chèn family): 56 cột lệch 100–305 mm. **Toàn bộ thuộc họ `Rectangular Column (Off Center)`** | Lỗi thật: `LocationPoint` là **điểm chèn family**, không phải tim — họ Off Center cố ý đặt điểm chèn ở mép |
+
+### Sửa — và ba lượt mới ra đúng cách lấy tâm
+
+| Lượt | Cách lấy tâm | So với thân IFC | Lộ ra gì |
+|---|---|---|---|
+| 1 | tâm hộp bao thường (`get_BoundingBox`) | 62/118 lệch > 5 mm | Cột nối vào tường: hộp bao chỉ còn phần ngoài tường |
+| 2 | hộp bao hình học gốc (`GetOriginalGeometry`) | **118/118 lệch ~1,3 m**, Messages báo *"tối đa 33740 mm"* | Hình học gốc ở **hệ toạ độ của family** — quên `GetTransform()`. Con số vô lý trong Messages là thứ bắt được, không phải test nào |
+| 3 | hộp bao gốc + transform | 48/107 cột nguyên thân lệch 117–160 mm | Hộp bao family Off Center chứa thêm hình học không phải thân |
+| 4 (giữ) | **trọng tâm solid** hình học gốc, cân theo thể tích, qua transform của instance; Z giữ của điểm chèn | 57/118 ≤ 5 mm; 61 lệch 52–305 mm | Xem dưới |
+
+Lệnh có thêm `pointMode`: `Centre` (mặc định) / `Insertion`, và luôn báo *"N phần tử có điểm chèn family lệch tâm
+hình học (tối đa … mm)"* — Snowdon: **20 phần tử, tối đa 102 mm**. Bộ `smoke` chạy lại với bản cuối: 41/41 + 1 bỏ
+qua, `SetoutExport` vẫn 260 điểm.
+
+### Cái chưa phân xử được — nói thẳng
+
+61 cột còn lệch **đều là họ Off Center** (và 4 cột Corinthian 22 mm), lệch có hệ thống theo chiều sâu cột
+(24" → 117 mm, 32" → 160 mm). Ở đó **hình học Revit** (hộp bao thường, hộp bao gốc, trọng tâm solid — ba cách
+cho cùng một tâm) và **bộ xuất IFC của Autodesk** đặt thân cột ở hai chỗ khác nhau; 11 cột trong số đó thân IFC
+còn bị cắt bởi join (267 × 548 mm cho cột 24" × 24"), script tách riêng nhóm này. Lệnh đi theo hình học Revit —
+đó là thứ Revit vẽ trên mặt bằng — nhưng đường thứ ba để phân xử (máy toàn đạc thật, hay mở family để đọc tham số
+offset) chưa có. Ghi ở `toa-do-dinh-vi.md` mục *Còn thiếu*.
+
+### Bẫy môi trường ghi lại
+
+- Script đối chiếu lượt đầu lọc dòng bằng `any(k in line)` với 27 mẫu trên 3 triệu dòng: chậm vài phút; và lấy
+  mọi IFCGRIDAXIS cho mọi IFCGRID nên nhân số cặp lên hàng chục triệu → `MemoryError`, tiến trình Python 8 GB
+  còn sống làm lượt Revit sau báo *"not enough memory to open the model"*. Sửa: `startswith(tuple)` + chỉ trục
+  mà chính grid tham chiếu.
+- `BatchExport` mặc định `dryRun: true` — lượt IFC đầu chỉ liệt kê sheet, không ghi file.
+
