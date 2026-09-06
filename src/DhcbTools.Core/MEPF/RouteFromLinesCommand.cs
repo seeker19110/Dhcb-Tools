@@ -64,7 +64,7 @@ public sealed class RouteFromLinesCommand : ICoreCommand<RouteFromLinesConfig>
         var lines = CollectLines(document, config.LineStyleName);
         if (lines.Count == 0)
         {
-            return CommandResult.Fail($"Không có model/detail line nào dùng line style \"{config.LineStyleName}\".");
+            return CommandResult.Fail(RouteBuildPlanner.NoLinesMessage(config.LineStyleName));
         }
 
         var level = RevitCompat.FindLevel(document, config.LevelName)
@@ -85,7 +85,7 @@ public sealed class RouteFromLinesCommand : ICoreCommand<RouteFromLinesConfig>
         };
         if (curveType == null)
         {
-            return CommandResult.Fail($"Không tìm thấy type \"{config.TypeName}\" cho {config.ElementType} (hợp lệ: Duct, Pipe, CableTray, Conduit).");
+            return CommandResult.Fail(RouteBuildPlanner.NoTypeMessage(config.TypeName, config.ElementType));
         }
 
         ElementId systemTypeId = ElementId.InvalidElementId;
@@ -109,30 +109,24 @@ public sealed class RouteFromLinesCommand : ICoreCommand<RouteFromLinesConfig>
             var c = ((LocationCurve)l.Location).Curve;
             var p0 = c.GetEndPoint(0);
             var p1 = c.GetEndPoint(1);
-            if (config.OffsetMm.HasValue)
-            {
-                var z = level.Elevation + RevitCompat.MmToFt(config.OffsetMm.Value);
-                p0 = new XYZ(p0.X, p0.Y, z);
-                p1 = new XYZ(p1.X, p1.Y, z);
-            }
-            return new RouteSegment<ElementId>(l.Id, new Point3(p0.X, p0.Y, p0.Z), new Point3(p1.X, p1.Y, p1.Z));
+            double? z = config.OffsetMm.HasValue ? level.Elevation + RevitCompat.MmToFt(config.OffsetMm.Value) : null;
+            return RouteBuildPlanner.Segment(l.Id, new Point3(p0.X, p0.Y, p0.Z), new Point3(p1.X, p1.Y, p1.Z), z);
         }).ToList();
 
         var graph = RouteGraph<ElementId>.Build(segments, tol);
         var result = CommandResult.Ok(string.Empty);
         result.Messages.AddRange(graph.Warnings);
 
-        var fittingPlan = graph.Nodes.Select(n => (Node: n, Kind: graph.FittingAt(n.Id))).Where(t => t.Kind != FittingKind.None).ToList();
+        var fittingPlan = RouteBuildPlanner.FittingPlan(graph);
 
         if (config.DryRun)
         {
-            result.Summary = $"[Xem trước] Sẽ dựng {graph.Edges.Count} đoạn {config.ElementType} ({curveType.Name}), " +
-                             $"{fittingPlan.Count(f => f.Kind == FittingKind.Elbow)} elbow, {fittingPlan.Count(f => f.Kind == FittingKind.Tee)} tee, " +
-                             $"{fittingPlan.Count(f => f.Kind == FittingKind.Cross)} cross; {graph.Rejected.Count} đoạn bị bỏ.";
+            result.Summary = RouteBuildPlanner.PreviewSummary(graph.Edges.Count, config.ElementType, curveType.Name,
+                RouteBuildPlanner.Count(fittingPlan), graph.Rejected.Count);
             result.AffectedCount = graph.Edges.Count;
             foreach (var e in graph.Edges)
             {
-                result.Messages.Add($"Đoạn {e.Key}: {graph.Nodes[e.StartNode].Position} → {graph.Nodes[e.EndNode].Position} (ft)");
+                result.Messages.Add(RouteBuildPlanner.PreviewEdgeLine(e, graph));
             }
             return result;
         }
@@ -173,7 +167,7 @@ public sealed class RouteFromLinesCommand : ICoreCommand<RouteFromLinesConfig>
             if (curves.Count != node.Degree)
             {
                 fittingsFailed++;
-                result.Errors.Add($"Đỉnh {node.Position}: thiếu đoạn để dựng {fkind} — để hở, nối tay.");
+                result.Errors.Add(RouteBuildPlanner.MissingCurvesMessage(node.Position, fkind));
                 continue;
             }
 
@@ -181,7 +175,7 @@ public sealed class RouteFromLinesCommand : ICoreCommand<RouteFromLinesConfig>
             if (connectors.Any(c => c == null))
             {
                 fittingsFailed++;
-                result.Errors.Add($"Đỉnh {node.Position}: không tìm được connector — để hở.");
+                result.Errors.Add(RouteBuildPlanner.NoConnectorMessage(node.Position));
                 continue;
             }
 
@@ -205,7 +199,7 @@ public sealed class RouteFromLinesCommand : ICoreCommand<RouteFromLinesConfig>
                     default:
                         sub.RollBack();
                         fittingsFailed++;
-                        result.Errors.Add($"Đỉnh {node.Position}: {node.Degree} nhánh — không có fitting, để hở.");
+                        result.Errors.Add(RouteBuildPlanner.NoFittingForDegreeMessage(node.Position, node.Degree));
                         continue;
                 }
                 sub.Commit();
@@ -214,7 +208,7 @@ public sealed class RouteFromLinesCommand : ICoreCommand<RouteFromLinesConfig>
             catch (Exception ex)
             {
                 fittingsFailed++;
-                result.Errors.Add($"Đỉnh {node.Position}: {fkind} thất bại ({ex.Message}) — connector để hở, kỹ sư nối tay. Đoạn: {string.Join(", ", curves.Select(c => c.Id))}");
+                result.Errors.Add(RouteBuildPlanner.FittingFailedMessage(node.Position, fkind, ex.Message, curves.Select(c => c.Id.ToString())));
             }
         }
 
@@ -224,16 +218,16 @@ public sealed class RouteFromLinesCommand : ICoreCommand<RouteFromLinesConfig>
             autoConnected = ConnectToNearest(document, created.Values, RevitCompat.MmToFt(config.ConnectToNearestMm), result);
         }
 
-        if (config.DeleteLines && result.Errors.Count == 0)
+        if (RouteBuildPlanner.ShouldDeleteLines(config.DeleteLines, result.Errors.Count))
         {
             document.Delete(lines.Select(l => l.Id).ToList());
         }
 
         tx.Commit();
 
-        result.Summary = $"Đã dựng {created.Count}/{graph.Edges.Count} đoạn {config.ElementType}, {fittingsOk} fitting OK, {fittingsFailed} fitting lỗi, {autoConnected} mối nối tự động.";
+        result.Summary = RouteBuildPlanner.FinalSummary(created.Count, graph.Edges.Count, config.ElementType, fittingsOk, fittingsFailed, autoConnected);
         result.AffectedCount = created.Count;
-        result.Success = created.Count > 0;
+        result.Success = RouteBuildPlanner.IsSuccess(created.Count);
         return result;
     }
 

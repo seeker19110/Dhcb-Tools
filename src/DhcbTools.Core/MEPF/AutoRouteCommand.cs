@@ -100,40 +100,21 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
                             RevitCompat.FtToMm(bb.Max.X), RevitCompat.FtToMm(bb.Max.Y), RevitCompat.FtToMm(bb.Max.Z));
         }
 
-        double minX = double.MaxValue, minY = double.MaxValue, minZ = double.MaxValue;
-        double maxX = double.MinValue, maxY = double.MinValue, maxZ = double.MinValue;
-        for (var i = 0; i < 8; i++)
-        {
-            var corner = transform.OfPoint(new XYZ(
-                (i & 1) == 0 ? bb.Min.X : bb.Max.X,
-                (i & 2) == 0 ? bb.Min.Y : bb.Max.Y,
-                (i & 4) == 0 ? bb.Min.Z : bb.Max.Z));
-            minX = Math.Min(minX, corner.X); maxX = Math.Max(maxX, corner.X);
-            minY = Math.Min(minY, corner.Y); maxY = Math.Max(maxY, corner.Y);
-            minZ = Math.Min(minZ, corner.Z); maxZ = Math.Max(maxZ, corner.Z);
-        }
-
-        return new Box3(RevitCompat.FtToMm(minX), RevitCompat.FtToMm(minY), RevitCompat.FtToMm(minZ),
-                        RevitCompat.FtToMm(maxX), RevitCompat.FtToMm(maxY), RevitCompat.FtToMm(maxZ));
+        var moved = AutoRoutePlanner.Corners(bb.Min.X, bb.Min.Y, bb.Min.Z, bb.Max.X, bb.Max.Y, bb.Max.Z)
+            .Select(c => transform.OfPoint(new XYZ(c.X, c.Y, c.Z)))
+            .Select(c => new Point3(RevitCompat.FtToMm(c.X), RevitCompat.FtToMm(c.Y), RevitCompat.FtToMm(c.Z)));
+        return AutoRoutePlanner.BoundsOf(moved);
     }
 
     /// <summary>Hộp tìm kiếm đưa sang hệ toạ độ khác (dùng cả tám đỉnh, vì phép biến đổi có thể xoay).</summary>
     private static Outline TransformOutline(Outline outline, Transform transform)
     {
-        double minX = double.MaxValue, minY = double.MaxValue, minZ = double.MaxValue;
-        double maxX = double.MinValue, maxY = double.MinValue, maxZ = double.MinValue;
-        for (var i = 0; i < 8; i++)
-        {
-            var corner = transform.OfPoint(new XYZ(
-                (i & 1) == 0 ? outline.MinimumPoint.X : outline.MaximumPoint.X,
-                (i & 2) == 0 ? outline.MinimumPoint.Y : outline.MaximumPoint.Y,
-                (i & 4) == 0 ? outline.MinimumPoint.Z : outline.MaximumPoint.Z));
-            minX = Math.Min(minX, corner.X); maxX = Math.Max(maxX, corner.X);
-            minY = Math.Min(minY, corner.Y); maxY = Math.Max(maxY, corner.Y);
-            minZ = Math.Min(minZ, corner.Z); maxZ = Math.Max(maxZ, corner.Z);
-        }
-
-        return new Outline(new XYZ(minX, minY, minZ), new XYZ(maxX, maxY, maxZ));
+        var box = AutoRoutePlanner.BoundsOf(
+            AutoRoutePlanner.Corners(outline.MinimumPoint.X, outline.MinimumPoint.Y, outline.MinimumPoint.Z,
+                                     outline.MaximumPoint.X, outline.MaximumPoint.Y, outline.MaximumPoint.Z)
+                .Select(c => transform.OfPoint(new XYZ(c.X, c.Y, c.Z)))
+                .Select(c => new Point3(c.X, c.Y, c.Z)));
+        return new Outline(new XYZ(box.MinX, box.MinY, box.MinZ), new XYZ(box.MaxX, box.MaxY, box.MaxZ));
     }
 
     /// <summary>
@@ -166,26 +147,21 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
                 if (insert == null) continue;
                 var cat = insert.Category == null ? 0 : RevitCompat.IdValue(insert.Category.Id);
                 var isDoorOrWindow = cat == (long)BuiltInCategory.OST_Doors || cat == (long)BuiltInCategory.OST_Windows;
-                if (isDoorOrWindow && !config.IncludeDoorsWindows) continue;
                 // Tường nhúng (curtain wall trong tường chủ) không phải lỗ để đi qua; liên kết kết cấu
                 // (Structural Connections) gắn vào tường cũng về qua FindInserts nhưng là thép đặc, không phải lỗ.
-                if (insert is Wall || cat == (long)BuiltInCategory.OST_StructConnections) continue;
+                if (!AutoRoutePlanner.IsPassableOpening(isDoorOrWindow, config.IncludeDoorsWindows, insert is Wall,
+                        cat == (long)BuiltInCategory.OST_StructConnections)) continue;
 
                 var hole = BoxOf(insert, transform);
                 // Chỉ tính lỗ thật sự nằm trên vật chủ trong hộp tìm kiếm — insert ở đầu kia của bức tường
                 // dài không phải lỗ để đi qua ở đây.
-                if (hole == null || !BoxSubtract.Overlaps(hole, box)) continue;
-                holes.Add(hole);
-                openingLog.Add($"{insert.Category?.Name ?? "?"} {hole.MaxX - hole.MinX:F0}×{hole.MaxY - hole.MinY:F0}×{hole.MaxZ - hole.MinZ:F0} "
-                             + $"tại ({(hole.MinX + hole.MaxX) / 2:F0},{(hole.MinY + hole.MaxY) / 2:F0},{(hole.MinZ + hole.MaxZ) / 2:F0}) "
-                             + $"trên {e.Category?.Name ?? "?"} {RevitCompat.IdValue(e.Id)}");
+                if (!AutoRoutePlanner.HoleTouchesHost(hole, box)) continue;
+                holes.Add(hole!);
+                openingLog.Add(AutoRoutePlanner.OpeningLine(insert.Category?.Name, hole!, e.Category?.Name, RevitCompat.IdValue(e.Id)));
             }
 
-            if (holes.Count > 0)
-            {
-                obstacles.AddRange(BoxSubtract.Minus(box, holes));
-                return true;
-            }
+            obstacles.AddRange(AutoRoutePlanner.ObstaclePieces(box, holes));
+            return true;
         }
 
         obstacles.Add(box);
@@ -195,20 +171,7 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
     /// <summary>Dòng chi tiết chung cho cả hai nhánh: từng link đóng góp bao nhiêu vật cản, và lỗ mở nào đã đục (mức D, tối đa 30 dòng).</summary>
     private static void AppendObstacleDetails(CommandResult result, List<string> linkSummary, List<string> openingLog)
     {
-        foreach (var line in linkSummary)
-        {
-            result.Messages.Add("  Link — " + line);
-        }
-
-        foreach (var line in openingLog.Take(30))
-        {
-            result.Messages.Add("  Lỗ mở — " + line);
-        }
-
-        if (openingLog.Count > 30)
-        {
-            result.Messages.Add($"  … và {openingLog.Count - 30} lỗ mở nữa.");
-        }
+        result.Messages.AddRange(AutoRoutePlanner.ObstacleDetails(linkSummary, openingLog));
     }
 
     private static readonly BuiltInCategory[] DefaultObstacles =
@@ -221,10 +184,7 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
     {
         var start = new Point3(config.StartMm.X, config.StartMm.Y, config.StartMm.Z);
         var goal = new Point3(config.EndMm.X, config.EndMm.Y, config.EndMm.Z);
-        var m = config.SearchMarginMm;
-        var mz = config.SearchMarginZMm;
-        var bounds = new Box3(Math.Min(start.X, goal.X) - m, Math.Min(start.Y, goal.Y) - m, Math.Min(start.Z, goal.Z) - mz,
-                              Math.Max(start.X, goal.X) + m, Math.Max(start.Y, goal.Y) + m, Math.Max(start.Z, goal.Z) + mz);
+        var bounds = AutoRoutePlanner.SearchBounds(start, goal, config.SearchMarginMm, config.SearchMarginZMm);
 
         ICollection<ElementId> catIds = config.ObstacleCategories.Count > 0
             ? ParameterSync.ParameterExportCommand.ResolveCategoryIds(document, config.ObstacleCategories, out _)
@@ -261,12 +221,11 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
                 var linkDoc = linkInstance.GetLinkDocument();
                 if (linkDoc == null)
                 {
-                    linkSummary.Add($"{linkInstance.Name}: chưa nạp (unloaded) — bỏ qua");
+                    linkSummary.Add(AutoRoutePlanner.LinkUnloadedLine(linkInstance.Name));
                     continue;
                 }
 
-                if (config.LinkNameContains.Count > 0 &&
-                    !config.LinkNameContains.Any(f => linkInstance.Name.IndexOf(f, StringComparison.OrdinalIgnoreCase) >= 0))
+                if (!AutoRoutePlanner.LinkSelected(linkInstance.Name, config.LinkNameContains))
                 {
                     continue;
                 }
@@ -278,7 +237,7 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
                     : DefaultObstacles.Select(c => new ElementId(c)).ToList();
                 if (idsLink.Count == 0)
                 {
-                    linkSummary.Add($"{linkInstance.Name}: không có category vật cản nào");
+                    linkSummary.Add(AutoRoutePlanner.LinkNoCategoryLine(linkInstance.Name));
                     continue;
                 }
 
@@ -291,7 +250,7 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
                 {
                     if (AddObstacle(e, transform, config, obstacles, openingLog)) added++;
                 }
-                linkSummary.Add($"{linkInstance.Name}: {added} vật cản");
+                linkSummary.Add(AutoRoutePlanner.LinkCountLine(linkInstance.Name, added));
                 inLinks += added;
             }
         }
@@ -302,15 +261,12 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
             NearObstaclePenalty = config.NearObstaclePenalty, MaxExpandedNodes = config.MaxExpandedNodes,
         });
         var elements = inDocument + inLinks;
-        var source = $"{inDocument} trong file + {inLinks} từ model liên kết"
-                     + (config.RespectOpenings ? $", {openingLog.Count} lỗ mở đã đục" : ", mức C: không đục lỗ mở");
+        var source = AutoRoutePlanner.SourceText(inDocument, inLinks, config.RespectOpenings, openingLog.Count);
         if (!path.Found)
         {
             // `path.Reason` đã nói rõ thua vì bị bịt kín hay vì hết ngân sách — hai thứ cần cách chữa khác
             // hẳn nhau, nên đừng nuốt mất; kèm cỡ lưới để người đọc biết bước lưới có hợp với hộp không.
-            var fail = CommandResult.Fail(
-                $"Không tìm được tuyến ({path.Reason}). Đã xét {elements} chướng ngại ({source}), "
-                + $"lưới {path.GridCells:N0} ô bước {config.StepMm:F0} mm, mở rộng {path.ExpandedNodes:N0}/{path.MaxExpandedNodes:N0} node.");
+            var fail = CommandResult.Fail(AutoRoutePlanner.FailSummary(path, elements, source, config.StepMm));
             // Thua thì càng cần biết đã đục lỗ nào — kỹ sư đối chiếu ngay "lỗ có nhưng không đúng chỗ" với
             // "không có lỗ nào", hai kết luận dẫn tới hai việc khác nhau (sửa điểm, hay vẽ lỗ chờ vào model).
             AppendObstacleDetails(fail, linkSummary, openingLog);
@@ -319,24 +275,23 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
 
         var segments = PolylineSimplifier.ToSegments(path.Polyline);
         var result = CommandResult.Ok(string.Empty);
-        result.Messages.Add($"{elements} chướng ngại trong hộp tìm kiếm ({source}), {path.ExpandedNodes} node, {path.Turns} lần rẽ, {segments.Count} đoạn, tổng {PolylineSimplifier.Length(path.Polyline) / 1000:F1} m.");
+        result.Messages.Add(AutoRoutePlanner.FoundMessage(path, elements, source, segments.Count));
         AppendObstacleDetails(result, linkSummary, openingLog);
 
         // Tuyến đi qua một không gian TRỐNG là kết quả vô nghĩa nhưng trông y hệt kết quả tốt — nói ra
         // ngay, đừng để người đọc tự đoán vì sao tuyến thẳng băng.
-        if (elements == 0)
+        var warning = AutoRoutePlanner.NoObstacleWarning(elements, config.IncludeLinkedModels);
+        if (warning != null)
         {
-            result.Messages.Add(config.IncludeLinkedModels
-                ? "KHÔNG có vật cản nào trong hộp tìm kiếm, kể cả từ model liên kết — tuyến này chỉ là đường nối hai điểm. Kiểm lại link đã nạp chưa."
-                : "KHÔNG có vật cản nào và includeLinkedModels đang tắt — bật lên nếu dầm/cột/tường nằm ở model liên kết.");
+            result.Messages.Add(warning);
         }
-        result.Messages.AddRange(segments.Take(50).Select(s => $"({s.Start.X:F0},{s.Start.Y:F0},{s.Start.Z:F0}) → ({s.End.X:F0},{s.End.Y:F0},{s.End.Z:F0})"));
+        result.Messages.AddRange(segments.Take(50).Select(s => AutoRoutePlanner.SegmentLine(s.Start, s.End)));
 
         if (config.DryRun)
         {
             // Số vật cản phải nằm trong Summary chứ không chỉ Messages: báo cáo batch chỉ in Summary, mà
             // "tuyến đẹp" tìm trong không gian trống là kết quả vô nghĩa trông y hệt kết quả tốt.
-            result.Summary = $"[Xem trước] Tuyến {segments.Count} đoạn, {path.QualityText()}, né {elements} vật cản ({source}).";
+            result.Summary = AutoRoutePlanner.PreviewSummary(segments.Count, path, elements, source);
             result.AffectedCount = segments.Count;
             return result;
         }
@@ -366,7 +321,7 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
             tx.Commit();
         }
 
-        result.Summary = $"Đã vẽ {created} model line (line style \"{config.LineStyleName}\"), {path.QualityText()}, né {elements} vật cản ({source}).";
+        result.Summary = AutoRoutePlanner.WrittenSummary(created, config.LineStyleName, path, elements, source);
         result.AffectedCount = created;
 
         if (config.BuildRoute)
