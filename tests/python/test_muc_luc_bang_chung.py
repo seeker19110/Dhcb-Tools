@@ -30,10 +30,7 @@ class MucLucTests(unittest.TestCase):
         d = tempfile.mkdtemp()
         f = os.path.join(d, "bc.md")
         with open(f, "w", encoding="utf-8") as h:
-            h.write("# T
-
-## 1. A
-")
+            h.write("# T" + chr(10) + chr(10) + "## 1. A" + chr(10))
         self.assertEqual(1, muc_luc.main(["--check"], f))     # chưa có mục lục → lệch
         self.assertEqual(0, muc_luc.main([], f))              # cập nhật
         self.assertEqual(0, muc_luc.main(["--check"], f))     # nay khớp
