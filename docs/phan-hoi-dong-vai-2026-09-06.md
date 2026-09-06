@@ -29,7 +29,7 @@ Dữ liệu: Snowdon Architectural (55 sheet) vì dự án A không có sheet; p
 
 | Lệnh | Tuần | Bỏ | Chưa | Ghi chú |
 |---|:--:|:--:|:--:|---|
-| `SleeveAuto` | | ☑ | | `E-CONFIG-MISSING sleeveFamilyName`. Dự án không có family sleeve; `FamilyAudit` 175 family cũng không thấy. **Bỏ vì thiếu family, không phải lỗi lệnh** — cần family sleeve chuẩn kèm bộ cài (đã ghi ở §21) |
+| `SleeveAuto` | | ☑ | | `E-CONFIG-MISSING sleeveFamilyName`. Dự án không có family sleeve; `FamilyAudit` 175 family cũng không thấy. **Bỏ vì thiếu family, không phải lỗi lệnh** — nay chạy `FamilyStarter` trước là có `DHCB_Sleeve` (§60) |
 | `HangerAuto` | ☑ | | | Với family thật của dự án `REDY_Pipe_ Support (None Insulation)`: 4769 hanger / 4470 phần tử, bỏ qua 108 vị trí đã có. Phải tra tên family qua `FamilyAudit` trước — hai bước |
 | `ClashDetection` | ☑ | | | 479 va chạm với link, 2,6 s, BCF 479 topic |
 | `SlopePipes` | ☑ | | | Kiểm 2738 ống, 2582 chưa đạt — con số để bàn với thiết kế |
@@ -70,7 +70,7 @@ dòng nào vào `run.jsonl` dù có step thì ghi một dòng lỗi `NETLOAD` k�
    `AttributeIncrement`, `ElevationTag`) đều đòi biết tên có thật. Hướng đã đi: lỗi và xem trước **liệt kê cái có thật**
    (block, tag từ vòng này; tham số từ `DictionaryLearn`). **`SleeveAuto`/`HangerAuto` nay liệt kê 8 family ứng viên ngay
    trong lỗi (§58)** — không còn phải chạy `FamilyAudit` trước.
-3. **Thiếu gì?** ~~CSV cho `ConnectorChecker`~~ (đã có, §58); family sleeve/hanger mẫu kèm bộ cài.
+3. **Thiếu gì?** ~~CSV cho `ConnectorChecker`~~ (đã có, §58); ~~family sleeve/hanger mẫu~~ — nay `FamilyStarter` dựng và nạp `DHCB_Sleeve`/`DHCB_Hanger` từ template của chính Revit (§60), hình giữ chỗ.
 4. **Có dùng tiếp không?** Không trả lời được bằng đóng vai — cần người thật hai tuần.
 
 ## Tổng hợp theo lệnh (như hướng dẫn cuối mẫu)

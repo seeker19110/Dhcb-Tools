@@ -530,6 +530,29 @@
         ]
       },
       "//": "Vai MEP §57 phai chay FamilyAudit rieng de tra ten; nay loi tu liet ke (8 ung vien), fitting bi day xuong cuoi nen Round Elbow 738 instance khong duoc len dau."
+    },
+    {
+      "name": "FamilyStarter — xem trước: tìm được template Generic Model, sẽ dựng 2 family",
+      "command": "FamilyStarter",
+      "config": {
+        "outputFolder": "{outputFolder}/family-mau",
+        "dryRun": true
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 10000,
+        "summaryContains": [
+          "[Xem trước] Sẽ dựng 2 family mẫu",
+          "DHCB_Sleeve",
+          "DHCB_Hanger"
+        ],
+        "messagesContain": [
+          "Template:"
+        ],
+        "neverContains": [
+          "Exception"
+        ]
+      }
     }
   ]
 }

@@ -10,6 +10,15 @@ namespace DhcbTools.Revit.Commands;
 // IExternalCommand riêng, nên danh sách dài nhưng mỗi mục chỉ có một dòng thân hàm.
 // Tên lệnh phải khớp RevitCommandTable.Dispatch — RibbonCoverageTests giữ điều đó.
 
+/// <summary>Dựng family mẫu DHCB_Sleeve / DHCB_Hanger từ template Revit, ghi .rfa và nạp vào mô hình.</summary>
+[Transaction(TransactionMode.Manual)]
+[Regeneration(RegenerationOption.Manual)]
+public sealed class FamilyStarterRibbonCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        => CommandRunner.Run(commandData, "FamilyStarter");
+}
+
 /// <summary>Tạo Level và view plan tương ứng từ danh sách trong config.</summary>
 [Transaction(TransactionMode.Manual)]
 [Regeneration(RegenerationOption.Manual)]

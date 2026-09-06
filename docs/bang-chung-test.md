@@ -3081,3 +3081,29 @@ Chạy lại toàn bộ thay đổi của §55–§58 trên **Revit 2026**, cùn
 Kết luận cho điểm (5): id phần tử của model mẫu Snowdon **ổn định giữa 2024 và 2026** (Autodesk chỉ thêm/bớt vài phần tử,
 không đánh lại id), nên chưa cần cơ chế "chọn ống theo bộ lọc" trong bộ test; ghi chú trong `revit-write-plumbing.json`
 đã nói đúng việc phải làm nếu một ngày id lệch (chọn lại id, không sửa kỳ vọng). Không đổi mã.
+
+## 60. `FamilyStarter` — family mẫu sleeve/hanger dựng bằng chính Revit, để `SleeveAuto` không còn "bỏ vì thiếu family" (2026-09-06 13:00 ICT)
+
+Câu hỏi mở số 3 của vòng đóng vai (§57): vai MEP tick *Bỏ* cho `SleeveAuto` vì dự án A không có family sleeve, và thư
+viện kèm Revit 2024/2026 cũng không có (`find` trong `RVT 2024/Libraries/English` không ra sleeve/hanger nào). Thay vì
+đóng .rfa vẽ tay vào bộ cài, lệnh Core mới **`FamilyStarter`** dựng family từ template `Metric Generic Model.rft` của
+chính máy đó (`Application.FamilyTemplatePath`, tìm thêm thư mục `English`), ghi .rfa và nạp vào mô hình:
+
+- `DHCB_Sleeve`: ống lồng DN100 dài 300 mm, tâm tại gốc, trục Z = pháp tuyến mặt; tham số instance `Nominal Width`/`Nominal
+  Height` (đúng tên mặc định `SleeveAuto` ghi kích thước).
+- `DHCB_Hanger`: đế 100×100×50 dưới gốc; tham số `Rod Length`.
+- Cả hai **work-plane-based** (`FAMILY_WORK_PLANE_BASED`) để `NewFamilyInstance(face, …)` của `SleeveAuto` đặt được lên
+  mặt tường/sàn. Hình học là hình giữ chỗ và **không** do tham số điều khiển — nói rõ trong catalog và tài liệu; doanh
+  nghiệp thay bằng family chuẩn của mình khi có.
+
+Tầng thuần `FamilyStarterPlanner` (2 ca), phần Revit ~150 dòng. Dây đủ: `RevitCommandTable`, catalog (writes), nút Ribbon
+MEPF, README/progress/mẫu phản hồi (51 lệnh Revit), hai ca kiểm.
+
+| Ca (Revit 2024.3) | Kết quả |
+|---|---|
+| `mep` — xem trước | 28/28: *"[Xem trước] Sẽ dựng 2 family mẫu (DHCB_Sleeve, DHCB_Hanger) và nạp vào mô hình."*, Messages có đường template |
+| `write-mep` — GHI THẬT | **19/19**: `FamilyStarter` 1.860 ms → 2 .rfa + *đã nạp 2/2*; **`SleeveAuto` với `DHCB_Sleeve`: đặt 455 sleeve** (tường/sàn ở link nên đặt tự do), lần hai **0** (*Bỏ qua, đã có sleeve: 562*); **`HangerAuto` với `DHCB_Hanger`: 1125 hanger** trên 1056 phần tử |
+
+Đây là lần đầu `SleeveAuto`/`HangerAuto` chạy trọn với family **do DHCB cung cấp** thay vì mượn `HeatRecoveryUnit` của
+model mẫu. Chưa chứng minh: đặt lên mặt tường **trong cùng file** (Snowdon để tường ở link nên đường host-vào-mặt chưa
+chạy với family này); Revit 2026 chưa chạy bộ `write-mep` sau thay đổi này.
