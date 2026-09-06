@@ -35,6 +35,11 @@ public static partial class Program
             return 2;
         }
 
+        // Tuyệt đối hoá: accoreconsole không giải đường dẫn tương đối theo thư mục của runner —
+        // `--plugin-dll src\...\DhcbTools.AutoCAD.Core.dll` cho "Unable to load ... assembly", mọi DHCB_RUN
+        // thành "Unknown command", và runner báo "0 OK, 0 lỗi" (đóng vai kỹ sư AutoCAD, §57).
+        plugin = Path.GetFullPath(plugin);
+
         var outputFolder = job.ResolveOutputFolder(runTime);
         if (!string.IsNullOrEmpty(outputFolder)) Directory.CreateDirectory(outputFolder);
         // Thư mục step/script riêng cho từng lần chạy, cùng dấu giờ với run-HHmmss.jsonl.
@@ -110,6 +115,7 @@ public static partial class Program
                 CreateNoWindow = true,
             };
             var startedAt = DateTime.Now;
+            var linesBefore = File.Exists(runLog) ? File.ReadAllLines(runLog).Length : 0;
             using var p = Process.Start(psi);
             if (p is null)
             {
@@ -148,6 +154,24 @@ public static partial class Program
             File.WriteAllText(Path.Combine(work, $"{index:D3}.log"), output + (errors.Length > 0 ? "\n--- stderr ---\n" + errors : string.Empty), new UTF8Encoding(false));
 
             var exitCode = timedOut ? -1 : p.ExitCode;
+            // accoreconsole thoát 0 kể cả khi NETLOAD thất bại và mọi DHCB_RUN là "Unknown command": không dòng
+            // nào vào run.jsonl, báo cáo "0 OK, 0 lỗi" trông như chưa chạy gì (§57). Bắt bằng hai dấu hiệu:
+            // dòng "Unable to load" trong output, hoặc số dòng log của file này không tăng dù có step.
+            var netload = AcadScriptGen.NetloadFailure(output + "\n" + errors);
+            var linesAfter = File.Exists(runLog) ? File.ReadAllLines(runLog).Length : 0;
+            if (!timedOut && (netload != null || (stepPaths.Count > 0 && linesAfter == linesBefore)))
+            {
+                RunLog.Append(runLog, new RunLogEntry
+                {
+                    File = file.Path,
+                    Command = "NETLOAD",
+                    Success = false,
+                    Summary = (netload ?? $"Không ca nào ghi vào run.jsonl dù script có {stepPaths.Count} step — NETLOAD thất bại?")
+                              + " DLL: " + plugin + " (xem " + Path.Combine(work, $"{index:D3}.log") + ").",
+                });
+                anyFailed = true;
+            }
+
             if (!timedOut && exitCode != 0)
             {
                 var tail = Tail(errors.Length > 0 ? errors : output, 5);

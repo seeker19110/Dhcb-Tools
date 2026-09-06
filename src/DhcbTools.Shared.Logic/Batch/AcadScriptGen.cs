@@ -26,6 +26,26 @@ namespace DhcbTools.Shared.Logic.Batch
         /// <param name="dwgVersion">Từ khoá phiên bản DWG cho SAVEAS (2000/2004/2007/2010/2013/2018), mặc định 2018.</param>
         /// <param name="saveTargetExists">File đích đã tồn tại → AutoCAD hỏi "replace it?"; thêm dòng <c>Y</c> để trả lời.
         /// Không có dòng này thì prompt nuốt luôn lệnh kế tiếp và bản vẽ không được lưu. Với saveMode=Save luôn là true.</param>
+        /// <summary>
+        /// Dòng "Unable to load … assembly." trong output của accoreconsole, hoặc <c>null</c>. Khi NETLOAD thất bại
+        /// thì mọi <c>DHCB_RUN</c> sau đó là "Unknown command" và không dòng nào được ghi vào run.jsonl — runner dùng
+        /// hàm này để biến "0 OK, 0 lỗi" câm thành một dòng lỗi có tên DLL (đóng vai kỹ sư AutoCAD, §57).
+        /// </summary>
+        public static string? NetloadFailure(string? consoleOutput)
+        {
+            if (string.IsNullOrEmpty(consoleOutput)) return null;
+            foreach (var raw in consoleOutput!.Split('\n'))
+            {
+                var line = raw.Trim('\r', ' ');
+                if (line.StartsWith("Unable to load", StringComparison.OrdinalIgnoreCase) && line.IndexOf("assembly", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return line;
+                }
+            }
+
+            return null;
+        }
+
         public static string Build(string pluginDllPath, IReadOnlyList<string> stepJsonPaths, string? saveAsPath, string runLogPath, string sourceFile,
             string? plotScript = null, string? dwgVersion = null, bool saveTargetExists = false)
         {

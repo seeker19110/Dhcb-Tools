@@ -321,4 +321,15 @@ public class AcadScriptGenTests
         Assert.Equal("LayerExport", (string?)json["command"]);
         Assert.Equal("x.csv", (string?)json["config"]!["outputPath"]);
     }
+
+    /// <summary>§57: NETLOAD thất bại thì accoreconsole vẫn thoát 0 — phải đọc được dòng lỗi từ output.</summary>
+    [Fact]
+    public void NetloadFailure_BatDongUnableToLoad_KhongBatKhiNapDuoc()
+    {
+        var output = "Command: NETLOAD Assembly file name: \"src\\x.dll\"\r\nUnable to load src\\x.dll assembly.\r\nCommand: DHCB_RUN\r\nUnknown command \"DHCB_RUN\".";
+        Assert.Equal("Unable to load src\\x.dll assembly.", AcadScriptGen.NetloadFailure(output));
+        Assert.Null(AcadScriptGen.NetloadFailure("Command: NETLOAD Assembly file name: \"C:\\x.dll\"\r\nCommand: DHCB_RUN\r\nStep JSON:"));
+        Assert.Null(AcadScriptGen.NetloadFailure(null));
+        Assert.Null(AcadScriptGen.NetloadFailure(string.Empty));
+    }
 }

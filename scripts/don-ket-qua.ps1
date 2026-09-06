@@ -29,6 +29,10 @@ param(
     [int]$KeepPerSuite = 2,
     [int]$MaxAgeDays = 14,
     [switch]$DropIfc,
+    # Journal Revit do batch để lại trong %APPDATA%\DHCB (journal.NNNN.txt + .worker1.log, ~0,5 MB mỗi lượt;
+    # 142 file sau ba ngày — §54). Giữ KeepJournals cặp mới nhất, xoá phần còn lại. Rỗng = không đụng.
+    [string]$JournalDir = "$env:APPDATA\DHCB",
+    [int]$KeepJournals = 10,
     [switch]$Apply
 )
 
@@ -75,9 +79,25 @@ foreach ($g in ($runs | Group-Object Suite)) {
     }
 }
 
+if ($JournalDir -and (Test-Path -LiteralPath $JournalDir)) {
+    $journals = Get-ChildItem -LiteralPath $JournalDir -File -Filter 'journal.*' | Sort-Object LastWriteTime -Descending
+    # Mỗi lượt là một cặp (journal.NNNN.txt + journal.NNNN.worker1.log): gom theo số thứ tự rồi giữ KeepJournals cặp.
+    $groups = $journals | Group-Object { ($_.Name -split '\.')[1] } | Sort-Object { [int]$_.Name } -Descending
+    $i = 0
+    foreach ($g in $groups) {
+        $i++
+        if ($i -le $KeepJournals) { continue }
+        foreach ($f in $g.Group) {
+            $plan += [pscustomobject]@{ Action = 'xoá journal'; Path = $f.FullName; MB = [math]::Round($f.Length / 1MB, 1) }
+        }
+    }
+}
+
 $total = [double](($plan | Where-Object Action -ne 'giữ' | Measure-Object MB -Sum).Sum)
 Write-Host ("{0} — {1} lượt trong {2} bộ, {3} thư mục khác không đụng tới." -f $Root, $runs.Count, ($runs | Group-Object Suite).Count, $other.Count)
-$plan | Where-Object Action -ne 'giữ' | ForEach-Object { Write-Host ("  {0,-14} {1,8:n1} MB  {2}" -f $_.Action, $_.MB, $_.Path) }
+$plan | Where-Object { $_.Action -ne 'giữ' -and $_.Action -ne 'xoá journal' } | ForEach-Object { Write-Host ("  {0,-14} {1,8:n1} MB  {2}" -f $_.Action, $_.MB, $_.Path) }
+$j = @($plan | Where-Object Action -eq 'xoá journal')
+if ($j.Count -gt 0) { Write-Host ("  xoá journal    {0,8:n1} MB  {1} file trong {2}" -f (($j | Measure-Object MB -Sum).Sum), $j.Count, $JournalDir) }
 Write-Host ("Sẽ giải phóng ≈ {0:n0} MB." -f $total)
 
 if (-not $Apply) { Write-Host "[Xem trước] Thêm -Apply để xoá thật."; exit 0 }
