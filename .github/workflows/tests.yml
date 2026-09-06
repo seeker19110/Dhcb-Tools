@@ -7,6 +7,13 @@ on:
     branches: [main]
   pull_request:
 
+# Đẩy commit mới lên cùng PR thì huỷ lượt CI cũ: 11 job × ~50 s của lượt cũ không còn giá trị gì
+# mà vẫn chiếm runner, lượt mới phải xếp hàng. Chỉ huỷ trên PR — trên main mỗi commit phải có
+# kết quả CI riêng (release.yml và bằng chứng kiểm thử tra theo commit).
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   logic-tests:
     runs-on: ubuntu-latest

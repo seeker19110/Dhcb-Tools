@@ -2760,3 +2760,30 @@ chính file exe** (`dotnet DhcbTools.BatchRunner.dll`) làm tiến trình con. B
   đọc JSON hỏng/rỗng, CSV, HTML). Cổng phủ 100% dòng vẫn xanh.
 - 4 ca CLI trong `BatchRunner.Tests` (mã thoát 0/1/2, ghi cả .html lẫn .csv, và ca chạy exe thật ở trên).
 - Tổng: 1364 ca thuần + 21 ca CLI.
+
+## 49. Đưa nửa mã nguồn không phủ vào cổng phủ — ba lệnh, 120 ca, hai bộ chạy thật (2026-09-06 08:30 ICT)
+
+### Xuất phát: 100 % của cái gì
+Đánh giá sâu toàn repo: cổng phủ 100 % dòng chỉ áp lên `Shared.Logic` (16.346 dòng) + `Shared.Hosting` (1.811) + test CLI `BatchRunner`;
+`Core` (13.924), `Core.AutoCAD` (4.532) và hai vỏ (5.357) — **≈ 55 % src** — không có ca test nào trên CI. Ba sự cố gần nhất
+(§38 `respectOpenings` thiếu trong `DefaultBool`, §44 IFC rác làm sập runner, §48 `InvariantGlobalization` tắt bỏ dấu trong exe)
+đều nằm trong nửa ấy. Đồng thời `SleeveCommand.cs` 855 dòng chỉ ~55 dòng chạm `Autodesk.Revit`: logic thuần bị giam vì đứng cạnh một `Document`.
+
+### Việc làm
+| PR | Gì | Test mới | Chạy thật |
+|---|---|---|---|
+| #104 | `DocCommandTableTests`: `CommandCatalog` ↔ README `## Lệnh` ↔ `progress.md`, cả hai chiều. **Đỏ ngay lượt đầu**: `CadLink`, `IdsValidate`, `ModelLinesFromCad` có mã mà thiếu ở README. `check-coverage.py` sập `UnicodeEncodeError` trên console cp1252 (chưa từng chạy được ở máy Windows) — sửa + ca hồi quy. `BridgeAuth`/`dac-ta-tinh-nang.md`: bảng 5 lớp đe doạ, nói rõ mã chạy cùng tài khoản vẫn đọc được token | 3 + 1 | — |
+| #105 | `SleevePlanner` (Liang–Barsky, hộp bao qua transform 8 đỉnh, lọc, cỡ sleeve `Resolved=false`, gom lý do có trần, Summary/Messages) | 54 | `mep` 26/26; `SleeveAuto` **445 sleeve** = §22 |
+| #106 | `SetoutExportLogic` (curvePoints/coordinateSystem, `ChooseMatchingTransform` trả −1 → phải cảnh báo, `SiteNotes`, Summary, ghi chú) + `ProgressReportLogic` (`ProgressGroupBy`, `GroupOf`, HTML tiêm `DateTime`, Summary/Notes) | 39 + 27 | `smoke` 41/41 + 1 bỏ qua; `SetoutExport` **260 điểm = 118 tim cột + 142 giao trục**, `ProgressReport` ra đúng E-PARAM-MISSING |
+
+Hành vi giữ nguyên từng chuỗi (kể cả mục rỗng trong bộ lọc = ký tự đại diện của bản cũ, có test ghim). Build Core xanh Revit 2024 (net48) và 2025 (net8).
+Shared.Logic **1367 → 1487 ca**, phủ 100 %. Rà `catch`: 7 khối rỗng đều best-effort; `catch (Exception)` duy nhất trên đường ghi (`ParameterImport.TrySetParameter`) trả `false` và được đếm + báo từng dòng.
+
+### Hạ tầng đi kèm
+- Ruleset `main` (id 22338598) tạo tay có include `~ALL` → chặn cả nhánh PR; sửa bằng `scripts/fix-ruleset.py` (user chạy — bộ phân loại auto-mode chặn Claude gọi `gh api PUT rulesets`): chỉ `~DEFAULT_BRANCH` + 11 required check. Từ #106, `gh pr merge --auto` ở trạng thái BLOCKED tới khi CI xanh rồi tự merge — lần đầu `--auto` đúng nghĩa.
+- `scripts/apply-rulesets.py`: cùng khuôn cho 11 repo, bộ check bắt buộc tối thiểu theo job cổng tổng hợp (`quality`/`ci`/`e2e` có `needs:` gom mọi job).
+- `tests.yml`: `concurrency` huỷ lượt cũ khi đẩy commit mới lên PR.
+
+### Còn mở
+Phần còn lại của `Core` (~12.000 dòng) vẫn ngoài cổng phủ. Ưu tiên tách tiếp theo cùng cách: `SlopePipes`, `HangerCommand`, `StyleCommands`, `AcadQueryHandler`.
+
