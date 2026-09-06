@@ -1,8 +1,9 @@
-﻿using System.Text;
+using System.Text;
 using Autodesk.Revit.DB;
 using DhcbTools.Shared.Logic;
 using DhcbTools.Shared.Logic.Bcf;
 using DhcbTools.Shared.Logic.Checks;
+using DhcbTools.Shared.Logic.Mep;
 
 namespace DhcbTools.Core.Checks;
 
@@ -55,15 +56,19 @@ public sealed class ClashDetectionConfig
     public int MaxResults { get; init; } = 2000;
 }
 
-/// <summary>Lọc thô <see cref="MepLayout.BoundingBoxesIntersect"/> → <see cref="ElementIntersectsElementFilter"/> chính xác.</summary>
+/// <summary>
+/// Lọc thô <see cref="MepLayout.BoundingBoxesIntersect"/> → <see cref="ElementIntersectsElementFilter"/> chính xác.
+/// Khoá, Summary, HTML, BCF và mọi câu giải thích nằm ở <see cref="ClashReport"/> (có test trên CI);
+/// file này chỉ còn quét hình học Revit và tạo 3D view.
+/// </summary>
 public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
 {
     public string CommandName => "ClashDetection";
 
-    private sealed record Clash(Element A, Element B, XYZ Centre, string Key, string? LinkName, ElementId? LinkInstanceId);
+    private sealed record Clash(Element A, Element B, ClashRecord Record, ElementId? LinkInstanceId);
 
     /// <summary>Phần tử nhóm B kèm hộp bao ĐÃ ĐƯA VỀ toạ độ file chủ (link thì khác toạ độ).</summary>
-    private sealed record Candidate(Element Element, XYZ Min, XYZ Max, Transform? Transform, string? LinkName, ElementId? LinkInstanceId);
+    private sealed record Candidate(Element Element, Box3 Box, Transform? Transform, string? LinkName, ElementId? LinkInstanceId);
 
     public CommandResult Execute(Document document, ClashDetectionConfig config)
     {
@@ -71,7 +76,7 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
         var idsB = ParameterSync.ParameterExportCommand.ResolveCategoryIds(document, config.CategoriesB, out var unknownB);
         if (idsA.Count == 0 || idsB.Count == 0)
         {
-            return CommandResult.Fail("Một trong hai nhóm category không có trong mô hình: " + string.Join(", ", unknownA.Concat(unknownB)));
+            return CommandResult.Fail(ClashReport.UnknownCategoriesError(unknownA.Concat(unknownB)));
         }
 
         var result = CommandResult.Ok(string.Empty);
@@ -103,8 +108,7 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
                     continue;
                 }
 
-                if (config.LinkNameContains.Count > 0 &&
-                    !config.LinkNameContains.Any(f => linkInstance.Name.IndexOf(f, StringComparison.OrdinalIgnoreCase) >= 0))
+                if (!ClashReport.LinkNameMatches(linkInstance.Name, config.LinkNameContains))
                 {
                     continue;
                 }
@@ -132,11 +136,11 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
         }
 
         // "0 va chạm" khi một trong hai nhóm rỗng là câu nói về TẬP ĐẦU VÀO, không phải về mô hình.
-        var inputPre = Shared.Logic.Checks.Precondition.First(
-            Shared.Logic.Checks.Precondition.NonEmptyInput(
+        var inputPre = Precondition.First(
+            Precondition.NonEmptyInput(
                 CommandName, $"phần tử nhóm A ({string.Join(", ", config.CategoriesA)})", elementsA.Count,
                 "Kiểm lại categoriesA, hoặc mở đúng file có nhóm phần tử đó."),
-            Shared.Logic.Checks.Precondition.NonEmptyInput(
+            Precondition.NonEmptyInput(
                 CommandName, $"phần tử nhóm B ({string.Join(", ", config.CategoriesB)})", elementsB.Count,
                 config.IncludeLinkedModels
                     ? "Kiểm lại categoriesB; nếu nhóm B nằm ở file liên kết thì kiểm cả bộ lọc linkNameContains."
@@ -160,24 +164,22 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
 
             var candidates = elementsB.Where(t => (t.LinkName != null || t.Element.Id != a.Id) && MepLayout.BoundingBoxesIntersect(
                 boxA.Min.X, boxA.Min.Y, boxA.Min.Z, boxA.Max.X, boxA.Max.Y, boxA.Max.Z,
-                t.Min.X, t.Min.Y, t.Min.Z, t.Max.X, t.Max.Y, t.Max.Z, tol)).ToList();
+                t.Box.MinX, t.Box.MinY, t.Box.MinZ, t.Box.MaxX, t.Box.MaxY, t.Box.MaxZ, tol)).ToList();
             if (candidates.Count == 0) continue;
 
             var hits = PreciseHits(document, a, candidates, result);
 
             foreach (var b in hits)
             {
-                var centre = new XYZ(
-                    (Math.Max(boxA.Min.X, b.Min.X) + Math.Min(boxA.Max.X, b.Max.X)) / 2,
-                    (Math.Max(boxA.Min.Y, b.Min.Y) + Math.Min(boxA.Max.Y, b.Max.Y)) / 2,
-                    (Math.Max(boxA.Min.Z, b.Min.Z) + Math.Min(boxA.Max.Z, b.Max.Z)) / 2);
-                var key = ClashAcceptance.MakeKey(RevitCompat.IdValue(a.Id), RevitCompat.IdValue(b.Element.Id), RevitCompat.FtToMm(centre.X), RevitCompat.FtToMm(centre.Y), RevitCompat.FtToMm(centre.Z));
-                // ElementId của link là id TRONG document link, có thể trùng với id ở file chủ hoặc link khác
-                // → khoá phải mang thêm id của link instance, nếu không hai va chạm khác nhau gộp làm một.
-                if (b.LinkInstanceId != null)
-                {
-                    key += "#link" + RevitCompat.IdValue(b.LinkInstanceId);
-                }
+                var centre = ClashReport.IntersectionCentre(
+                    boxA.Min.X, boxA.Min.Y, boxA.Min.Z, boxA.Max.X, boxA.Max.Y, boxA.Max.Z,
+                    b.Box.MinX, b.Box.MinY, b.Box.MinZ, b.Box.MaxX, b.Box.MaxY, b.Box.MaxZ);
+                var xMm = RevitCompat.FtToMm(centre.X);
+                var yMm = RevitCompat.FtToMm(centre.Y);
+                var zMm = RevitCompat.FtToMm(centre.Z);
+                var key = ClashReport.MakeKey(
+                    RevitCompat.IdValue(a.Id), RevitCompat.IdValue(b.Element.Id), xMm, yMm, zMm,
+                    b.LinkInstanceId == null ? (long?)null : RevitCompat.IdValue(b.LinkInstanceId));
                 if (!seen.Add(key)) continue;
                 if (accepted.Contains(key))
                 {
@@ -185,18 +187,24 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
                     continue;
                 }
 
-                clashes.Add(new Clash(a, b.Element, centre, key, b.LinkName, b.LinkInstanceId));
+                var record = new ClashRecord(
+                    RevitCompat.IdValue(a.Id), a.Category?.Name, a.Name,
+                    RevitCompat.IdValue(b.Element.Id), b.Element.Category?.Name,
+                    xMm, yMm, zMm, key, b.LinkName);
+                clashes.Add(new Clash(a, b.Element, record, b.LinkInstanceId));
                 if (config.MaxResults > 0 && clashes.Count >= config.MaxResults)
                 {
-                    result.Messages.Add($"Đạt giới hạn {config.MaxResults} va chạm — dừng quét.");
+                    result.Messages.Add(ClashReport.MaxResultsNote(config.MaxResults));
                     goto Done;
                 }
             }
         }
 
     Done:
-        WriteHtml(document, config, clashes, skippedAccepted);
-        WriteBcf(document, config, clashes, result);
+        var records = clashes.Select(c => c.Record).ToList();
+        RevitCompat.EnsureParentDirectory(config.OutputPath);
+        File.WriteAllText(config.OutputPath, ClashReport.Html(document.Title, config.CategoriesA, config.CategoriesB, records, skippedAccepted), Encoding.UTF8);
+        WriteBcf(document, config, records, result);
 
         if (config.Create3dView && clashes.Count > 0)
         {
@@ -209,8 +217,7 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
 
             if (config.DryRun)
             {
-                result.Messages.Add($"[Xem trước] Sẽ tạo/ghi đè 3D view \"{config.ViewName}\" và isolate {hostIds.Count} phần tử phía file chủ"
-                                    + (fromLinks > 0 ? $" ({fromLinks} phần tử phía link không isolate được, xem danh sách)." : "."));
+                result.Messages.Add(ClashReport.ViewNote(true, config.ViewName, hostIds.Count, fromLinks));
             }
             else
             {
@@ -224,8 +231,7 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
                     {
                         try { view.Name = config.ViewName; } catch { /* trùng tên */ }
                         view.IsolateElementsTemporary(hostIds);
-                        result.Messages.Add($"Đã tạo 3D view \"{view.Name}\" isolate {hostIds.Count} phần tử phía file chủ"
-                                            + (fromLinks > 0 ? $"; {fromLinks} phần tử phía link không isolate được (khác document)." : "."));
+                        result.Messages.Add(ClashReport.ViewNote(false, view.Name, hostIds.Count, fromLinks));
                     }
                     tx.Commit();
                 }
@@ -236,70 +242,35 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
             }
         }
 
-        foreach (var c in clashes.Take(500))
-        {
-            var bDesc = c.LinkName == null ? $"{c.B.Id}" : $"{c.B.Id} (link \"{c.LinkName}\")";
-            result.Messages.Add($"Va chạm {c.A.Id} ({c.A.Category?.Name}) × {bDesc} ({c.B.Category?.Name}) tại ({RevitCompat.FtToMm(c.Centre.X):F0},{RevitCompat.FtToMm(c.Centre.Y):F0},{RevitCompat.FtToMm(c.Centre.Z):F0}) mm  key={c.Key}");
-        }
-
         var inDocument = elementsB.Count(c => c.LinkName == null);
         var inLinks = elementsB.Count - inDocument;
-        result.Messages.Add($"Nhóm B xét tới: {inDocument} phần tử trong file, {inLinks} từ model liên kết.");
-        foreach (var line in linkSummary)
-        {
-            result.Messages.Add("  Link — " + line);
-        }
-
-        result.Summary = $"Tìm thấy {clashes.Count} va chạm ({skippedAccepted} đã chấp nhận, bỏ qua) → \"{config.OutputPath}\".";
-
-        // "0 va chạm" là kết luận người ta TIN VÀ LÀM THEO, nên nó phải kèm cơ sở: xét bao nhiêu phần tử,
-        // từ đâu. Bản trước chỉ có con số 0 trơ trọi, và trên file MEP link kết cấu thì con số đó luôn là 0.
-        if (clashes.Count == 0)
-        {
-            result.Summary += elementsB.Count == 0
-                ? (config.IncludeLinkedModels
-                    ? " Không có phần tử nhóm B nào để xét, kể cả trong model liên kết — kiểm lại link đã nạp chưa."
-                    : " Không có phần tử nhóm B nào trong file này và includeLinkedModels đang tắt — bật lên nếu nhóm B nằm ở model liên kết.")
-                : $" Đã xét {elementsA.Count} × ({inDocument} trong file + {inLinks} từ model liên kết).";
-        }
-        else if (inLinks > 0)
-        {
-            var fromLinks = clashes.Count(c => c.LinkName != null);
-            result.Summary += $" Trong đó {fromLinks} va chạm với model liên kết.";
-        }
+        result.Messages.AddRange(ClashReport.Notes(records, inDocument, inLinks, linkSummary));
+        result.Summary = ClashReport.Summary(records, skippedAccepted, config.OutputPath, elementsA.Count, inDocument, inLinks, config.IncludeLinkedModels);
         result.AffectedCount = clashes.Count;
         return result;
     }
 
-
     /// <summary>
-    /// Phần tử nhóm B kèm hộp bao ở toạ độ file chủ. Link xoay thì hộp bao dựng lại từ tám đỉnh —
-    /// lấy hai điểm min/max qua phép biến đổi là sai khi có xoay.
+    /// Phần tử nhóm B kèm hộp bao ở toạ độ file chủ. Link xoay thì hộp bao dựng lại từ tám đỉnh
+    /// (<see cref="SleevePlanner.TransformedBox"/>) — lấy hai điểm min/max qua phép biến đổi là sai khi có xoay.
     /// </summary>
     private static Candidate? Describe(Element element, Transform? transform, string? linkName, ElementId? linkInstanceId)
     {
         var box = element.get_BoundingBox(null);
         if (box == null) return null;
 
+        var local = new Box3(box.Min.X, box.Min.Y, box.Min.Z, box.Max.X, box.Max.Y, box.Max.Z);
         if (transform == null)
         {
-            return new Candidate(element, box.Min, box.Max, null, null, null);
+            return new Candidate(element, local, null, null, null);
         }
 
-        double minX = double.MaxValue, minY = double.MaxValue, minZ = double.MaxValue;
-        double maxX = double.MinValue, maxY = double.MinValue, maxZ = double.MinValue;
-        for (var i = 0; i < 8; i++)
+        var moved = SleevePlanner.TransformedBox(local, (x, y, z) =>
         {
-            var corner = transform.OfPoint(new XYZ(
-                (i & 1) == 0 ? box.Min.X : box.Max.X,
-                (i & 2) == 0 ? box.Min.Y : box.Max.Y,
-                (i & 4) == 0 ? box.Min.Z : box.Max.Z));
-            minX = Math.Min(minX, corner.X); maxX = Math.Max(maxX, corner.X);
-            minY = Math.Min(minY, corner.Y); maxY = Math.Max(maxY, corner.Y);
-            minZ = Math.Min(minZ, corner.Z); maxZ = Math.Max(maxZ, corner.Z);
-        }
-
-        return new Candidate(element, new XYZ(minX, minY, minZ), new XYZ(maxX, maxY, maxZ), transform, linkName, linkInstanceId);
+            var p = transform.OfPoint(new XYZ(x, y, z));
+            return (p.X, p.Y, p.Z);
+        });
+        return new Candidate(element, moved, transform, linkName, linkInstanceId);
     }
 
     /// <summary>
@@ -392,35 +363,15 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
         return null;
     }
 
-    /// <summary>
-    /// Xuất BCF 2.1. Toạ độ BCF là **mét**, còn Revit đo bằng foot — quy đổi ở đúng một chỗ này.
-    /// GUID của topic sinh từ chính <c>key</c> đã dùng cho clash-accepted.json, nên xuất lại cùng một
-    /// va chạm vẫn ra đúng vấn đề cũ trong phần mềm điều phối chứ không đẻ ra vấn đề mới.
-    /// </summary>
-    private static void WriteBcf(Document doc, ClashDetectionConfig config, List<Clash> clashes, CommandResult result)
+    /// <summary>Xuất BCF 2.1 — nội dung vấn đề dựng ở <see cref="ClashReport.BcfIssues"/>; ở đây chỉ ghi file.</summary>
+    private static void WriteBcf(Document doc, ClashDetectionConfig config, List<ClashRecord> clashes, CommandResult result)
     {
         if (string.IsNullOrWhiteSpace(config.BcfPath)) return;
 
         try
         {
-            var issues = new List<BcfIssue>();
-            foreach (var c in clashes)
-            {
-                var bDesc = c.LinkName == null ? $"{RevitCompat.IdValue(c.B.Id)}" : $"{RevitCompat.IdValue(c.B.Id)} (link \"{c.LinkName}\")";
-                var issue = new BcfIssue(BcfWriter.GuidFromKey(c.Key), $"{c.A.Category?.Name} × {c.B.Category?.Name} — {c.A.Name}")
-                {
-                    Description = $"Va chạm {RevitCompat.IdValue(c.A.Id)} ({c.A.Category?.Name}) × {bDesc} ({c.B.Category?.Name})"
-                                  + $" tại ({RevitCompat.FtToMm(c.Centre.X):F0}, {RevitCompat.FtToMm(c.Centre.Y):F0}, {RevitCompat.FtToMm(c.Centre.Z):F0}) mm. key={c.Key}",
-                    Target = new BcfPoint(FtToM(c.Centre.X), FtToM(c.Centre.Y), FtToM(c.Centre.Z)),
-                    Author = "DHCB Tools",
-                };
-                issue.Labels.Add(c.LinkName == null ? "Trong file" : "Với model liên kết");
-                issue.Components.Add(new BcfComponent(RevitCompat.IdValue(c.A.Id).ToString(), null, doc.Title));
-                issue.Components.Add(new BcfComponent(RevitCompat.IdValue(c.B.Id).ToString(), null, c.LinkName ?? doc.Title));
-                issues.Add(issue);
-            }
-
-            BcfWriter.WriteFile(config.BcfPath!, issues, new BcfProject { Name = string.IsNullOrWhiteSpace(config.BcfProjectName) ? doc.Title : config.BcfProjectName });
+            var issues = ClashReport.BcfIssues(doc.Title, clashes);
+            BcfWriter.WriteFile(config.BcfPath!, issues, new BcfProject { Name = ClashReport.BcfProjectName(config.BcfProjectName, doc.Title) });
             result.Messages.Add($"Đã ghi BCF {BcfWriter.Version}: {issues.Count} vấn đề → \"{config.BcfPath}\".");
         }
         catch (Exception ex)
@@ -429,32 +380,5 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
             // nhưng cũng không được im — người dùng đang chờ một file để mở bên Navisworks.
             result.Messages.Add("Không ghi được file BCF: " + ex.Message);
         }
-    }
-
-    private static double FtToM(double feet) => RevitCompat.FtToMm(feet) / 1000.0;
-
-    private static void WriteHtml(Document doc, ClashDetectionConfig config, List<Clash> clashes, int skipped)
-    {
-        var sb = new StringBuilder();
-        sb.Append("<!DOCTYPE html><html lang=\"vi\"><head><meta charset=\"utf-8\"><title>DHCB - Va chạm</title>")
-          .Append("<style>body{font-family:Segoe UI,Arial,sans-serif;margin:24px}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:4px 8px}th{background:#f3f3f3}code{font-size:11px}</style></head><body>")
-          .Append("<h1>Va chạm nội bộ — ").Append(HtmlText.Escape(doc.Title)).Append("</h1>")
-          .Append("<p>").Append(HtmlText.Escape(string.Join(", ", config.CategoriesA))).Append(" × ").Append(HtmlText.Escape(string.Join(", ", config.CategoriesB)))
-          .Append(": <b>").Append(clashes.Count).Append("</b> va chạm; ").Append(skipped).Append(" đã chấp nhận (clash-accepted.json).</p>")
-          .Append("<p>Để chấp nhận một va chạm: thêm <code>{\"key\":\"…\",\"note\":\"…\"}</code> vào file accepted với key ở cột cuối.</p>")
-          .Append("<table><thead><tr><th>#</th><th>A</th><th>Category A</th><th>B</th><th>Category B</th><th>X</th><th>Y</th><th>Z (mm)</th><th>Key</th></tr></thead><tbody>");
-        var i = 1;
-        foreach (var c in clashes)
-        {
-            sb.Append("<tr><td>").Append(i++).Append("</td><td>").Append(RevitCompat.IdValue(c.A.Id)).Append("</td><td>").Append(HtmlText.Escape(c.A.Category?.Name))
-              .Append("</td><td>").Append(RevitCompat.IdValue(c.B.Id)).Append("</td><td>").Append(HtmlText.Escape(c.B.Category?.Name))
-              .Append("</td><td>").Append(RevitCompat.FtToMm(c.Centre.X).ToString("F0")).Append("</td><td>").Append(RevitCompat.FtToMm(c.Centre.Y).ToString("F0")).Append("</td><td>").Append(RevitCompat.FtToMm(c.Centre.Z).ToString("F0"))
-              .Append("</td><td><code>").Append(HtmlText.Escape(c.Key)).Append("</code></td></tr>");
-        }
-        sb.Append("</tbody></table></body></html>");
-
-        var dir = Path.GetDirectoryName(config.OutputPath);
-        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-        File.WriteAllText(config.OutputPath, sb.ToString(), Encoding.UTF8);
     }
 }
