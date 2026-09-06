@@ -24,6 +24,8 @@ param(
     # Cho phép ca khai báo "allowWrite" ghi THẬT vào model. Script sẽ chép model mẫu sang thư mục kết
     # quả và chạy trên bản chép, nên file gốc kèm Revit không bao giờ bị đụng tới.
     [switch]$AllowWrites,
+    # Không dọn DHCB-test-results sau khi chạy (mặc định dọn: bản chép model chỉ giữ ở lượt mới nhất mỗi bộ).
+    [switch]$NoPrune,
 
     [int]$RevitVersion = 2024,
 
@@ -270,4 +272,11 @@ if (Test-Path $report) {
 }
 
 Write-Host "Thư mục kết quả: $outDir"
+
+# ── 8. Dọn tự động ──────────────────────────────────────────────────────────
+# Mỗi lượt ghi để lại 270–400 MB bản chép; không ai gọi don-ket-qua.ps1 bằng tay nên thư mục lại phình (§61).
+# Giữ bản chép ở lượt mới nhất mỗi bộ (tức lượt vừa chạy), log/report các lượt cũ giữ nguyên. -NoPrune để tắt.
+if (-not $NoPrune) {
+    try { & (Join-Path $PSScriptRoot 'don-ket-qua.ps1') -Root $OutputRoot -Apply | Select-Object -Last 1 | Write-Host } catch { Write-Warning "Dọn kết quả lỗi: $_" }
+}
 exit $exit

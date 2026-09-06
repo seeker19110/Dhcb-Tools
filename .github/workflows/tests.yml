@@ -106,6 +106,7 @@ jobs:
           # Ngưỡng 100% câu lệnh (fail_under trong pyproject.toml) — cùng con số khi chạy ở máy.
           python3 -m coverage run -m unittest discover -s tools/autocad-mcp-server -p 'test_*.py'
           python3 -m coverage run --append -m unittest discover -s tests/python -p 'test_*.py'
+          python3 scripts/muc-luc-bang-chung.py --check
           python3 -m coverage report
 
       - name: Kiểm tra JavaScript panel AutoCAD

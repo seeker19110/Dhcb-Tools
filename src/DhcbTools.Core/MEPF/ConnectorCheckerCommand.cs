@@ -20,7 +20,7 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
     public CommandResult Execute(Document document, ConnectorCheckerConfig config)
     {
         // 1. Collect open connectors
-        var openConnectors = FindOpenConnectors(document, config);
+        var openConnectors = FindOpenConnectors(document, config, out var skipped);
 
         // Build report lines
         var reportLines = new List<string>();
@@ -47,7 +47,7 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
 
         if (openConnectors.Count == 0)
         {
-            return CommandResult.Ok("Không tìm thấy connector hở nào trong mô hình." + (csvPath == null ? string.Empty : $" CSV (chỉ tiêu đề): \"{csvPath}\"."), 0);
+            return CommandResult.Ok("Không tìm thấy connector hở nào trong mô hình." + (csvPath == null ? string.Empty : $" CSV (chỉ tiêu đề): \"{csvPath}\".") + ConnectorReport.SkippedNote(skipped), 0);
         }
 
         // 2. Tuỳ chọn tạo/cập nhật 3D view — chỉ khi không phải xem trước.
@@ -77,7 +77,7 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
             }
         }
 
-        var summary = ConnectorReport.Summary(openConnectors.Count, elementIds.Count, csvPath);
+        var summary = ConnectorReport.Summary(openConnectors.Count, elementIds.Count, csvPath) + ConnectorReport.SkippedNote(skipped);
         var result = CommandResult.Ok(summary, openConnectors.Count);
         result.Messages.AddRange(reportLines);
         return result;
@@ -117,9 +117,10 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
         public required string Level { get; set; }
     }
 
-    private List<ConnectorInfo> FindOpenConnectors(Document doc, ConnectorCheckerConfig config)
+    private List<ConnectorInfo> FindOpenConnectors(Document doc, ConnectorCheckerConfig config, out int skipped)
     {
         var result = new List<ConnectorInfo>();
+        skipped = 0;
 
         var allElements = new FilteredElementCollector(doc)
             .WhereElementIsNotElementType()
@@ -146,6 +147,7 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
             }
             catch (System.Exception)
             {
+                skipped++;
                 continue;
             }
 
@@ -200,7 +202,8 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
             }
             catch (System.Exception)
             {
-                // Skip elements where connector enumeration fails
+                // Không đọc được connector của phần tử này — đếm và nói ra, con số hở là cận dưới (§61).
+                skipped++;
             }
         }
 

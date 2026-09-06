@@ -1,3 +1,4 @@
+using DhcbTools.Shared.Logic.Checks;
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
@@ -109,7 +110,7 @@ public sealed class HealthReportCommand : ICoreCommand<HealthReportConfig>
 
             string summary = $"Health Report: {metrics.WarningCount} cảnh báo, " +
                              $"{metrics.UnplacedViewCount} view chưa đặt, " +
-                             $"{metrics.OpenConnectorCount} connector hở, " +
+                             $"{metrics.OpenConnectorCount} connector hở" + HealthReportNotes.ConnectorScanNote(metrics.ConnectorScanSkipped, metrics.ConnectorScanAborted) + ", " +
                              $"{metrics.InPlaceFamilyCount} in-place family. " +
                              $"File: {outputPath}";
             return CommandResult.Ok(summary, metrics.WarningCount);
@@ -140,7 +141,7 @@ public sealed class HealthReportCommand : ICoreCommand<HealthReportConfig>
                     else if (elem is FamilyInstance fi && fi.MEPModel != null)
                         cm = fi.MEPModel.ConnectorManager;
                 }
-                catch (System.Exception) { continue; }
+                catch (System.Exception) { metrics.ConnectorScanSkipped++; continue; }
 
                 if (cm == null) continue;
 
@@ -157,11 +158,16 @@ public sealed class HealthReportCommand : ICoreCommand<HealthReportConfig>
                             metrics.OpenConnectorCount++;
                         }
                     }
-                    catch (System.Exception) { /* ignore */ }
+                    catch (System.Exception) { metrics.ConnectorScanSkipped++; }
                 }
             }
         }
-        catch (System.Exception) { /* ignore connector check failures */ }
+        catch (System.Exception ex)
+        {
+            // Quét đổ giữa chừng thì con số connector hở là số ĐẾM DỞ — phải nói ra, không được để "0 connector hở"
+            // đọc như "sạch" (§61: rà 40 khối catch của Core).
+            metrics.ConnectorScanAborted = ex.Message;
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -304,6 +310,12 @@ public sealed class HealthReportCommand : ICoreCommand<HealthReportConfig>
         public int UnplacedViewCount;
         public List<string> UnplacedViews = new List<string>();
         public int OpenConnectorCount;
+
+        /// <summary>Phần tử/connector không đọc được khi quét — con số hở ở trên là cận dưới nếu > 0.</summary>
+        public int ConnectorScanSkipped;
+
+        /// <summary>Quét connector đổ giữa chừng (thông báo lỗi) — con số hở là số đếm dở.</summary>
+        public string? ConnectorScanAborted;
         public int InPlaceFamilyCount;
         public List<string> InPlaceFamilyNames = new List<string>();
         public double FileSizeMb;

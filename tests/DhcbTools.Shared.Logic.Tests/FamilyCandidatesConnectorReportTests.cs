@@ -88,5 +88,15 @@ public class FamilyCandidatesConnectorReportTests
         Assert.Equal("Tìm thấy 2 connector hở trên 2 phần tử.", ConnectorReport.Summary(2, 2, null));
         Assert.Equal("Tìm thấy 2 connector hở trên 2 phần tử. CSV: \"c.csv\".", ConnectorReport.Summary(2, 2, "c.csv"));
         Assert.Equal(ConnectorReport.Header + "\n", ConnectorReport.Csv(new List<OpenConnectorRow>()));
+        Assert.Equal(string.Empty, ConnectorReport.SkippedNote(0));
+        Assert.Equal(" 3 phần tử không đọc được connector (bỏ qua) — con số hở là cận dưới.", ConnectorReport.SkippedNote(3));
+    }
+
+    [Fact]
+    public void HealthReportNotes_ConnectorScan()
+    {
+        Assert.Equal(string.Empty, DhcbTools.Shared.Logic.Checks.HealthReportNotes.ConnectorScanNote(0, null));
+        Assert.Equal(" (2 phần tử không đọc được — cận dưới)", DhcbTools.Shared.Logic.Checks.HealthReportNotes.ConnectorScanNote(2, null));
+        Assert.Equal(" (quét đổ giữa chừng: boom — số đếm dở)", DhcbTools.Shared.Logic.Checks.HealthReportNotes.ConnectorScanNote(5, "boom"));
     }
 }
