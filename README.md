@@ -267,7 +267,6 @@ với API Revit/AutoCAD 2023–2027 (ma trận CI, gồm cả đường .NET 10)
 **Đã chạy trên phần mềm thật:** 43/43 lệnh Revit *của vòng 2026-09-04* có ít nhất một ca kiểm chạy bên trong Revit 2024.3
 và 15/15 lệnh AutoCAD có ca kiểm qua `accoreconsole`, cộng một đêm batch trên **dự án thật** — bằng chứng và số liệu từng vòng:
 [`docs/bang-chung-test.md`](docs/bang-chung-test.md), NETLOAD trên AutoCAD thật:
-[`docs/bang-chung-test-autocad-live.md`](docs/bang-chung-test-autocad-live.md). Phần **chưa** khép: chất lượng tuyến của `AutoRoute` (còn nhãn
-*thử nghiệm*), đối chiếu một điểm của `SetoutExport` bằng máy toàn đạc trên công trường thật,
+[`docs/bang-chung-test-autocad-live.md`](docs/bang-chung-test-autocad-live.md). Phần **chưa** khép: `AutoRoute` mới đo chất lượng tuyến trên một model mẫu (§55: 3 tuyến 1,00× Manhattan, riser qua lỗ sàn 3,48×), đối chiếu một điểm của `SetoutExport` bằng máy toàn đạc trên công trường thật,
 chạy thật trên Revit 2025/2027 (máy có 2024.3 và 2026), và 9.4 — đưa cho một nhóm kỹ sư dùng thật. Chi tiết và lỗi còn mở:
 [`docs/progress.md`](docs/progress.md) · lộ trình: [`docs/roadmap.md`](docs/roadmap.md).

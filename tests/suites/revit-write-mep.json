@@ -317,6 +317,131 @@
         ],
         "maxMs": 120000
       }
+    },
+    {
+      "name": "AutoRoute riser L3→L4 (chỉ Floors) — GHI THẬT: vẽ 3 model line style DHCB-Route-Test",
+      "//": [
+        "§54: đường thành công của RouteFromLines chưa từng chạy vì model mẫu không có model line nào mang line style tuyến.",
+        "Ca này tự dựng fixture bằng chính AutoRoute (cùng hai điểm với ca riser trong revit-autoroute.json: qua lỗ sàn, 3 đoạn, 2 rẽ)."
+      ],
+      "command": "AutoRoute",
+      "allowWrite": true,
+      "config": {
+        "startMm": {
+          "x": -15725,
+          "y": 1137,
+          "z": 9000
+        },
+        "endMm": {
+          "x": -15725,
+          "y": 1137,
+          "z": 13056
+        },
+        "searchMarginMm": 6000,
+        "searchMarginZMm": 500,
+        "stepMm": 200,
+        "clearanceMm": 100,
+        "obstacleCategories": [
+          "Floors"
+        ],
+        "respectOpenings": false,
+        "buildRoute": false,
+        "lineStyleName": "DHCB-Route-Test",
+        "dryRun": false
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 3,
+        "summaryContains": [
+          "Đã vẽ 3 model line",
+          "× Manhattan",
+          "(tối thiểu 0)"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "neverContains": [
+          "Exception"
+        ],
+        "maxMs": 120000
+      }
+    },
+    {
+      "name": "RouteFromLines Duct từ 3 line đó — xem trước: 3 đoạn, 2 elbow",
+      "command": "RouteFromLines",
+      "config": {
+        "lineStyleName": "DHCB-Route-Test",
+        "elementType": "Duct",
+        "sizeMm": {
+          "width": 400,
+          "height": 200
+        },
+        "dryRun": true
+      },
+      "expect": {
+        "success": true,
+        "summaryContains": [
+          "Sẽ dựng 3 đoạn Duct",
+          "2 elbow"
+        ],
+        "neverContains": [
+          "Exception"
+        ],
+        "maxMs": 60000
+      }
+    },
+    {
+      "name": "RouteFromLines Duct — GHI THẬT, đường thành công đầu tiên (3 duct + 2 elbow, xoá line sau khi dựng)",
+      "//": "deleteLines: true là chốt commit cho ca sau — line còn thì lần hai lại dựng được.",
+      "command": "RouteFromLines",
+      "allowWrite": true,
+      "config": {
+        "lineStyleName": "DHCB-Route-Test",
+        "elementType": "Duct",
+        "sizeMm": {
+          "width": 400,
+          "height": 200
+        },
+        "deleteLines": true,
+        "dryRun": false
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 3,
+        "summaryContains": [
+          "Đã dựng 3/3 đoạn Duct",
+          "2 fitting OK",
+          "0 fitting lỗi"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "neverContains": [
+          "Exception"
+        ],
+        "noErrors": true,
+        "maxMs": 120000
+      }
+    },
+    {
+      "name": "RouteFromLines lần hai — phải KHÔNG còn line nào: bằng chứng lần trước đã commit (dựng + xoá line)",
+      "command": "RouteFromLines",
+      "config": {
+        "lineStyleName": "DHCB-Route-Test",
+        "elementType": "Duct",
+        "dryRun": true
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "Không có model/detail line nào"
+        ],
+        "neverContains": [
+          "Exception"
+        ],
+        "maxMs": 60000
+      },
+      "//": "Không cần allowWrite: lệnh Fail trước khi tới transaction. dryRun true cũng đủ vì kiểm tra line nằm trước cả dryRun."
     }
   ]
 }

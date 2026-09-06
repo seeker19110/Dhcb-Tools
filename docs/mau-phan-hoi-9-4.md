@@ -70,7 +70,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 | `SlopePipes` | Đặt hoặc kiểm tra dốc ống thoát nước theo % hoặc bảng DN | ☐ | ☐ | ☐ | |
 | `PipeKick` | Kick/jog một ống bằng hai cút 45° hoặc 90° | ☐ | ☐ | ☐ | |
 | `SystemBom` | BOM theo hệ/spool: ống theo mét + số cây, fitting theo số lượng | ☐ | ☐ | ☐ | |
-| `AutoRoute` | Routing mức C: A* né chướng ngại giữa 2 điểm *(thử nghiệm)* | ☐ | ☐ | ☐ | |
+| `AutoRoute` | Routing mức C/D: A* né chướng ngại giữa 2 điểm, Summary báo dài/Manhattan và số rẽ | ☐ | ☐ | ☐ | |
 | `ScheduleExport` | Xuất schedule ra CSV đúng cột/hàng đang hiển thị | ☐ | ☐ | ☐ | |
 | `ViewportCopy` | Copy legend/schedule sang nhiều sheet, cùng vị trí, ghim lại | ☐ | ☐ | ☐ | |
 | `SetoutExport` | Xuất toạ độ định vị (tim cột, tâm thiết bị, giao trục) ra CSV cho máy toàn đạc + DXF | ☐ | ☐ | ☐ | |

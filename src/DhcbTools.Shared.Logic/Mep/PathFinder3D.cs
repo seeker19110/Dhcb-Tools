@@ -110,6 +110,54 @@ namespace DhcbTools.Shared.Logic.Mep
         /// tuyến CÓ tồn tại, chỉ là hết ngân sách tìm kiếm — khác hẳn với bị kết cấu bịt kín.
         /// </summary>
         public bool GoalConnected { get; set; }
+
+        /// <summary>Tổng chiều dài polyline (mm). 0 khi chưa tìm được.</summary>
+        public double LengthMm { get; set; }
+
+        /// <summary>
+        /// Chặn dưới Manhattan |dx|+|dy|+|dz| giữa điểm đầu và điểm cuối (mm): không tuyến trục nào ngắn hơn.
+        /// </summary>
+        public double ManhattanMm { get; set; }
+
+        /// <summary>
+        /// Chất lượng tuyến: <see cref="LengthMm"/> / <see cref="ManhattanMm"/>. 1,00 là tuyến ngắn nhất có thể;
+        /// 1,30 nghĩa là phải đi vòng thêm 30 % vì vật cản. Đây là con số để so hai lượt hoặc hai cấu hình —
+        /// trước §54 lệnh chỉ báo "N đoạn, M lần rẽ" nên không ai biết tuyến tốt hay dở.
+        /// </summary>
+        public double DetourRatio => ManhattanMm <= 0 ? 1.0 : LengthMm / ManhattanMm;
+
+        /// <summary>
+        /// Số lần rẽ ít nhất về nguyên tắc: số trục có độ lệch khác 0 trừ 1 (điểm cùng trục: 0). Tuyến thật
+        /// rẽ nhiều hơn chừng này là do phải né.
+        /// </summary>
+        public int MinTurns { get; set; }
+
+        /// <summary>Một dòng cho Summary: "dài 12,6 m = 1,05× Manhattan, 3 rẽ (tối thiểu 1)".</summary>
+        public string QualityText()
+        {
+            return string.Format(System.Globalization.CultureInfo.GetCultureInfo("vi-VN"),
+                "dài {0:0.0} m = {1:0.00}× Manhattan, {2} rẽ (tối thiểu {3})", LengthMm / 1000.0, DetourRatio, Turns, MinTurns);
+        }
+
+        /// <summary>Tính ba số đo từ polyline đã có (dùng sau <c>Reconstruct</c>, và cho test).</summary>
+        public void ComputeQuality()
+        {
+            LengthMm = 0;
+            MinTurns = 0;
+            ManhattanMm = 0;
+            if (Polyline.Count == 0)
+            {
+                return;
+            }
+
+            LengthMm = PolylineSimplifier.Length(Polyline);
+            var a = Polyline[0];
+            var b = Polyline[Polyline.Count - 1];
+            double dx = Math.Abs(b.X - a.X), dy = Math.Abs(b.Y - a.Y), dz = Math.Abs(b.Z - a.Z);
+            ManhattanMm = dx + dy + dz;
+            var axes = (dx > 1e-9 ? 1 : 0) + (dy > 1e-9 ? 1 : 0) + (dz > 1e-9 ? 1 : 0);
+            MinTurns = Math.Max(0, axes - 1);
+        }
     }
 
     /// <summary>
@@ -354,6 +402,7 @@ namespace DhcbTools.Shared.Logic.Mep
             }
 
             result.Polyline.AddRange(pts);
+            result.ComputeQuality();
         }
 
         /// <summary>

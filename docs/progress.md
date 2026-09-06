@@ -2,14 +2,17 @@
 
 Ảnh chụp tại thời điểm cập nhật gần nhất. Kế hoạch phía trước xem [`roadmap.md`](roadmap.md).
 
-> Cập nhật lần cuối: 2026-09-06 · sau vòng **đánh giá sâu** và sửa điểm yếu (§51): gỡ nhãn *thử nghiệm* lỗi thời của
+> Cập nhật lần cuối: 2026-09-06 · sau vòng **đánh giá sâu lần hai** (§54–§55: tài liệu lệch tái phát → test đối chiếu
+> `release.yml`; script dọn kết quả; thước đo chất lượng tuyến, `RouteFromLines` ghi thật). Trước đó vòng **đánh giá sâu** thứ nhất (§51): gỡ nhãn *thử nghiệm* lỗi thời của
 > `SetoutExport`, `ConstructionStatus`, `ProgressReport`, `ModelLinesFromCad` (cả bốn đã chạy thật 2026-09-05 — §28, §29,
 > §31 — nhưng catalog, Ribbon, README và tài liệu vẫn nói "chưa chạy"); tách `SlopePipes`/`PipeKick` xuống tầng thuần;
 > `BatchRunner/Program.cs` 905 dòng chia thành 6 file theo đường chạy; `catch {}` cuối cùng ở `ViewportCopy` nay báo
 > ra Messages. Trước đó: mở **chặng thi công** (A1 `SetoutExport`, B1 `ConstructionStatus` + `ProgressReport`), đêm batch
 > đầu tiên trên **dự án thật** (§20) và vòng đóng vai kỹ sư dùng thử (§21).
 >
-> **Lệnh còn mang nhãn *thử nghiệm*:** chỉ `AutoRoute` (chất lượng tuyến chưa chứng minh — mục *Còn mở*).
+> **Lệnh còn mang nhãn *thử nghiệm*:** không còn. `AutoRoute` gỡ nhãn 2026-09-06 (§55): Summary nay mang thước đo
+> *dài X m = R× Manhattan, T rẽ (tối thiểu M)*, đo thật trên Snowdon HVAC — 3 tuyến 1,00×, riser qua lỗ sàn 3,48×; và
+> `RouteFromLines` lần đầu chạy đường thành công thật (3 duct + 2 elbow).
 > Con số "đã chạy thật": **49/49** lệnh Revit trên Revit 2024.3.
 >
 > **Đã kiểm trên Revit thật:** 43/43 lệnh Revit *của vòng đó* có ít nhất một ca kiểm chạy trong Revit, chia ba bộ theo
@@ -34,8 +37,8 @@
 > **`snapshot` phía AutoCAD (10.1) đã có:** agent nhìn được bản vẽ — render off-screen sống (`live`) hoặc ảnh xem
 > trước trong DWG (`thumbnail`), chạy thật trên AutoCAD 2026.1 — §25. Giai đoạn 10 không còn mục ⬜ nào.
 >
-> **Còn lại:** chưa có job nào chạy **tự động qua Task Scheduler** (hai lượt ở §20/§21 đều chạy tay); chất
-> lượng tuyến `AutoRoute` vẫn chưa chứng minh được; và 9.4 — đưa cho một nhóm kỹ sư dùng thật.
+> **Còn lại:** chất lượng tuyến `AutoRoute` mới đo trên một model mẫu, chưa trên dự án thật; và 9.4 — đưa cho
+> một nhóm kỹ sư dùng thật (Task Scheduler đã tự chạy thật từ §43).
 
 ## Tóm tắt
 
@@ -141,6 +144,7 @@ Core/vỏ (kể cả vỏ core-only) trên Linux với API Revit 2025 + AutoCAD 
 | **Đưa nửa mã nguồn không phủ vào cổng phủ — SleeveAuto, SetoutExport, ProgressReport** | 2026-09-06 | Đánh giá sâu chỉ ra cổng phủ 100 % chỉ áp lên ~45 % src (`Shared.Logic`/`Hosting`/`BatchRunner`); `Core` + `Core.AutoCAD` + hai vỏ (~23.800 dòng) không có ca test nào trên CI, và cả ba sự cố §38/§44/§48 đều rơi vào đúng nửa ấy. Tách phần quyết định của ba lệnh sang `SleevePlanner`, `SetoutExportLogic`, `ProgressReportLogic` (**120 ca mới**, Shared.Logic 1367 → 1487, vẫn 100 %); Core chỉ còn dịch API Revit. Revit 2024.3 thật: bộ `mep` **26/26** (`SleeveAuto` đúng **445 sleeve** như §22), bộ `smoke` **41/41 + 1 bỏ qua** (`SetoutExport` 260 điểm gồm 142 giao trục). Cùng đợt: `DocCommandTableTests` chặn tài liệu trôi (bắt ngay 3 lệnh thiếu ở README), cổng phủ sập trên console Windows (cp1252) — sửa, bảng rủi ro còn lại của Bridge, ruleset `main` có 11 required check nên `--auto` chờ CI thật — §49 |
 | **Tách tiếp 4 lệnh: ClashDetection, HangerAuto, PipeSplitter, ElevationTag** | 2026-09-06 | `ClashReport` (khoá `#link`, Summary "vì sao 0", HTML, BCF mm→m một chỗ), `HangerPlanner`, `PipeSplitPlanner`, `ElevationTagPlanner`; gộp ba bản `BelongsToLevel` y hệt vào `RevitCompat`. **31 ca mới**, Shared.Logic 1487 → 1519, 100 %. Revit 2024.3 thật bộ `mep` ba lượt đều **26/26**: 7 va chạm với link (= §22), 1120 hanger, 44 điểm cắt, 1053 phần tử cao độ — không lệch số nào — §50 |
 | **Sửa điểm yếu sau đánh giá sâu + Revit 2026 lần đầu** | 2026-09-06 | Gỡ nhãn *thử nghiệm* lỗi thời ở 6 chỗ cho `SetoutExport`/`ConstructionStatus`/`ProgressReport`/`ModelLinesFromCad` (đã chạy thật từ §28–§31 mà tài liệu vẫn nói chưa); `SlopePlanner` + `KickPlanner` (**32 ca**, Shared.Logic 1519 → 1551, 100 %); `Program.cs` 905 dòng → 6 file; `catch {}` cuối ở `ViewportCopy` báo ra Messages; `release.yml` + installer thêm Revit 2026. Revit thật: 2024.3 `plumbing` 8/8 + `mep` 26/26 (`SlopePipes` 1794/1706/1732 = trước khi tách); **Revit 2026** `smoke` 41/41+1, `plumbing` 8/8, `mep` 26/26 — 445 sleeve, 1120 hanger, 7 va chạm trùng 2024 — §51 |
+| **Thước đo chất lượng tuyến + đường thành công `RouteFromLines`** | 2026-09-06 | `PathResult` thêm `LengthMm`/`ManhattanMm`/`DetourRatio`/`MinTurns` (4 ca thuần), Summary `AutoRoute` in *dài X m = R× Manhattan, T rẽ (tối thiểu M)*; `autoroute` 13/13 với số thật; `write-mep` 15/15: AutoRoute vẽ 3 line → `RouteFromLines` dựng 3/3 duct + 2/2 elbow, xoá line → lần hai không còn line = commit — §55 |
 | **Tự đối chiếu `SetoutExport` bằng IFC của Autodesk** | 2026-09-06 | Đường độc lập với mã DHCB: xuất IFC 2x3 rồi đọc IFCSITE/IFCGRID/IFCCOLUMN bằng `scripts/doi-chieu-setout-ifc.py` (23 ca, 100 %). Gốc Survey khớp từng chữ số, **142/142 giao trục ≤ 0,7 mm**; lộ lỗi thật: điểm chèn family ≠ tim với họ *Off Center* (tới 305 mm) → `pointMode` Centre/Insertion, tâm = trọng tâm solid hình học gốc qua transform (ba lượt sai trước khi đúng, kể cả quên `GetTransform` → lệch 33 m). Phân xử 61 cột Off Center bằng tham số family (`Depth_Center to Front/Back`…): trọng tâm của lệnh khớp từng mm, **bộ xuất IFC sai** 186–305 mm (cắt join hoặc lệch gốc) — §52 |
 | **Bộ ghi thật thứ ba `write-plumbing` — đường thành công của `PipeKick` và `SlopePipes`** | 2026-09-06 | Trước đó hai lệnh này chỉ có ca lỗi/xem trước (model HVAC không có ống). Bộ mới trên model cấp thoát nước, id ống cố định của file mẫu: `PipeKick` **3 đoạn + 2/2 cút 45°** trên ống đồng 17,4 m, kick lại ở 16 m bị chặn (bằng chứng commit); `SlopePipes` đặt dốc 1 % rồi kiểm lại **0 chưa đạt**. 5/5 ngay lượt đầu — §53 |
 | **Bộ test CLI cho BatchRunner — 17 ca đầu vào hỏng** | 2026-09-06 | §44 chỉ ra cả hai lỗi sập runner đều ở BatchRunner, ngoài tầm cổng phủ 100%. Nay `tests/DhcbTools.BatchRunner.Tests` gọi thẳng `Program.Main`: file .ifc rác, IDS hỏng/rỗng/lệch chuẩn, job hỏng, nhật ký bị sửa, gói bàn giao vẫn dựng khi IFC hỏng. Gỡ tạm hai bản vá §44 → 5 ca đỏ đúng chỗ. Nối vào `tests.yml` và `check-build.sh` — §47 |
@@ -179,18 +183,19 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
 
 ### Còn mở
 
-- **`AutoRoute` — chất lượng tuyến chưa chứng minh được.** Phần đọc model liên kết đã sửa (§18: vật cản
+- **`AutoRoute` — chất lượng tuyến mới đo trên một model mẫu.** Từ §55 mỗi tuyến báo *dài/Manhattan* và *số rẽ so với tối
+  thiểu*: trên Snowdon HVAC ba tuyến thật ra 1,00× (tối ưu), riser L3→L4 qua lỗ sàn 3,48× / 2 rẽ (phải đi ngang tới lỗ
+  sàn rồi quay lại — đúng hình học model). Chưa có số trên dự án thật. Lịch sử: phần đọc model liên kết đã sửa (§18: vật cản
   30 → 546); bộ tìm đường cũng đã vá ba lỗi đo được (§19: chậm, heuristic mù hướng, thất bại câm —
   4049 ms → 10 ms trên 550 vật cản), và đã chạy lại trên Snowdon HVAC: bộ `mep` 19/19, `AutoRoute`
   0,3 s → 82 ms (bước 500 mm) và 17,9 s → 815 ms (bước 100 mm). Hai bước lưới cho **cùng một kết luận
   bằng hai con số độc lập**: hai điểm của ca kiểm không nối thông nhau (782/12.025 và 79.701/1.335.961 ô),
   tức bị sàn và tường của model liên kết bao kín — không phải giới hạn bộ tìm đường. **Việc còn lại không
   còn là hiệu năng** mà là chọn được hai điểm trong cùng khoang trần kỹ thuật, nên chất lượng tuyến vẫn là
-  con số không có. Giữ nhãn *thử nghiệm* vì lý do đó, không còn vì chậm.
+  con số không có — tới §55 thì có (ca `autoroute` đã chọn được điểm trong cùng khoang trần từ §19).
 - **Mỗi lệnh mới chạy thật trên một vài tình huống**, chưa phủ hết biến thể của dự án thật. Rủi ro còn cao nhất theo
-  thứ tự: `RouteFromLines` (fitting phụ thuộc routing preference; `PipeKick` đã ghi thật 2/2 cút 45° trên ống đồng
-  Snowdon — §53), `AutoRoute` (chất lượng tuyến —
-  xem mục trên), `TransferStandards` (LineStyles/ObjectStyles không copy được qua API — đã ghi rõ trong Messages),
+  thứ tự: `RouteFromLines` (fitting phụ thuộc routing preference; đã ghi thật 3 duct + 2 elbow trên Snowdon HVAC — §55, và
+  `PipeKick` 2/2 cút 45° trên ống đồng — §53), `AutoRoute` (chất lượng tuyến mới đo trên model mẫu — xem mục trên), `TransferStandards` (LineStyles/ObjectStyles không copy được qua API — đã ghi rõ trong Messages),
   `ProjectFromTemplate` (worksharing cần môi trường mạng), `StylePurge` (phân tích tham chiếu có thể thiếu trường hợp —
   luôn xem trước), `SlopePipes` trên ống đã nối fitting hai đầu (Revit có thể từ chối dịch điểm cuối — trên ống đồng
   17 m nối hai đầu của Snowdon thì dịch được, §53).
