@@ -89,6 +89,8 @@ public sealed class App : IExternalApplication
 
         // ── Panel 4: MEPF ─────────────────────────────────────────
         var mepf = application.CreateRibbonPanel(TabName, "MEPF");
+        Add(mepf, path, "DhcbFamilyStarter", "Family mẫu\nsleeve/hanger", "FamilyStarterRibbonCommand",
+            "Dựng DHCB_Sleeve / DHCB_Hanger từ template Revit, ghi .rfa và nạp vào mô hình.");
         Add(mepf, path, "DhcbSleeve", "Sleeve\ntự động", "SleeveAutoCommand",
             "Đặt sleeve/opening tại giao cắt MEP với tường/sàn tự động.");
         Add(mepf, path, "DhcbElevTag", "Gán cao\nđộ MEP", "ElevationTagAutoCommand",
@@ -297,6 +299,7 @@ public sealed class App : IExternalApplication
         "DhcbSheetTools" or "DhcbSheetRename" or "DhcbRevisionOnSheets" or "DhcbViewportCopy" or "DhcbSheetIndex"
             or "DhcbColorByParameter" or "DhcbStyleTools" or "DhcbStylePurge" or "DhcbFamilyAudit"
             => RibbonIcons.Sheets,
+        "DhcbFamilyStarter" => RibbonIcons.Mepf,
         "DhcbParameterRuleCheck" or "DhcbIdsValidate" or "DhcbClashDetection" or "DhcbAiTools" or "DhcbCadLayerMap" or "DhcbSpecToConfig"
             or "DhcbDictionaryLearn"
             => RibbonIcons.Checks,

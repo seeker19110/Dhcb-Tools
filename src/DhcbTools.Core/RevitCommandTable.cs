@@ -50,6 +50,7 @@ public static class RevitCommandTable
                 "FAMILYLOADER" => new FamilyLoaderCommand().Execute(doc, Deserialize<FamilyLoaderConfig>(configJson)),
 
                 "SLEEVEAUTO" => new SleeveCommand().Execute(doc, Deserialize<SleeveConfig>(configJson)),
+                "FAMILYSTARTER" => new FamilyStarterCommand().Execute(doc, Deserialize<FamilyStarterConfig>(configJson)),
                 "ELEVATIONTAG" => new ElevationTagCommand().Execute(doc, Deserialize<ElevationTagConfig>(configJson)),
                 "HANGERAUTO" => new HangerCommand().Execute(doc, Deserialize<HangerConfig>(configJson)),
                 "PIPESPLITTER" => new PipeSplitterCommand().Execute(doc, Deserialize<PipeSplitterConfig>(configJson)),

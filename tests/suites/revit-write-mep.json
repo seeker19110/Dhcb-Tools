@@ -442,6 +442,114 @@
         "maxMs": 60000
       },
       "//": "Không cần allowWrite: lệnh Fail trước khi tới transaction. dryRun true cũng đủ vì kiểm tra line nằm trước cả dryRun."
+    },
+    {
+      "name": "FamilyStarter — GHI THẬT: dựng DHCB_Sleeve + DHCB_Hanger từ template Revit, ghi .rfa, nạp vào bản chép",
+      "//": "§60: vai MEP 'Bỏ SleeveAuto vì thiếu family' (§57). Family mẫu tối giản, hình giữ chỗ, tham số Nominal Width/Height và Rod Length.",
+      "command": "FamilyStarter",
+      "allowWrite": true,
+      "config": {
+        "outputFolder": "{outputFolder}/family-mau",
+        "dryRun": false
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 2,
+        "summaryContains": [
+          "Đã dựng 2 family mẫu",
+          "đã nạp 2/2"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "noErrors": true,
+        "filesExist": [
+          "{outputFolder}/family-mau/DHCB_Sleeve.rfa",
+          "{outputFolder}/family-mau/DHCB_Hanger.rfa"
+        ],
+        "neverContains": [
+          "Exception"
+        ],
+        "maxMs": 120000
+      }
+    },
+    {
+      "name": "SleeveAuto với DHCB_Sleeve vừa nạp — GHI THẬT, đặt được lên mặt tường/sàn của link",
+      "command": "SleeveAuto",
+      "allowWrite": true,
+      "config": {
+        "sleeveFamilyName": "DHCB_Sleeve",
+        "mepCategories": [
+          "Ducts",
+          "Pipes"
+        ]
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "summaryContains": [
+          "Đã đặt"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "neverContains": [
+          "Exception"
+        ],
+        "maxMs": 300000
+      }
+    },
+    {
+      "name": "SleeveAuto DHCB_Sleeve lần hai — 0 cái, chống trùng vẫn nhận family mới",
+      "command": "SleeveAuto",
+      "allowWrite": true,
+      "config": {
+        "sleeveFamilyName": "DHCB_Sleeve",
+        "mepCategories": [
+          "Ducts",
+          "Pipes"
+        ]
+      },
+      "expect": {
+        "success": true,
+        "maxAffected": 0,
+        "summaryContains": [
+          "Bỏ qua, đã có sleeve"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "neverContains": [
+          "Exception"
+        ],
+        "maxMs": 300000
+      }
+    },
+    {
+      "name": "HangerAuto với DHCB_Hanger vừa nạp — GHI THẬT",
+      "command": "HangerAuto",
+      "allowWrite": true,
+      "config": {
+        "hangerFamilyName": "DHCB_Hanger",
+        "spacingMm": 3000,
+        "categories": [
+          "Ducts"
+        ]
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "summaryContains": [
+          "Đã đặt"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "neverContains": [
+          "Exception"
+        ],
+        "maxMs": 300000
+      }
     }
   ]
 }

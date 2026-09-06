@@ -28,7 +28,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 
 ---
 
-## Revit — 50 lệnh
+## Revit — 51 lệnh
 
 | Lệnh | Việc nó làm | Tuần | Bỏ | Chưa | Nếu bỏ: vì sao |
 |---|---|:--:|:--:|:--:|---|
@@ -42,6 +42,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 | `LevelSetup` | Tạo tầng + view plan từ danh sách | ☐ | ☐ | ☐ | |
 | `GridSetup` | Tạo trục từ danh sách | ☐ | ☐ | ☐ | |
 | `FamilyLoader` | Load family theo danh mục | ☐ | ☐ | ☐ | |
+| `FamilyStarter` | Dựng family mẫu DHCB_Sleeve / DHCB_Hanger và nạp vào mô hình | ☐ | ☐ | ☐ | |
 | `SleeveAuto` | Đặt sleeve tại giao cắt MEP × tường/sàn | ☐ | ☐ | ☐ | |
 | `ElevationTag` | Điền cao độ đáy/đỉnh/tim vào tham số MEP | ☐ | ☐ | ☐ | |
 | `HangerAuto` | Đặt hanger theo khoảng cách chuẩn | ☐ | ☐ | ☐ | |
