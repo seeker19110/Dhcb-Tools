@@ -12,7 +12,24 @@ khoảng trống theo chặng công việc (thiết kế → BIM → shop → th
 [`docs/nghien-cuu-chuoi-den-hoan-cong.md`](docs/nghien-cuu-chuoi-den-hoan-cong.md),
 hiện trạng ở [`docs/progress.md`](docs/progress.md).
 
-## Bắt đầu nhanh (10 phút)
+## Bắt đầu cho kỹ sư: cài → bấm 3 lệnh → thấy kết quả
+
+1. **Cài add-in** — cách nhanh nhất là tải installer ở [Releases](https://github.com/seeker19110/Dhcb-Tools/releases)
+   (xem chi tiết ở [Cài đặt](#cài-đặt) bên dưới), ~10 phút.
+2. **Mở model đang làm** (Revit hoặc AutoCAD) → tab **DHCB Tools** trên Ribbon.
+3. **Bấm một trong 14 lệnh đã kiểm giá trị rõ** (bậc *hỗ trợ*, xem bảng ở [`docs/tong-quan.md`](docs/tong-quan.md))
+   — ví dụ `WarningsExport` hoặc `HealthReport`. Lệnh luôn **xem trước** (dry-run) trước khi hỏi *Chạy thật*, nên
+   bấm thử không sợ hỏng model.
+
+Trang riêng theo vai trò (chỉ 3 lệnh nên dùng trước, không phải đọc hết README):
+[kiến trúc](docs/vai-tro-kien-truc.md) · [MEP](docs/vai-tro-mep.md) · [BIM manager](docs/vai-tro-bim-manager.md) ·
+[AutoCAD](docs/vai-tro-autocad.md).
+
+Batch chạy đêm, HTTP Bridge/MCP cho agent AI, và lớp AI offline là các lớp **nâng cao** — xem mục riêng
+[Batch chạy đêm](#batch-chạy-đêm) và [HTTP Bridge, agent và MCP](#http-bridge-agent-và-mcp) khi cần, không
+phải bước bắt buộc để bắt đầu dùng.
+
+## Dành cho người phát triển: build & test nhanh
 
 **Cần có:**
 

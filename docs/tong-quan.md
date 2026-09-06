@@ -42,6 +42,15 @@ Nút Ribbon của các lệnh còn lại (bậc **thử nghiệm**) có ghi chú
 - **Phần tuân thủ pháp luật (IDS mẫu, dấu bản vẽ hoàn công)** cần người có chuyên môn QLDA/pháp lý rà soát
   bản gốc Công báo trước khi dùng cho hồ sơ nộp — chưa ai rà.
 
+## Một trang riêng theo vai trò
+
+| Vai trò | Đọc |
+|---|---|
+| Kiến trúc / dựng sheet | [`vai-tro-kien-truc.md`](vai-tro-kien-truc.md) |
+| MEP (điện/nước/HVAC) | [`vai-tro-mep.md`](vai-tro-mep.md) |
+| BIM manager / QLDA | [`vai-tro-bim-manager.md`](vai-tro-bim-manager.md) |
+| AutoCAD | [`vai-tro-autocad.md`](vai-tro-autocad.md) |
+
 ## Đọc tiếp ở đâu
 
 | Muốn biết | Đọc |

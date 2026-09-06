@@ -117,7 +117,16 @@ tốt cho việc này nhưng viết cho agent, không cho người.
   tổng`, và trả `Success=false` khi `done=0` (trước đây báo `Success=true` cả khi xuất được **0** schedule).
   `BatchReport` có ô màu vàng riêng ("Một phần"), `RunLog.ExitCode` trả 1 khi có step một phần — báo cáo
   đêm không còn im lặng gọi "OK" cho việc chưa xong hết. Xem `bang-chung-test.md` §66.
-- Batch Revit thoát bằng `Environment.Exit`; `RvtFileInfo` đọc phiên bản bằng quét chuỗi 2 MB đầu file.
+- ~~Batch Revit thoát bằng kill cứng (runner `Process.Kill(true)` sau tối đa 60s chờ), không xin Revit thoát êm.~~
+  ✅ 2026-09-06: `BatchStartupHook` nay gọi `UIApplication.PostCommand(ExitRevit)` ngay sau khi ghi
+  `batch-done.json`, xin Revit tự thoát ở vòng idle kế tiếp. Runner (`Program.Revit.cs`) giữ nguyên cơ chế
+  chờ rồi kill cứng làm lưới an toàn — không đổi hành vi khi lệnh thoát êm thất bại vì lý do gì đó. **Chưa
+  chạy thật trên Revit** để xác nhận Revit thoát êm trước khi bị kill (cần một lượt batch thật trên máy có
+  Revit — xem `revit-test-env`); nếu quan sát thấy vẫn luôn bị kill thì coi thay đổi này là chưa có tác dụng
+  đo được, không phải hỏng.
+- `RvtFileInfo` đọc phiên bản bằng quét chuỗi 2 MB đầu file — giữ nguyên, chưa sửa: đây là lựa chọn có chủ đích
+  (cùng cách RevitBatchProcessor dùng), không phải lỗi đang chờ; chỉ nên thay bằng parser OLE/CFBF đầy đủ nếu
+  thực tế gặp file gây nhận sai phiên bản.
 - ~~6 khối `catch {}` rỗng còn lại trong `src/`~~ ✅ 2026-09-06: cả 6 nay có bình luận giải thích lý do im
   lặng (đúng quy ước đã áp dụng cho 40+ khối khác từ §61) — xem `bang-chung-test.md` §66.
 - `AutoRoute` mức C: đã đo được 1,00× trên 8/9 tuyến, nhưng vẫn phải chuẩn bị điểm bằng `SetoutExport` và bỏ
@@ -138,9 +147,12 @@ Mục tiêu duy nhất: **5 kỹ sư ở 2 công ty dùng 4 tuần, số liệu 
   `SlopePipes`, `IdsValidate`, `ParameterRuleCheck`, `SetoutExport`, `LayerStandardCheck`,
   `AttributeIncrement`, `BlockQuantity`; Ribbon (`App.cs`) tự thêm ghi chú "Bậc thử nghiệm" vào tooltip cho
   lệnh còn lại. Quyết định *có đóng băng thêm lệnh mới hay không* vẫn chờ chốt ở mục 6.
-- **Gói nhập môn cho người, không cho agent:** một dự án mẫu Việt (có sheet, có MEP, có shared parameter thi
-  công) đi kèm bản cài; một trang A4 mỗi vai (kiến trúc, MEP, BIM manager, AutoCAD); một video 15 phút.
-  Viết lại README theo thứ tự *kỹ sư cài → bấm 3 lệnh → thấy kết quả*, đẩy Bridge/MCP/AI xuống mục riêng.
+- **Gói nhập môn cho người, không cho agent:** ✅ 2026-09-06: README nay mở đầu bằng mục *Bắt đầu cho kỹ sư*
+  (cài → bấm 3 lệnh → thấy kết quả), đẩy Bridge/MCP/AI xuống mục riêng phía sau; bốn trang A4 một vai —
+  [`vai-tro-kien-truc.md`](vai-tro-kien-truc.md), [`vai-tro-mep.md`](vai-tro-mep.md),
+  [`vai-tro-bim-manager.md`](vai-tro-bim-manager.md), [`vai-tro-autocad.md`](vai-tro-autocad.md) — dẫn từ
+  `tong-quan.md`. **Còn thiếu:** dự án mẫu Việt (có sheet, có MEP, có shared parameter thi công) đi kèm bản
+  cài — cần dựng thật trong Revit, không sinh được bằng văn bản; và video 15 phút.
 - **Sẵn sàng phân phối:** chọn giấy phép (đề xuất mã mở lõi thuần theo MIT/Apache, vỏ và installer giữ quyền
   hoặc cũng mở — quyết ở mục 6), ký DLL bằng chứng chỉ thật, ✅ `CommandResult` có trạng thái *một phần*
   (`PartialSuccess`, 2026-09-06 — xem §4.7).
