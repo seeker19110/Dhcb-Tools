@@ -17,7 +17,7 @@ hiện trạng ở [`docs/progress.md`](docs/progress.md).
 |---|---|---|
 | Windows | 10/11 x64 | Chạy add-in (chỉ để build/test thuần thì Linux/macOS cũng được) |
 | .NET SDK | 8.0.x **+ 10.0.x** | SDK 8 build net48/net8.0-windows; SDK 10 cho AutoCAD ≥ 2026 và Revit ≥ 2027 (net10.0-windows) |
-| Revit | 2023–2025 (2026/2027 build được, chưa chạy thật) | Dùng add-in Revit |
+| Revit | 2023–2026 (2027 build được, chưa chạy thật) | Dùng add-in Revit |
 | AutoCAD | 2024–2026 | Dùng plugin AutoCAD (2026.1 dùng .NET 10 — đã chạy thật qua accoreconsole) |
 | Python | 3.9+ | Dùng `scripts/*.py` (client Bridge, MCP server, AI offline) |
 | Node/npx | bất kỳ LTS | **Chỉ** khi đóng gói `.mcpb` bằng `scripts/pack-mcpb.ps1` |
@@ -90,13 +90,13 @@ Ribbon/dòng lệnh, HTTP Bridge, batch runner, lớp AI. Danh mục đầy đ�
 | Dữ liệu ↔ CSV | `ParameterExport` / `ParameterImport` | `LayerExport` / `LayerImport`, `AttributeExport` / `AttributeImport` |
 | Dọn dẹp | `RemoveUnusedViews` | `DrawingCleanup` (an toàn: CLAYER, linetype của layer, xref) |
 | Đánh số | `AutoNumbering` (theo vị trí), `FlowNumbering` (theo dòng chảy) | `AutoNumbering` (block attribute) |
-| Xuất & báo cáo | `BatchExport` (PDF/DWG/IFC/NWC), `HealthReport`, `SetoutExport` (toạ độ định vị cho máy toàn đạc — *thử nghiệm*, [`docs/toa-do-dinh-vi.md`](docs/toa-do-dinh-vi.md)) | `XrefAudit` |
+| Xuất & báo cáo | `BatchExport` (PDF/DWG/IFC/NWC), `HealthReport`, `SetoutExport` (toạ độ định vị cho máy toàn đạc, [`docs/toa-do-dinh-vi.md`](docs/toa-do-dinh-vi.md)) | `XrefAudit` |
 | Kiểm tra | `ParameterRuleCheck`, `ClashDetection` (+ `clash-accepted.json`), `ConnectorChecker`, `IdsValidate` (IDS 1.0 buildingSMART, [`docs/kiem-ids.md`](docs/kiem-ids.md)) | `LayerStandardCheck`, `TextReplace` |
 | Dự án & hồ sơ | `ProjectFromTemplate`, `TransferStandards`, `LevelSetup`, `GridSetup`, `GridFromCsv`, `FamilyLoader`, `ProjectInfo`, `SheetBatchCreate`, `CadLink` (link DWG/DXF vào view của một tầng) | `GridExtract` (layer AXIS → CSV cho `GridFromCsv`) |
-| MEPF | `SleeveAuto`, `ElevationTag`, `HangerAuto`, `PipeSplitter`, `ModelLinesFromCad` (CAD đã link → model line, *thử nghiệm*), `RouteFromLines`, `DevicePlacement`, `SizingProposal` / `ApplySizing`, `SystemColor`, `SystemName` | — |
+| MEPF | `SleeveAuto`, `ElevationTag`, `HangerAuto`, `PipeSplitter`, `ModelLinesFromCad` (CAD đã link → model line), `RouteFromLines`, `DevicePlacement`, `SizingProposal` / `ApplySizing`, `SystemColor`, `SystemName` | — |
 | Hồ sơ & style (giai đoạn 7) | `SheetRename`, `RevisionOnSheets`, `SheetIndex`, `StylePurge`, `ColorByParameter`, `FamilyAudit`, `WarningsExport`, `ScheduleExport`, `ViewportCopy` | `LayerTranslate`, `DrawingCompare`, `BlockQuantity`, `AttributeIncrement` |
 | MEPF nâng cao (P2) | `SlopePipes`, `PipeKick`, `SystemBom`, `AutoRoute` (mức C → mức A) | — |
-| Thi công & hoàn công | `ConstructionStatus`, `ProgressReport` (tiến độ theo tầng/hệ, % theo số lượng và chiều dài — *thử nghiệm*, [`docs/tien-do-thi-cong.md`](docs/tien-do-thi-cong.md)) | — |
+| Thi công & hoàn công | `ConstructionStatus`, `ProgressReport` (tiến độ theo tầng/hệ, % theo số lượng và chiều dài, [`docs/tien-do-thi-cong.md`](docs/tien-do-thi-cong.md)) | — |
 | AI offline | `CadLayerMap`, `SpecToConfig`, `DictionaryLearn`, nút *Ra lệnh tiếng Việt* | `CadLayerMap` (`DHCB_LAYER_MAP`); ra lệnh tiếng Việt qua Bridge `POST /chat` |
 
 Lệnh AutoCAD trên dòng lệnh — đúng các `[CommandMethod]` có trong `src/DhcbTools.AutoCAD`:
@@ -205,7 +205,7 @@ AutoCAD ≥ 2026 (package 25.1.x) và Revit ≥ 2027 dùng **net10.0-windows** �
 - **CI** (`.github/workflows/tests.yml`, ubuntu-latest, mọi push/PR): test `Shared.Logic` + `dotnet build` toàn bộ
   Core/vỏ (kể cả vỏ core-only) bằng API package NuGet, `UseWPF=false` — bắt lỗi biên dịch không cần Windows.
 - **CD** (`.github/workflows/release.yml`, windows-latest, khi đẩy tag `vX.Y.Z` hoặc chạy tay): build **Release thật**
-  (đủ WPF) cho Revit 2023/2024/2025 và AutoCAD 2024/2025/2026 + vỏ core-only, đóng gói zip kèm hướng dẫn cài đặt, và tạo
+  (đủ WPF) cho Revit 2023/2024/2025/2026 và AutoCAD 2024/2025/2026 + vỏ core-only, đóng gói zip kèm hướng dẫn cài đặt, và tạo
   GitHub Release đính kèm toàn bộ gói.
 
 ```powershell
@@ -266,7 +266,6 @@ với API Revit/AutoCAD 2023–2027 (ma trận CI, gồm cả đường .NET 10)
 và 15/15 lệnh AutoCAD có ca kiểm qua `accoreconsole`, cộng một đêm batch trên **dự án thật** — bằng chứng và số liệu từng vòng:
 [`docs/bang-chung-test.md`](docs/bang-chung-test.md), NETLOAD trên AutoCAD thật:
 [`docs/bang-chung-test-autocad-live.md`](docs/bang-chung-test-autocad-live.md). Phần **chưa** khép: chất lượng tuyến của `AutoRoute` (còn nhãn
-*thử nghiệm*), ba lệnh chặng thi công mới thêm 2026-09-05 (`SetoutExport` — [`docs/toa-do-dinh-vi.md`](docs/toa-do-dinh-vi.md);
-`ConstructionStatus` và `ProgressReport` — [`docs/tien-do-thi-cong.md`](docs/tien-do-thi-cong.md); đều có ca kiểm, **chưa chạy thật**),
-chạy thật trên Revit 2026/2027 (máy chỉ có 2024.3), và 9.4 — đưa cho một nhóm kỹ sư dùng thật. Chi tiết và lỗi còn mở:
+*thử nghiệm*), đối chiếu một điểm của `SetoutExport` bằng máy toàn đạc trên công trường thật,
+chạy thật trên Revit 2025/2027 (máy có 2024.3 và 2026), và 9.4 — đưa cho một nhóm kỹ sư dùng thật. Chi tiết và lỗi còn mở:
 [`docs/progress.md`](docs/progress.md) · lộ trình: [`docs/roadmap.md`](docs/roadmap.md).

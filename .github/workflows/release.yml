@@ -40,7 +40,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        revit: [2023, 2024, 2025]
+        # 2026 (net8.0-windows) thêm 2026-09-06 sau khi ba bộ ca kiểm chạy thật trên Revit 2026 — bang-chung-test.md §51.
+        revit: [2023, 2024, 2025, 2026]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -175,7 +176,7 @@ jobs:
           $stage = "dist/stage"
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
 
-          foreach ($r in 2023, 2024, 2025) {
+          foreach ($r in 2023, 2024, 2025, 2026) {
             Expand-Archive "artifacts/DhcbTools.Revit-$r-$v.zip" -DestinationPath "$stage/revit-$r" -Force
           }
           foreach ($a in 2024, 2025, 2026) {

@@ -184,8 +184,8 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("dryRun", "xem trước: kiểm file/tầng/view nhưng không đưa gì vào mô hình", FieldKind.Bool)
                 .Words("link cad", "insert cad", "chèn bản vẽ", "link dwg", "chèn dwg"),
             // Mắt xích trước RouteFromLines: dựng chính model line mà lệnh trên cần, từ DWG đã link/import.
-            // "(thử nghiệm)" theo nguyên tắc 6 — có ca kiểm nhưng chưa chạy thật trong Revit.
-            new CommandDescriptor("ModelLinesFromCad", Revit, "Dựng model line từ bản vẽ CAD đã link/import (lọc layer, bỏ đoạn rác và đường vẽ chồng, nối đoạn thẳng hàng) để RouteFromLines dựng ống (thử nghiệm)", true, "LineTuCad", "CadToLines")
+            // Nhãn "(thử nghiệm)" đã gỡ: chạy thật 2026-09-05 với DXF và DWG link (bang-chung-test.md §29, §31).
+            new CommandDescriptor("ModelLinesFromCad", Revit, "Dựng model line từ bản vẽ CAD đã link/import (lọc layer, bỏ đoạn rác và đường vẽ chồng, nối đoạn thẳng hàng) để RouteFromLines dựng ống", true, "LineTuCad", "CadToLines")
                 .Field("dwgNameContains", "chỉ đọc bản vẽ CAD có tên chứa chuỗi này (rỗng = mọi DWG trong mô hình)")
                 .Field("includeLayers", "layer lấy đường, hỗ trợ * ? ~ (rỗng = mọi layer)", FieldKind.TextList)
                 .Field("excludeLayers", "layer bỏ, xét sau danh sách lấy (ví dụ *-TEXT, *-DIM)", FieldKind.TextList)
@@ -291,9 +291,9 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Words("copy viewport", "copy legend", "chép legend sang sheet", "copy schedule sang sheet"),
 
             // ── Revit — chặng thi công (nghien-cuu-chuoi-den-hoan-cong.md, đợt A) ──
-            // "(thử nghiệm)" theo nguyên tắc 6 của roadmap: có ca kiểm trong tests/suites nhưng chưa chạy
-            // thật trong Revit — gỡ nhãn khi bang-chung-test.md ghi nhận lượt chạy đầu tiên.
-            new CommandDescriptor("SetoutExport", Revit, "Xuất toạ độ định vị (tim cột, tâm thiết bị/sleeve, giao trục) ra CSV cho máy toàn đạc + DXF điểm, hệ Survey (thử nghiệm)", false, "Setout", "ToaDoDinhVi", "StakeOut")
+            // Nhãn "(thử nghiệm)" đã gỡ 2026-09-06: cả ba lệnh chạy thật trong Revit 2024 ngày 2026-09-05
+            // (bang-chung-test.md §28 — 260/545 điểm định vị, 1.599 cấu kiện; đường ghi ConstructionStatus 1,4 %).
+            new CommandDescriptor("SetoutExport", Revit, "Xuất toạ độ định vị (tim cột, tâm thiết bị/sleeve, giao trục) ra CSV cho máy toàn đạc + DXF điểm, hệ Survey", false, "Setout", "ToaDoDinhVi", "StakeOut")
                 .Field("outputPath", "file CSV cho máy toàn đạc")
                 .Field("dxfPath", "file DXF điểm (tuỳ chọn, cho phần mềm máy đời cũ)")
                 .Field("categories", "category lấy điểm (rỗng = Structural Columns + Columns)")
@@ -311,7 +311,7 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("utf8Bom", "ghi BOM UTF-8 để Excel đọc tiếng Việt (để máy đọc: tắt)", FieldKind.Bool)
                 .Words("toạ độ định vị", "setout", "stake out", "máy toàn đạc", "trắc đạc", "toạ độ tim cột", "xuất toạ độ", "cắm mốc"),
 
-            new CommandDescriptor("ConstructionStatus", Revit, "Ghi trạng thái thi công (chưa lắp / đang lắp / đã lắp / đã nghiệm thu) từ CSV hiện trường vào mô hình (thử nghiệm)", true, "TrangThaiThiCong", "InstallStatus")
+            new CommandDescriptor("ConstructionStatus", Revit, "Ghi trạng thái thi công (chưa lắp / đang lắp / đã lắp / đã nghiệm thu) từ CSV hiện trường vào mô hình", true, "TrangThaiThiCong", "InstallStatus")
                 .Field("inputPath", "CSV hiện trường: mã cấu kiện + trạng thái, tuỳ chọn ngày / người xác nhận / ghi chú")
                 .Field("statusParameter", "tham số trạng thái (rỗng = từ điển constructionStatus)")
                 .Field("keyParameter", "tham số làm mã cấu kiện trong CSV, ví dụ Mark (rỗng = cột mã là ElementId)")
@@ -323,7 +323,7 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("allowDowngrade", "cho phép lùi trạng thái (mặc định tắt — lùi thường là nhập đè file cũ)", FieldKind.Bool)
                 .Field("dryRun", "xem trước")
                 .Words("trạng thái thi công", "cập nhật hiện trường", "đã lắp", "nghiệm thu", "nhập tiến độ"),
-            new CommandDescriptor("ProgressReport", Revit, "Báo cáo tiến độ thi công: % theo số lượng và theo chiều dài, gộp theo tầng/hệ/category, luỹ kế theo tuần → HTML + CSV (thử nghiệm)", false, "TienDo", "Progress")
+            new CommandDescriptor("ProgressReport", Revit, "Báo cáo tiến độ thi công: % theo số lượng và theo chiều dài, gộp theo tầng/hệ/category, luỹ kế theo tuần → HTML + CSV", false, "TienDo", "Progress")
                 .Field("outputPath", "file HTML").Field("csvPath", "CSV cùng nội dung (tuỳ chọn)")
                 .Field("categories", "category cần tính (rỗng = nhóm MEP + thiết bị mặc định)")
                 .Field("groupBy", "Level (tầng) | System (hệ) | Category", FieldKind.Text)
