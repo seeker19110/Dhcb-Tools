@@ -91,20 +91,17 @@ public sealed class SetoutExportCommand : ICoreCommand<SetoutExportConfig>
             return CommandResult.Fail(unitError);
         }
 
-        var curvePoints = (config.CurvePoints ?? "Ends").Trim();
-        if (!curvePoints.Equals("Ends", StringComparison.OrdinalIgnoreCase)
-            && !curvePoints.Equals("Mid", StringComparison.OrdinalIgnoreCase)
-            && !curvePoints.Equals("Both", StringComparison.OrdinalIgnoreCase))
+        if (!SetoutExportLogic.TryParseCurvePoints(config.CurvePoints, out var curveEnds, out var curveMid, out var curveError))
         {
-            return CommandResult.Fail($"curvePoints \"{config.CurvePoints}\" không hợp lệ. Hợp lệ: Ends (hai đầu), Mid (điểm giữa), Both.");
+            return CommandResult.Fail(curveError);
         }
 
-        var system = (config.CoordinateSystem ?? "Survey").Trim();
-        var useSurvey = system.Equals("Survey", StringComparison.OrdinalIgnoreCase) || system.Equals("Shared", StringComparison.OrdinalIgnoreCase);
-        if (!useSurvey && !system.Equals("Internal", StringComparison.OrdinalIgnoreCase))
+        if (!SetoutExportLogic.TryParseCoordinateSystem(config.CoordinateSystem, out var useSurvey, out var systemError))
         {
-            return CommandResult.Fail($"coordinateSystem \"{config.CoordinateSystem}\" không hợp lệ. Hợp lệ: Survey (toạ độ chung) hoặc Internal (gốc nội bộ).");
+            return CommandResult.Fail(systemError);
         }
+
+        var anchorKinds = SetoutExportLogic.CurveAnchorKinds(curveEnds, curveMid);
 
         Level? level = null;
         if (!string.IsNullOrWhiteSpace(config.LevelName))
@@ -155,7 +152,7 @@ public sealed class SetoutExportCommand : ICoreCommand<SetoutExportConfig>
                 continue;
             }
 
-            var anchors = Anchors(element, curvePoints, out var fromBox);
+            var anchors = Anchors(element, anchorKinds, out var fromBox);
             if (anchors.Count == 0)
             {
                 noGeometry++;
@@ -195,7 +192,7 @@ public sealed class SetoutExportCommand : ICoreCommand<SetoutExportConfig>
         var elementPoints = sources.Count - intersections;
         var precondition = Precondition.NonEmptyInput(
             CommandName,
-            config.ElementIds.Count > 0 ? "phần tử theo elementIds" : "điểm định vị (phần tử theo bộ lọc" + (config.IncludeGridIntersections ? ", giao trục" : string.Empty) + ")",
+            SetoutExportLogic.InputDescription(config.ElementIds.Count > 0, config.IncludeGridIntersections),
             sources.Count,
             "Kiểm lại categories/levelName/familyContains, hoặc bật includeGridIntersections; tra phần tử có thật bằng query elements.");
         var result = CommandResult.Ok(string.Empty);
@@ -229,11 +226,11 @@ public sealed class SetoutExportCommand : ICoreCommand<SetoutExportConfig>
             File.WriteAllText(config.DxfPath!, SetoutDxf.Write(plan.Points, metres, format.EffectiveDecimals), new UTF8Encoding(false));
         }
 
-        var unitLabel = metres ? "m" : "mm";
         result = CommandResult.Ok(
-            $"Xuất {plan.Points.Count} điểm định vị ({elementPoints} điểm của {elements.Count - filteredOut - noGeometry} phần tử"
-            + (config.IncludeGridIntersections ? $", {intersections} giao trục" : string.Empty)
-            + $") → \"{config.OutputPath}\" — hệ {(useSurvey ? "Survey" : "Internal")}, {unitLabel}, cột {string.Concat(columns.Select(LetterOf))}.",
+            SetoutExportLogic.Summary(
+                plan.Points.Count, elementPoints, elements.Count - filteredOut - noGeometry,
+                config.IncludeGridIntersections, intersections,
+                config.OutputPath, useSurvey, metres, columns),
             plan.Points.Count);
 
         foreach (var m in messages)
@@ -246,30 +243,7 @@ public sealed class SetoutExportCommand : ICoreCommand<SetoutExportConfig>
             result.Messages.Add($"{kv.Key}: {kv.Value} điểm");
         }
 
-        if (!string.IsNullOrWhiteSpace(config.DxfPath))
-        {
-            result.Messages.Add($"DXF điểm: \"{config.DxfPath}\" (layer DHCB-<mã> và DHCB-<mã>-TEN).");
-        }
-
-        if (filteredOut > 0)
-        {
-            result.Messages.Add($"{filteredOut} phần tử ngoài bộ lọc tầng/family/type.");
-        }
-
-        if (boxFallback > 0)
-        {
-            result.Messages.Add($"{boxFallback} phần tử không có điểm/đường đặt (Location) nên lấy tâm hộp bao — kiểm lại trước khi cắm.");
-        }
-
-        if (noGeometry > 0)
-        {
-            result.Messages.Add($"{noGeometry} phần tử không có hình học nào để lấy điểm, đã bỏ qua.");
-        }
-
-        if (curvedGrids > 0)
-        {
-            result.Messages.Add($"{curvedGrids} trục cong bị bỏ qua khi tính giao trục (chỉ xét trục thẳng).");
-        }
+        result.Messages.AddRange(SetoutExportLogic.TrailingNotes(config.DxfPath, filteredOut, boxFallback, noGeometry, curvedGrids));
 
         foreach (var note in plan.Notes)
         {
@@ -297,43 +271,31 @@ public sealed class SetoutExportCommand : ICoreCommand<SetoutExportConfig>
             return new XYZ(pos.EastWest, pos.NorthSouth, pos.Elevation);
         }).ToArray();
 
-        var tolerance = RevitCompat.MmToFt(1);
-        Transform? chosen = null;
-        foreach (var candidate in new[] { total.Inverse, total })
-        {
-            var ok = true;
-            for (var i = 0; i < probes.Length; i++)
+        // Ứng viên theo thứ tự ưu tiên: Inverse trước (đúng với API hiện hành), rồi chính total.
+        var candidates = new[] { total.Inverse, total };
+        var index = SetoutExportLogic.ChooseMatchingTransform(
+            candidates.Select(c => (Func<(double X, double Y, double Z), (double X, double Y, double Z)>)(p =>
             {
-                if (candidate.OfPoint(probes[i]).DistanceTo(expected[i]) > tolerance)
-                {
-                    ok = false;
-                    break;
-                }
-            }
+                var q = c.OfPoint(new XYZ(p.X, p.Y, p.Z));
+                return (q.X, q.Y, q.Z);
+            })).ToList(),
+            probes.Select(p => (p.X, p.Y, p.Z)).ToList(),
+            expected.Select(p => (p.X, p.Y, p.Z)).ToList(),
+            RevitCompat.MmToFt(1));
 
-            if (ok)
-            {
-                chosen = candidate;
-                break;
-            }
-        }
-
-        if (chosen == null)
+        var chosen = index >= 0 ? candidates[index] : total.Inverse;
+        if (index < 0)
         {
-            chosen = total.Inverse;
-            messages.Add("Không đối chiếu được chiều của GetTotalTransform với GetProjectPosition — toạ độ Survey có thể sai, kiểm lại một điểm bằng Spot Coordinate trước khi đưa ra hiện trường.");
+            messages.Add(SetoutExportLogic.DirectionUnverifiedNote);
         }
 
         var origin = location.GetProjectPosition(XYZ.Zero);
-        var e = RevitCompat.FtToMm(origin.EastWest);
-        var n = RevitCompat.FtToMm(origin.NorthSouth);
-        var z = RevitCompat.FtToMm(origin.Elevation);
-        var angle = origin.Angle * 180.0 / Math.PI;
-        messages.Add($"Site \"{location.Name}\": gốc nội bộ ở E={e:F0} N={n:F0} Z={z:F0} mm, True North xoay {angle:F4}°.");
-        if (Math.Abs(e) < 0.5 && Math.Abs(n) < 0.5 && Math.Abs(z) < 0.5 && Math.Abs(angle) < 1e-6)
-        {
-            messages.Add("Hệ Survey trùng hệ nội bộ (mô hình chưa khai toạ độ chung) — toạ độ ra file là toạ độ Revit, không phải toạ độ khảo sát; đối chiếu với tổ trắc đạc trước khi dùng.");
-        }
+        messages.AddRange(SetoutExportLogic.SiteNotes(
+            location.Name,
+            RevitCompat.FtToMm(origin.EastWest),
+            RevitCompat.FtToMm(origin.NorthSouth),
+            RevitCompat.FtToMm(origin.Elevation),
+            origin.Angle * 180.0 / Math.PI));
 
         return chosen;
     }
@@ -361,9 +323,10 @@ public sealed class SetoutExportCommand : ICoreCommand<SetoutExportConfig>
                 }
             }
 
-            if (missing.Count > 0)
+            var missingNote = SetoutExportLogic.MissingIdsNote(missing);
+            if (missingNote != null)
             {
-                messages.Add($"{missing.Count} Id không có trong mô hình: {string.Join(", ", missing.Take(20))}{(missing.Count > 20 ? ", …" : string.Empty)}.");
+                messages.Add(missingNote);
             }
 
             return list;
@@ -375,7 +338,7 @@ public sealed class SetoutExportCommand : ICoreCommand<SetoutExportConfig>
             categoryIds = ParameterSync.ParameterExportCommand.ResolveCategoryIds(document, config.Categories, out var unknown);
             if (unknown.Count > 0)
             {
-                error = "Category không có: " + string.Join(", ", unknown) + ". Tra tên category có thật bằng query categories hoặc parameters_of.";
+                error = SetoutExportLogic.UnknownCategoriesError(unknown);
                 return list;
             }
         }
@@ -392,7 +355,7 @@ public sealed class SetoutExportCommand : ICoreCommand<SetoutExportConfig>
     }
 
     /// <summary>Điểm đặc trưng của phần tử theo <c>Location</c>: điểm đặt (tim), hai đầu/giữa đường, hay tâm hộp bao.</summary>
-    private static List<KeyValuePair<string, XYZ>> Anchors(Element element, string curvePoints, out bool fromBox)
+    private static List<KeyValuePair<string, XYZ>> Anchors(Element element, List<(string Kind, double T)> anchorKinds, out bool fromBox)
     {
         fromBox = false;
         var points = new List<KeyValuePair<string, XYZ>>();
@@ -406,21 +369,11 @@ public sealed class SetoutExportCommand : ICoreCommand<SetoutExportConfig>
 
                 case LocationCurve lc when lc.Curve != null:
                     var curve = lc.Curve;
-                    var ends = !curvePoints.Equals("Mid", StringComparison.OrdinalIgnoreCase);
-                    var mid = !curvePoints.Equals("Ends", StringComparison.OrdinalIgnoreCase);
-                    if (ends)
+                    foreach (var (kind, t) in anchorKinds)
                     {
-                        points.Add(new KeyValuePair<string, XYZ>("đầu", curve.GetEndPoint(0)));
-                    }
-
-                    if (mid)
-                    {
-                        points.Add(new KeyValuePair<string, XYZ>("giữa", curve.Evaluate(0.5, true)));
-                    }
-
-                    if (ends)
-                    {
-                        points.Add(new KeyValuePair<string, XYZ>("cuối", curve.GetEndPoint(1)));
+                        // Hai đầu lấy đúng GetEndPoint (không nội suy) để trùng từng bit với toạ độ Revit hiển thị.
+                        var point = t <= 0 ? curve.GetEndPoint(0) : t >= 1 ? curve.GetEndPoint(1) : curve.Evaluate(t, true);
+                        points.Add(new KeyValuePair<string, XYZ>(kind, point));
                     }
 
                     return points;
@@ -504,17 +457,4 @@ public sealed class SetoutExportCommand : ICoreCommand<SetoutExportConfig>
 
         return string.Empty;
     }
-
-    private static string LetterOf(SetoutColumn column) => column switch
-    {
-        SetoutColumn.Name => "P",
-        SetoutColumn.North => "N",
-        SetoutColumn.East => "E",
-        SetoutColumn.Elevation => "Z",
-        SetoutColumn.Description => "D",
-        SetoutColumn.Code => "C",
-        SetoutColumn.Level => "L",
-        SetoutColumn.ElementId => "I",
-        _ => "?",
-    };
 }
