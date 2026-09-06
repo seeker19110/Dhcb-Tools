@@ -19,7 +19,14 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <InvariantGlobalization>true</InvariantGlobalization>
+    <!--
+      InvariantGlobalization phải là FALSE: ở chế độ invariant, string.Normalize() thành no-op, nên
+      LayerMappingSuggester.RemoveDiacritics KHÔNG bỏ dấu nữa — mọi so khớp bỏ dấu của Shared.Logic gọi
+      từ runner (đối chiếu danh mục hồ sơ 11.6, đọc ý định lệnh) âm thầm sai mà không có lỗi nào.
+      Lộ ra khi chạy thử tham số dossier trên thư mục có file "Báo cáo khảo sát địa chất.pdf": mẫu *khao-sat*
+      trượt trong exe nhưng khớp trong test thuần (test host không bật invariant) — §48.
+    -->
+    <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>

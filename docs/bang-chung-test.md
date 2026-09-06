@@ -2713,3 +2713,50 @@ giữ nguyên cho tầng thuần. Chạy trong CI (`tests.yml`, job `logic-tests
   text/dim/regapp) **chưa có mã nguồn**"* — cả bốn lệnh đều có lớp `*Command` trong `Core.AutoCAD`, đều dây
   vào `AcadCommandTable`, và `CleanupConfig` có đủ ba cờ purge text style / dim style / RegApp. Mục
   *"Lệnh AutoCAD — nay đã đủ 15 lệnh có mã nguồn"* ngay bên dưới đã nói ngược lại từ lâu.
+
+## 48. `DossierIndex` — nửa làm được của 11.6, và một lỗi bỏ dấu chỉ lộ trong exe thật (2026-09-06 07:10 ICT)
+
+Mục 11.6 có hai nửa. `AsBuiltStamp` (family dấu hoàn công theo Phụ lục IIb) phải mở trình soạn family của
+Revit — không tự động hoá từ đây được. Nửa còn lại, **`DossierIndex`**, thuần logic nên làm được ngay:
+`DhcbTools.BatchRunner --dossier <thư mục> --dossier-spec <danh-muc.json> [--dossier-report <html>]`,
+mã thoát 0 đủ mục bắt buộc · 1 còn thiếu · 2 thiếu thư mục/danh mục.
+
+### Không phát biểu hộ nội dung Phụ lục VII
+
+Thử đọc bản gốc: trang Công báo chỉ có link tải DOCX/PDF, các trang tin đăng lại chỉ có tiêu đề ba nhóm.
+Nên **không viết cứng danh mục vào mã**: danh mục nằm ở file cấu hình của dự án, DHCB chỉ đối chiếu với file
+có thật và đếm. Mẫu `configs/ho-so-hoan-cong.sample.json` có ba nhóm I/II/III theo Điều 28 + Phụ lục VII,
+còn từng dòng mục ghi rõ là **ví dụ cách khai**, đơn vị lập hồ sơ điền theo bản gốc và chịu trách nhiệm —
+cùng ranh giới đã đặt cho family dấu. Tài liệu: [`ho-so-hoan-cong.md`](ho-so-hoan-cong.md).
+
+### Lỗi lộ ngay lượt chạy thử đầu tiên
+
+Dựng tay một thư mục hồ sơ (7 file, có `Báo cáo khảo sát địa chất.pdf`) rồi chạy thật:
+
+| Lượt | Kết quả |
+|---|---|
+| 1 | 5/12 mục có hồ sơ, 4 mục bắt buộc thiếu — nhưng `Báo cáo khảo sát địa chất.pdf` **không khớp** mẫu `*khao-sat*` |
+| 2 (sau khi gom dấu ngăn cách) | vẫn không khớp trong exe, **trong khi test thuần cùng chuỗi đó lại xanh** |
+| 3 (sau khi tắt `InvariantGlobalization`) | khớp, 2/2 mục |
+
+Hai lỗi chồng nhau:
+
+1. **Bỏ dấu chưa đủ**: mẫu `*khao-sat*` (gạch ngang) trượt tên file có khoảng trắng. Nay `Normalize` gom mọi
+   dấu ngăn cách (khoảng trắng, `_`, `-`) về một dấu, nên một mẫu bắt cả ba kiểu đặt tên.
+2. **`InvariantGlobalization=true` của BatchRunner làm `string.Normalize()` thành no-op**, nên
+   `RemoveDiacritics` **ngừng bỏ dấu** trong exe thật. Đây không phải lỗi riêng của 11.6: mọi so khớp bỏ dấu
+   của `Shared.Logic` gọi từ runner đều âm thầm sai mà không có lỗi nào. Chứng minh bằng hai mẫu cạnh nhau —
+   `*khảo sát*` (giữ dấu) khớp, `*khao-sat*` (bỏ dấu) trượt. Tắt cờ đó.
+
+**Test thuần không bao giờ bắt được lỗi thứ hai**: `InvariantGlobalization` nằm trong runtimeconfig của
+runner, mà mọi test gọi `Program.Main` đều chạy trong test host với cấu hình khác. Nên có thêm một ca **chạy
+chính file exe** (`dotnet DhcbTools.BatchRunner.dll`) làm tiến trình con. Bật lại cờ đó thì đúng ca này đỏ,
+20 ca kia vẫn xanh.
+
+### Kiểm thử
+
+- 16 ca thuần `DossierIndexTests` (thiếu mục bắt buộc, mục tuỳ chọn không kéo mã thoát, file thừa được liệt
+  kê riêng, một file thoả hai mục, khớp mẫu bỏ dấu/gom dấu/đuôi đường dẫn, mục chưa khai mẫu luôn báo thiếu,
+  đọc JSON hỏng/rỗng, CSV, HTML). Cổng phủ 100% dòng vẫn xanh.
+- 4 ca CLI trong `BatchRunner.Tests` (mã thoát 0/1/2, ghi cả .html lẫn .csv, và ca chạy exe thật ở trên).
+- Tổng: 1364 ca thuần + 21 ca CLI.

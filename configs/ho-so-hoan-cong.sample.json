@@ -1,0 +1,122 @@
+{
+  "//": [
+    "MẪU danh mục hồ sơ hoàn thành công trình cho lệnh: DhcbTools.BatchRunner --dossier <thư mục> --dossier-spec <file này>",
+    "",
+    "QUAN TRỌNG — ĐỌC TRƯỚC KHI DÙNG:",
+    "Ba nhóm I/II/III dưới đây theo Điều 28 + Phụ lục VII NĐ 207/2026/NĐ-CP (hiệu lực 01/7/2026).",
+    "TỪNG DÒNG MỤC trong mỗi nhóm là VÍ DỤ để bạn thấy cách khai, KHÔNG phải bản sao phụ lục.",
+    "Đơn vị lập hồ sơ phải mở bản gốc (Công báo Chính phủ) và điền đúng danh mục của phụ lục cộng",
+    "những gì hợp đồng của dự án đòi thêm; DHCB chỉ ĐỐI CHIẾU với file có thật trong thư mục và đếm.",
+    "",
+    "patterns: mẫu tên file kiểu shell (* và ?), so trên đường dẫn tương đối lẫn riêng tên file,",
+    "không phân biệt hoa thường và BỎ DẤU tiếng Việt — nên 'bien-ban-*' khớp cả 'Biên bản ....pdf'.",
+    "required=false: mục có thì tốt, thiếu không chặn (không tính vào mã thoát 1)."
+  ],
+  "title": "Danh mục hồ sơ hoàn thành công trình",
+  "legalBasis": "Điều 28 và Phụ lục VII Nghị định 207/2026/NĐ-CP ngày 15/6/2026",
+  "project": "<tên công trình>",
+  "groups": [
+    {
+      "code": "I",
+      "name": "Hồ sơ chuẩn bị đầu tư xây dựng và hợp đồng",
+      "items": [
+        {
+          "code": "I.1",
+          "name": "Quyết định chủ trương đầu tư / quyết định phê duyệt dự án",
+          "required": true,
+          "patterns": ["*quyet-dinh*phe-duyet*", "*QD-*phe-duyet*"],
+          "note": "Bản sao có xác nhận của chủ đầu tư"
+        },
+        {
+          "code": "I.2",
+          "name": "Giấy phép xây dựng (trường hợp phải có)",
+          "required": false,
+          "patterns": ["*giay-phep-xay-dung*", "*GPXD*"],
+          "note": "Bỏ qua nếu công trình được miễn giấy phép"
+        },
+        {
+          "code": "I.3",
+          "name": "Hợp đồng xây dựng và các phụ lục hợp đồng",
+          "required": true,
+          "patterns": ["*hop-dong*", "*phu-luc-hop-dong*"],
+          "note": ""
+        }
+      ]
+    },
+    {
+      "code": "II",
+      "name": "Hồ sơ khảo sát, thiết kế xây dựng",
+      "items": [
+        {
+          "code": "II.1",
+          "name": "Báo cáo kết quả khảo sát xây dựng",
+          "required": true,
+          "patterns": ["*khao-sat*"],
+          "note": ""
+        },
+        {
+          "code": "II.2",
+          "name": "Hồ sơ thiết kế bản vẽ thi công đã được phê duyệt",
+          "required": true,
+          "patterns": ["thiet-ke/*", "*ban-ve-thi-cong*"],
+          "note": "Kể cả bản vẽ đã chỉnh sửa trong quá trình thi công"
+        },
+        {
+          "code": "II.3",
+          "name": "Văn bản thẩm định, phê duyệt thiết kế",
+          "required": true,
+          "patterns": ["*tham-dinh*", "*phe-duyet-thiet-ke*"],
+          "note": ""
+        },
+        {
+          "code": "II.4",
+          "name": "Mô hình BIM và dữ liệu BIM nộp kèm (nếu dự án áp dụng)",
+          "required": false,
+          "patterns": ["*.ifc", "bim/*"],
+          "note": "NĐ 217/2026 bắt nộp dữ liệu BIM cho cơ quan chuyên môn"
+        }
+      ]
+    },
+    {
+      "code": "III",
+      "name": "Hồ sơ quản lý chất lượng thi công xây dựng",
+      "items": [
+        {
+          "code": "III.1",
+          "name": "Bản vẽ hoàn công",
+          "required": true,
+          "patterns": ["hoan-cong/*", "*hoan-cong*.pdf"],
+          "note": "Đóng dấu theo Phụ lục IIb; kích thước trong dung sai thì photocopy bản thi công rồi đóng dấu"
+        },
+        {
+          "code": "III.2",
+          "name": "Biên bản nghiệm thu công việc, giai đoạn, hoàn thành hạng mục",
+          "required": true,
+          "patterns": ["*bien-ban*nghiem-thu*", "nghiem-thu/*"],
+          "note": ""
+        },
+        {
+          "code": "III.3",
+          "name": "Nhật ký thi công xây dựng",
+          "required": true,
+          "patterns": ["*nhat-ky*", "*.jsonl"],
+          "note": "Nhật ký điện tử: dấu thời gian không sửa ngược — kiểm bằng BatchRunner --verify-log"
+        },
+        {
+          "code": "III.4",
+          "name": "Kết quả thí nghiệm, kiểm định vật liệu và cấu kiện",
+          "required": true,
+          "patterns": ["*thi-nghiem*", "*kiem-dinh*"],
+          "note": ""
+        },
+        {
+          "code": "III.5",
+          "name": "Báo cáo tuân thủ / kiểm mô hình trước nộp",
+          "required": false,
+          "patterns": ["*ids*.html", "ban-giao.html"],
+          "note": "Gói bàn giao đêm của DHCB sinh sẵn (mục 11.3)"
+        }
+      ]
+    }
+  ]
+}

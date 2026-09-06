@@ -68,6 +68,16 @@ Khai khối `handover` trong job (xem [`goi-ban-giao.md`](goi-ban-giao.md)): sau
 `ban-giao.html` (in được, ô ký chủ đầu tư theo Điều 11 NĐ 207/2026) và `ban-giao.json` — băm SHA-256 từng file
 sản phẩm, danh mục bản vẽ từ `SheetIndex`, kết quả `--verify-log` / `--verify-ifc` / `--verify-ids` của chính đêm đó.
 
+## Danh mục hồ sơ hoàn công (`--dossier`)
+
+```bash
+DhcbTools.BatchRunner --dossier "D:/DHCB/ho-so" --dossier-spec configs/ho-so-hoan-cong.json --dossier-report bao-cao/danh-muc.html
+```
+
+Đối chiếu danh mục của dự án với file thật trong thư mục: 0 đủ mục bắt buộc · 1 còn thiếu · 2 thiếu thư
+mục/danh mục. Danh mục nằm ở file cấu hình (Phụ lục VII là văn bản pháp luật, DHCB không viết cứng) — xem
+[`ho-so-hoan-cong.md`](ho-so-hoan-cong.md).
+
 ## Chuỗi băm của nhật ký (`--verify-log`)
 
 Mỗi dòng trong `run-HHmmss.jsonl` mang thêm hai trường ở cuối:
