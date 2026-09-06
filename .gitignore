@@ -19,3 +19,6 @@ dist/
 .coverage
 coverage/
 TestResults/
+
+# Không commit family sinh ra khi chạy scripts/dung-family.ps1 (nhị phân, dựng lại được).
+out/

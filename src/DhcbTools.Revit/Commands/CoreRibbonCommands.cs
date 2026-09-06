@@ -19,6 +19,15 @@ public sealed class FamilyStarterRibbonCommand : IExternalCommand
         => CommandRunner.Run(commandData, "FamilyStarter");
 }
 
+/// <summary>Nâng cấp hàng loạt .rfa sang định dạng của phiên bản Revit đang chạy, ghi sang thư mục khác.</summary>
+[Transaction(TransactionMode.Manual)]
+[Regeneration(RegenerationOption.Manual)]
+public sealed class FamilyUpgradeRibbonCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        => CommandRunner.Run(commandData, "FamilyUpgrade");
+}
+
 /// <summary>Tạo Level và view plan tương ứng từ danh sách trong config.</summary>
 [Transaction(TransactionMode.Manual)]
 [Regeneration(RegenerationOption.Manual)]

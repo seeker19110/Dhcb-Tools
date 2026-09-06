@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using Autodesk.Revit.ApplicationServices;
 using Autodesk.Revit.UI;
 using DhcbTools.Core.Updaters;
@@ -91,6 +91,8 @@ public sealed class App : IExternalApplication
         var mepf = application.CreateRibbonPanel(TabName, "MEPF");
         Add(mepf, path, "DhcbFamilyStarter", "Family mẫu\nsleeve/hanger", "FamilyStarterRibbonCommand",
             "Dựng DHCB_Sleeve / DHCB_Hanger từ template Revit, ghi .rfa và nạp vào mô hình.");
+        Add(mepf, path, "DhcbFamilyUpgrade", "Nâng cấp\nfamily", "FamilyUpgradeRibbonCommand",
+            "Nâng cấp hàng loạt .rfa sang định dạng Revit đang chạy; bản gốc giữ nguyên.");
         Add(mepf, path, "DhcbSleeve", "Sleeve\ntự động", "SleeveAutoCommand",
             "Đặt sleeve/opening tại giao cắt MEP với tường/sàn tự động.");
         Add(mepf, path, "DhcbElevTag", "Gán cao\nđộ MEP", "ElevationTagAutoCommand",
@@ -300,6 +302,7 @@ public sealed class App : IExternalApplication
             or "DhcbColorByParameter" or "DhcbStyleTools" or "DhcbStylePurge" or "DhcbFamilyAudit"
             => RibbonIcons.Sheets,
         "DhcbFamilyStarter" => RibbonIcons.Mepf,
+        "DhcbFamilyUpgrade" => RibbonIcons.Mepf,
         "DhcbParameterRuleCheck" or "DhcbIdsValidate" or "DhcbClashDetection" or "DhcbAiTools" or "DhcbCadLayerMap" or "DhcbSpecToConfig"
             or "DhcbDictionaryLearn"
             => RibbonIcons.Checks,
