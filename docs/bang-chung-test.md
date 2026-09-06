@@ -3310,6 +3310,7 @@ chèn vào giữa — 8 `<param>` trỏ vào hư không, còn `NetloadFailure` t
 | `-Suite write -AllowWrites` (2024.3 / **2026**) | **16/16** — **16/16** |
 | `-Suite write-mep -AllowWrites` (2024.3 / **2026**) | **21/21** — **21/21** |
 | `-Suite write-plumbing -AllowWrites` (2024.3 / **2026**) | **5/5** — **5/5** |
+| `-Suite autoroute` (2024.3 / **2026**) | **13/13** — **13/13** |
 
 Trong lượt `mep`, `SleeveAuto` cho *"[Xem trước] Sẽ đặt 445 sleeve"* **không kèm** dòng cảnh báo mới — tức trên mô
 hình này mọi phần tử MEP đều đọc được solid và ghi chú không nổ bừa. Đó là phần kiểm mà một ca test thuần không làm
@@ -3350,6 +3351,13 @@ Không ca nào sinh dòng cảnh báo mới của §64, và các ca "lần hai p
 đường ghi lẫn chống trùng. Chỗ duy nhất khác nhau là **ElementId của đoạn ống `PipeKick` vừa tạo** (1716336/1716338
 so với 1738943/1738945) — phần tử mới thì id mới; id ống gốc bị chia vẫn là 1591774 ở cả hai.
 
-**Chốt hai phiên bản.** §64 có bằng chứng đủ trên **cả Revit 2024.3 và 2026**, **sáu bộ** — `smoke`, `mep`,
-`plumbing`, `write`, `write-mep`, `write-plumbing`: **240 ca chạy thật, 0 trượt**. Mọi chỗ lệch giữa hai phiên bản
-đều đối chiếu được với con số đã ghi ở §51/§59 cho model mẫu, không chỗ nào là khác biệt của mã.
+**Bộ `autoroute` — hai phiên bản ra kết quả không lệch một con số nào.** 13/13 mỗi bên, và đây là bộ duy nhất
+đạt điều đó **tuyệt đối**: từng ô lưới (304.668, 100.467, 92.004…), từng số node mở rộng (206.893/2.000.000,
+329.125/644.028, 31.382/703.269), từng số chướng ngại và lỗ mở, từng ElementId dẫn trong tên ca — **trùng nguyên giữa
+2024.3 và 2026**. Chỉ thời gian chạy khác. Đó là vì `PathFinder3D` là tầng thuần: nó nhận hộp bao rồi tự dựng lưới,
+không hỏi Revit thêm gì — có bằng chứng thì nói được, không thì chỉ là suy đoán từ kiến trúc.
+
+**Chốt hai phiên bản.** §64 có bằng chứng đủ trên **cả Revit 2024.3 và 2026**, **bảy bộ** — `smoke`, `mep`,
+`plumbing`, `write`, `write-mep`, `write-plumbing`, `autoroute`: **266 ca chạy thật, 0 trượt**. Toàn bộ bộ ca kiểm
+Revit của dự án đã chạy lại sau thay đổi này. Mọi chỗ lệch giữa hai phiên bản đều đối chiếu được với con số đã
+ghi ở §51/§59 cho model mẫu, không chỗ nào là khác biệt của mã.
