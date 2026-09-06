@@ -2990,3 +2990,17 @@ chỉ có ca lỗi vì model mẫu không có model line nào mang line style tu
 
 Cái chưa chứng minh: elbow dựng được với duct type mặc định của Snowdon (Mitered Elbows / Taps); dự án có routing
 preference khác có thể ra *fitting lỗi* — lệnh đã đếm và báo riêng từng đỉnh. Chưa có số chất lượng tuyến trên dự án thật.
+
+## 56. Tách `AutoRoute` / `RouteFromLines` xuống tầng thuần — điểm (3) của §54 (2026-09-06 12:20 ICT)
+
+Cùng cách §49–§51. `SetoutExport` đã có `SetoutExportLogic` + `SetoutPlanner` từ §49/§52, phần còn lại của nó là
+hình học Revit (trọng tâm solid, transform Survey) — không tách thêm. Hai lệnh còn nặng phần quyết định:
+
+| Tầng thuần | Gì | Ca |
+|---|---|---|
+| `Mep/AutoRoutePlanner` | `SearchBounds`, `Corners` + `BoundsOf` (hộp bao qua tám đỉnh đã biến đổi — test xoay 90° cho thấy biến đổi min/max sai), `IsPassableOpening` (cửa/tường nhúng/liên kết kết cấu), `HoleTouchesHost`, `ObstaclePieces`, `LinkSelected`, và mọi câu Summary/Messages (`SourceText`, `FailSummary`, `FoundMessage`, `NoObstacleWarning`, `ObstacleDetails` trần 30, `PreviewSummary`/`WrittenSummary`) | 16 |
+| `Mep/RouteBuildPlanner` | `Segment` (ép cao độ theo `offsetMm`), `FittingPlan` + `Count`, `PreviewSummary`, `ShouldDeleteLines` (chỉ khi không lỗi — line ở lại làm dấu nối tay), `FinalSummary`, `IsSuccess`, bốn thông báo lỗi fitting | 12 |
+
+`AutoRouteCommand` 412 → 367 dòng, `RouteFromLinesCommand` 407 → 401 (phần Revit là dựng Duct/fitting, đúng chỗ của
+nó). Shared.Logic 1567 → **1595 ca**, mã mới phủ 100 %. Chuỗi giữ nguyên từng ký tự: chạy lại **`autoroute` 13/13**
+và **`write-mep` 15/15** trên Revit 2024.3, Summary trùng §55 tới từng số (3,48×, 2 fitting OK, 403 ms so với 433 ms).
