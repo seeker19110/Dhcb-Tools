@@ -16,8 +16,9 @@
 param(
     # Bộ ca kiểm: "smoke" (model kiến trúc), "mep" (model HVAC), "plumbing" (cấp thoát nước)
     # "write" (đường ghi thật trên model kiến trúc — xem -AllowWrites), "write-mep" (đường ghi
-    # cho nhóm lệnh tạo phần tử MEP, chạy trên model HVAC), hoặc "autoroute" (tuyến duct thật, model HVAC).
-    [ValidateSet('smoke', 'mep', 'plumbing', 'write', 'write-mep', 'autoroute')]
+    # cho nhóm lệnh tạo phần tử MEP, chạy trên model HVAC), "write-plumbing" (PipeKick/SlopePipes ghi thật
+    # trên model cấp thoát nước), hoặc "autoroute" (tuyến duct thật, model HVAC).
+    [ValidateSet('smoke', 'mep', 'plumbing', 'write', 'write-mep', 'write-plumbing', 'autoroute')]
     [string]$Suite = 'smoke',
 
     # Cho phép ca khai báo "allowWrite" ghi THẬT vào model. Script sẽ chép model mẫu sang thư mục kết
@@ -77,6 +78,7 @@ if (-not $Model) {
         'write-mep' { Join-Path $samples 'Snowdon Towers Sample HVAC.rvt' }
         'autoroute' { Join-Path $samples 'Snowdon Towers Sample HVAC.rvt' }
         'plumbing' { Join-Path $samples 'Snowdon Towers Sample Plumbing.rvt' }
+        'write-plumbing' { Join-Path $samples 'Snowdon Towers Sample Plumbing.rvt' }
         default    { Join-Path $samples 'Snowdon Towers Sample Architectural.rvt' }
     }
 }
