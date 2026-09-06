@@ -68,6 +68,7 @@
 - §63 — [`FamilyUpgrade` — thư viện family cho nhiều phiên bản Revit, hai chiều đều có bằng chứng (2026-09-06 14:30 ICT)](#63-familyupgrade-thư-viện-family-cho-nhiều-phiên-bản-revit-hai-chiều-đều-có-bằng-chứng-2026-09-06-1430-ict)
 - §64 — [Quét sâu lần hai: 34 khối `catch` rỗng còn lại được phân loại, 3 chỗ nói dối về mô hình đã sửa (2026-09-06 15:15 ICT)](#64-quét-sâu-lần-hai-34-khối-catch-rỗng-còn-lại-được-phân-loại-3-chỗ-nói-dối-về-mô-hình-đã-sửa-2026-09-06-1515-ict)
 - §65 — [Đóng một phần nợ checklist tay 8.4 — `overwriteExisting` nay ra checkbox (2026-09-06)](#65-đóng-một-phần-nợ-checklist-tay-84-overwriteexisting-nay-ra-checkbox-2026-09-06)
+- §66 — [Hai mục nợ kỹ thuật của bản đánh giá 2026-09-06 — `CommandResult.PartialSuccess` và dọn 6 khối `catch` rỗng](#66-hai-mục-nợ-kỹ-thuật-của-bản-đánh-giá-2026-09-06-commandresultpartialsuccess-và-dọn-6-khối-catch-rỗng)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
