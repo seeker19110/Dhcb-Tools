@@ -98,6 +98,24 @@ class CheckCoverageTests(unittest.TestCase):
         self.assertEqual(2, code)
         self.assertIn("coverage", text)
 
+    def test_console_cp1252_van_in_duoc_tieng_viet(self) -> None:
+        """Hồi quy: cổng phủ từng sập ở máy Windows trước khi in nổi một dòng.
+
+        Console Windows mặc định cp1252, mà mọi thông báo của cổng đều có dấu tiếng Việt →
+        UnicodeEncodeError ngay ở print đầu tiên. CI Linux chạy UTF-8 nên không bao giờ đỏ,
+        lỗi chỉ lộ khi chạy tay ở máy. main() nay tự đặt lại encoding cho stdout/stderr.
+        """
+        write_report(self.folder, 1.0, [])
+        raw = io.BytesIO()
+        console = io.TextIOWrapper(raw, encoding="cp1252", errors="strict", write_through=True)
+
+        with redirect_stdout(console):
+            code = check_coverage.main(["check-coverage.py", str(self.folder)])
+        console.flush()
+
+        self.assertEqual(0, code)
+        self.assertIn("Phủ dòng", raw.getvalue().decode("utf-8"))
+
 
 if __name__ == "__main__":
     unittest.main()
