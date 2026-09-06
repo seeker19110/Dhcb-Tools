@@ -105,8 +105,8 @@ Script in gốc IFCSITE (so với dòng *"Site … gốc nội bộ"* trong Mess
 cột tới điểm IFC gần nhất, tách riêng cột mà thân IFC **bị cắt bởi join** (nhỏ hơn cỡ danh nghĩa trong tên type —
 tâm thân đó không phải tim). Mã thoát 1 khi có điểm lệch quá ngưỡng. Kết quả trên Snowdon (§52): gốc Survey
 khớp **từng mm**, 142/142 giao trục lệch ≤ 0,7 mm, 57/118 tim cột ≤ 5 mm; 61 cột còn lại đều thuộc họ *Off
-Center* và lệch 52–305 mm — ở đó bộ xuất IFC và hình học Revit **không đồng ý** với nhau về vị trí thân cột, lệnh
-đi theo hình học Revit (trọng tâm solid). Với cột lệch tâm, giao file kèm dòng ghi chú của lệnh để trắc đạc biết.
+Center* và lệch 52–305 mm — ở đó bộ xuất IFC **sai** (phân xử bằng tham số family, xem *Còn thiếu*), lệnh đi theo
+hình học Revit (trọng tâm solid) là đúng. Với cột lệch tâm, giao file kèm dòng ghi chú của lệnh để trắc đạc biết.
 
 ## Config đầy đủ
 
@@ -147,10 +147,12 @@ hợp lệ. Bảng mã chung: [`ma-loi.md`](ma-loi.md).
 
 ## Còn thiếu
 
-- ~~Chưa chạy thật trong Revit~~ — đã chạy (§28) và **đã đối chiếu độc lập** bằng IFC của Autodesk (§52). Còn
-  mở: **họ cột "Off Center"** — hình học Revit và bộ xuất IFC đặt thân cột lệch nhau 52–305 mm; chưa có đường
-  thứ ba (máy toàn đạc trên công trường, hay mở family để đọc offset) để phân xử. Cột đối xứng đặt tâm (57/118
-  của Snowdon) khớp ≤ 5 mm.
+- ~~Chưa chạy thật trong Revit~~ — đã chạy (§28), **đã đối chiếu độc lập** bằng IFC của Autodesk và **đã phân xử**
+  bằng đường thứ ba là tham số của chính family (§52): với họ *Off Center*, tâm thật lệch điểm chèn đúng bằng
+  `(Depth_Center to Back − Center to Front)/2` và `(Width_Center to Right − Center to Left)/2`; trọng tâm mà lệnh
+  lấy khớp **từng mm** với con số đó (cột 32"×24": 101,6 mm; 24"×20": 50,8 mm), còn bộ xuất IFC đặt sai 186 mm và
+  cắt thân cột nối tường. Kết luận: **`SetoutExport` đúng, IFC là bên sai** ở 61 cột đó — đừng dùng thân IFCCOLUMN
+  làm chuẩn cho họ cột lệch tâm; giao trục và gốc Survey trong IFC thì vẫn là chuẩn tốt.
 - Chưa đọc phần tử trong model liên kết (kết cấu thường là file link khi mở file MEP).
 - Chưa có mẫu riêng cho định dạng nhị phân/GSI của Leica — CSV theo cột và DXF là hai định dạng mọi phần mềm
   máy đều nhập được; làm thêm khi có tổ trắc đạc thật yêu cầu (đúng thứ tự "sau khi có số liệu 9.4").
