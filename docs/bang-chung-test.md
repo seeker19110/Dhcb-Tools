@@ -3064,3 +3064,20 @@ nay khai `outputPath` + `filesExist`. Catalog thêm trường, `CatalogFieldTest
 
 Chưa làm: family sleeve/hanger mẫu kèm bộ cài (câu hỏi 3) — cần dựng trong trình soạn family; vai MEP vẫn phải nạp family
 của dự án trước khi `SleeveAuto` chạy được.
+
+## 59. Năm bộ của hôm nay chạy lại trên Revit 2026 — id model mẫu giữ nguyên, điểm (5) của §54 khép bằng bằng chứng (2026-09-06 12:50 ICT)
+
+§54 lo bộ ghi thật gắn ElementId cố định của model mẫu 2024 sẽ vỡ trên model mẫu 2026 (đã thấy lệch hai ống ở §51).
+Chạy lại toàn bộ thay đổi của §55–§58 trên **Revit 2026**, cùng script (`-RevitVersion 2026`):
+
+| Bộ | 2024.3 | 2026 | Ghi chú |
+|---|---|---|---|
+| `mep` (27 ca) | 27/27 | **27/27** | ConnectorChecker 37 hở → CSV; ca family sai tên liệt kê đúng 97 type, Air Terminals/HRU lên đầu; SizingProposal 799 đoạn thay 266 (model mẫu 2026 khác) |
+| `plumbing` (8) | 8/8 | **8/8** | ConnectorChecker 35 hở / 34 phần tử (2024: 33/32) → CSV |
+| `autoroute` (13) | 13/13 | **13/13** | Thước đo trùng từng số: 1,00× ×3, riser 3,48× |
+| `write-plumbing` (5) | 5/5 | **5/5** | **Id 1591774 / 1406421 vẫn là đúng ống**: kick 3 đoạn + 2/2 cút (727 ms), dốc 1/1 rồi kiểm lại 0 chưa đạt |
+| `write-mep` (15) | 15/15 | **15/15** | AutoRoute vẽ 3 line → RouteFromLines 3/3 duct + 2 fitting OK → lần hai không còn line |
+
+Kết luận cho điểm (5): id phần tử của model mẫu Snowdon **ổn định giữa 2024 và 2026** (Autodesk chỉ thêm/bớt vài phần tử,
+không đánh lại id), nên chưa cần cơ chế "chọn ống theo bộ lọc" trong bộ test; ghi chú trong `revit-write-plumbing.json`
+đã nói đúng việc phải làm nếu một ngày id lệch (chọn lại id, không sửa kỳ vọng). Không đổi mã.
