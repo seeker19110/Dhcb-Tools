@@ -180,15 +180,32 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
         BuiltInCategory.OST_DuctCurves, BuiltInCategory.OST_PipeCurves, BuiltInCategory.OST_CableTray,
     };
 
+    /// <summary>Tên hiển thị đúng như <see cref="AutoRoutePlanner.OwnRouteCategoryToExclude"/> trả về — chỉ ba
+    /// category có thể là "chính loại đang vẽ" mới cần tra, không phải bảng tra category đầy đủ.</summary>
+    private static string? CategoryDisplayName(BuiltInCategory category) => category switch
+    {
+        BuiltInCategory.OST_DuctCurves => "Ducts",
+        BuiltInCategory.OST_PipeCurves => "Pipes",
+        BuiltInCategory.OST_CableTray => "Cable Trays",
+        _ => null,
+    };
+
     public CommandResult Execute(Document document, AutoRouteConfig config)
     {
         var start = new Point3(config.StartMm.X, config.StartMm.Y, config.StartMm.Z);
         var goal = new Point3(config.EndMm.X, config.EndMm.Y, config.EndMm.Z);
         var bounds = AutoRoutePlanner.SearchBounds(start, goal, config.SearchMarginMm, config.SearchMarginZMm);
 
+        var elementType = config.RouteConfig?.ElementType ?? new RouteFromLinesConfig().ElementType;
+        var excludeOwnCategory = AutoRoutePlanner.OwnRouteCategoryToExclude(
+            config.ObstacleCategories.Count > 0, config.BuildRoute, elementType);
+        var defaultObstacles = excludeOwnCategory == null
+            ? DefaultObstacles
+            : DefaultObstacles.Where(c => CategoryDisplayName(c) != excludeOwnCategory).ToArray();
+
         ICollection<ElementId> catIds = config.ObstacleCategories.Count > 0
             ? ParameterSync.ParameterExportCommand.ResolveCategoryIds(document, config.ObstacleCategories, out _)
-            : DefaultObstacles.Select(c => new ElementId(c)).ToList();
+            : defaultObstacles.Select(c => new ElementId(c)).ToList();
 
         var outline = new Outline(new XYZ(RevitCompat.MmToFt(bounds.MinX), RevitCompat.MmToFt(bounds.MinY), RevitCompat.MmToFt(bounds.MinZ)),
                                   new XYZ(RevitCompat.MmToFt(bounds.MaxX), RevitCompat.MmToFt(bounds.MaxY), RevitCompat.MmToFt(bounds.MaxZ)));
@@ -234,7 +251,7 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
                 // toạ độ LINK trước khi lọc — bộ lọc chạy trong document của link.
                 ICollection<ElementId> idsLink = config.ObstacleCategories.Count > 0
                     ? ParameterSync.ParameterExportCommand.ResolveCategoryIds(linkDoc, config.ObstacleCategories, out _)
-                    : DefaultObstacles.Select(c => new ElementId(c)).ToList();
+                    : defaultObstacles.Select(c => new ElementId(c)).ToList();
                 if (idsLink.Count == 0)
                 {
                     linkSummary.Add(AutoRoutePlanner.LinkNoCategoryLine(linkInstance.Name));

@@ -129,8 +129,11 @@ tốt cho việc này nhưng viết cho agent, không cho người.
   thực tế gặp file gây nhận sai phiên bản.
 - ~~6 khối `catch {}` rỗng còn lại trong `src/`~~ ✅ 2026-09-06: cả 6 nay có bình luận giải thích lý do im
   lặng (đúng quy ước đã áp dụng cho 40+ khối khác từ §61) — xem `bang-chung-test.md` §66.
-- `AutoRoute` mức C: đã đo được 1,00× trên 8/9 tuyến, nhưng vẫn phải chuẩn bị điểm bằng `SetoutExport` và bỏ
-  Ducts khỏi `obstacleCategories` bằng tay — chưa phải một nút.
+- ~~`AutoRoute` mức C: đã đo được 1,00× trên 8/9 tuyến, nhưng vẫn phải chuẩn bị điểm bằng `SetoutExport` và bỏ
+  Ducts khỏi `obstacleCategories` bằng tay — chưa phải một nút.~~ ✅ 2026-09-06: khi `buildRoute=true` và
+  `obstacleCategories` để mặc định, `AutoRoute` tự loại category của chính loại phần tử sắp dựng
+  (Duct/Pipe/CableTray) khỏi vật cản mặc định — không cần gõ tay nữa. Vẫn phải chuẩn bị điểm bằng
+  `SetoutExport` (chưa tự động được, cần API kết nối khác hẳn). Xem `bang-chung-test.md` §68.
 
 ## 5. Tầm nhìn 24 tháng — ba chân trời
 

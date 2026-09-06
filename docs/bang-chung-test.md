@@ -70,6 +70,7 @@
 - §65 — [Đóng một phần nợ checklist tay 8.4 — `overwriteExisting` nay ra checkbox (2026-09-06)](#65-đóng-một-phần-nợ-checklist-tay-84-overwriteexisting-nay-ra-checkbox-2026-09-06)
 - §66 — [Hai mục nợ kỹ thuật của bản đánh giá 2026-09-06 — `CommandResult.PartialSuccess` và dọn 6 khối `catch` rỗng](#66-hai-mục-nợ-kỹ-thuật-của-bản-đánh-giá-2026-09-06-commandresultpartialsuccess-và-dọn-6-khối-catch-rỗng)
 - §67 — [Xác nhận thật trên Revit — batch thoát êm bằng `PostCommand(ExitRevit)`, không còn phải kill cứng (2026-09-06 22:38 ICT)](#67-xác-nhận-thật-trên-revit-batch-thoát-êm-bằng-postcommandexitrevit-không-còn-phải-kill-cứng-2026-09-06-2238-ict)
+- §68 — [`AutoRoute` tự loại category của chính nó khi dựng route — đóng nốt "chưa phải một nút" ở §4.7 (2026-09-06 23:03 ICT)](#68-autoroute-tự-loại-category-của-chính-nó-khi-dựng-route-đóng-nốt-chưa-phải-một-nút-ở-47-2026-09-06-2303-ict)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
@@ -3448,3 +3449,40 @@ Kết luận: thay đổi ở §4.7 có tác dụng đo được, không chỉ l
 recovered", `CArchiveException 105`), một vấn đề của bản sao file mẫu cài cùng Revit 2024 trên máy này,
 không phải lỗi ở `BatchStartupHook` hay `RunTests`. Không sửa ở đây — không liên quan tới việc đang xác
 nhận, và Audit lại file mẫu là việc một lần trên máy, không phải nợ mã.
+
+## 68. `AutoRoute` tự loại category của chính nó khi dựng route — đóng nốt "chưa phải một nút" ở §4.7 (2026-09-06 23:03 ICT)
+
+§4.7 của bản đánh giá 2026-09-06 còn một câu: *"vẫn phải chuẩn bị điểm bằng `SetoutExport` và bỏ Ducts
+khỏi `obstacleCategories` bằng tay — chưa phải một nút."* Lý do phải bỏ tay: hai đầu tuyến luôn là điểm
+nối vào duct/pipe/cable tray **có sẵn**, mà danh sách vật cản mặc định của `AutoRoute` có chính category
+đó — điểm xuất phát nằm ngay trong hộp bao của duct mình sắp nối vào nên bị coi là "trong chướng ngại"
+ngay từ bước đầu (ca `Điểm đặt ngay trên duct hiện có...` trong `tests/suites/revit-autoroute.json` chốt
+đúng hành vi cũ này khi category được **gõ tay**).
+
+**Sửa:** `AutoRoutePlanner.OwnRouteCategoryToExclude` (tầng thuần, `Shared.Logic/Mep`) — khi
+`buildRoute=true` **và** `obstacleCategories` đang để mặc định (rỗng, chưa tự chọn), loại category của
+chính loại phần tử sắp dựng (`RouteConfig.ElementType`: `Duct`→"Ducts", `Pipe`→"Pipes",
+`CableTray`→"Cable Trays") khỏi bảy category vật cản mặc định. Không đụng khi người dùng đã tự gõ
+`obstacleCategories` — tôn trọng lựa chọn tường minh kể cả khi họ tự để nguyên category đó (đúng ca kiểm
+`revit-autoroute.json` ở trên, mọi ca đều gõ tay category nên không ca nào đổi hành vi). `buildRoute=false`
+(chỉ xem trước/vẽ line) cũng không đụng — mặc định giữ nguyên như cũ.
+
+**Bằng chứng thuần:** 4 ca `Theory`/`Fact` mới trong `AutoRouteRouteBuildPlannerTests.cs`
+(`OwnRouteCategoryToExclude_...`) — Duct/Pipe/CableTray ra đúng tên category, đã tự chọn category thì
+không đụng, `buildRoute=false` không đụng, `Conduit` (không nằm trong 7 category mặc định) không loại gì.
+`dotnet test tests/DhcbTools.Shared.Logic.Tests` **1635/1635**.
+
+**Bằng chứng chạy thật (Revit 2024, Snowdon HVAC):** job trực tiếp qua `BatchRunner` với đúng hai điểm
+của ca `Điểm đặt ngay trên duct hiện có` ở trên nhưng `obstacleCategories: []`, `buildRoute: true`,
+`dryRun: true` (không ghi gì vào model — chỉ kiểm bước lọc vật cản chạy trước bước ghi). Trước sửa, ca
+này phải ra "trong chướng ngại" giống hệt ca gõ tay category ở `revit-autoroute.json`. Sau sửa:
+
+```
+"success":true,"affected":2,
+"summary":"[Xem trước] Tuyến 2 đoạn, dài 3,7 m = 1,00× Manhattan, 1 rẽ (tối thiểu 1),
+            né 64 vật cản (0 trong file + 64 từ model liên kết, mức C: không đục lỗ mở)."
+```
+
+`0 trong file` xác nhận đúng cơ chế: Ducts trong file HVAC (chủ) bị loại khỏi vật cản như thiết kế —
+64 vật cản còn lại đều từ bốn model liên kết (kiến trúc, kết cấu, cấp thoát nước…), không phải trùng hợp
+tuyến né được. Tuyến 3,7 m tìm được ngay, không cần kỹ sư tự gõ `obstacleCategories` bỏ Ducts.
