@@ -117,6 +117,21 @@ internal static class BatchStartupHook
             // (ít khả năng bị khoá hơn là xoá) rồi mới thử xoá, và không giới hạn loại exception.
             RetirePendingFile();
             TryWrite(DonePath, new JObject { ["exitCode"] = exitCode }.ToString());
+
+            // Trước đây không có bước này: Revit cứ đứng im (không document, không transaction) tới khi
+            // runner thấy batch-done.json rồi Kill(true) cưỡng bức sau tối đa 60s (xem Program.Revit.cs).
+            // PostCommand(ExitRevit) xin Revit tự thoát êm ở vòng idle kế tiếp — dọn được tài nguyên nội
+            // bộ (license, log nội bộ) mà kill cứng bỏ qua. Nếu lệnh này thất bại vì bất kỳ lý do gì,
+            // runner vẫn kill như cũ — đây chỉ là cải thiện thêm, không phải đường duy nhất để thoát.
+            try
+            {
+                var exitCommand = RevitCommandId.LookupPostableCommandId(PostableCommand.ExitRevit);
+                uiApplication.PostCommand(exitCommand);
+            }
+            catch (Exception ex)
+            {
+                SafeLog("[Batch] không xin thoát êm được, runner sẽ kill cứng: " + ex.Message);
+            }
         }
 
         return true;
