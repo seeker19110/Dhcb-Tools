@@ -59,6 +59,12 @@ public sealed class SetoutExportConfig
     /// <summary>Phần tử dạng đường (dầm, tường, ống): <c>Ends</c> (hai đầu — mặc định), <c>Mid</c>, <c>Both</c>.</summary>
     public string CurvePoints { get; init; } = "Ends";
 
+    /// <summary>
+    /// Điểm lấy cho phần tử đặt theo điểm (cột, thiết bị): <c>Centre</c> (tâm hình học trên mặt bằng — mặc định)
+    /// hoặc <c>Insertion</c> (điểm chèn family). Họ cột "Off Center" có điểm chèn ở mép, lệch tim tới 305 mm (§52).
+    /// </summary>
+    public string PointMode { get; init; } = "Centre";
+
     /// <summary>Thêm giao điểm các trục thẳng (A-1, B-2…).</summary>
     public bool IncludeGridIntersections { get; init; }
 
@@ -101,6 +107,11 @@ public sealed class SetoutExportCommand : ICoreCommand<SetoutExportConfig>
             return CommandResult.Fail(systemError);
         }
 
+        if (!SetoutExportLogic.TryParsePointMode(config.PointMode, out var useCentre, out var modeError))
+        {
+            return CommandResult.Fail(modeError);
+        }
+
         var anchorKinds = SetoutExportLogic.CurveAnchorKinds(curveEnds, curveMid);
 
         Level? level = null;
@@ -129,6 +140,8 @@ public sealed class SetoutExportCommand : ICoreCommand<SetoutExportConfig>
         var noGeometry = 0;
         var boxFallback = 0;
         var filteredOut = 0;
+        var offCentre = 0;
+        var maxOffsetMm = 0.0;
         foreach (var element in elements)
         {
             if (level != null && !string.Equals(LevelNameOf(document, element), level.Name, StringComparison.OrdinalIgnoreCase))
@@ -152,7 +165,13 @@ public sealed class SetoutExportCommand : ICoreCommand<SetoutExportConfig>
                 continue;
             }
 
-            var anchors = Anchors(element, anchorKinds, out var fromBox);
+            var anchors = Anchors(element, anchorKinds, useCentre, out var fromBox, out var offsetMm);
+            if (offsetMm > SetoutExportLogic.OffCentreToleranceMm)
+            {
+                offCentre++;
+                maxOffsetMm = Math.Max(maxOffsetMm, offsetMm);
+            }
+
             if (anchors.Count == 0)
             {
                 noGeometry++;
@@ -244,6 +263,12 @@ public sealed class SetoutExportCommand : ICoreCommand<SetoutExportConfig>
         }
 
         result.Messages.AddRange(SetoutExportLogic.TrailingNotes(config.DxfPath, filteredOut, boxFallback, noGeometry, curvedGrids));
+        var offCentreNote = SetoutExportLogic.OffCentreNote(offCentre, maxOffsetMm, useCentre);
+        if (offCentreNote != null)
+        {
+            result.Messages.Add(offCentreNote);
+        }
+
 
         foreach (var note in plan.Notes)
         {
@@ -354,17 +379,96 @@ public sealed class SetoutExportCommand : ICoreCommand<SetoutExportConfig>
         return list;
     }
 
+    /// <summary>
+    /// Tâm mặt bằng của phần tử đặt theo điểm. Với family instance: TRỌNG TÂM các solid của hình học GỐC
+    /// (trước join/cut) cân theo thể tích, đưa qua transform của instance. Vì sao không dùng hộp bao: cột nối
+    /// vào tường thì hộp bao thường chỉ còn phần ngoài tường; hộp bao hình học gốc của họ "Off Center" lại lệch
+    /// 117–160 mm so với thân cột thật (family chứa thêm hình học không phải thân) — cả hai đều lộ khi đối chiếu
+    /// với IFC của Autodesk (§52). Không có solid → tâm hộp bao thường; không có gì → null.
+    /// </summary>
+    private static XYZ? PlanCentre(Element element)
+    {
+        if (element is FamilyInstance fi)
+        {
+            try
+            {
+                var volume = 0.0;
+                var sum = XYZ.Zero;
+                foreach (var g in fi.GetOriginalGeometry(new Options()))
+                {
+                    foreach (var solid in SolidsOf(g))
+                    {
+                        if (solid.Volume <= 1e-9)
+                        {
+                            continue;
+                        }
+
+                        sum += solid.ComputeCentroid() * solid.Volume;
+                        volume += solid.Volume;
+                    }
+                }
+
+                if (volume > 1e-9)
+                {
+                    return fi.GetTransform().OfPoint(sum / volume);
+                }
+            }
+            catch (Exception)
+            {
+                // Family không có hình học 3D hay API từ chối tính trọng tâm → rơi về hộp bao thường.
+            }
+        }
+
+        var bb = element.get_BoundingBox(null);
+        return bb == null ? null : (bb.Min + bb.Max) / 2;
+    }
+
+    private static IEnumerable<Solid> SolidsOf(GeometryObject g)
+    {
+        switch (g)
+        {
+            case Solid s:
+                yield return s;
+                break;
+            case GeometryInstance gi:
+                foreach (var inner in gi.GetSymbolGeometry())
+                {
+                    foreach (var s in SolidsOf(inner))
+                    {
+                        yield return gi.Transform.IsIdentity ? s : SolidUtils.CreateTransformed(s, gi.Transform);
+                    }
+                }
+
+                break;
+        }
+    }
+
     /// <summary>Điểm đặc trưng của phần tử theo <c>Location</c>: điểm đặt (tim), hai đầu/giữa đường, hay tâm hộp bao.</summary>
-    private static List<KeyValuePair<string, XYZ>> Anchors(Element element, List<(string Kind, double T)> anchorKinds, out bool fromBox)
+    private static List<KeyValuePair<string, XYZ>> Anchors(Element element, List<(string Kind, double T)> anchorKinds, bool useCentre, out bool fromBox, out double offsetMm)
     {
         fromBox = false;
+        offsetMm = 0;
         var points = new List<KeyValuePair<string, XYZ>>();
         try
         {
             switch (element.Location)
             {
                 case LocationPoint lp:
-                    points.Add(new KeyValuePair<string, XYZ>("tim", lp.Point));
+                    // Điểm chèn family KHÔNG chắc là tim: họ "Rectangular Column (Off Center)" của Snowdon lệch
+                    // tới 305 mm, đối chiếu bằng IFC của Autodesk mới lộ (§52). Mặc định lấy trọng tâm solid
+                    // trên mặt bằng (PlanCentre), giữ Z của điểm chèn (cao độ chân cột).
+                    var anchor = lp.Point;
+                    var centre = PlanCentre(element);
+                    if (centre != null
+                        && SetoutExportLogic.IsOffCentre(
+                            RevitCompat.FtToMm(lp.Point.X), RevitCompat.FtToMm(lp.Point.Y),
+                            RevitCompat.FtToMm(centre.X), RevitCompat.FtToMm(centre.Y), out offsetMm)
+                        && useCentre)
+                    {
+                        anchor = new XYZ(centre.X, centre.Y, lp.Point.Z);
+                    }
+
+                    points.Add(new KeyValuePair<string, XYZ>("tim", anchor));
                     return points;
 
                 case LocationCurve lc when lc.Curve != null:

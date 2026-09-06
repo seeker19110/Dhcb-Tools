@@ -263,4 +263,48 @@ public class SetoutExportLogicTests
         Assert.Equal("1 phần tử không có hình học nào để lấy điểm, đã bỏ qua.", notes[3]);
         Assert.Equal("4 trục cong bị bỏ qua khi tính giao trục (chỉ xét trục thẳng).", notes[4]);
     }
+
+    // ── pointMode / lệch tâm (§52: cột "Off Center" của Snowdon lệch tim tới 305 mm) ──
+
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("", true)]
+    [InlineData("Centre", true)]
+    [InlineData("center", true)]
+    [InlineData("Insertion", false)]
+    public void TryParsePointMode_HopLe(string? raw, bool useCentre)
+    {
+        Assert.True(SetoutExportLogic.TryParsePointMode(raw, out var centre, out var error));
+        Assert.Equal(useCentre, centre);
+        Assert.Equal(string.Empty, error);
+    }
+
+    [Fact]
+    public void TryParsePointMode_Sai_BaoRo()
+    {
+        Assert.False(SetoutExportLogic.TryParsePointMode("Tim", out _, out var error));
+        Assert.Contains("pointMode \"Tim\" không hợp lệ", error);
+        Assert.Contains("Insertion", error);
+    }
+
+    [Fact]
+    public void IsOffCentre_TheoNguong1mm()
+    {
+        Assert.False(SetoutExportLogic.IsOffCentre(0, 0, 0.5, 0.5, out var small));
+        Assert.Equal(Math.Sqrt(0.5), small, 9);
+        Assert.True(SetoutExportLogic.IsOffCentre(1000, 2000, 1000, 2305, out var off));
+        Assert.Equal(305, off, 9);
+    }
+
+    [Fact]
+    public void OffCentreNote_KhongCo_Null_CoThiNoiRoDangLayGi()
+    {
+        Assert.Null(SetoutExportLogic.OffCentreNote(0, 0, true));
+        var centre = SetoutExportLogic.OffCentreNote(53, 304.8, true)!;
+        Assert.StartsWith("53 phần tử có điểm chèn family lệch tâm hình học (tối đa 305 mm)", centre);
+        Assert.Contains("TÂM HÌNH HỌC", centre);
+        var insertion = SetoutExportLogic.OffCentreNote(2, 186.2, false)!;
+        Assert.Contains("(tối đa 186 mm)", insertion);
+        Assert.Contains("ĐIỂM CHÈN", insertion);
+    }
 }

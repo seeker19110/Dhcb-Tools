@@ -70,6 +70,7 @@ src/
 └── DhcbTools.BatchRunner/         # Console chạy đêm (Revit qua add-in, AutoCAD qua accoreconsole), báo cáo, mã thoát
 scripts/  dhcb_agent.py · dhcb_mcp_server.py · dhcb_ai.py           # client Bridge, MCP server, AI offline
           check-build.sh                                            # biên dịch Core + vỏ bằng API package (Linux/CI)
+          doi-chieu-setout-ifc.py                                   # đối chiếu setout.csv với IFC của Autodesk (gốc Survey, giao trục, tim cột)
           run-in-revit-tests.ps1 · run-in-autocad-tests.ps1          # chạy bộ ca kiểm bên trong Revit / accoreconsole
           install-nightly-task.ps1                                   # đăng ký Task Scheduler chạy batch đêm
           sign-addin.ps1 · pack-mcpb.ps1                             # ký DLL · đóng gói .mcpb (cần Node/npx)

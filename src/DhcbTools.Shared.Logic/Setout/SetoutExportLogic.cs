@@ -89,6 +89,55 @@ namespace DhcbTools.Shared.Logic.Setout
         }
 
         /// <summary>
+        /// Điểm chèn family và tâm hình học lệch nhau quá ngưỡng này (mm) thì coi là "cột lệch tâm": họ
+        /// "Rectangular Column (Off Center)" của Snowdon lệch 100–305 mm — §52. Dưới ngưỡng là sai số làm tròn.
+        /// </summary>
+        public const double OffCentreToleranceMm = 1.0;
+
+        /// <summary><c>pointMode</c>: Centre (tâm hình học — mặc định khi rỗng) hoặc Insertion (điểm chèn family).</summary>
+        public static bool TryParsePointMode(string? raw, out bool useCentre, out string error)
+        {
+            var text = (raw ?? "Centre").Trim();
+            if (text.Length == 0)
+            {
+                text = "Centre";
+            }
+
+            error = string.Empty;
+            useCentre = text.Equals("Centre", StringComparison.OrdinalIgnoreCase) || text.Equals("Center", StringComparison.OrdinalIgnoreCase);
+            if (useCentre || text.Equals("Insertion", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            error = $"pointMode \"{raw}\" không hợp lệ. Hợp lệ: Centre (tâm hình học) hoặc Insertion (điểm chèn family).";
+            return false;
+        }
+
+        /// <summary>
+        /// Điểm chèn (LocationPoint) có lệch tâm hình học (tâm hộp bao trên mặt bằng) không. Với họ cột
+        /// "Off Center" điểm chèn nằm ở mép, mà thứ trắc đạc cắm là tim — xuất điểm chèn là cắm sai cột.
+        /// </summary>
+        public static bool IsOffCentre(double insertionXMm, double insertionYMm, double centreXMm, double centreYMm, out double offsetMm)
+        {
+            offsetMm = Math.Sqrt(Math.Pow(centreXMm - insertionXMm, 2) + Math.Pow(centreYMm - insertionYMm, 2));
+            return offsetMm > OffCentreToleranceMm;
+        }
+
+        /// <summary>Dòng Messages về phần tử lệch tâm; null khi không có.</summary>
+        public static string? OffCentreNote(int offCentre, double maxOffsetMm, bool useCentre)
+        {
+            if (offCentre <= 0)
+            {
+                return null;
+            }
+
+            return useCentre
+                ? $"{offCentre} phần tử có điểm chèn family lệch tâm hình học (tối đa {maxOffsetMm:F0} mm) — CSV lấy TÂM HÌNH HỌC (tim thật). Muốn điểm chèn: pointMode: Insertion."
+                : $"{offCentre} phần tử có điểm chèn family lệch tâm hình học (tối đa {maxOffsetMm:F0} mm) — CSV đang lấy ĐIỂM CHÈN theo pointMode: Insertion, không phải tim.";
+        }
+
+        /// <summary>
         /// Các điểm lấy trên một đường theo <c>curvePoints</c>: nhãn và tham số [0, 1] trên đường, đúng thứ tự
         /// đầu → giữa → cuối. Thứ tự này quyết định số thứ tự {n} trong tên điểm, đổi là đổi tên trên máy.
         /// </summary>

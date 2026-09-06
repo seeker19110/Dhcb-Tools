@@ -102,7 +102,7 @@ jobs:
           python3 -m pip install --quiet -r tools/autocad-mcp-server/requirements.txt
           python3 -m pip install --quiet coverage
           python3 -m py_compile scripts/dhcb_agent.py scripts/dhcb_mcp_server.py scripts/dhcb_ai.py \
-            tools/autocad-mcp-server/server.py tools/autocad-mcp-server/panel_api.py
+            scripts/doi-chieu-setout-ifc.py tools/autocad-mcp-server/server.py tools/autocad-mcp-server/panel_api.py
           # Ngưỡng 100% câu lệnh (fail_under trong pyproject.toml) — cùng con số khi chạy ở máy.
           python3 -m coverage run -m unittest discover -s tools/autocad-mcp-server -p 'test_*.py'
           python3 -m coverage run --append -m unittest discover -s tests/python -p 'test_*.py'

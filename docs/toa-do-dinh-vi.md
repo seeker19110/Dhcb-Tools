@@ -15,7 +15,7 @@ và lớp AI như mọi lệnh khác.
 
 | Phần tử | Điểm lấy | `Kind` |
 |---|---|---|
-| Có điểm đặt (`LocationPoint`): cột, sleeve/generic model, thiết bị, sprinkler, miệng gió, cửa | điểm đặt — với cột đứng là **tim cột tại chân** | `tim` |
+| Có điểm đặt (`LocationPoint`): cột, sleeve/generic model, thiết bị, sprinkler, miệng gió, cửa | **trọng tâm solid** của hình học gốc family (trước join), Z của điểm chèn — `pointMode: "Centre"` (mặc định). Điểm chèn family **không chắc là tim**: họ *Rectangular Column (Off Center)* của Snowdon lệch tới 305 mm (§52). `pointMode: "Insertion"` lấy đúng điểm chèn; lệnh luôn đếm và báo số phần tử hai điểm này lệch nhau > 1 mm | `tim` |
 | Có đường đặt (`LocationCurve`): dầm, tường, ống, duct, cột nghiêng | hai đầu (`curvePoints: "Ends"`, mặc định), điểm giữa (`Mid`) hoặc cả ba (`Both`) | `đầu`, `giữa`, `cuối` |
 | Không có Location | tâm hộp bao — thông báo đếm riêng để kiểm tay | `tâm hộp bao` |
 | Trục (`includeGridIntersections: true`) | giao điểm từng cặp **trục thẳng** cắt nhau trong phạm vi vẽ (dung sai 1 mm); trục cong bị bỏ qua và báo số lượng | `giao trục` |
@@ -93,6 +93,21 @@ Playbook [`skills/xuat-toa-do-dinh-vi/`](../skills/xuat-toa-do-dinh-vi/SKILL.md)
 → chọn một điểm có `ElementId` → `query element_geometry` (toạ độ nội bộ, mm) hoặc *Spot Coordinate* trong
 Revit → khớp mới giao. Bước này là chỗ duy nhất bắt được sai hệ toạ độ.
 
+**Đối chiếu bằng đường độc lập — IFC của Autodesk.** `query element_geometry` và Spot Coordinate đều là đọc lại
+cùng một mô hình; thứ độc lập với mã DHCB là **bộ xuất IFC của Autodesk** (Revit → IFC, `BatchExport` với
+`formats: ["Ifc"]`): IFCSITE mang gốc Survey và góc True North, IFCGRID mang từng trục, IFCCOLUMN mang thân cột.
+
+```bash
+python scripts/doi-chieu-setout-ifc.py C:/DHCB/setout/L1.csv "C:/DHCB/export/Model.ifc" --tol-mm 5
+```
+
+Script in gốc IFCSITE (so với dòng *"Site … gốc nội bộ"* trong Messages), khoảng cách từng giao trục và từng tim
+cột tới điểm IFC gần nhất, tách riêng cột mà thân IFC **bị cắt bởi join** (nhỏ hơn cỡ danh nghĩa trong tên type —
+tâm thân đó không phải tim). Mã thoát 1 khi có điểm lệch quá ngưỡng. Kết quả trên Snowdon (§52): gốc Survey
+khớp **từng mm**, 142/142 giao trục lệch ≤ 0,7 mm, 57/118 tim cột ≤ 5 mm; 61 cột còn lại đều thuộc họ *Off
+Center* và lệch 52–305 mm — ở đó bộ xuất IFC và hình học Revit **không đồng ý** với nhau về vị trí thân cột, lệnh
+đi theo hình học Revit (trọng tâm solid). Với cột lệch tâm, giao file kèm dòng ghi chú của lệnh để trắc đạc biết.
+
 ## Config đầy đủ
 
 ```json
@@ -111,6 +126,7 @@ Revit → khớp mới giao. Bước này là chỗ duy nhất bắt được sa
   "gridNamePattern": "{Grid}",
   "descriptionPattern": "{Category} {Level}",
   "curvePoints": "Ends",
+  "pointMode": "Centre",
   "includeGridIntersections": true,
   "maxNameLength": 16,
   "utf8Bom": false,
@@ -131,8 +147,10 @@ hợp lệ. Bảng mã chung: [`ma-loi.md`](ma-loi.md).
 
 ## Còn thiếu
 
-- **Chưa chạy thật trong Revit** — việc đầu tiên khi có máy: `run-in-revit-tests.ps1 -Suite smoke` rồi `mep`,
-  và đối chiếu một điểm bằng Spot Coordinate trên model có khai toạ độ chung thật.
+- ~~Chưa chạy thật trong Revit~~ — đã chạy (§28) và **đã đối chiếu độc lập** bằng IFC của Autodesk (§52). Còn
+  mở: **họ cột "Off Center"** — hình học Revit và bộ xuất IFC đặt thân cột lệch nhau 52–305 mm; chưa có đường
+  thứ ba (máy toàn đạc trên công trường, hay mở family để đọc offset) để phân xử. Cột đối xứng đặt tâm (57/118
+  của Snowdon) khớp ≤ 5 mm.
 - Chưa đọc phần tử trong model liên kết (kết cấu thường là file link khi mở file MEP).
 - Chưa có mẫu riêng cho định dạng nhị phân/GSI của Leica — CSV theo cột và DXF là hai định dạng mọi phần mềm
   máy đều nhập được; làm thêm khi có tổ trắc đạc thật yêu cầu (đúng thứ tự "sau khi có số liệu 9.4").
