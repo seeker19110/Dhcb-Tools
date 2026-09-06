@@ -3307,6 +3307,9 @@ chèn vào giữa — 8 `<param>` trỏ vào hư không, còn `NetloadFailure` t
 | `run-in-revit-tests.ps1 -Suite smoke` (Revit **2026**) | **41 đạt / 0 trượt / 1 bỏ qua** trên 42 ca |
 | `run-in-revit-tests.ps1 -Suite plumbing` (Revit 2024.3) | **8 đạt / 0 trượt** trên 8 ca |
 | `run-in-revit-tests.ps1 -Suite plumbing` (Revit **2026**) | **8 đạt / 0 trượt** trên 8 ca |
+| `-Suite write -AllowWrites` (2024.3 / **2026**) | **16/16** — **16/16** |
+| `-Suite write-mep -AllowWrites` (2024.3 / **2026**) | **21/21** — **21/21** |
+| `-Suite write-plumbing -AllowWrites` (2024.3 / **2026**) | **5/5** — **5/5** |
 
 Trong lượt `mep`, `SleeveAuto` cho *"[Xem trước] Sẽ đặt 445 sleeve"* **không kèm** dòng cảnh báo mới — tức trên mô
 hình này mọi phần tử MEP đều đọc được solid và ghi chú không nổ bừa. Đó là phần kiểm mà một ca test thuần không làm
@@ -3329,6 +3332,24 @@ Bộ `plumbing` chạy trên cả hai phiên bản: **8/8** mỗi bên. Các ch�
 33 hở / 32 phần tử ở 2024.3 và **35 / 34** ở 2026 (§59). `PipeSplitter` 143 phần tử / 189 điểm cắt và `SystemBom`
 352 dòng trùng nguyên ở cả hai.
 
-**Chốt hai phiên bản.** §64 có bằng chứng đủ trên **cả Revit 2024.3 và 2026**, ba bộ `smoke` + `mep` + `plumbing`:
-**156 ca chạy thật, 0 trượt**. Mọi chỗ lệch giữa hai phiên bản đều đối chiếu được với con số đã ghi ở §51/§59 cho
-model mẫu, không chỗ nào là khác biệt của mã.
+**Ba bộ ghi thật — phần đáng giá nhất của §64.** Đường chỉ xem trước không đụng tới hai chỗ vừa sửa — `SleeveAuto`
+ghi thật và `ElevationTag`/`ElevationUpdater` trên phần tử thật. Chạy cả ba bộ `-AllowWrites` trên **cả hai phiên
+bản**: **84 ca, 0 trượt**, và từng con số **trùng khít giữa 2024.3 và 2026**:
+
+| Ca ghi thật | 2024.3 | 2026 |
+|---|---|---|
+| `SleeveAuto` đặt lần đầu (tường ở link) | 435 sleeve, 10 đã có | 435, 10 |
+| `SleeveAuto` lần hai (chống trùng) | 0 mới, 552 đã có | 0, 552 |
+| `SleeveAuto` với `DHCB_Sleeve` vừa nạp | 455 → 0 mới, 562 đã có | 455 → 0, 562 |
+| `HangerAuto` | 1.120 → 0; 1.125 với family mới | 1.120 → 0; 1.125 |
+| `AutoRoute` riser ghi thật | 14,6 m = 3,48× Manhattan, 2 rẽ | 14,6 m = 3,48×, 2 rẽ |
+| `RouteFromLines` | 3/3 duct, 2 fitting, lần hai không còn line | trùng |
+| `PipeKick` + `SlopePipes` ghi thật | 3 đoạn + 2 cút; đặt dốc 1/1, kiểm lại 0 chưa đạt | trùng |
+
+Không ca nào sinh dòng cảnh báo mới của §64, và các ca "lần hai phải 0" vẫn đúng — tức thay đổi không làm lệch
+đường ghi lẫn chống trùng. Chỗ duy nhất khác nhau là **ElementId của đoạn ống `PipeKick` vừa tạo** (1716336/1716338
+so với 1738943/1738945) — phần tử mới thì id mới; id ống gốc bị chia vẫn là 1591774 ở cả hai.
+
+**Chốt hai phiên bản.** §64 có bằng chứng đủ trên **cả Revit 2024.3 và 2026**, **sáu bộ** — `smoke`, `mep`,
+`plumbing`, `write`, `write-mep`, `write-plumbing`: **240 ca chạy thật, 0 trượt**. Mọi chỗ lệch giữa hai phiên bản
+đều đối chiếu được với con số đã ghi ở §51/§59 cho model mẫu, không chỗ nào là khác biệt của mã.
