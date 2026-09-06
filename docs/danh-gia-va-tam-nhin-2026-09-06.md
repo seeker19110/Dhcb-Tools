@@ -120,10 +120,10 @@ tốt cho việc này nhưng viết cho agent, không cho người.
 - ~~Batch Revit thoát bằng kill cứng (runner `Process.Kill(true)` sau tối đa 60s chờ), không xin Revit thoát êm.~~
   ✅ 2026-09-06: `BatchStartupHook` nay gọi `UIApplication.PostCommand(ExitRevit)` ngay sau khi ghi
   `batch-done.json`, xin Revit tự thoát ở vòng idle kế tiếp. Runner (`Program.Revit.cs`) giữ nguyên cơ chế
-  chờ rồi kill cứng làm lưới an toàn — không đổi hành vi khi lệnh thoát êm thất bại vì lý do gì đó. **Chưa
-  chạy thật trên Revit** để xác nhận Revit thoát êm trước khi bị kill (cần một lượt batch thật trên máy có
-  Revit — xem `revit-test-env`); nếu quan sát thấy vẫn luôn bị kill thì coi thay đổi này là chưa có tác dụng
-  đo được, không phải hỏng.
+  chờ rồi kill cứng làm lưới an toàn — không đổi hành vi khi lệnh thoát êm thất bại vì lý do gì đó. **Đã
+  chạy thật** (`run-in-revit-tests.ps1 -Suite smoke`, Revit 2024, 2026-09-06 22:38): journal ghi chuỗi
+  thoát êm chuẩn (`ExitManagedInstance` → `ExitNativeInstance` → `Journal Exit`) 1,4 s sau khi ghi
+  `batch-done.json`, console không in dòng cảnh báo phải kill cứng — xem `bang-chung-test.md` §67.
 - `RvtFileInfo` đọc phiên bản bằng quét chuỗi 2 MB đầu file — giữ nguyên, chưa sửa: đây là lựa chọn có chủ đích
   (cùng cách RevitBatchProcessor dùng), không phải lỗi đang chờ; chỉ nên thay bằng parser OLE/CFBF đầy đủ nếu
   thực tế gặp file gây nhận sai phiên bản.

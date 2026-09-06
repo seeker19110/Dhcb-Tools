@@ -69,6 +69,7 @@
 - §64 — [Quét sâu lần hai: 34 khối `catch` rỗng còn lại được phân loại, 3 chỗ nói dối về mô hình đã sửa (2026-09-06 15:15 ICT)](#64-quét-sâu-lần-hai-34-khối-catch-rỗng-còn-lại-được-phân-loại-3-chỗ-nói-dối-về-mô-hình-đã-sửa-2026-09-06-1515-ict)
 - §65 — [Đóng một phần nợ checklist tay 8.4 — `overwriteExisting` nay ra checkbox (2026-09-06)](#65-đóng-một-phần-nợ-checklist-tay-84-overwriteexisting-nay-ra-checkbox-2026-09-06)
 - §66 — [Hai mục nợ kỹ thuật của bản đánh giá 2026-09-06 — `CommandResult.PartialSuccess` và dọn 6 khối `catch` rỗng](#66-hai-mục-nợ-kỹ-thuật-của-bản-đánh-giá-2026-09-06-commandresultpartialsuccess-và-dọn-6-khối-catch-rỗng)
+- §67 — [Xác nhận thật trên Revit — batch thoát êm bằng `PostCommand(ExitRevit)`, không còn phải kill cứng (2026-09-06 22:38 ICT)](#67-xác-nhận-thật-trên-revit-batch-thoát-êm-bằng-postcommandexitrevit-không-còn-phải-kill-cứng-2026-09-06-2238-ict)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
@@ -3419,3 +3420,31 @@ lý do im lặng, đúng quy ước §61 đã áp cho 40+ khối khác của d�
 `dotnet test tests/DhcbTools.BatchRunner.Tests` **21/21**, build `DhcbTools.Revit` (Revit 2024, net48) và
 `DhcbTools.BatchRunner` (net10) đều xanh 0 lỗi 0 cảnh báo. Không cần chạy trong Revit: cả hai thay đổi nằm
 ở tầng thuần (`CommandResult`, `RunLog`, `BatchReport`) hoặc là bình luận không đổi hành vi.
+
+## 67. Xác nhận thật trên Revit — batch thoát êm bằng `PostCommand(ExitRevit)`, không còn phải kill cứng (2026-09-06 22:38 ICT)
+
+Mục còn để ngỏ ở §4.7 của bản đánh giá 2026-09-06: `BatchStartupHook` (PR trước) gọi
+`UIApplication.PostCommand(ExitRevit)` ngay sau khi ghi `batch-done.json`, nhưng "chưa chạy thật trên
+Revit để xác nhận". Đã chạy `scripts/run-in-revit-tests.ps1 -Suite smoke -RevitVersion 2024` (model
+Snowdon Towers Architectural) và đọc lại đúng ba nguồn có thể phân biệt "thoát êm" với "bị kill cứng":
+
+- **Console `BatchRunner`:** không in dòng `"Revit không thoát sau khi xong — kết thúc tiến trình."`
+  (`Program.Revit.cs:108`) — dòng này chỉ in khi `process.WaitForExit(60_000)` sau khi thấy
+  `batch-done.json` hết hạn và phải `Kill(true)`. Không thấy nghĩa là Revit tự thoát trong cửa sổ 60 s.
+- **Thời điểm:** `batch-done.json` ghi lúc `22:38:46.474`; journal Revit (`journal.0190.worker1.log`)
+  cho thấy `UI-less ExitManagedInstance` bắt đầu `22:38:46.976` (0,5 s sau) và `Journal Exit` / `End
+  RevitProcessMonitor` lúc `22:38:47.910` — toàn bộ chuỗi thoát diễn ra trong 1,4 s, tức add-in tự thoát
+  ngay ở vòng idle kế tiếp như thiết kế, không phải Windows chờ hết 60 s rồi giết tiến trình.
+- **Hình dạng chuỗi thoát:** journal ghi đúng trình tự thoát êm chuẩn của Revit — hủy đăng ký từng
+  updater bên thứ ba (Steel Connections DB, Bending Details DB…), `UI-less ExitManagedInstance` →
+  `UI-less ExitNativeInstance` → `Journal Exit`. `Process.Kill(true)` (kill cây tiến trình ở mức OS) sẽ
+  không để lại trình tự dọn dẹp có thứ tự như vậy trong journal.
+
+Kết luận: thay đổi ở §4.7 có tác dụng đo được, không chỉ là code chưa kiểm chứng — có thể xoá dòng
+"Chưa chạy thật" khỏi bản đánh giá.
+
+**Ngoài phạm vi xác nhận này:** lượt chạy trả mã thoát 1 vì lý do khác hẳn — file mẫu
+`Snowdon Towers Sample Architectural.rvt` trên máy này cần Audit ("Some data in file... needs to be
+recovered", `CArchiveException 105`), một vấn đề của bản sao file mẫu cài cùng Revit 2024 trên máy này,
+không phải lỗi ở `BatchStartupHook` hay `RunTests`. Không sửa ở đây — không liên quan tới việc đang xác
+nhận, và Audit lại file mẫu là việc một lần trên máy, không phải nợ mã.
