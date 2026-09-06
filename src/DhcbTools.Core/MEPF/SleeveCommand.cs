@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
@@ -60,6 +60,9 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         // Số giao cắt không tính được bằng solid lẫn hộp bao — phải rơi về trung điểm tuyến MEP (kém chính
         // xác). Báo trong Messages thay vì im lặng.
         var midpointFallback = 0;
+
+        // Phần tử MEP không lấy được solid — lọc host lùi về mức hộp bao. Báo ra như midpointFallback.
+        var noSolid = 0;
 
         // Lỗi hiệu năng đã sửa: trước đây FilteredElementCollector toàn model (Walls+Floors) được dựng lại
         // BÊN TRONG vòng lặp cho từng phần tử MEP — O(n·m) trên model lớn, vượt timeout Bridge 30 s.
@@ -123,6 +126,10 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
 
             // Get element's solid for precise intersection
             var solid = GetFirstSolid(mepElem);
+            if (solid == null)
+            {
+                noSolid++;
+            }
 
             // Find candidate host elements using bounding box first — lọc trong danh sách đã thu thập một lần
             // ở ngoài vòng lặp (hostCandidatesAll), không dựng FilteredElementCollector mới cho mỗi phần tử MEP.
@@ -202,7 +209,7 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         if (config.DryRun)
         {
             var preview = CommandResult.Ok(SleevePlanner.PreviewSummary(placements.Count, whyNothing), placements.Count);
-            AddNotes(preview, unknownSize, midpointFallback, hostsInDocument, hostsInLinks, linkSummary, placements.Count, mepElements.Count, config);
+            AddNotes(preview, unknownSize, midpointFallback, noSolid, hostsInDocument, hostsInLinks, linkSummary, placements.Count, mepElements.Count, config);
             foreach (var p in placements)
             {
                 var hostId = p.HostWall != null ? p.HostWall.Id : p.HostFloor?.Id;
@@ -305,7 +312,7 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         {
             result.Messages.Add(failureLine);
         }
-        AddNotes(result, unknownSize, midpointFallback, hostsInDocument, hostsInLinks, linkSummary, placed, mepElements.Count, config);
+        AddNotes(result, unknownSize, midpointFallback, noSolid, hostsInDocument, hostsInLinks, linkSummary, placed, mepElements.Count, config);
         return result;
     }
 
@@ -313,7 +320,7 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
 
     /// <summary>Ba nhóm ghi chú dùng chung cho xem trước và ghi thật, theo đúng thứ tự cũ.</summary>
     private static void AddNotes(
-        CommandResult result, List<long> unknownSize, int midpointFallback,
+        CommandResult result, List<long> unknownSize, int midpointFallback, int noSolid,
         int hostsInDocument, int hostsInLinks, List<string> linkSummary,
         int placedCount, int mepCount, SleeveConfig config)
     {
@@ -327,6 +334,12 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         if (midpoint != null)
         {
             result.Messages.Add(midpoint);
+        }
+
+        var noSolidNote = SleevePlanner.NoSolidNote(noSolid);
+        if (noSolidNote != null)
+        {
+            result.Messages.Add(noSolidNote);
         }
 
         result.Messages.AddRange(SleevePlanner.HostSourceNotes(

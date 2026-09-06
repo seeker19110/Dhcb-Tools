@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -348,6 +348,21 @@ namespace DhcbTools.Shared.Logic.Mep
 
             return $"{midpointFallback} giao cắt không tính được bằng solid lẫn hộp bao của host — "
                    + "dùng tạm trung điểm tuyến MEP, vị trí sleeve có thể lệch, kiểm lại.";
+        }
+
+        /// <summary>
+        /// Số phần tử MEP không đọc được solid nên chỉ lọc host bằng hộp bao. Kết quả vẫn ra sleeve,
+        /// nhưng rộng hơn thực tế — im lặng thì không ai biết con số mình đang đọc lỏng đến đâu (§64).
+        /// </summary>
+        public static string? NoSolidNote(int noSolidCount)
+        {
+            if (noSolidCount <= 0)
+            {
+                return null;
+            }
+
+            return $"{noSolidCount} phần tử MEP không đọc được solid — host chỉ được lọc ở mức hộp bao, "
+                   + "danh sách giao cắt có thể rộng hơn thực tế, kiểm lại.";
         }
 
         /// <summary>Summary cho bản xem trước.</summary>

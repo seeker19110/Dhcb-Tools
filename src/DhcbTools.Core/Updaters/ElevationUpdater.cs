@@ -100,30 +100,49 @@ public sealed class ElevationUpdater : IUpdater
         }
 
         var sw = Stopwatch.StartNew();
+        var failed = 0;
         try
         {
             var doc = data.GetDocument();
             foreach (var id in data.GetModifiedElementIds().Concat(data.GetAddedElementIds()))
             {
-                var el = doc.GetElement(id);
-                var bb = el?.get_BoundingBox(null);
-                if (el == null || bb == null)
+                // Phạm vi try nằm TRONG vòng lặp: bản trước bọc cả vòng, nên một phần tử hỏng
+                // (hộp bao lỗi, tham số bị khoá) là mọi phần tử còn lại trong lượt đó không được cập
+                // nhật cao độ mà không một dấu vết nào — đúng lớp lỗi im lặng §61.
+                try
                 {
-                    continue;
-                }
+                    var el = doc.GetElement(id);
+                    var bb = el?.get_BoundingBox(null);
+                    if (el == null || bb == null)
+                    {
+                        continue;
+                    }
 
-                var e = MepLayout.Elevations(bb.Min.Z, bb.Max.Z);
-                SetIfPossible(el, "bottomElevation", _config.BottomElevParamName, e.BottomMm);
-                SetIfPossible(el, "topElevation", _config.TopElevParamName, e.TopMm);
-                SetIfPossible(el, "centreElevation", _config.CenterElevParamName, e.CentreMm);
+                    var e = MepLayout.Elevations(bb.Min.Z, bb.Max.Z);
+                    SetIfPossible(el, "bottomElevation", _config.BottomElevParamName, e.BottomMm);
+                    SetIfPossible(el, "topElevation", _config.TopElevParamName, e.TopMm);
+                    SetIfPossible(el, "centreElevation", _config.CenterElevParamName, e.CentreMm);
+                }
+                catch (Exception ex)
+                {
+                    failed++;
+                    Log($"ElevationUpdater: phần tử {RevitCompat.IdValue(id)} không cập nhật được cao độ — {ex.Message}");
+                }
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Tuyệt đối không ném ra ngoài — làm hỏng transaction của người dùng.
+            // Tuyệt đối không ném ra ngoài — làm hỏng transaction của người dùng. Nhưng phải để lại dấu vết:
+            // hỏng ở đây nghĩa là cả lượt không chạy, không phải một phần tử.
+            Log("ElevationUpdater: cả lượt cập nhật không chạy — " + ex.Message);
         }
         finally
         {
+            if (failed > 0)
+            {
+                Log($"ElevationUpdater: {failed} phần tử không cập nhật được cao độ trong lượt này.");
+            }
+
             sw.Stop();
             if (sw.ElapsedMilliseconds > _maxMs)
             {
@@ -132,6 +151,13 @@ public sealed class ElevationUpdater : IUpdater
             }
         }
     }
+
+    /// <summary>
+    /// Ghi vết vào nhật ký add-in. Updater không có <c>CommandResult</c> để báo về vỏ, nên nhật ký
+    /// là chỗ duy nhất kể lại được vì sao một đoạn ống không có cao độ. Bản thân nó nuốt lỗi IO
+    /// (<see cref="DhcbLog"/>) nên gọi trong catch là an toàn.
+    /// </summary>
+    private static void Log(string message) => Shared.Hosting.DhcbLog.Write("Revit", message);
 
     /// <summary>Ghi qua từ điển tên tham số (giai đoạn 9.2); paramName là tên người dùng chỉ định, có thể null.</summary>
     private static void SetIfPossible(Element el, string key, string? paramName, double mm)

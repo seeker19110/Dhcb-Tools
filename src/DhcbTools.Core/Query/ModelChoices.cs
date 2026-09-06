@@ -1,4 +1,4 @@
-using Autodesk.Revit.DB;
+﻿using Autodesk.Revit.DB;
 using DhcbTools.Shared.Logic.Ai;
 
 namespace DhcbTools.Core.Query;
@@ -11,14 +11,14 @@ namespace DhcbTools.Core.Query;
 public static class ModelChoices
 {
     /// <summary>Gợi ý cho một trường config theo kiểu của nó. Rỗng = trường tự do, form hiện ô nhập thường.</summary>
-    public static IReadOnlyList<string> For(Document document, FieldKind kind) => kind switch
+    public static ChoiceList For(Document document, FieldKind kind) => kind switch
     {
         FieldKind.Category => Categories(document),
         FieldKind.Parameter => Parameters(document),
         FieldKind.Level => Levels(document),
         FieldKind.View => ViewTemplates(document),
         FieldKind.FamilyType => FamilyTypes(document),
-        _ => Array.Empty<string>(),
+        _ => ChoiceList.Empty,
     };
 
     /// <summary>
@@ -26,7 +26,7 @@ public static class ModelChoices
     /// <c>Settings.Categories</c> thay vì quét mọi phần tử — trên model 300 nghìn phần tử cách cũ
     /// làm form mở chậm vài giây.
     /// </summary>
-    public static IReadOnlyList<string> Categories(Document document)
+    public static ChoiceList Categories(Document document)
     {
         var names = new SortedSet<string>(StringComparer.CurrentCultureIgnoreCase);
         try
@@ -41,16 +41,18 @@ public static class ModelChoices
                 }
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Mô hình lỗi thì thà trả danh sách rỗng (form về ô nhập tay) còn hơn chặn cả cửa sổ.
+            // Mô hình lỗi thì không chặn cả cửa sổ — nhưng phải nói rõ là đọc hỏng. Trả danh sách rỗng suông
+            // thì form ghi "mô hình chưa có giá trị nào", một lời khẳng định sai (§61).
+            return ChoiceList.Failed(names, ex);
         }
 
-        return names.ToList();
+        return new ChoiceList(names.ToList(), null);
     }
 
     /// <summary>Tên tham số instance và type gặp trong mô hình.</summary>
-    public static IReadOnlyList<string> Parameters(Document document)
+    public static ChoiceList Parameters(Document document)
     {
         var names = new SortedSet<string>(StringComparer.CurrentCultureIgnoreCase);
         try
@@ -72,23 +74,24 @@ public static class ModelChoices
                 }
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            return ChoiceList.Failed(names, ex);
         }
 
-        return names.ToList();
+        return new ChoiceList(names.ToList(), null);
     }
 
-    public static IReadOnlyList<string> Levels(Document document) =>
+    public static ChoiceList Levels(Document document) =>
         Names(document, () => new FilteredElementCollector(document)
             .OfClass(typeof(Level)).Cast<Element>());
 
-    public static IReadOnlyList<string> ViewTemplates(Document document) =>
+    public static ChoiceList ViewTemplates(Document document) =>
         Names(document, () => new FilteredElementCollector(document)
             .OfClass(typeof(View)).Cast<View>().Where(v => v.IsTemplate).Cast<Element>());
 
     /// <summary>Tên type dạng "Family: Type" — đúng định dạng <c>RevitCompat.FindType</c> nhận.</summary>
-    public static IReadOnlyList<string> FamilyTypes(Document document)
+    public static ChoiceList FamilyTypes(Document document)
     {
         var names = new SortedSet<string>(StringComparer.CurrentCultureIgnoreCase);
         try
@@ -98,14 +101,15 @@ public static class ModelChoices
                 names.Add(type.FamilyName + ": " + type.Name);
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            return ChoiceList.Failed(names, ex);
         }
 
-        return names.ToList();
+        return new ChoiceList(names.ToList(), null);
     }
 
-    private static IReadOnlyList<string> Names(Document document, Func<IEnumerable<Element>> query)
+    private static ChoiceList Names(Document document, Func<IEnumerable<Element>> query)
     {
         var names = new SortedSet<string>(StringComparer.CurrentCultureIgnoreCase);
         try
@@ -118,10 +122,11 @@ public static class ModelChoices
                 }
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            return ChoiceList.Failed(names, ex);
         }
 
-        return names.ToList();
+        return new ChoiceList(names.ToList(), null);
     }
 }

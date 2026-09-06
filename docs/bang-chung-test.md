@@ -66,6 +66,7 @@
 - §61 — [Rà 40 khối `catch` của Core, dọn tự động sau mỗi lượt và sau job đêm, mục lục cho file này (2026-09-06 13:20 ICT)](#61-rà-40-khối-catch-của-core-dọn-tự-động-sau-mỗi-lượt-và-sau-job-đêm-mục-lục-cho-file-này-2026-09-06-1320-ict)
 - §62 — [`ConnectorChecker` có danh sách đã chấp nhận, family sleeve nhận tham số, `AutoRoute` 5 tuyến nữa trên dự án A (2026-09-06 13:55 ICT)](#62-connectorchecker-có-danh-sách-đã-chấp-nhận-family-sleeve-nhận-tham-số-autoroute-5-tuyến-nữa-trên-dự-án-a-2026-09-06-1355-ict)
 - §63 — [`FamilyUpgrade` — thư viện family cho nhiều phiên bản Revit, hai chiều đều có bằng chứng (2026-09-06 14:30 ICT)](#63-familyupgrade-thư-viện-family-cho-nhiều-phiên-bản-revit-hai-chiều-đều-có-bằng-chứng-2026-09-06-1430-ict)
+- §64 — [Quét sâu lần hai: 34 khối `catch` rỗng còn lại được phân loại, 3 chỗ nói dối về mô hình đã sửa (2026-09-06 15:15 ICT)](#64-quét-sâu-lần-hai-34-khối-catch-rỗng-còn-lại-được-phân-loại-3-chỗ-nói-dối-về-mô-hình-đã-sửa-2026-09-06-1515-ict)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
@@ -3253,3 +3254,56 @@ bản, và mọi quy trình phải chạy từ bản thấp lên bản cao.
 **Một lỗi tìm ra khi chạy thật.** `-SourceFolder` nhận đường dẫn tương đối thì lượt đầu báo "Không có thư mục nguồn" —
 config đi vào job rồi được đọc **bên trong Revit**, mà thư mục làm việc của Revit không phải thư mục gọi script. Script
 nay `Resolve-Path` trước khi ghi job.
+
+## 64. Quét sâu lần hai: 34 khối `catch` rỗng còn lại được phân loại, 3 chỗ nói dối về mô hình đã sửa (2026-09-06 15:15 ICT)
+
+**Câu hỏi.** §61 sửa 4 khối `catch` nuốt lỗi làm sai số connector hở. Còn bao nhiêu chỗ như thế, và chỗ nào thật sự
+nguy hiểm?
+
+**Cách quét.** Dò toàn bộ `src` bằng biểu thức tìm `catch` có thân rỗng (kể cả thân chỉ có chú thích): **34 khối**.
+Không đọc con số đó như một hạn mức phải kéo về 0 — phần lớn `catch` rỗng ở đây là **cố ý và đúng**: ghi nhật ký,
+ghi số đo sử dụng, dọn file tạm bị khoá, `Dispose` listener, đổi tên view trùng, lùi tra tham số sang type. Tiêu chí
+lọc là tiêu chí §61: *lỗi bị nuốt có làm kết quả sai mà không ai biết không?*
+
+| Nhóm | Số khối | Xử lý |
+|---|---:|---|
+| Cố ý, đã có chú thích đúng (log, dọn file, Dispose…) | 28 | giữ nguyên |
+| Người gọi đã xử lý đúng sau §61 (`ClashDetection.FirstSolid`) | 1 | giữ nguyên |
+| **Nói dối về mô hình** | 5 | **sửa** |
+
+**Sửa 1 — `ElevationUpdater` bỏ dở cả lượt trong im lặng.** `try` bọc **cả vòng lặp** phần tử. Một phần tử hỏng (hộp
+bao lỗi, tham số bị khoá) là **mọi phần tử còn lại trong lượt đó không được cập nhật cao độ**, không một dòng nhật ký.
+Updater không được ném ra ngoài (làm hỏng transaction của người dùng) — nhưng đó là lý do để **thu hẹp phạm vi `try`**,
+không phải lý do để im. Nay mỗi phần tử một `try`, mỗi lỗi một dòng `DhcbLog` kèm ElementId, cuối lượt một dòng tổng;
+`catch` ngoài giữ nguyên vai trò chắn cuối nhưng cũng ghi vết ("cả lượt cập nhật không chạy").
+
+**Sửa 2 — `ModelChoices` trả danh sách rỗng cho cả hai trường hợp.** Bốn khối `catch` rỗng bọc trọn vòng liệt kê
+category / tham số / level / view / family type. Mô hình có link lỗi hay family hỏng → danh sách rỗng, **y hệt** một mô
+hình không có gì; và form ghi lên nhãn *"mô hình chưa có giá trị nào — gõ tay"* — một lời khẳng định **sai về mô hình**,
+đúng lớp lỗi §61. Nay có kiểu thuần `ChoiceList` (Shared.Logic, **4 ca test**) mang theo cả tên đọc được lẫn lý do
+dừng: đọc hỏng giữa chừng thì **giữ lại cận dưới** và nhãn ghi *"danh sách chưa đầy đủ (n giá trị đọc được)"*, hỏng từ
+đầu thì *"không đọc được danh sách từ mô hình"*. Rỗng mà đọc trọn vẹn vẫn giữ nguyên câu cũ.
+
+**Sửa 3 — `SleeveAuto` lùi về hộp bao mà không nói.** Không đọc được solid của phần tử MEP thì lọc host chỉ còn ở mức
+hộp bao — kết quả vẫn ra sleeve, nhưng **rộng hơn thực tế**. `ClashDetection` đã nói câu này sau §61; `SleeveAuto` thì
+chưa. Nay `SleevePlanner.NoSolidNote` (tầng thuần, **1 ca test**) đếm và báo, cùng chỗ với `MidpointFallbackNote`.
+
+**Dọn 9 cảnh báo build.** Khối XML doc của `AcadScriptGen.Build` bị tách rời khỏi phương thức khi `NetloadFailure` được
+chèn vào giữa — 8 `<param>` trỏ vào hư không, còn `NetloadFailure` thì mất tài liệu tham số. Đưa khối doc về đúng chỗ:
+**9 cảnh báo → 0**.
+
+**Bằng chứng.**
+
+| Lượt | Kết quả |
+|---|---|
+| `dotnet build Dhcb-Tools.sln -c Release` | **0 lỗi, 0 cảnh báo** (trước: 9 cảnh báo) |
+| `dotnet test` tầng thuần | **1.617 đạt** / 0 trượt (trước: 1.612 — thêm 5 ca) |
+| Cổng phủ dòng | **100,00 %**, 0 dòng chưa chạy |
+| `pytest tests/python` | 155 đạt |
+| `scripts/check-build.sh` (đường CI Linux) | OK, 0 cảnh báo |
+| `run-in-revit-tests.ps1 -Suite smoke` (Revit 2024.3) | **41 đạt / 0 trượt / 1 bỏ qua** trên 42 ca |
+| `run-in-revit-tests.ps1 -Suite mep` (Revit 2024.3) | **29 đạt / 0 trượt** trên 29 ca |
+
+Trong lượt `mep`, `SleeveAuto` cho *"[Xem trước] Sẽ đặt 445 sleeve"* **không kèm** dòng cảnh báo mới — tức trên mô
+hình này mọi phần tử MEP đều đọc được solid và ghi chú không nổ bừa. Đó là phần kiểm mà một ca test thuần không làm
+thay được.

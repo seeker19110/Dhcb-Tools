@@ -1,4 +1,4 @@
-using DhcbTools.Shared.Logic.Mep;
+﻿using DhcbTools.Shared.Logic.Mep;
 using Xunit;
 
 namespace DhcbTools.Shared.Logic.Tests;
@@ -370,6 +370,19 @@ public class SleevePlannerTests
         Assert.Null(SleevePlanner.MidpointFallbackNote(0));
         Assert.Null(SleevePlanner.MidpointFallbackNote(-1));
         Assert.StartsWith("3 giao cắt không tính được", SleevePlanner.MidpointFallbackNote(3));
+    }
+
+    [Fact]
+    public void NoSolidNote_ChiKhiCoCa()
+    {
+        Assert.Null(SleevePlanner.NoSolidNote(0));
+        Assert.Null(SleevePlanner.NoSolidNote(-1));
+
+        var note = SleevePlanner.NoSolidNote(2);
+        Assert.StartsWith("2 phần tử MEP không đọc được solid", note);
+
+        // Phải nói rõ con số đang lỏng theo hướng nào — không phải một lời cảnh báo chung chung.
+        Assert.Contains("rộng hơn thực tế", note);
     }
 
     [Fact]
