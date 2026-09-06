@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Text;
+using DhcbTools.Shared.Logic;
 using DhcbTools.Shared.Logic.Ai;
+using DhcbTools.Shared.Logic.AsBuilt;
 using DhcbTools.Shared.Logic.Batch;
 using DhcbTools.Shared.Logic.Handover;
 using DhcbTools.Shared.Logic.Ids;
@@ -43,6 +45,12 @@ public static class Program
             return string.IsNullOrEmpty(opts.VerifyIds)
                 ? VerifyIfc(opts.VerifyIfc!, opts.IfcSpec)
                 : VerifyIds(opts.VerifyIfc!, opts.VerifyIds!, opts.IdsReport);
+        }
+
+        // Đối chiếu danh mục hồ sơ cũng là việc độc lập: chỉ liệt kê file trong một thư mục.
+        if (!string.IsNullOrEmpty(opts.Dossier))
+        {
+            return VerifyDossier(opts.Dossier!, opts.DossierSpec, opts.DossierReport);
         }
 
         BatchJob job;
@@ -355,6 +363,71 @@ public static class Program
 
         Console.WriteLine(IdsReport.Summary(check, schemaWarnings) + (string.IsNullOrEmpty(reportPath) ? "." : $" → \"{reportPath}\"."));
         return check.FailureCount > 0 ? 1 : 0;
+    }
+
+    /// <summary>
+    /// <c>--dossier &lt;thư mục&gt; --dossier-spec &lt;danh-muc.json&gt;</c>: đối chiếu danh mục hồ sơ hoàn thành
+    /// công trình (mục 11.6) với file THẬT trong thư mục. Mã thoát 0 đủ mục bắt buộc · 1 còn thiếu ·
+    /// 2 không có thư mục/danh mục hoặc danh mục hỏng.
+    /// <para>
+    /// Không làm thành lệnh Core vì việc này không cần <c>Document</c> nào — cùng lý do với
+    /// <c>--verify-log</c> và <c>--verify-ifc</c>, và đổi lại được thứ chạy trên CI.
+    /// </para>
+    /// </summary>
+    internal static int VerifyDossier(string folder, string? specPath, string? reportPath)
+    {
+        if (!Directory.Exists(folder))
+        {
+            Console.Error.WriteLine("Không có thư mục hồ sơ: " + folder);
+            return 2;
+        }
+
+        if (string.IsNullOrEmpty(specPath) || !File.Exists(specPath))
+        {
+            Console.Error.WriteLine("Không có file danh mục: " + (specPath ?? "(chưa khai --dossier-spec)"));
+            return 2;
+        }
+
+        DossierSpec spec;
+        try
+        {
+            spec = DossierSpec.FromJson(File.ReadAllText(specPath!, Encoding.UTF8));
+        }
+        catch (ArgumentException ex)
+        {
+            Console.Error.WriteLine("File danh mục không dùng được: " + ex.Message);
+            return 2;
+        }
+
+        var root = Path.GetFullPath(folder).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var files = Directory.GetFiles(root, "*", SearchOption.AllDirectories)
+            .Select(f => f.Substring(root.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+            .ToList();
+
+        var result = DossierIndex.Check(spec, files);
+
+        Console.WriteLine(root);
+        Console.WriteLine(DossierIndex.Summary(result));
+        foreach (var item in result.Items.Where(i => i.MissingRequired))
+        {
+            Console.WriteLine($"THIẾU {item.Item.Code} — {item.Item.Name}"
+                              + (item.Item.Patterns.Count > 0 ? " (mẫu: " + string.Join(", ", item.Item.Patterns) + ")" : " (chưa khai mẫu tên file)"));
+        }
+
+        foreach (var file in result.Unmatched.Take(20))
+        {
+            Console.WriteLine("Chưa xếp mục: " + file);
+        }
+
+        if (!string.IsNullOrEmpty(reportPath))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(reportPath!)) ?? ".");
+            File.WriteAllText(reportPath!, DossierIndex.Html(spec, result, root, DateTime.Now), new UTF8Encoding(true));
+            File.WriteAllText(Path.ChangeExtension(reportPath!, ".csv"), DossierIndex.Csv(result), CsvText.Utf8WithBom);
+            Console.WriteLine("Báo cáo: " + reportPath);
+        }
+
+        return result.Ok ? 0 : 1;
     }
 
     /// <summary>
@@ -761,6 +834,9 @@ internal sealed class Options
     public string? IfcSpec { get; private set; }
     public string? VerifyIds { get; private set; }
     public string? IdsReport { get; private set; }
+    public string? Dossier { get; private set; }
+    public string? DossierSpec { get; private set; }
+    public string? DossierReport { get; private set; }
 
     public const string Usage = """
         DhcbTools.BatchRunner --job <job.json> [--dry-run] [--log-dir logs] [--max-minutes 480]
@@ -769,10 +845,12 @@ internal sealed class Options
         DhcbTools.BatchRunner --verify-log <run-HHmmss.jsonl>
         DhcbTools.BatchRunner --verify-ifc <file.ifc> [--ifc-spec <quy-tac.json>]
         DhcbTools.BatchRunner --verify-ifc <file.ifc> --verify-ids <yeu-cau.ids> [--ids-report <bao-cao.html>]
+        DhcbTools.BatchRunner --dossier <thu-muc-ho-so> --dossier-spec <danh-muc.json> [--dossier-report <bao-cao.html>]
         (Revit: phiên bản tự nhận từ header .rvt; step "PlotPdf" trong job AutoCAD sinh -PLOT ra PDF)
         (--verify-log kiểm chuỗi băm của log đã ghi: 0 nguyên vẹn · 1 hỏng, in ra đúng dòng · 2 không có file)
         (--verify-ifc đọc lại file IFC vừa xuất: 0 đạt · 1 có lỗi · 2 không có file hay quy tắc hỏng)
         (--verify-ids kiểm chính file IFC theo IDS 1.0: 0 không phần tử nào không đạt · 1 có · 2 không có file / IDS hỏng)
+        (--dossier đối chiếu danh mục hồ sơ hoàn công với file thật: 0 đủ mục bắt buộc · 1 còn thiếu · 2 thiếu thư mục/danh mục)
         """;
 
     public static Options? Parse(string[] args)
@@ -800,6 +878,9 @@ internal sealed class Options
                     case "--ifc-spec": o.IfcSpec = Next(); break;
                     case "--verify-ids": o.VerifyIds = Next(); break;
                     case "--ids-report": o.IdsReport = Next(); break;
+                    case "--dossier": o.Dossier = Next(); break;
+                    case "--dossier-spec": o.DossierSpec = Next(); break;
+                    case "--dossier-report": o.DossierReport = Next(); break;
                     case "-h": case "--help": return null;
                     default:
                         Console.Error.WriteLine("Tham số không biết: " + args[i]);
@@ -813,7 +894,12 @@ internal sealed class Options
             }
         }
 
-        // --verify-log và --verify-ifc đứng một mình được: chúng không chạy job nào cả.
-        return string.IsNullOrEmpty(o.JobPath) && string.IsNullOrEmpty(o.VerifyLog) && string.IsNullOrEmpty(o.VerifyIfc) ? null : o;
+        // --verify-log, --verify-ifc và --dossier đứng một mình được: chúng không chạy job nào cả.
+        return string.IsNullOrEmpty(o.JobPath)
+               && string.IsNullOrEmpty(o.VerifyLog)
+               && string.IsNullOrEmpty(o.VerifyIfc)
+               && string.IsNullOrEmpty(o.Dossier)
+            ? null
+            : o;
     }
 }
