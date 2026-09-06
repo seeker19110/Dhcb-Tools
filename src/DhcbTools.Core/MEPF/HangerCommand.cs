@@ -4,6 +4,7 @@ using System.Linq;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Structure;
 using DhcbTools.Shared.Logic;
+using DhcbTools.Shared.Logic.Mep;
 
 namespace DhcbTools.Core.MEPF;
 
@@ -100,15 +101,11 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
 
         if (config.DryRun)
         {
-            var preview = CommandResult.Ok(
-                $"[Xem trước] Sẽ đặt {plan.Count} hanger trên {elements.Count} phần tử MEP."
-                + SkipNote(skippedExisting),
-                plan.Count);
+            var preview = CommandResult.Ok(HangerPlanner.PreviewSummary(plan.Count, elements.Count, skippedExisting), plan.Count);
             foreach (var (pt, dir) in plan)
             {
-                preview.Messages.Add(
-                    $"  → ({RevitCompat.FtToMm(pt.X):F0}, {RevitCompat.FtToMm(pt.Y):F0}, {RevitCompat.FtToMm(pt.Z):F0}) mm" +
-                    $"  dir=({dir.X:F2},{dir.Y:F2},{dir.Z:F2})");
+                preview.Messages.Add(HangerPlanner.PreviewLine(
+                    RevitCompat.FtToMm(pt.X), RevitCompat.FtToMm(pt.Y), RevitCompat.FtToMm(pt.Z), dir.X, dir.Y, dir.Z));
             }
             return preview;
         }
@@ -133,9 +130,9 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
                     point, symbol, StructuralType.NonStructural);
 
                 // Rotate to align with element direction if not along X axis
-                if (Math.Abs(direction.X) > 0.01 || Math.Abs(direction.Y) > 0.01)
+                if (HangerPlanner.NeedsRotation(direction.X, direction.Y))
                 {
-                    var angle = Math.Atan2(direction.Y, direction.X);
+                    var angle = HangerPlanner.RotationAngle(direction.X, direction.Y);
                     var axis = Line.CreateBound(point, point + XYZ.BasisZ);
                     ElementTransformUtils.RotateElement(document, inst.Id, axis, angle);
                 }
@@ -148,33 +145,23 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
                 // Không huỷ cả lô vì một cái lỗi, nhưng phải ghi lý do — nuốt im lặng thì "0 hanger"
                 // không ai biết vì sao.
                 failed++;
-                if (failureReasons.Count < 5 && !failureReasons.Contains(ex.Message))
-                {
-                    failureReasons.Add(ex.Message);
-                }
+                HangerPlanner.AddDistinctReason(failureReasons, ex.Message);
             }
         }
 
         tx.Commit();
-        var summary = $"Đã đặt {placed} hanger trên {elements.Count} phần tử MEP." + SkipNote(skippedExisting);
-        if (failed > 0)
+        var result = CommandResult.Ok(
+            HangerPlanner.WriteSummary(placed, elements.Count, skippedExisting, failed, plan.Count), placed).WithChanged(placedIds);
+        var failureLine = HangerPlanner.FailureReasonsLine(failed, failureReasons);
+        if (failureLine != null)
         {
-            summary += $" {failed}/{plan.Count} vị trí đặt lỗi.";
-        }
-
-        var result = CommandResult.Ok(summary, placed).WithChanged(placedIds);
-        if (failed > 0)
-        {
-            result.Messages.Add($"{failed} vị trí không đặt được hanger. Lý do (tối đa 5 loại): " + string.Join(" | ", failureReasons));
+            result.Messages.Add(failureLine);
         }
 
         return result;
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
-
-    private static string SkipNote(int skippedExisting) =>
-        skippedExisting > 0 ? $" Bỏ qua, đã có hanger: {skippedExisting} vị trí." : string.Empty;
 
     /// <summary>Vị trí các hanger cùng family đã có sẵn trong model (feet, toạ độ nội bộ Revit).</summary>
     private static List<(double X, double Y, double Z)> CollectExistingHangerPoints(Document doc, string familyName)
