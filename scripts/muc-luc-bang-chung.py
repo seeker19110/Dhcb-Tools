@@ -56,7 +56,7 @@ def main(argv, path=None):
     # Console cp1252 trên Windows ném UnicodeEncodeError khi in tiếng Việt (bẫy §48 của check-coverage.py).
     try:
         sys.stdout.reconfigure(encoding="utf-8")
-    except Exception:
+    except Exception:  # pragma: no cover — stdout không phải TextIOWrapper (test bắt stdout)
         pass
     path = Path(path) if path else Path(__file__).resolve().parents[1] / "docs" / "bang-chung-test.md"
     text = path.read_text(encoding="utf-8")
@@ -64,6 +64,11 @@ def main(argv, path=None):
     if "--check" in argv:
         if new != text:
             print("Mục lục bang-chung-test.md lệch tiêu đề thật — chạy: python scripts/muc-luc-bang-chung.py")
+            for i, (a, b) in enumerate(zip(new.splitlines(), text.splitlines())):
+                if a != b:
+                    print(f"  dòng {i + 1} mong đợi: {a[:160]!r}")
+                    print(f"  dòng {i + 1} thực tế : {b[:160]!r}")
+                    break
             return 1
         print("Mục lục khớp.")
         return 0
