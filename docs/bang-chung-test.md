@@ -64,6 +64,7 @@
 - §59 — [Năm bộ của hôm nay chạy lại trên Revit 2026 — id model mẫu giữ nguyên, điểm (5) của §54 khép bằng bằng chứng (2026-09-06 12:50 ICT)](#59-năm-bộ-của-hôm-nay-chạy-lại-trên-revit-2026-id-model-mẫu-giữ-nguyên-điểm-5-của-54-khép-bằng-bằng-chứng-2026-09-06-1250-ict)
 - §60 — [`FamilyStarter` — family mẫu sleeve/hanger dựng bằng chính Revit, để `SleeveAuto` không còn "bỏ vì thiếu family" (2026-09-06 13:00 ICT)](#60-familystarter-family-mẫu-sleevehanger-dựng-bằng-chính-revit-để-sleeveauto-không-còn-bỏ-vì-thiếu-family-2026-09-06-1300-ict)
 - §61 — [Rà 40 khối `catch` của Core, dọn tự động sau mỗi lượt và sau job đêm, mục lục cho file này (2026-09-06 13:20 ICT)](#61-rà-40-khối-catch-của-core-dọn-tự-động-sau-mỗi-lượt-và-sau-job-đêm-mục-lục-cho-file-này-2026-09-06-1320-ict)
+- §62 — [`ConnectorChecker` có danh sách đã chấp nhận, family sleeve nhận tham số, `AutoRoute` 5 tuyến nữa trên dự án A (2026-09-06 13:55 ICT)](#62-connectorchecker-có-danh-sách-đã-chấp-nhận-family-sleeve-nhận-tham-số-autoroute-5-tuyến-nữa-trên-dự-án-a-2026-09-06-1355-ict)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
@@ -3193,3 +3194,33 @@ tiên sau thay đổi dọn 595 MB (hai `ban-chep` cũ + 26 journal). `install-n
 
 **Mục lục.** `scripts/muc-luc-bang-chung.py` sinh khối mục lục 60 mục giữa hai dấu ở đầu file này; `--check` chạy trên CI
 (`tests.yml`) và `tests/python/test_muc_luc_bang_chung.py` đỏ khi tiêu đề thêm/đổi mà mục lục chưa cập nhật.
+
+## 62. `ConnectorChecker` có danh sách đã chấp nhận, family sleeve nhận tham số, `AutoRoute` 5 tuyến nữa trên dự án A (2026-09-06 13:55 ICT)
+
+Ba mục còn lại của danh sách *chưa tốt*.
+
+**Đã chấp nhận cho connector hở.** 1.040 connector hở của dự án A (§57) có những cái cố ý để hở — không có cách đánh dấu
+thì lần chạy sau vẫn 1.040 và báo cáo mất tác dụng. Nay `ConnectorChecker` nhận `acceptedPath` **cùng định dạng
+`clash-accepted.json`** (danh sách `{key, note, by}`), khoá = cột **Key** mới của CSV: `<ElementId>@<x>,<y>,<z>` làm tròn
+lưới 100 mm như `ClashAcceptance.MakeKey`, nên phần tử dịch dưới 50 mm vẫn cùng khoá. Summary: *"Tìm thấy 36 connector hở
+trên 36 phần tử (1 đã chấp nhận, bỏ qua)"*. Ca mới trong `revit-mep` dùng fixture một khoá thật lấy từ CSV lượt §61:
+**37 → 36 + 1 bỏ qua**, đúng con số.
+
+**Family sleeve nhận tham số.** §60 ghi rõ hình học là hình giữ chỗ. Nay `FamilyStarter` gắn **kích thước đường kính lên
+cung sketch và gán nhãn tham số `Nominal Width`** (`NewDiameterDimension` + `FamilyLabel`), nên đổi `Nominal Width` là đổi
+đường kính ống lồng — đúng thứ `SleeveAuto` vẫn ghi vào tham số đó. Không gắn được thì Messages ghi lý do và family vẫn
+dùng được với hình cố định. Chốt bằng `messagesContain` trong bộ ghi thật: `write-mep` **19/19** với dòng *"(đường kính do
+Nominal Width điều khiển)"* — tức nhãn gắn thành công trên Revit 2024.3.
+
+**`AutoRoute` — 5 tuyến nữa trên dự án A** (MEP L02, hai đầu duct thật cách 9–12 m, vật cản kết cấu từ link):
+
+| Tuyến | Kết quả |
+|---|---|
+| 12,4 m | 2 đoạn, **1,00×**, 1 rẽ (tối thiểu 1) |
+| 12,7 m | 3 đoạn, **1,19×**, 2 rẽ (tối thiểu 1) — né 2 vật cản |
+| 12,3 m | 2 đoạn, **1,00×**, 1 rẽ |
+| 9,0 m | 1 đoạn, **1,00×**, 0 rẽ |
+| 9,6 m | 2 đoạn, **1,00×**, 1 rẽ |
+
+Cộng tuyến §57: **6 tuyến trên dự án thật, 5 tuyến tối ưu tuyệt đối, 1 tuyến đi vòng 19 %**. Con số 80–130 ms mỗi tuyến.
+Đây là thước đo đầu tiên có mẫu đủ để nói *chất lượng tuyến trên dự án thật*, không còn là một điểm dữ liệu.

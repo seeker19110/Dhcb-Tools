@@ -42,7 +42,21 @@ namespace DhcbTools.Shared.Logic.Mep
     /// </summary>
     public static class ConnectorReport
     {
-        public const string Header = "ElementId,Category,Level,Domain,Shape,X_mm,Y_mm,Z_mm";
+        public const string Header = "Key,ElementId,Category,Level,Domain,Shape,X_mm,Y_mm,Z_mm";
+
+        /// <summary>
+        /// Khoá ổn định của một connector hở: id phần tử + toạ độ làm tròn lưới 100 mm (cùng cách
+        /// <c>ClashAcceptance.MakeKey</c>) — để ghi vào file "đã chấp nhận" (cùng định dạng clash-accepted.json) và
+        /// lần chạy sau bỏ qua, như <c>ClashDetection</c> (§62). Phần tử dịch dưới 50 mm vẫn cùng khoá.
+        /// </summary>
+        public static string MakeKey(long elementId, double xMm, double yMm, double zMm)
+        {
+            return elementId.ToString(CultureInfo.InvariantCulture) + "@" + Snap(xMm) + "," + Snap(yMm) + "," + Snap(zMm);
+        }
+
+        private static string Snap(double v) => System.Math.Round(v / 100.0).ToString(CultureInfo.InvariantCulture);
+
+        public static string Key(OpenConnectorRow r) => MakeKey(r.ElementId, r.XMm, r.YMm, r.ZMm);
 
         public static string Csv(IReadOnlyList<OpenConnectorRow> rows)
         {
@@ -50,7 +64,8 @@ namespace DhcbTools.Shared.Logic.Mep
             sb.Append(Header).Append('\n');
             foreach (var r in rows)
             {
-                sb.Append(r.ElementId.ToString(CultureInfo.InvariantCulture)).Append(',')
+                sb.Append(Key(r)).Append(',')
+                  .Append(r.ElementId.ToString(CultureInfo.InvariantCulture)).Append(',')
                   .Append(CsvText.Escape(r.Category)).Append(',')
                   .Append(CsvText.Escape(r.Level)).Append(',')
                   .Append(CsvText.Escape(r.Domain)).Append(',')
@@ -72,9 +87,11 @@ namespace DhcbTools.Shared.Logic.Mep
         public static string SkippedNote(int skipped)
             => skipped <= 0 ? string.Empty : $" {skipped} phần tử không đọc được connector (bỏ qua) — con số hở là cận dưới.";
 
-        public static string Summary(int connectors, int elements, string? csvPath)
+        public static string Summary(int connectors, int elements, string? csvPath, int accepted = 0)
         {
-            var s = $"Tìm thấy {connectors} connector hở trên {elements} phần tử.";
+            var s = accepted > 0
+                ? $"Tìm thấy {connectors} connector hở trên {elements} phần tử ({accepted} đã chấp nhận, bỏ qua)."
+                : $"Tìm thấy {connectors} connector hở trên {elements} phần tử.";
             return csvPath == null ? s : s + $" CSV: \"{csvPath}\".";
         }
     }

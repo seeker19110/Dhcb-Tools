@@ -172,7 +172,8 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("categories", "danh sách category (rỗng = mọi category MEP)").Field("domains", "Piping/Hvac/Electrical (rỗng = tất cả)")
                 .Field("create3dView", "true = GHI một 3D view khoanh vùng vào mô hình (thao tác ghi duy nhất của lệnh, mặc định false)")
                 .Field("viewName", "tên 3D view").Field("dryRun", "xem trước: không tạo view")
-                .Field("outputPath", "CSV từng connector hở: ElementId, Category, Level, Domain, Shape, X/Y/Z mm (rỗng = chỉ Messages)")
+                .Field("outputPath", "CSV từng connector hở: Key, ElementId, Category, Level, Domain, Shape, X/Y/Z mm (rỗng = chỉ Messages)")
+                .Field("acceptedPath", "JSON đã chấp nhận (cùng định dạng clash-accepted.json, khoá = cột Key của CSV) — bỏ qua và đếm riêng")
                 .Words("connector hở", "open connector", "kiểm tra connector"),
             new CommandDescriptor("RouteFromLines", Revit, "Routing mức A: dựng duct/pipe/tray từ model line vẽ tay", true, "Routing", "RouteA")
                 .Field("lineStyleName", "line style tuyến").Field("elementType", "Duct/Pipe/CableTray/Conduit").Field("typeName", "type").Field("systemType", "hệ")

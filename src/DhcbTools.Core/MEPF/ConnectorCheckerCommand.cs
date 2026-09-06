@@ -26,11 +26,19 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
         var reportLines = new List<string>();
         var elementIds = new HashSet<ElementId>();
         var rows = new List<OpenConnectorRow>();
+        var accepted = DhcbTools.Shared.Logic.Checks.ClashAcceptance.LoadKeys(config.AcceptedPath);
+        var skippedAccepted = 0;
 
         foreach (var info in openConnectors)
         {
             var row = new OpenConnectorRow(RevitCompat.IdValue(info.ElementId), info.Category, RevitCompat.FtToMm(info.Origin.X),
                 RevitCompat.FtToMm(info.Origin.Y), RevitCompat.FtToMm(info.Origin.Z), info.Domain, info.Shape, info.Level);
+            if (accepted.Contains(ConnectorReport.Key(row)))
+            {
+                skippedAccepted++;
+                continue;
+            }
+
             rows.Add(row);
             reportLines.Add(ConnectorReport.MessageLine(row));
             elementIds.Add(info.ElementId);
@@ -45,9 +53,9 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
             System.IO.File.WriteAllText(csvPath, ConnectorReport.Csv(rows), DhcbTools.Shared.Logic.CsvText.Utf8WithBom);
         }
 
-        if (openConnectors.Count == 0)
+        if (rows.Count == 0)
         {
-            return CommandResult.Ok("Không tìm thấy connector hở nào trong mô hình." + (csvPath == null ? string.Empty : $" CSV (chỉ tiêu đề): \"{csvPath}\".") + ConnectorReport.SkippedNote(skipped), 0);
+            return CommandResult.Ok("Không tìm thấy connector hở nào trong mô hình." + (skippedAccepted > 0 ? $" ({skippedAccepted} đã chấp nhận, bỏ qua.)" : string.Empty) + (csvPath == null ? string.Empty : $" CSV (chỉ tiêu đề): \"{csvPath}\".") + ConnectorReport.SkippedNote(skipped), 0);
         }
 
         // 2. Tuỳ chọn tạo/cập nhật 3D view — chỉ khi không phải xem trước.
@@ -77,8 +85,8 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
             }
         }
 
-        var summary = ConnectorReport.Summary(openConnectors.Count, elementIds.Count, csvPath) + ConnectorReport.SkippedNote(skipped);
-        var result = CommandResult.Ok(summary, openConnectors.Count);
+        var summary = ConnectorReport.Summary(rows.Count, elementIds.Count, csvPath, skippedAccepted) + ConnectorReport.SkippedNote(skipped);
+        var result = CommandResult.Ok(summary, rows.Count);
         result.Messages.AddRange(reportLines);
         return result;
     }

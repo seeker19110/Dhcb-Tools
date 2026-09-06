@@ -81,9 +81,13 @@ public class FamilyCandidatesConnectorReportTests
         };
         var csv = ConnectorReport.Csv(rows);
         var lines = csv.TrimEnd('\n').Split('\n');
-        Assert.Equal("ElementId,Category,Level,Domain,Shape,X_mm,Y_mm,Z_mm", lines[0]);
-        Assert.Equal("1709919,Pipes,LEVEL 02,DomainPiping,Round,19950.2,35010.0,11700.0", lines[1]);
-        Assert.Equal("5,\"Duct \"\"A\"\", B\",L1,DomainHvac,Rectangular,1.0,2.5,3.0", lines[2]);
+        Assert.Equal("Key,ElementId,Category,Level,Domain,Shape,X_mm,Y_mm,Z_mm", lines[0]);
+        Assert.Equal("1709919@200,350,117,1709919,Pipes,LEVEL 02,DomainPiping,Round,19950.2,35010.0,11700.0", lines[1]);
+        Assert.Equal("5@0,0,0,5,\"Duct \"\"A\"\", B\",L1,DomainHvac,Rectangular,1.0,2.5,3.0", lines[2]);
+        Assert.Equal("Tìm thấy 2 connector hở trên 2 phần tử (1 đã chấp nhận, bỏ qua).", ConnectorReport.Summary(2, 2, null, 1));
+        // Khoá bền với dịch chuyển nhỏ: dưới 50 mm cùng ô lưới.
+        Assert.Equal(ConnectorReport.MakeKey(7, 19950.2, 35010, 11700), ConnectorReport.MakeKey(7, 19980, 34990, 11720));
+        Assert.NotEqual(ConnectorReport.MakeKey(7, 0, 0, 0), ConnectorReport.MakeKey(8, 0, 0, 0));
         Assert.Equal("Element 1709919 at (19950.2,35010.0,11700.0) mm - DomainPiping", ConnectorReport.MessageLine(rows[0]));
         Assert.Equal("Tìm thấy 2 connector hở trên 2 phần tử.", ConnectorReport.Summary(2, 2, null));
         Assert.Equal("Tìm thấy 2 connector hở trên 2 phần tử. CSV: \"c.csv\".", ConnectorReport.Summary(2, 2, "c.csv"));

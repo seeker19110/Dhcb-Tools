@@ -445,7 +445,7 @@
     },
     {
       "name": "FamilyStarter — GHI THẬT: dựng DHCB_Sleeve + DHCB_Hanger từ template Revit, ghi .rfa, nạp vào bản chép",
-      "//": "§60: vai MEP 'Bỏ SleeveAuto vì thiếu family' (§57). Family mẫu tối giản, hình giữ chỗ, tham số Nominal Width/Height và Rod Length.",
+      "//": "§60: vai MEP 'Bỏ SleeveAuto vì thiếu family' (§57). Family mẫu tối giản, hình giữ chỗ, tham số Nominal Width/Height và Rod Length. §62: chốt luôn việc gắn nhãn tham số cho kích thước đường kính — không gắn được thì Messages ghi lý do và ca này đỏ.",
       "command": "FamilyStarter",
       "allowWrite": true,
       "config": {
@@ -470,7 +470,10 @@
         "neverContains": [
           "Exception"
         ],
-        "maxMs": 120000
+        "maxMs": 120000,
+        "messagesContain": [
+          "đường kính do Nominal Width điều khiển"
+        ]
       }
     },
     {
