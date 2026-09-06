@@ -1,4 +1,4 @@
-# DHCB Tools — Bằng chứng Build & Test
+﻿# DHCB Tools — Bằng chứng Build & Test
 
 <!-- muc-luc:bat-dau -->
 **Mục lục** (sinh bằng `scripts/muc-luc-bang-chung.py`, đừng sửa tay):
@@ -3303,7 +3303,14 @@ chèn vào giữa — 8 `<param>` trỏ vào hư không, còn `NetloadFailure` t
 | `scripts/check-build.sh` (đường CI Linux) | OK, 0 cảnh báo |
 | `run-in-revit-tests.ps1 -Suite smoke` (Revit 2024.3) | **41 đạt / 0 trượt / 1 bỏ qua** trên 42 ca |
 | `run-in-revit-tests.ps1 -Suite mep` (Revit 2024.3) | **29 đạt / 0 trượt** trên 29 ca |
+| `run-in-revit-tests.ps1 -Suite mep` (Revit **2026**) | **29 đạt / 0 trượt** trên 29 ca |
 
 Trong lượt `mep`, `SleeveAuto` cho *"[Xem trước] Sẽ đặt 445 sleeve"* **không kèm** dòng cảnh báo mới — tức trên mô
 hình này mọi phần tử MEP đều đọc được solid và ghi chú không nổ bừa. Đó là phần kiểm mà một ca test thuần không làm
 thay được.
+
+**Hai phiên bản Revit cho cùng một con số.** Bộ `mep` chạy lại trên **Revit 2026**: cũng **29/29**, và từng con số
+trùng bản 2024.3 — 445 sleeve, 1.120 hanger, 1.053 phần tử cao độ, 7 va chạm với link, 37 → 36 + 1 connector đã chấp
+nhận, 546 điểm định vị. Chỗ duy nhất lệch là `SizingProposal` **799 đoạn thay vì 266** (và `ApplySizing` 793 thay vì
+260) — đã biết từ §59: **model mẫu kèm Revit 2026 khác model mẫu kèm 2024**, không phải khác biệt của mã.
+`SleeveAuto` trên 2026 cũng không kèm dòng cảnh báo mới.
