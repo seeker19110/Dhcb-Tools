@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
 using Newtonsoft.Json;
@@ -12,20 +12,6 @@ namespace DhcbTools.Shared.Logic.Batch
     /// </summary>
     public static class AcadScriptGen
     {
-        /// <summary>
-        /// Một dòng script cho mỗi step. JSON được ghi ra file riêng (đường dẫn truyền vào lệnh) vì dòng lệnh
-        /// AutoCAD không chịu dấu nháy/kí tự đặc biệt tốt; DHCB_RUN đọc file đó.
-        /// </summary>
-        /// <param name="pluginDllPath">DLL NETLOAD (ưu tiên DhcbTools.AutoCAD.Core.dll).</param>
-        /// <param name="stepJsonPaths">File JSON từng step cho DHCB_RUN.</param>
-        /// <param name="saveAsPath">Đường dẫn lưu; null = đóng không lưu. Với saveMode=Save truyền chính file nguồn
-        /// (QSAVE không có trong core console — SAVEAS về cùng đường dẫn tương đương).</param>
-        /// <param name="runLogPath">run.jsonl mà DHCB_RUN ghi vào.</param>
-        /// <param name="sourceFile">File DWG nguồn (ghi vào cột file của log).</param>
-        /// <param name="plotScript">Chuỗi -PLOT (từ <see cref="PlotPdf"/>) chèn trước SAVEAS, hoặc null.</param>
-        /// <param name="dwgVersion">Từ khoá phiên bản DWG cho SAVEAS (2000/2004/2007/2010/2013/2018), mặc định 2018.</param>
-        /// <param name="saveTargetExists">File đích đã tồn tại → AutoCAD hỏi "replace it?"; thêm dòng <c>Y</c> để trả lời.
-        /// Không có dòng này thì prompt nuốt luôn lệnh kế tiếp và bản vẽ không được lưu. Với saveMode=Save luôn là true.</param>
         /// <summary>
         /// Dòng "Unable to load … assembly." trong output của accoreconsole, hoặc <c>null</c>. Khi NETLOAD thất bại
         /// thì mọi <c>DHCB_RUN</c> sau đó là "Unknown command" và không dòng nào được ghi vào run.jsonl — runner dùng
@@ -46,6 +32,20 @@ namespace DhcbTools.Shared.Logic.Batch
             return null;
         }
 
+        /// <summary>
+        /// Một dòng script cho mỗi step. JSON được ghi ra file riêng (đường dẫn truyền vào lệnh) vì dòng lệnh
+        /// AutoCAD không chịu dấu nháy/kí tự đặc biệt tốt; DHCB_RUN đọc file đó.
+        /// </summary>
+        /// <param name="pluginDllPath">DLL NETLOAD (ưu tiên DhcbTools.AutoCAD.Core.dll).</param>
+        /// <param name="stepJsonPaths">File JSON từng step cho DHCB_RUN.</param>
+        /// <param name="saveAsPath">Đường dẫn lưu; null = đóng không lưu. Với saveMode=Save truyền chính file nguồn
+        /// (QSAVE không có trong core console — SAVEAS về cùng đường dẫn tương đương).</param>
+        /// <param name="runLogPath">run.jsonl mà DHCB_RUN ghi vào.</param>
+        /// <param name="sourceFile">File DWG nguồn (ghi vào cột file của log).</param>
+        /// <param name="plotScript">Chuỗi -PLOT (từ <see cref="PlotPdf"/>) chèn trước SAVEAS, hoặc null.</param>
+        /// <param name="dwgVersion">Từ khoá phiên bản DWG cho SAVEAS (2000/2004/2007/2010/2013/2018), mặc định 2018.</param>
+        /// <param name="saveTargetExists">File đích đã tồn tại → AutoCAD hỏi "replace it?"; thêm dòng <c>Y</c> để trả lời.
+        /// Không có dòng này thì prompt nuốt luôn lệnh kế tiếp và bản vẽ không được lưu. Với saveMode=Save luôn là true.</param>
         public static string Build(string pluginDllPath, IReadOnlyList<string> stepJsonPaths, string? saveAsPath, string runLogPath, string sourceFile,
             string? plotScript = null, string? dwgVersion = null, bool saveTargetExists = false)
         {

@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -499,21 +499,29 @@ internal sealed class PathEditor : FieldEditorBase
 internal sealed class ChoiceEditor : FieldEditorBase
 {
     private readonly ComboBox _box = Input(new ComboBox { IsEditable = true });
+    private readonly string? _note;
 
-    public ChoiceEditor(FieldSpec field, JToken? value, IReadOnlyList<string> choices) : base(field)
+    public ChoiceEditor(FieldSpec field, JToken? value, ChoiceList choices) : base(field)
     {
-        foreach (var choice in choices)
+        foreach (var choice in choices.Names)
         {
             _box.Items.Add(choice);
         }
 
+        // Đọc hỏng thì nói là đọc hỏng. Nhãn cũ luôn ghi "mô hình chưa có giá trị nào"
+        // cho cả hai trường hợp — khẳng định sai về mô hình (§64).
+        _note = choices.Note();
         _box.Text = FormValueText.Display(value, field.IsList);
     }
 
     public override UIElement Build()
     {
         var label = Label();
-        if (_box.Items.Count == 0)
+        if (_note != null)
+        {
+            label.Text += "  (" + _note + ")";
+        }
+        else if (_box.Items.Count == 0)
         {
             label.Text += "  (mô hình chưa có giá trị nào — gõ tay)";
         }
