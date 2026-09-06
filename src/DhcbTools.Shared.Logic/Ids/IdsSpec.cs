@@ -351,7 +351,7 @@ namespace DhcbTools.Shared.Logic.Ids
                             // Sai một chữ trong "relation" (viết thiếu, sai chính tả) mà nhận thì facet lặng
                             // lẽ rơi về "chuỗi trộn" — kiểm lỏng hơn điều IDS author thật sự đòi, và báo cáo
                             // không có cách nào biết. Từ chối rõ, giống mọi facet/ràng buộc lạ khác ở đây.
-                            if (!IdsRelations.All.Contains(relation))
+                            if (!IdsRelations.All.Contains(relation!))
                             {
                                 throw new IdsParseException(
                                     "Facet \"partOf\" khai relation=\"" + relation + "\" không hợp lệ. Hợp lệ: "

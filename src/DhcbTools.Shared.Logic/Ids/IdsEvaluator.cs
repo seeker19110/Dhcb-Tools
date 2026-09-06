@@ -36,7 +36,7 @@ namespace DhcbTools.Shared.Logic.Ids
 
         /// <summary>
         /// Tổ tiên "thuộc về" (tên nhóm/hệ/tầng…), mỗi mục gắn quan hệ IFC đã dùng để tới đó.
-        /// <see cref="Relation"/> <c>null</c> nghĩa là tới được bằng cấu trúc quan hệ IFC hợp lệ bất kỳ,
+        /// <c>Relation</c> <c>null</c> nghĩa là tới được bằng cấu trúc quan hệ IFC hợp lệ bất kỳ,
         /// đi qua trộn lẫn nhiều loại quan hệ (đúng khi facet <c>partOf</c> không khai <c>relation</c>).
         /// Một quan hệ cụ thể chỉ xuất hiện khi tới được bằng <b>đúng một loại</b> quan hệ đó xuyên suốt —
         /// theo <c>partof-facet.md</c> của buildingSMART: "if specified only the given type must be

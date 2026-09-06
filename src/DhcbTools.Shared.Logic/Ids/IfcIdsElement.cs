@@ -292,8 +292,8 @@ namespace DhcbTools.Shared.Logic.Ids
         /// <b>trộn nhiều loại</b>, đều tính — hai trường hợp này không phải cùng một tập hợp (chuỗi trộn
         /// A→B bằng <c>IfcRelNests</c> rồi B→C bằng <c>IfcRelAggregates</c> làm C "thuộc về" A khi không
         /// khai <c>relation</c>, nhưng KHÔNG khi khai <c>relation="IFCRELAGGREGATES"</c>), nên tính riêng:
-        /// năm chuỗi thuần (<see cref="Relation"/> khác <c>null</c>) và một chuỗi trộn
-        /// (<see cref="Relation"/> <c>null</c>, đi qua hợp của cả năm loại quan hệ).
+        /// năm chuỗi thuần (<c>Relation</c> khác <c>null</c>) và một chuỗi trộn
+        /// (<c>Relation</c> <c>null</c>, đi qua hợp của cả năm loại quan hệ).
         /// IDS khai <c>partOf</c> bằng <b>tên lớp</b> (<c>IFCBUILDINGSTOREY</c>, <c>IFCSYSTEM</c>…), nên ở
         /// đây trả tên lớp chứ không trả tên tầng.
         /// </summary>
@@ -455,35 +455,86 @@ namespace DhcbTools.Shared.Logic.Ids
                 return list;
             }
 
-            // Bảng TRỘN cho trường hợp không khai relation: hợp của cả năm quan hệ, một cha có thể rẽ qua
-            // nhiều đường khác nhau.
-            var mixed = new Dictionary<int, List<int>>();
-            void AddMixedEdge(int child, int parent)
+            // Chuỗi TRỘN cho trường hợp không khai relation: y NGUYÊN thuật toán trước bản sửa này (một
+            // "cha kế tiếp" mỗi bước — ưu tiên aggregates rồi mới container, KHÔNG rẽ nhánh qua nhóm/hệ),
+            // để không âm thầm đổi hành vi đã có test giữ từ trước. Rẽ nhánh đầy đủ qua mọi quan hệ (kể cả
+            // nhóm/hệ) từng làm cho phụ kiện lồng trong cửa "thuộc về" luôn cả hệ của chính cửa — hợp lý
+            // theo nghĩa đồ thị, nhưng KHÁC kết luận cũ mà chưa ai xác nhận lại là đúng hơn (không có
+            // IfcTester ở đây để đối chiếu). Chỉ phần "khai relation cụ thể" là mục 11.4 phải sửa, không
+            // phải phần này.
+            var singleParent = new Dictionary<int, int>(aggregates);
+            foreach (var pair in nests)
             {
-                if (!mixed.TryGetValue(child, out var list))
+                if (!singleParent.ContainsKey(pair.Key))
                 {
-                    list = new List<int>();
-                    mixed[child] = list;
-                }
-
-                if (!list.Contains(parent))
-                {
-                    list.Add(parent);
+                    singleParent[pair.Key] = pair.Value;
                 }
             }
 
-            foreach (var pair in aggregates) AddMixedEdge(pair.Key, pair.Value);
-            foreach (var pair in nests) AddMixedEdge(pair.Key, pair.Value);
-            foreach (var pair in contained) AddMixedEdge(pair.Key, pair.Value);
+            void AddMixedAncestors(List<string> list, int start)
+            {
+                var guard = 0;
+                var current = start;
+                while (guard++ < 64)
+                {
+                    var entity = _model.ById(current);
+                    if (entity != null && !list.Contains(entity.Type))
+                    {
+                        list.Add(entity.Type);
+                    }
+
+                    if (!singleParent.TryGetValue(current, out var next))
+                    {
+                        if (contained.TryGetValue(current, out var container))
+                        {
+                            next = container;
+                        }
+                        else
+                        {
+                            return;
+                        }
+                    }
+
+                    current = next;
+                }
+            }
+
+            var mixed = new Dictionary<int, List<string>>();
+            foreach (var id in contained.Keys.Concat(singleParent.Keys).Distinct())
+            {
+                var list = new List<string>();
+                if (singleParent.TryGetValue(id, out var parent))
+                {
+                    AddMixedAncestors(list, parent);
+                }
+
+                if (contained.TryGetValue(id, out var container))
+                {
+                    AddMixedAncestors(list, container);
+                }
+
+                mixed[id] = list;
+            }
+
+            // Nhóm/hệ: một bước phẳng, KHÔNG đệ quy — chỉ gắn cho đúng phần tử là RelatedObjects của
+            // IfcRelAssignsToGroup, không lan lên/xuống theo aggregates/nests/contained. Y nguyên bản cũ.
             foreach (var pair in groups)
             {
-                foreach (var group in pair.Value)
+                if (!mixed.TryGetValue(pair.Key, out var list))
                 {
-                    AddMixedEdge(pair.Key, group);
+                    list = new List<string>();
+                    mixed[pair.Key] = list;
+                }
+
+                foreach (var groupId in pair.Value)
+                {
+                    var group = _model.ById(groupId);
+                    if (group != null && !list.Contains(group.Type))
+                    {
+                        list.Add(group.Type);
+                    }
                 }
             }
-
-            foreach (var pair in voidsAndFills) AddMixedEdge(pair.Key, pair.Value);
 
             var everyChild = aggregates.Keys.Concat(nests.Keys).Concat(contained.Keys)
                 .Concat(groups.Keys).Concat(voidsAndFills.Keys).Distinct();
@@ -491,7 +542,11 @@ namespace DhcbTools.Shared.Logic.Ids
             foreach (var id in everyChild)
             {
                 var entries = new List<(string?, string)>();
-                entries.AddRange(WalkMulti(mixed, id).Select(type => ((string?)null, type)));
+                if (mixed.TryGetValue(id, out var mixedList))
+                {
+                    entries.AddRange(mixedList.Select(type => ((string?)null, type)));
+                }
+
                 entries.AddRange(WalkSingle(aggregates, id).Select(type => ((string?)IdsRelations.Aggregates, type)));
                 entries.AddRange(WalkSingle(nests, id).Select(type => ((string?)IdsRelations.Nests, type)));
                 entries.AddRange(WalkSingle(contained, id).Select(type => ((string?)IdsRelations.ContainedInSpatialStructure, type)));
