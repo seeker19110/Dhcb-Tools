@@ -177,7 +177,7 @@ namespace DhcbTools.Shared.Logic.Ai
             };
 
         private static readonly string[] BoolPrefixes =
-            { "is", "use", "create", "allow", "purge", "pin", "delete", "keep", "skip", "check", "build", "reset", "remove", "detach" };
+            { "is", "use", "create", "allow", "purge", "pin", "delete", "keep", "skip", "check", "build", "reset", "remove", "detach", "overwrite" };
 
         private static readonly string[] NumberSuffixes =
             { "Mm", "Deg", "Ms", "PerM", "Percent", "Count", "Minutes", "Seconds", "Days" };
