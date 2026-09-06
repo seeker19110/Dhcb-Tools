@@ -18,7 +18,12 @@ Cách nhanh nhất — một lệnh làm trọn vòng (build → cài add-in →
 ```powershell
 .\scripts\run-in-revit-tests.ps1 -Suite mep        # smoke | mep | plumbing
 .\scripts\run-in-autocad-tests.ps1                 # bên AutoCAD, qua accoreconsole
+.\scripts\don-ket-qua.ps1 [-Apply]                 # dọn %USERPROFILE%\DHCB-test-results; mặc định chỉ xem trước
 ```
+
+Mỗi lượt để lại `ban-chep\` 270–400 MB (bản chép model + model liên kết); sau 41 lượt thư mục kết quả đã 1,8 GB.
+`don-ket-qua.ps1` giữ bản chép ở **lượt mới nhất mỗi bộ**, các lượt sau chỉ giữ log/report (bằng chứng vài trăm KB),
+lượt quá 14 ngày ngoài 2 lượt mới nhất thì xoá hẳn; thư mục không theo mẫu `<bộ>-yyyy-MM-dd_HH-mm-ss` không bao giờ bị đụng.
 
 Script Revit **chờ tới 120 s cho Revit đóng hẳn** rồi mới bỏ cuộc: Revit khoá DLL add-in khi chạy, và tiến
 trình của lượt trước còn sống vài chục giây sau khi batch kết thúc — chạy ba bộ nối đuôi nhau trong một
