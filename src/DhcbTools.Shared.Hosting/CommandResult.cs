@@ -11,6 +11,19 @@ namespace DhcbTools.Shared.Hosting
     {
         public bool Success { get; set; }
 
+        /// <summary>
+        /// Lệnh chạy xong nhưng chỉ xử lý được <b>một phần</b> đối tượng (ví dụ 3/5 schedule xuất được,
+        /// 2 cái lỗi nằm trong <see cref="Errors"/>) — không phải đúng/sai nhị phân.
+        /// <para>
+        /// Trước đây các lệnh dạng "xuất N/M đối tượng" phải ép về <see cref="Success"/> = true dù có lỗi
+        /// một phần, nên báo cáo đêm hiện "OK" giả (ví dụ <c>ScheduleExport</c>). Quy ước:
+        /// <see cref="Success"/> = false chỉ khi <b>không xử lý được đối tượng nào</b>; khi xử lý được một
+        /// phần thì <see cref="Success"/> vẫn true (lệnh không hỏng) nhưng cờ này bật lên, và người đọc
+        /// báo cáo (batch, HTML) phải coi ca này khác "xanh tuyệt đối".
+        /// </para>
+        /// </summary>
+        public bool PartialSuccess { get; set; }
+
         public string Summary { get; set; } = string.Empty;
 
         public List<string> Messages { get; } = new List<string>();

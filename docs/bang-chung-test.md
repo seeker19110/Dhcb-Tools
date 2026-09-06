@@ -68,6 +68,7 @@
 - §63 — [`FamilyUpgrade` — thư viện family cho nhiều phiên bản Revit, hai chiều đều có bằng chứng (2026-09-06 14:30 ICT)](#63-familyupgrade-thư-viện-family-cho-nhiều-phiên-bản-revit-hai-chiều-đều-có-bằng-chứng-2026-09-06-1430-ict)
 - §64 — [Quét sâu lần hai: 34 khối `catch` rỗng còn lại được phân loại, 3 chỗ nói dối về mô hình đã sửa (2026-09-06 15:15 ICT)](#64-quét-sâu-lần-hai-34-khối-catch-rỗng-còn-lại-được-phân-loại-3-chỗ-nói-dối-về-mô-hình-đã-sửa-2026-09-06-1515-ict)
 - §65 — [Đóng một phần nợ checklist tay 8.4 — `overwriteExisting` nay ra checkbox (2026-09-06)](#65-đóng-một-phần-nợ-checklist-tay-84-overwriteexisting-nay-ra-checkbox-2026-09-06)
+- §66 — [Hai mục nợ kỹ thuật của bản đánh giá 2026-09-06 — `CommandResult.PartialSuccess` và dọn 6 khối `catch` rỗng](#66-hai-mục-nợ-kỹ-thuật-của-bản-đánh-giá-2026-09-06-commandresultpartialsuccess-và-dọn-6-khối-catch-rỗng)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
@@ -3385,3 +3386,36 @@ Sửa: thêm `"overwrite"` vào `BoolPrefixes` (`FieldKind.cs`), thêm ca `overw
 Bốn mục còn lại của §34 ("Cái chưa chứng minh") — bấm *Chạy thật* trên Ribbon, nhóm MEPF trên model HVAC,
 ngoại lệ .NET tiếng Anh, id hiện `0.0` ở PipeKick/FlowNumbering — cần một vòng bấm tay mới qua giao diện
 thật (không phải sửa mã đơn thuần), để dành cho vòng kiểm 8.4 kế tiếp.
+
+## 66. Hai mục nợ kỹ thuật của bản đánh giá 2026-09-06 — `CommandResult.PartialSuccess` và dọn 6 khối `catch` rỗng
+
+Bản đánh giá độc lập [`danh-gia-va-tam-nhin-2026-09-06.md`](danh-gia-va-tam-nhin-2026-09-06.md) §4.7 chỉ ra
+hai nợ nhỏ nên đóng trước khi có người dùng thật. Cả hai không cần mở Revit để chứng minh — thuần logic
+hoặc kiểm bằng đối chiếu mã nguồn.
+
+**`ScheduleExport` báo "OK" giả khi xuất một phần, và cả khi xuất được 0/N.** Đọc lại
+`ScheduleExportCommand.Execute` (`src/DhcbTools.Core/Sheets/SheetCommands2.cs`): `result` khởi tạo bằng
+`CommandResult.Ok(...)` từ đầu vòng lặp, và **không có nhánh nào đặt lại `Success`** dù bao nhiêu schedule
+lỗi — kể cả khi *tất cả* đều lỗi (`done == 0`), lệnh vẫn trả `Success=true` với thông báo "Đã xuất 0/5
+schedule". Sửa:
+
+- `CommandResult` (`Shared.Hosting`) thêm `PartialSuccess` — quy ước: `Success=false` chỉ khi không xử lý
+  được đối tượng nào; xử lý một phần thì `Success` vẫn true (lệnh không hỏng) nhưng cờ này bật.
+- `ScheduleExportCommand`: `done=0` → `Success=false`; `0<done<tổng` → `PartialSuccess=true`.
+- `RunLogEntry` mang thêm `partialSuccess` (bỏ qua khi `false` nên log cũ không đổi hình dạng).
+- `BatchReport`: ô màu vàng riêng (`class="partial"`), KPI "Một phần" cạnh "Thành công"/"Lỗi"/"Bỏ qua".
+- `RunLog.ExitCode`: step `PartialSuccess` cũng làm mã thoát batch đêm khác 0 — không được để một đêm có
+  step chạy dở đi qua như thể mọi thứ xanh.
+
+**6 khối `catch` rỗng còn lại** (rà bằng regex trên toàn `src/`, đối chiếu với danh sách 34 khối đã phân
+loại ở §64): `HttpBridgeServer.Dispose` (`_listener.Close()`), `ConnectorCheckerCommand` (đặt lại tên view
+khi trùng lần hai), `RevitCompat.Lookup` (tra tham số ở type), `HangerCommand.GetCurveTangent`,
+`ProgressReportCommand` (tra level qua nhiều đường), `SleeveCommand` (đọc solid hình học) — cả 6 đều là
+"lỗi có thể lường trước, có đường rơi hợp lý phía sau", nên giữ nguyên hành vi và chỉ thêm bình luận nói rõ
+lý do im lặng, đúng quy ước §61 đã áp cho 40+ khối khác của dự án.
+
+**Bằng chứng:** `dotnet test tests/DhcbTools.Shared.Logic.Tests` **1620/1620** (thêm 3 ca:
+`overwriteExisting` của §65, `MaThoat_1KhiThanhCongMotPhan`, `ThanhCongMotPhan_CoOMauRieng_KhongLanVoiOkHayFail`),
+`dotnet test tests/DhcbTools.BatchRunner.Tests` **21/21**, build `DhcbTools.Revit` (Revit 2024, net48) và
+`DhcbTools.BatchRunner` (net10) đều xanh 0 lỗi 0 cảnh báo. Không cần chạy trong Revit: cả hai thay đổi nằm
+ở tầng thuần (`CommandResult`, `RunLog`, `BatchReport`) hoặc là bình luận không đổi hành vi.

@@ -64,6 +64,15 @@ public sealed class ScheduleExportCommand : ICoreCommand<ScheduleExportConfig>
 
         result.Summary = $"Đã xuất {done}/{schedules.Count} schedule → \"{config.OutputFolder}\".";
         result.AffectedCount = done;
+        if (done == 0)
+        {
+            result.Success = false;
+        }
+        else if (done < schedules.Count)
+        {
+            result.PartialSuccess = true;
+        }
+
         return result;
     }
 

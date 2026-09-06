@@ -676,7 +676,7 @@ namespace DhcbTools.Shared.Hosting
 
             _disposed = true;
             Stop();
-            try { _listener.Close(); } catch { }
+            try { _listener.Close(); } catch (Exception) { } // listener có thể đã Close/Dispose từ Stop()
         }
     }
 }

@@ -183,6 +183,16 @@ public class RunLogTests
         Assert.Equal(1, RunLog.ExitCode(new[] { new RunLogEntry { Success = true, Skipped = true } }));
     }
 
+    /// <summary>
+    /// Một step chỉ thành công một phần (ví dụ ScheduleExport 3/5 schedule) không được lẫn với "OK" tuyệt
+    /// đối — báo cáo đêm phải có chỗ dừng lại đọc, không im lặng cho qua (mục 4.7 đánh giá 2026-09-06).
+    /// </summary>
+    [Fact]
+    public void MaThoat_1KhiThanhCongMotPhan()
+    {
+        Assert.Equal(1, RunLog.ExitCode(new[] { new RunLogEntry { Success = true, PartialSuccess = true } }));
+    }
+
     [Fact]
     public void FileKhongTonTai_TraRong()
     {
@@ -210,6 +220,25 @@ public class BatchReportTests
         Assert.Contains("class=\"skip\"", html);
         Assert.Contains("Job &lt;đêm&gt;", html);
         Assert.DoesNotContain("<1>", html);
+    }
+
+    /// <summary>
+    /// Một step thành công một phần (`Success=true, PartialSuccess=true`, ví dụ ScheduleExport 3/5) phải
+    /// có ô riêng — không được trộn vào "ok" (đọc thì tưởng xong hết) hay "fail" (đọc thì tưởng hỏng
+    /// hoàn toàn). Mục 4.7 đánh giá 2026-09-06.
+    /// </summary>
+    [Fact]
+    public void ThanhCongMotPhan_CoOMauRieng_KhongLanVoiOkHayFail()
+    {
+        var entries = new List<RunLogEntry>
+        {
+            new() { File = "A.rvt", Command = "ScheduleExport", Success = true, PartialSuccess = true, Summary = "Đã xuất 3/5 schedule" },
+        };
+
+        var html = BatchReport.Render("Job", entries, new DateTime(2026, 9, 1));
+
+        Assert.Contains("class=\"partial\"", html);
+        Assert.Contains("Một phần: 1", html);
     }
 }
 

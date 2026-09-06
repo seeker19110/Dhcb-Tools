@@ -211,6 +211,7 @@ public sealed class ProgressReportCommand : ICoreCommand<ProgressReportConfig>
         }
         catch (Exception)
         {
+            // Không tra được level bằng cách nào — trả rỗng, người gọi gộp phần tử này vào nhóm "chưa rõ tầng".
         }
 
         return string.Empty;

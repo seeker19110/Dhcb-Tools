@@ -249,7 +249,7 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
         {
             // Name conflict — append timestamp
             try { view.Name = viewName + "_" + DateTime.Now.ToString("HHmm"); }
-            catch (System.Exception) { }
+            catch (System.Exception) { } // vẫn trùng thì giữ tên mặc định của Revit, không phải lý do hỏng lệnh
         }
 
         return view;

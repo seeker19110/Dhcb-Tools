@@ -113,6 +113,7 @@ public sealed class BatchJobRunner
                         File = file.Path,
                         Command = step.Command,
                         Success = result.Success,
+                        PartialSuccess = result.PartialSuccess,
                         Affected = result.AffectedCount,
                         Summary = result.Summary,
                         Messages = result.Messages.Take(2000).ToList(),
