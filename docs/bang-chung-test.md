@@ -3160,7 +3160,8 @@ chính máy đó (`Application.FamilyTemplatePath`, tìm thêm thư mục `Engli
   Height` (đúng tên mặc định `SleeveAuto` ghi kích thước).
 - `DHCB_Hanger`: đế 100×100×50 dưới gốc; tham số `Rod Length`.
 - Cả hai **work-plane-based** (`FAMILY_WORK_PLANE_BASED`) để `NewFamilyInstance(face, …)` của `SleeveAuto` đặt được lên
-  mặt tường/sàn. Hình học là hình giữ chỗ và **không** do tham số điều khiển — nói rõ trong catalog và tài liệu; doanh
+  mặt tường/sàn. Hình học ở §60 là hình giữ chỗ, **không** do tham số điều khiển (§62 đã gắn `Nominal Width` vào đường
+  kính) — nói rõ trong catalog và tài liệu; doanh
   nghiệp thay bằng family chuẩn của mình khi có.
 
 Tầng thuần `FamilyStarterPlanner` (2 ca), phần Revit ~150 dòng. Dây đủ: `RevitCommandTable`, catalog (writes), nút Ribbon
