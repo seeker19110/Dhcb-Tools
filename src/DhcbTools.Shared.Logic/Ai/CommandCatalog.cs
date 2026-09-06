@@ -56,6 +56,23 @@ namespace DhcbTools.Shared.Logic.Ai
             return this;
         }
 
+        /// <summary>
+        /// Bậc <b>hỗ trợ</b>: giá trị đã rõ qua vòng đóng vai kỹ sư (xem
+        /// <c>docs/danh-gia-va-tam-nhin-2026-09-06.md</c> §5, Chân trời 1) — chỉ sửa lỗi/ma sát do người
+        /// dùng thật báo, không thêm tính năng tuỳ hứng. Mặc định <c>false</c> (bậc <b>thử nghiệm</b>):
+        /// phần lớn 64 lệnh còn lại đã chạy thật trong Revit/AutoCAD nhưng chưa có bằng chứng người dùng
+        /// ngoài tác giả cần đến, nên Ribbon phải nói rõ ràng buộc đó thay vì im lặng coi mọi lệnh ngang
+        /// hàng nhau.
+        /// </summary>
+        public bool Supported { get; private set; }
+
+        /// <summary>Đánh dấu lệnh ở bậc hỗ trợ — xem <see cref="Supported"/>.</summary>
+        public CommandDescriptor Endorsed()
+        {
+            Supported = true;
+            return this;
+        }
+
         /// <summary>Tên trường config → mô tả ngắn (dùng cho MCP inputSchema và cho intent parser).</summary>
         public Dictionary<string, string> ConfigFields { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -133,10 +150,10 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Words("đánh số", "numbering", "đánh số cửa", "đánh số phòng"),
             new CommandDescriptor("BatchExport", Revit, "Xuất PDF/DWG/IFC/NWC hàng loạt", false, "Export")
                 .Field("outputFolder", "thư mục").Field("formats", "Pdf/Dwg/Ifc/Nwc").Field("sheetNumbers", "lọc sheet").Field("fileNamePattern", "mẫu tên file {SheetNumber}-{SheetName}").Field("dryRun", "xem trước")
-                .Words("xuất pdf", "xuất dwg", "in hàng loạt", "export pdf", "xuất ifc"),
+                .Words("xuất pdf", "xuất dwg", "in hàng loạt", "export pdf", "xuất ifc").Endorsed(),
             new CommandDescriptor("HealthReport", Revit, "Báo cáo HTML sức khoẻ mô hình", false, "Health")
                 .Field("outputPath", "file HTML")
-                .Words("health report", "báo cáo sức khoẻ", "kiểm tra mô hình", "warning"),
+                .Words("health report", "báo cáo sức khoẻ", "kiểm tra mô hình", "warning").Endorsed(),
             new CommandDescriptor("ProjectInfo", Revit, "Gán thông tin dự án", true)
                 .Field("projectName", "tên dự án").Field("projectNumber", "mã dự án").Field("dryRun", "xem trước")
                 .Words("thông tin dự án", "project info"),
@@ -165,7 +182,7 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Words("cao độ", "elevation", "gán cao độ"),
             new CommandDescriptor("HangerAuto", Revit, "Đặt hanger theo khoảng cách chuẩn", true, "Hanger", "Hangers")
                 .Field("hangerFamilyName", "family hanger").Field("spacingMm", "khoảng cách").Field("dryRun", "xem trước")
-                .Words("hanger", "giá đỡ", "ty treo", "support"),
+                .Words("hanger", "giá đỡ", "ty treo", "support").Endorsed(),
             new CommandDescriptor("PipeSplitter", Revit, "Chia ống/duct theo chiều dài cây", true, "PipeSplit", "SplitPipes")
                 .Field("maxSegmentMm", "chiều dài tối đa").Field("dryRun", "xem trước")
                 .Words("chia ống", "cắt ống", "split pipe", "chia đoạn"),
@@ -244,10 +261,10 @@ namespace DhcbTools.Shared.Logic.Ai
             // ── Revit — hồ sơ & style (giai đoạn 7, học từ pyRevit/DiRoots/Ideate/Colour Splasher) ──
             new CommandDescriptor("SheetRename", Revit, "Đổi số/tên sheet hoặc view theo mẫu token + regex, chống trùng", true, "RenameSheets", "RenameViews")
                 .Field("target", "Sheets | Views").Field("numberPattern", "mẫu số, ví dụ A-{Level}-{n:00}").Field("namePattern", "mẫu tên").Field("find", "regex tìm").Field("replace", "thay").Field("filterContains", "lọc số/tên chứa").Field("dryRun", "xem trước")
-                .Words("đổi tên sheet", "đổi số sheet", "rename sheet", "đổi tên view", "đánh số sheet"),
+                .Words("đổi tên sheet", "đổi số sheet", "rename sheet", "đổi tên view", "đánh số sheet").Endorsed(),
             new CommandDescriptor("RevisionOnSheets", Revit, "Gán hoặc bỏ một revision trên nhiều sheet", true, "SetRevisions")
                 .Field("revisionSequence", "số thứ tự revision").Field("sheetNumberContains", "lọc sheet").Field("remove", "bỏ thay vì gán").Field("dryRun", "xem trước")
-                .Words("revision", "gán revision", "phát hành", "set revision"),
+                .Words("revision", "gán revision", "phát hành", "set revision").Endorsed(),
             new CommandDescriptor("SheetIndex", Revit, "Danh mục bản vẽ: số, tên, revision hiện hành, ngày phát hành, người vẽ/kiểm ra CSV/HTML", false, "DrawingIndex", "DrawingList")
                 .Field("outputPath", "file CSV danh mục").Field("htmlPath", "file HTML để in (tuỳ chọn)").Field("sheetNumberContains", "lọc sheet").Field("skipPlaceholders", "bỏ sheet giữ chỗ")
                 .Words("danh mục bản vẽ", "danh sách bản vẽ", "sheet index", "drawing list", "mục lục bản vẽ"),
@@ -262,12 +279,12 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Words("kiểm kê family", "đổi tên family", "family audit", "family reviser", "family không dùng"),
             new CommandDescriptor("WarningsExport", Revit, "Xuất toàn bộ warning ra CSV kèm ElementId/category, đếm theo loại", false, "ExportWarnings")
                 .Field("outputPath", "file CSV")
-                .Words("xuất warning", "danh sách warning", "warning csv", "review warnings"),
+                .Words("xuất warning", "danh sách warning", "warning csv", "review warnings").Endorsed(),
 
             // ── Revit — P2 giai đoạn 7 (Naviate/Victaulic/eVolve/pyRevit/SheetLink) ──
             new CommandDescriptor("SlopePipes", Revit, "Đặt hoặc kiểm tra dốc ống thoát nước theo % hoặc bảng tối thiểu theo DN", true, "PipeSlope")
                 .Field("slopePercent", "% (rỗng = theo DN)").Field("systemContains", "lọc hệ").Field("levelName", "tầng").Field("lowerEnd", "End|Start").Field("checkOnly", "chỉ kiểm").Field("dryRun", "xem trước")
-                .Words("ống dốc", "độ dốc", "slope pipe", "đặt dốc", "kiểm tra dốc"),
+                .Words("ống dốc", "độ dốc", "slope pipe", "đặt dốc", "kiểm tra dốc").Endorsed(),
             new CommandDescriptor("PipeKick", Revit, "Kick/jog một ống bằng hai cút 45° hoặc 90° (dịch ngang/lên/xuống)", true, "Kick90", "Jog")
                 .Field("elementId", "Id ống").Field("offsetMm", "khoảng dịch").Field("offsetDirection", "Up|Down|Left|Right").Field("elbowAngleDeg", "45|90").Field("distanceFromStartMm", "vị trí").Field("dryRun", "xem trước")
                 .Words("kick", "kick-90", "jog ống", "né ống", "dịch ống"),
@@ -318,7 +335,7 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("pointMode", "cột/thiết bị đặt theo điểm: Centre (tâm hình học, mặc định) | Insertion (điểm chèn family — họ Off Center lệch tim tới 305 mm)", FieldKind.Text)
                 .Field("includeGridIntersections", "thêm giao điểm các trục thẳng (A-1, B-2…)", FieldKind.Bool)
                 .Field("utf8Bom", "ghi BOM UTF-8 để Excel đọc tiếng Việt (để máy đọc: tắt)", FieldKind.Bool)
-                .Words("toạ độ định vị", "setout", "stake out", "máy toàn đạc", "trắc đạc", "toạ độ tim cột", "xuất toạ độ", "cắm mốc"),
+                .Words("toạ độ định vị", "setout", "stake out", "máy toàn đạc", "trắc đạc", "toạ độ tim cột", "xuất toạ độ", "cắm mốc").Endorsed(),
 
             new CommandDescriptor("ConstructionStatus", Revit, "Ghi trạng thái thi công (chưa lắp / đang lắp / đã lắp / đã nghiệm thu) từ CSV hiện trường vào mô hình", true, "TrangThaiThiCong", "InstallStatus")
                 .Field("inputPath", "CSV hiện trường: mã cấu kiện + trạng thái, tuỳ chọn ngày / người xác nhận / ghi chú")
@@ -344,18 +361,18 @@ namespace DhcbTools.Shared.Logic.Ai
             // ── Revit — kiểm tra (cấp 2) ────────────────────────────────────
             new CommandDescriptor("ParameterRuleCheck", Revit, "Kiểm tra tham số thiếu / sai quy tắc đặt tên → HTML", false, "RuleCheck")
                 .Field("rulesPath", "file JSON quy tắc").Field("outputPath", "file HTML").Field("create3dView", "true = GHI một 3D view isolate phần tử vi phạm (chỉ khi dryRun=false)").Field("dryRun", "xem trước: không tạo view")
-                .Words("kiểm tra tham số", "rule check", "kiểm tra đặt tên"),
+                .Words("kiểm tra tham số", "rule check", "kiểm tra đặt tên").Endorsed(),
             new CommandDescriptor("IdsValidate", Revit, "Kiểm mô hình theo file IDS 1.0 của chủ đầu tư/thẩm tra (buildingSMART) → HTML + CSV", false, "KiemIds", "IDS")
                 .Field("idsPath", "file .ids (XML) khai yêu cầu thông tin")
                 .Field("outputPath", "file HTML báo cáo")
                 .Field("csvPath", "CSV cùng nội dung (tuỳ chọn)")
                 .Field("categories", "category cần kiểm (rỗng = mọi phần tử mô hình)")
                 .Field("levelName", "chỉ tầng này")
-                .Words("kiểm ids", "ids", "yêu cầu thông tin", "kiểm theo yêu cầu chủ đầu tư", "information delivery specification"),
+                .Words("kiểm ids", "ids", "yêu cầu thông tin", "kiểm theo yêu cầu chủ đầu tư", "information delivery specification").Endorsed(),
             new CommandDescriptor("ClashDetection", Revit, "Va chạm nội bộ giữa hai nhóm category → HTML + 3D view", false, "Clash")
                 .Field("categoriesA", "nhóm A").Field("categoriesB", "nhóm B").Field("outputPath", "file HTML").Field("acceptedPath", "clash-accepted.json")
                 .Field("includeLinkedModels", "xét cả model liên kết cho nhóm B (mặc định bật)", FieldKind.Bool).Field("create3dView", "true = GHI một 3D view isolate phần tử va chạm (chỉ khi dryRun=false)").Field("dryRun", "xem trước: không tạo view")
-                .Words("clash", "va chạm", "kiểm tra va chạm"),
+                .Words("clash", "va chạm", "kiểm tra va chạm").Endorsed(),
 
             // ── Revit — AI (offline) ────────────────────────────────────────
             new CommandDescriptor("CadLayerMap", Revit, "AI offline: gợi ý map layer CAD → Revit type, ghi CSV để duyệt", false, "LayerMap")
@@ -405,7 +422,7 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Words("thay text", "find replace", "đổi chữ", "sửa text hàng loạt"),
             new CommandDescriptor("LayerStandardCheck", AutoCad, "Kiểm tra layer theo bộ quy tắc đặt tên → HTML", false, "LayerCheck")
                 .Field("rulesPath", "file JSON quy tắc").Field("outputPath", "file HTML")
-                .Words("kiểm tra layer", "chuẩn layer", "layer standard"),
+                .Words("kiểm tra layer", "chuẩn layer", "layer standard").Endorsed(),
             new CommandDescriptor("GridExtract", AutoCad, "Trích trục từ layer AXIS ra CSV cho Revit GridFromCsv", false, "ExtractGrids")
                 .Field("gridLayer", "layer trục (mặc định AXIS)").Field("outputPath", "file CSV")
                 .Words("trích trục", "lấy trục từ cad", "extract grid"),
@@ -420,10 +437,10 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Words("so sánh bản vẽ", "drawing compare", "khác nhau giữa hai bản"),
             new CommandDescriptor("BlockQuantity", AutoCad, "Đếm block theo tên (và nhóm theo attribute) → CSV BOM", false, "BlockCount", "Bom")
                 .Field("outputPath", "file CSV").Field("groupByAttribute", "tag attribute để nhóm").Field("blockNameContains", "lọc")
-                .Words("đếm block", "thống kê block", "bom block", "block quantity"),
+                .Words("đếm block", "thống kê block", "bom block", "block quantity").Endorsed(),
             new CommandDescriptor("AttributeIncrement", AutoCad, "Gán attribute tăng dần theo mẫu {n:000} theo thứ tự vị trí (Lee Mac BATTE)", true, "BatchAttribute")
                 .Field("blockName", "tên block").Field("attributeTag", "tag").Field("pattern", "mẫu, ví dụ P-{n:000}").Field("startNumber", "bắt đầu").Field("dryRun", "xem trước")
-                .Words("attribute tăng dần", "đánh số attribute", "batte", "increment attribute"),
+                .Words("attribute tăng dần", "đánh số attribute", "batte", "increment attribute").Endorsed(),
             new CommandDescriptor("CadLayerMap", AutoCad, "AI offline: gợi ý map layer → Revit type từ danh sách type", false, "LayerMap")
                 .Field("revitTypesPath", "file .txt danh sách type").Field("outputPath", "CSV mapping").Field("useOllama", "dùng model local nếu có")
                 .Words("map layer", "ánh xạ layer"),

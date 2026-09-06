@@ -1,5 +1,8 @@
 ﻿# DHCB Tools — Revit & AutoCAD
 
+> Mới đọc lần đầu, không cần chi tiết kỹ thuật? Xem [`docs/tong-quan.md`](docs/tong-quan.md) (1 trang: là gì,
+> 14 lệnh dùng được ngay, giới hạn cần biết).
+
 Add-in **2-trong-1** (C#) tự động hoá các tác vụ lặp lại cho kỹ sư xây dựng, chạy trực tiếp trên **Revit desktop**
 và **AutoCAD desktop**, có **batch chạy đêm**, **HTTP Bridge/MCP cho agent AI**, và **lớp AI offline** (heuristic +
 Ollama local — không dữ liệu nào rời máy). Ngoại lệ duy nhất: **panel web AutoCAD** (`tools/autocad-mcp-server`) gọi
