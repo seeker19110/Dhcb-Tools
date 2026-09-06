@@ -238,4 +238,34 @@ public class AutoRouteRouteBuildPlannerTests
         Assert.Equal($"Đỉnh {p}: Tee thất bại (vì) — connector để hở, kỹ sư nối tay. Đoạn: 1, 2",
             RouteBuildPlanner.FittingFailedMessage(p, FittingKind.Tee, "vì", new[] { "1", "2" }));
     }
+
+    // ───────────── OwnRouteCategoryToExclude (§4.7 đánh giá 2026-09-06: "chưa phải một nút") ─────────────
+
+    [Theory]
+    [InlineData("Duct", "Ducts")]
+    [InlineData("duct", "Ducts")]
+    [InlineData("Pipe", "Pipes")]
+    [InlineData("CableTray", "Cable Trays")]
+    public void OwnRouteCategoryToExclude_BuildRouteVaMacDinh_LoaiDungCategoryCuaChinhNo(string elementType, string expected)
+    {
+        Assert.Equal(expected, AutoRoutePlanner.OwnRouteCategoryToExclude(obstacleCategoriesCustomized: false, buildRoute: true, elementType));
+    }
+
+    [Fact]
+    public void OwnRouteCategoryToExclude_DaTuChonObstacleCategories_KhongDungToi()
+    {
+        Assert.Null(AutoRoutePlanner.OwnRouteCategoryToExclude(obstacleCategoriesCustomized: true, buildRoute: true, "Duct"));
+    }
+
+    [Fact]
+    public void OwnRouteCategoryToExclude_ChiVeLineKhongDungRoute_KhongLoaiGi()
+    {
+        Assert.Null(AutoRoutePlanner.OwnRouteCategoryToExclude(obstacleCategoriesCustomized: false, buildRoute: false, "Duct"));
+    }
+
+    [Fact]
+    public void OwnRouteCategoryToExclude_ElementTypeLa_Conduit_KhongCoTrongDanhSachVatCanMacDinh()
+    {
+        Assert.Null(AutoRoutePlanner.OwnRouteCategoryToExclude(obstacleCategoriesCustomized: false, buildRoute: true, "Conduit"));
+    }
 }

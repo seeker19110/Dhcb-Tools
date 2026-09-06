@@ -159,5 +159,25 @@ namespace DhcbTools.Shared.Logic.Mep
         {
             return $"Đã vẽ {created} model line (line style \"{lineStyleName}\"), {path.QualityText()}, né {elements} vật cản ({source}).";
         }
+
+        /// <summary>
+        /// Khi dựng luôn duct/pipe (<c>BuildRoute</c>) mà danh sách vật cản đang dùng mặc định (rỗng, chưa
+        /// tự chọn), category CỦA CHÍNH loại phần tử đang vẽ phải loại khỏi vật cản mặc định: hai đầu tuyến
+        /// là điểm nối vào duct/pipe/cable tray có sẵn, mặc định coi chính category đó là vật cản thì tuyến
+        /// luôn "bị chặn ngay tại điểm xuất phát" — kỹ sư phải tự gõ <c>obstacleCategories</c> bỏ Ducts đi mới
+        /// chạy được (§4.7 đánh giá 2026-09-06: "chưa phải một nút"). Không đụng khi người dùng đã tự chọn
+        /// <c>obstacleCategories</c> — tôn trọng lựa chọn tường minh, kể cả khi họ tự để nguyên category đó.
+        /// </summary>
+        public static string? OwnRouteCategoryToExclude(bool obstacleCategoriesCustomized, bool buildRoute, string elementType)
+        {
+            if (obstacleCategoriesCustomized || !buildRoute) return null;
+            return elementType.Trim().ToUpperInvariant() switch
+            {
+                "DUCT" => "Ducts",
+                "PIPE" => "Pipes",
+                "CABLETRAY" => "Cable Trays",
+                _ => null,
+            };
+        }
     }
 }
