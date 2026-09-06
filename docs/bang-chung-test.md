@@ -1,5 +1,71 @@
 # DHCB Tools — Bằng chứng Build & Test
 
+<!-- muc-luc:bat-dau -->
+**Mục lục** (sinh bằng `scripts/muc-luc-bang-chung.py`, đừng sửa tay):
+
+- §1 — [Test tự động](#1-test-tự-động)
+- §2 — [Build — đúng bộ phiên bản mà `release.yml` đóng gói](#2-build-đúng-bộ-phiên-bản-mà-releaseyml-đóng-gói)
+- §3 — [Gateway panel AutoCAD — kiểm chứng chạy thật](#3-gateway-panel-autocad-kiểm-chứng-chạy-thật)
+- §4 — [Phạm vi — cái gì đã kiểm, cái gì chưa](#4-phạm-vi-cái-gì-đã-kiểm-cái-gì-chưa)
+- §5 — [Vì sao bản trước sai](#5-vì-sao-bản-trước-sai)
+- §6 — [Revit 2024 thật — vòng kiểm thử đầu tiên (2026-09-02 23:18 ICT)](#6-revit-2024-thật-vòng-kiểm-thử-đầu-tiên-2026-09-02-2318-ict)
+- §7 — [Batch trong Revit — vòng chạy tự động đầu tiên (2026-09-03 09:51 ICT)](#7-batch-trong-revit-vòng-chạy-tự-động-đầu-tiên-2026-09-03-0951-ict)
+- §8 — [Phủ đủ 42/42 lệnh Revit (2026-09-03 11:00 ICT)](#8-phủ-đủ-4242-lệnh-revit-2026-09-03-1100-ict)
+- §9 — [Batch AutoCAD — vòng chạy thật đầu tiên (2026-09-03 11:04 ICT)](#9-batch-autocad-vòng-chạy-thật-đầu-tiên-2026-09-03-1104-ict)
+- §10 — [Phủ đủ 15/15 lệnh AutoCAD (2026-09-03 11:32 ICT)](#10-phủ-đủ-1515-lệnh-autocad-2026-09-03-1132-ict)
+- §11 — [Đường ghi thật (2026-09-03 12:07 ICT)](#11-đường-ghi-thật-2026-09-03-1207-ict)
+- §12 — [Đường ghi cho nhóm lệnh **tạo phần tử mới** (2026-09-03 12:45 ICT)](#12-đường-ghi-cho-nhóm-lệnh-tạo-phần-tử-mới-2026-09-03-1245-ict)
+- §13 — [Lệnh chạy nền và `GET /progress/<id>` (2026-09-03 13:35 ICT)](#13-lệnh-chạy-nền-và-get-progressid-2026-09-03-1335-ict)
+- §14 — [`SleeveAuto` không nhìn thấy model liên kết — 0 → 345 (2026-09-03 14:40 ICT)](#14-sleeveauto-không-nhìn-thấy-model-liên-kết-0-345-2026-09-03-1440-ict)
+- §15 — [Quét hồi quy sau 10 PR trong một ngày (2026-09-03 16:50 ICT)](#15-quét-hồi-quy-sau-10-pr-trong-một-ngày-2026-09-03-1650-ict)
+- §16 — [Cùng lỗi ở `ClashDetection` — 0 → 7 va chạm (2026-09-03 18:25 ICT)](#16-cùng-lỗi-ở-clashdetection-0-7-va-chạm-2026-09-03-1825-ict)
+- §17 — [`DevicePlacement` — 0 phòng → 44 phòng, và cái bẫy tên family (2026-09-03 18:40 ICT)](#17-deviceplacement-0-phòng-44-phòng-và-cái-bẫy-tên-family-2026-09-03-1840-ict)
+- §18 — [`AutoRoute` — 30 → 546 vật cản, và giới hạn thật của bộ tìm đường (2026-09-03 18:50 ICT)](#18-autoroute-30-546-vật-cản-và-giới-hạn-thật-của-bộ-tìm-đường-2026-09-03-1850-ict)
+- §19 — [Bộ tìm đường `AutoRoute` — 4049 ms → 10 ms, và thất bại biết nói (2026-09-03 20:10 ICT)](#19-bộ-tìm-đường-autoroute-4049-ms-10-ms-và-thất-bại-biết-nói-2026-09-03-2010-ict)
+- §20 — [Đêm batch thật đầu tiên trên dự án thật — dự án thực tế A, và hộp thoại thứ hai chưa ai bắt được (2026-09-04 00:35 ICT)](#20-đêm-batch-thật-đầu-tiên-trên-dự-án-thật-dự-án-thực-tế-a-và-hộp-thoại-thứ-hai-chưa-ai-bắt-được-2026-09-04-0035-ict)
+- §21 — [Đóng vai kỹ sư dùng thử — và một lỗi ngầm nguy hiểm hơn cả lỗi crash (2026-09-04 06:35 ICT)](#21-đóng-vai-kỹ-sư-dùng-thử-và-một-lỗi-ngầm-nguy-hiểm-hơn-cả-lỗi-crash-2026-09-04-0635-ict)
+- §22 — [Ba nâng cấp tự động hoá — chạy thật trên Revit 2024.3 (2026-09-04 14:12 ICT)](#22-ba-nâng-cấp-tự-động-hoá-chạy-thật-trên-revit-20243-2026-09-04-1412-ict)
+- §23 — [Chuỗi băm nhật ký batch — bốn cách sửa log, bốn lần bị bắt (2026-09-04 23:34 ICT)](#23-chuỗi-băm-nhật-ký-batch-bốn-cách-sửa-log-bốn-lần-bị-bắt-2026-09-04-2334-ict)
+- §24 — [Bản build mới, vòng chạy thật trọn cả hai phần mềm — và chuỗi băm trên log thật (2026-09-05 00:05 ICT)](#24-bản-build-mới-vòng-chạy-thật-trọn-cả-hai-phần-mềm-và-chuỗi-băm-trên-log-thật-2026-09-05-0005-ict)
+- §25 — [`snapshot` phía AutoCAD — agent nhìn thấy bản vẽ, trên AutoCAD 2026.1 thật (2026-09-05 06:26 ICT)](#25-snapshot-phía-autocad-agent-nhìn-thấy-bản-vẽ-trên-autocad-20261-thật-2026-09-05-0626-ict)
+- §26 — [Phát hành AutoCAD 2026 — diễn tập đóng gói, và một test xanh trên CI mà đỏ trên máy (2026-09-05 06:40 ICT)](#26-phát-hành-autocad-2026-diễn-tập-đóng-gói-và-một-test-xanh-trên-ci-mà-đỏ-trên-máy-2026-09-05-0640-ict)
+- §27 — [Kiểm IFC trước nộp — và một đường xuất chưa bao giờ chạy được (2026-09-05 12:40 ICT)](#27-kiểm-ifc-trước-nộp-và-một-đường-xuất-chưa-bao-giờ-chạy-được-2026-09-05-1240-ict)
+- §28 — [Bốn tính năng mới bỏ nhãn *thử nghiệm* — và một cái vẫn phải giữ (2026-09-05 12:45 ICT)](#28-bốn-tính-năng-mới-bỏ-nhãn-thử-nghiệm-và-một-cái-vẫn-phải-giữ-2026-09-05-1245-ict)
+- §29 — [Fixture CAD cho C4 — và tham số `dwgNameContains` chưa bao giờ khớp một bản vẽ link (2026-09-05 13:00 ICT)](#29-fixture-cad-cho-c4-và-tham-số-dwgnamecontains-chưa-bao-giờ-khớp-một-bản-vẽ-link-2026-09-05-1300-ict)
+- §30 — [Quét hồi quy trọn cả hai phần mềm sau #75 — bảy bộ, 113 ca, không một ca trượt (2026-09-05 16:10 ICT)](#30-quét-hồi-quy-trọn-cả-hai-phần-mềm-sau-75-bảy-bộ-113-ca-không-một-ca-trượt-2026-09-05-1610-ict)
+- §31 — [Ba khoảng trống của §30 — và một lệnh báo "đã có" cho bản vẽ chưa bao giờ vào mô hình (2026-09-05 17:45 ICT)](#31-ba-khoảng-trống-của-30-và-một-lệnh-báo-đã-có-cho-bản-vẽ-chưa-bao-giờ-vào-mô-hình-2026-09-05-1745-ict)
+- §32 — [`IdsValidate` — và một dòng roadmap tự nhận là đã có mã (2026-09-05 18:05 ICT)](#32-idsvalidate-và-một-dòng-roadmap-tự-nhận-là-đã-có-mã-2026-09-05-1805-ict)
+- §33 — [Bấm tay Ribbon — và một hộp thoại rơi xuống dưới cửa sổ chính (2026-09-05 18:35 ICT)](#33-bấm-tay-ribbon-và-một-hộp-thoại-rơi-xuống-dưới-cửa-sổ-chính-2026-09-05-1835-ict)
+- §34 — [Bấm tay đủ 47 nút Ribbon — bốn lớp lỗi làm lệnh không chạy được từ giao diện (2026-09-05 20:20 ICT)](#34-bấm-tay-đủ-47-nút-ribbon-bốn-lớp-lỗi-làm-lệnh-không-chạy-được-từ-giao-diện-2026-09-05-2020-ict)
+- §35 — [`AutoRoute` — ngân sách A* cố định 400.000 thua ở bài có lời giải, và 61 lớp cao độ không ai gọi tới (2026-09-05 20:45 ICT)](#35-autoroute-ngân-sách-a-cố-định-400000-thua-ở-bài-có-lời-giải-và-61-lớp-cao-độ-không-ai-gọi-tới-2026-09-05-2045-ict)
+- §36 — [`AutoRoute` — ba điều §35 chưa chứng minh, nay chứng minh xong bằng tuyến duct thật (2026-09-05 21:15 ICT)](#36-autoroute-ba-điều-35-chưa-chứng-minh-nay-chứng-minh-xong-bằng-tuyến-duct-thật-2026-09-05-2115-ict)
+- §37 — [Routing mức D — tuyến chui qua lỗ mở của tường/sàn (2026-09-05 21:50 ICT)](#37-routing-mức-d-tuyến-chui-qua-lỗ-mở-của-tườngsàn-2026-09-05-2150-ict)
+- §38 — [Bấm tay form `AutoRoute` với `respectOpenings` — và lỗi mặc định chỉ lộ khi bấm tay (2026-09-05 22:05 ICT)](#38-bấm-tay-form-autoroute-với-respectopenings-và-lỗi-mặc-định-chỉ-lộ-khi-bấm-tay-2026-09-05-2205-ict)
+- §39 — [`IdsValidate` đối chiếu với IfcTester trên cùng file IDS — 42 lỗi giả và một fixture sai chuẩn (2026-09-05 22:35 ICT)](#39-idsvalidate-đối-chiếu-với-ifctester-trên-cùng-file-ids-42-lỗi-giả-và-một-fixture-sai-chuẩn-2026-09-05-2235-ict)
+- §40 — [`IdsValidate` cảnh báo file IDS lệch chuẩn XSD — cảnh báo, không chặn (2026-09-05 23:20 ICT)](#40-idsvalidate-cảnh-báo-file-ids-lệch-chuẩn-xsd-cảnh-báo-không-chặn-2026-09-05-2320-ict)
+- §41 — [`IdsValidate` trên chính file IFC — đối chiếu 10 specification với IfcTester, và một lỗi của IfcTester (2026-09-05 23:30 ICT)](#41-idsvalidate-trên-chính-file-ifc-đối-chiếu-10-specification-với-ifctester-và-một-lỗi-của-ifctester-2026-09-05-2330-ict)
+- §42 — [`DictionaryLearn` chạy thật trên dự án A — "Join Status" suýt thành trạng thái thi công; chuỗi băm trên log dự án thật (2026-09-05 23:20 ICT)](#42-dictionarylearn-chạy-thật-trên-dự-án-a-join-status-suýt-thành-trạng-thái-thi-công-chuỗi-băm-trên-log-dự-án-thật-2026-09-05-2320-ict)
+- §43 — [Gói bàn giao đêm (11.3) chạy thật trên dự án A và lần đầu Task Scheduler tự chạy một job (2026-09-05 23:40 ICT)](#43-gói-bàn-giao-đêm-113-chạy-thật-trên-dự-án-a-và-lần-đầu-task-scheduler-tự-chạy-một-job-2026-09-05-2340-ict)
+- §44 — [Vai kỹ sư test: phá thử những gì vừa merge trong ngày (2026-09-05 23:55 ICT)](#44-vai-kỹ-sư-test-phá-thử-những-gì-vừa-merge-trong-ngày-2026-09-05-2355-ict)
+- §45 — [Phát hành v1.1.0, cài bằng installer thật, task đêm trỏ vào bản cài, gói bàn giao dự án thứ hai có sheet (2026-09-06 00:55 ICT)](#45-phát-hành-v110-cài-bằng-installer-thật-task-đêm-trỏ-vào-bản-cài-gói-bàn-giao-dự-án-thứ-hai-có-sheet-2026-09-06-0055-ict)
+- §46 — [Installer treo khi cài im lặng — `MsgBox` trong `[Code]` không bị `/SUPPRESSMSGBOXES` tắt (2026-09-06 01:00 ICT)](#46-installer-treo-khi-cài-im-lặng-msgbox-trong-code-không-bị-suppressmsgboxes-tắt-2026-09-06-0100-ict)
+- §47 — [Bộ test cho đường CLI của BatchRunner — chỗ cổng phủ 100% không với tới (2026-09-06 01:30 ICT)](#47-bộ-test-cho-đường-cli-của-batchrunner-chỗ-cổng-phủ-100-không-với-tới-2026-09-06-0130-ict)
+- §48 — [`DossierIndex` — nửa làm được của 11.6, và một lỗi bỏ dấu chỉ lộ trong exe thật (2026-09-06 07:10 ICT)](#48-dossierindex-nửa-làm-được-của-116-và-một-lỗi-bỏ-dấu-chỉ-lộ-trong-exe-thật-2026-09-06-0710-ict)
+- §49 — [Đưa nửa mã nguồn không phủ vào cổng phủ — ba lệnh, 120 ca, hai bộ chạy thật (2026-09-06 08:30 ICT)](#49-đưa-nửa-mã-nguồn-không-phủ-vào-cổng-phủ-ba-lệnh-120-ca-hai-bộ-chạy-thật-2026-09-06-0830-ict)
+- §50 — [Tách tiếp bốn lệnh — ClashDetection, HangerAuto, PipeSplitter, ElevationTag (2026-09-06 09:30 ICT)](#50-tách-tiếp-bốn-lệnh-clashdetection-hangerauto-pipesplitter-elevationtag-2026-09-06-0930-ict)
+- §51 — [Sửa điểm yếu sau đánh giá sâu — nhãn lỗi thời, SlopePipes/PipeKick xuống tầng thuần, Revit 2026 lần đầu (2026-09-06 09:40 ICT)](#51-sửa-điểm-yếu-sau-đánh-giá-sâu-nhãn-lỗi-thời-slopepipespipekick-xuống-tầng-thuần-revit-2026-lần-đầu-2026-09-06-0940-ict)
+- §52 — [Tự đối chiếu `SetoutExport` thay kỹ sư — Autodesk IFC làm trọng tài, lộ cột "Off Center" lệch tim 305 mm (2026-09-06 10:45 ICT)](#52-tự-đối-chiếu-setoutexport-thay-kỹ-sư-autodesk-ifc-làm-trọng-tài-lộ-cột-off-center-lệch-tim-305-mm-2026-09-06-1045-ict)
+- §53 — [Bộ ghi thật thứ ba — `PipeKick` và `SlopePipes` lần đầu chạy đường thành công (2026-09-06 11:05 ICT)](#53-bộ-ghi-thật-thứ-ba-pipekick-và-slopepipes-lần-đầu-chạy-đường-thành-công-2026-09-06-1105-ict)
+- §54 — [Đánh giá sâu lần hai — tài liệu lệch tái phát, thư mục kết quả 1,8 GB (2026-09-06 11:30 ICT)](#54-đánh-giá-sâu-lần-hai-tài-liệu-lệch-tái-phát-thư-mục-kết-quả-18-gb-2026-09-06-1130-ict)
+- §55 — [Thước đo chất lượng tuyến, và `RouteFromLines` lần đầu chạy đường thành công (2026-09-06 12:05 ICT)](#55-thước-đo-chất-lượng-tuyến-và-routefromlines-lần-đầu-chạy-đường-thành-công-2026-09-06-1205-ict)
+- §56 — [Tách `AutoRoute` / `RouteFromLines` xuống tầng thuần — điểm (3) của §54 (2026-09-06 12:20 ICT)](#56-tách-autoroute-routefromlines-xuống-tầng-thuần-điểm-3-của-54-2026-09-06-1220-ict)
+- §57 — [Đóng vai sáu kỹ sư thay nhóm 9.4 — một lỗi câm ở runner AutoCAD, AutoRoute lần đầu trên dự án thật (2026-09-06 12:40 ICT)](#57-đóng-vai-sáu-kỹ-sư-thay-nhóm-94-một-lỗi-câm-ở-runner-autocad-autoroute-lần-đầu-trên-dự-án-thật-2026-09-06-1240-ict)
+- §58 — [Hai điểm vướng của vai MEP — lỗi thiếu family tự liệt kê family có thật, `ConnectorChecker` ra CSV (2026-09-06 12:45 ICT)](#58-hai-điểm-vướng-của-vai-mep-lỗi-thiếu-family-tự-liệt-kê-family-có-thật-connectorchecker-ra-csv-2026-09-06-1245-ict)
+- §59 — [Năm bộ của hôm nay chạy lại trên Revit 2026 — id model mẫu giữ nguyên, điểm (5) của §54 khép bằng bằng chứng (2026-09-06 12:50 ICT)](#59-năm-bộ-của-hôm-nay-chạy-lại-trên-revit-2026-id-model-mẫu-giữ-nguyên-điểm-5-của-54-khép-bằng-bằng-chứng-2026-09-06-1250-ict)
+- §60 — [`FamilyStarter` — family mẫu sleeve/hanger dựng bằng chính Revit, để `SleeveAuto` không còn "bỏ vì thiếu family" (2026-09-06 13:00 ICT)](#60-familystarter-family-mẫu-sleevehanger-dựng-bằng-chính-revit-để-sleeveauto-không-còn-bỏ-vì-thiếu-family-2026-09-06-1300-ict)
+- §61 — [Rà 40 khối `catch` của Core, dọn tự động sau mỗi lượt và sau job đêm, mục lục cho file này (2026-09-06 13:20 ICT)](#61-rà-40-khối-catch-của-core-dọn-tự-động-sau-mỗi-lượt-và-sau-job-đêm-mục-lục-cho-file-này-2026-09-06-1320-ict)
+<!-- muc-luc:ket-thuc -->
+
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
 **Nguồn:** nhiều PR liên tiếp trên `main` (bắt đầu từ `fix/toan-bo-danh-gia`,
 [PR #21](https://github.com/seeker19110/Dhcb-Tools/pull/21)); mỗi mục dưới đây ghi ngày giờ riêng của lần đo đó.
@@ -3107,3 +3173,23 @@ MEPF, README/progress/mẫu phản hồi (51 lệnh Revit), hai ca kiểm.
 Đây là lần đầu `SleeveAuto`/`HangerAuto` chạy trọn với family **do DHCB cung cấp** thay vì mượn `HeatRecoveryUnit` của
 model mẫu. Chưa chứng minh: đặt lên mặt tường **trong cùng file** (Snowdon để tường ở link nên đường host-vào-mặt chưa
 chạy với family này). **Revit 2026:** `write-mep` **19/19** ngay sau đó (13:03) — FamilyStarter 1.822 ms, SleeveAuto DHCB_Sleeve 455 → 0, HangerAuto 1125, trùng 2024.3.
+
+## 61. Rà 40 khối `catch` của Core, dọn tự động sau mỗi lượt và sau job đêm, mục lục cho file này (2026-09-06 13:20 ICT)
+
+Ba việc "chưa tốt" mà mã sửa được, từ danh sách trả lời câu *tất cả còn gì chưa tốt*.
+
+**`catch` trong Core.** Đọc đủ 40 khối `catch (Exception)`: 31 khối đã báo ra Messages/Errors hoặc trả `Fail`; 5 khối là
+rơi về phương án dự phòng có ghi chú (tâm hộp bao, tên tầng rỗng, solid null → hộp bao); **4 khối nuốt lỗi làm sai số
+đếm** — đều ở phép đếm connector hở: `HealthReport` (3 chỗ, kể cả `catch` bao cả vòng quét) và `ConnectorChecker` (2 chỗ
+`continue`). Một ngoại lệ ở phần tử thứ 100 làm `HealthReport` báo *"0 connector hở"* trông như sạch. Nay đếm phần tử bị
+bỏ qua và nói ra ngay trong Summary: *"533 connector hở (2 phần tử không đọc được — cận dưới)"*, hoặc *"(quét đổ giữa
+chừng: … — số đếm dở)"*; `ConnectorChecker` thêm *"N phần tử không đọc được connector (bỏ qua) — con số hở là cận dưới."*
+(`HealthReportNotes`, `ConnectorReport.SkippedNote`, 2 ca thuần). Trên Snowdon không phần tử nào bị bỏ qua nên chuỗi không
+đổi: `smoke` 41/41+1, `mep` 28/28.
+
+**Dọn tự động.** `run-in-revit-tests.ps1` gọi `don-ket-qua.ps1 -Apply` ở bước cuối (tắt bằng `-NoPrune`); lượt `smoke` đầu
+tiên sau thay đổi dọn 595 MB (hai `ban-chep` cũ + 26 journal). `install-nightly-task.ps1` đăng ký **hai action**: runner rồi
+`pwsh don-ket-qua.ps1 -Apply`; task đêm dự án A đã đăng ký lại với hai action (23:50).
+
+**Mục lục.** `scripts/muc-luc-bang-chung.py` sinh khối mục lục 60 mục giữa hai dấu ở đầu file này; `--check` chạy trên CI
+(`tests.yml`) và `tests/python/test_muc_luc_bang_chung.py` đỏ khi tiêu đề thêm/đổi mà mục lục chưa cập nhật.

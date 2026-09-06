@@ -15,6 +15,7 @@ param(
     [string] $LogDir = "$env:USERPROFILE\Documents\DHCB\logs",
     [string] $Time = "23:00",
     [int] $MaxMinutes = 480,
+    [switch] $NoPrune,
     [string] $TaskName = "DHCB Tools - Batch đêm",
     [switch] $Analyze
 )
@@ -29,11 +30,18 @@ $runnerArgs = "--job `"$Job`" --log-dir `"$LogDir`" --max-minutes $MaxMinutes"
 if ($Analyze) { $runnerArgs += " --analyze" }
 
 $action = New-ScheduledTaskAction -Execute $RunnerExe -Argument $runnerArgs -WorkingDirectory (Split-Path $RunnerExe)
+# Hành động thứ hai: dọn DHCB-test-results + journal Revit sau job đêm (§61). Task Scheduler chạy các action tuần tự.
+$prune = Join-Path $PSScriptRoot 'don-ket-qua.ps1'
+$actions = @($action)
+if (-not $NoPrune -and (Test-Path $prune)) {
+    $pwsh = (Get-Command pwsh -ErrorAction SilentlyContinue)?.Source ?? (Get-Command powershell).Source
+    $actions += New-ScheduledTaskAction -Execute $pwsh -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$prune`" -Apply" -WorkingDirectory (Split-Path $prune)
+}
 $trigger = New-ScheduledTaskTrigger -Daily -At $Time
 $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes ($MaxMinutes + 30)) -StartWhenAvailable -WakeToRun
 $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
 
-$task = Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force
+$task = Register-ScheduledTask -TaskName $TaskName -Action $actions -Trigger $trigger -Settings $settings -Principal $principal -Force
 if (-not $task) { throw "Register-ScheduledTask không trả về task — chưa đăng ký được '$TaskName'." }
 
 Write-Host "Đã đăng ký task '$TaskName' chạy $Time hàng ngày."

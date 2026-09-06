@@ -68,6 +68,10 @@ namespace DhcbTools.Shared.Logic.Mep
             return string.Format(CultureInfo.InvariantCulture, "Element {0} at ({1:F1},{2:F1},{3:F1}) mm - {4}", r.ElementId, r.XMm, r.YMm, r.ZMm, r.Domain);
         }
 
+        /// <summary>Phần tử không đọc được connector: nói ra để con số hở được hiểu là cận dưới. Rỗng khi 0.</summary>
+        public static string SkippedNote(int skipped)
+            => skipped <= 0 ? string.Empty : $" {skipped} phần tử không đọc được connector (bỏ qua) — con số hở là cận dưới.";
+
         public static string Summary(int connectors, int elements, string? csvPath)
         {
             var s = $"Tìm thấy {connectors} connector hở trên {elements} phần tử.";
