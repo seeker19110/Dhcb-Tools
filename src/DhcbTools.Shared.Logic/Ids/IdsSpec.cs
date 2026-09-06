@@ -358,7 +358,7 @@ namespace DhcbTools.Shared.Logic.Ids
                                     + string.Join(", ", new[] { IdsRelations.Aggregates, IdsRelations.AssignsToGroup, IdsRelations.ContainedInSpatialStructure, IdsRelations.Nests, IdsRelations.VoidsAndFills }) + ".");
                             }
 
-                            partOf.Relation = relation.ToUpperInvariant();
+                            partOf.Relation = relation!.ToUpperInvariant();
                         }
 
                         yield return partOf;
