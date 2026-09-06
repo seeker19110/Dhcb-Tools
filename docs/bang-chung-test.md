@@ -3311,6 +3311,7 @@ chèn vào giữa — 8 `<param>` trỏ vào hư không, còn `NetloadFailure` t
 | `-Suite write-mep -AllowWrites` (2024.3 / **2026**) | **21/21** — **21/21** |
 | `-Suite write-plumbing -AllowWrites` (2024.3 / **2026**) | **5/5** — **5/5** |
 | `-Suite autoroute` (2024.3 / **2026**) | **13/13** — **13/13** |
+| `run-in-autocad-tests.ps1 -Suite smoke` (AutoCAD 2026) | **18 đạt / 0 trượt** trên 18 ca |
 
 Trong lượt `mep`, `SleeveAuto` cho *"[Xem trước] Sẽ đặt 445 sleeve"* **không kèm** dòng cảnh báo mới — tức trên mô
 hình này mọi phần tử MEP đều đọc được solid và ghi chú không nổ bừa. Đó là phần kiểm mà một ca test thuần không làm
@@ -3357,7 +3358,13 @@ so với 1738943/1738945) — phần tử mới thì id mới; id ống gốc b�
 2024.3 và 2026**. Chỉ thời gian chạy khác. Đó là vì `PathFinder3D` là tầng thuần: nó nhận hộp bao rồi tự dựng lưới,
 không hỏi Revit thêm gì — có bằng chứng thì nói được, không thì chỉ là suy đoán từ kiến trúc.
 
+**AutoCAD.** Trong bốn việc của §64, chỉ một việc chạm tới đường AutoCAD: khối XML doc của
+`AcadScriptGen.Build` — sửa tài liệu, không đổi một dòng sinh script `.scr` nào. Nhưng chính `AcadScriptGen` là thứ
+dựng script cho `accoreconsole`, nên bộ `autocad-smoke` là chỗ duy nhất chứng minh được "không đổi" đó trên máy
+thật: **18/18**, trùng đúng con số §51/§57 — NETLOAD chạy, 15/15 lệnh đều vào được, không ca nào rơi vào đường
+"Unknown command" câm mà `NetloadFailure` sinh ra để bắt.
+
 **Chốt hai phiên bản.** §64 có bằng chứng đủ trên **cả Revit 2024.3 và 2026**, **bảy bộ** — `smoke`, `mep`,
 `plumbing`, `write`, `write-mep`, `write-plumbing`, `autoroute`: **266 ca chạy thật, 0 trượt**. Toàn bộ bộ ca kiểm
-Revit của dự án đã chạy lại sau thay đổi này. Mọi chỗ lệch giữa hai phiên bản đều đối chiếu được với con số đã
+Revit của dự án đã chạy lại sau thay đổi này; cộng `autocad-smoke` là **284 ca**. Mọi chỗ lệch giữa hai phiên bản đều đối chiếu được với con số đã
 ghi ở §51/§59 cho model mẫu, không chỗ nào là khác biệt của mã.
