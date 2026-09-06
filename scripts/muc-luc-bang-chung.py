@@ -52,13 +52,13 @@ def strip_toc(text: str) -> str:
     return text
 
 
-def main(argv):
+def main(argv, path=None):
     # Console cp1252 trên Windows ném UnicodeEncodeError khi in tiếng Việt (bẫy §48 của check-coverage.py).
     try:
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
         pass
-    path = Path(__file__).resolve().parents[1] / "docs" / "bang-chung-test.md"
+    path = Path(path) if path else Path(__file__).resolve().parents[1] / "docs" / "bang-chung-test.md"
     text = path.read_text(encoding="utf-8")
     new = render(text)
     if "--check" in argv:
