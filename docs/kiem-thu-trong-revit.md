@@ -126,6 +126,10 @@ Bản chép **giữ nguyên tên gốc**, nằm trong `<thư mục kết quả>/
 thì link lưu theo đường dẫn tương đối không giải được từ vị trí bản chép, và `SleeveAuto` không thấy
 tường nào — xem [`bang-chung-test.md`](bang-chung-test.md) §14.
 
+Bộ ghi thứ ba `write-plumbing` (model cấp thoát nước) đi cùng cơ chế: `PipeKick` và `SlopePipes` ghi thật trên
+ống có `ElementId` cố định của model mẫu, chứng minh commit bằng lượt chạy thứ hai phải bị chặn / phải đạt dốc
+(§53).
+
 Giá phải trả là dung lượng: một lượt bộ ghi MEP tốn **~320 MB** (sáu model Snowdon). Vì vậy script tự
 dọn lượt cũ **của cùng bộ ca kiểm** trước mỗi lần chạy, giữ `-KeepRuns` lượt gần nhất (mặc định 2):
 

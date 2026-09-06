@@ -1,0 +1,100 @@
+{
+  "name": "DHCB — đường ghi thật trên model cấp thoát nước: PipeKick và SlopePipes",
+  "model": "Snowdon Towers Sample Plumbing.rvt",
+  "//": [
+    "Bộ ghi thật thứ ba. Model HVAC không có ống (bộ write-mep), model kiến trúc càng không, nên đường",
+    "THÀNH CÔNG của PipeKick và SlopePipes chưa từng chạy thật cho tới bộ này (bang-chung-test.md §51 ghi",
+    "đó là thứ chưa chứng minh). Cùng ba lớp khoá: ca khai allowWrite → -AllowWrites → chạy trên BẢN CHÉP.",
+    "",
+    "ElementId lấy từ model mẫu kèm Revit 2024 (query element_geometry Pipes, 2026-09-06): 1591774 là ống",
+    "đồng thẳng nằm ngang 17.451 mm ở tầng Parking, 1406421 là ống đồng 17.146 mm ở L4. Id của file mẫu",
+    "ổn định giữa các máy; nếu Autodesk đổi model mẫu thì ca đầu báo 'Không tìm thấy ống Id' — đó là lúc",
+    "phải chọn lại id, không phải lúc sửa kỳ vọng.",
+    "",
+    "Chứng minh đã COMMIT: PipeKick không có phép nghịch đảo, nên lượt hai cố kick lại chính id đó ở",
+    "16.000 mm — ống nguyên 17.451 mm thì kick lọt (16.000 + 300 + 3D < 17.451), còn sau lượt một dù id",
+    "giữ đoạn đầu (3 m) hay đoạn cuối (~14 m) thì 16.000 mm đều nằm ngoài ống → phải bị chặn. Lượt hai",
+    "mà thành công là lượt một đã rollback.",
+    "",
+    "SlopePipes: đặt dốc 1 % cho một ống rồi kiểm lại chính ống đó — 'Kiểm 1 ống: 0 chưa đạt dốc' chỉ",
+    "xảy ra khi lượt ghi đã commit (trước đó ống nằm ngang, 1706/1794 ống của model chưa đạt dốc — §51)."
+  ],
+  "cases": [
+    {
+      "name": "Kick ống — xem trước trên ống thật",
+      "command": "PipeKick",
+      "config": {
+        "elementId": "1591774",
+        "offsetMm": 300,
+        "offsetDirection": "Up",
+        "elbowAngleDeg": 45,
+        "distanceFromStartMm": 3000
+      },
+      "expect": {
+        "success": true,
+        "summaryContains": ["[Xem trước]", "3 đoạn + 2 cút"],
+        "messagesContain": ["đoạn chéo 424 mm"]
+      }
+    },
+    {
+      "name": "Kick ống — GHI THẬT",
+      "command": "PipeKick",
+      "allowWrite": true,
+      "config": {
+        "elementId": "1591774",
+        "offsetMm": 300,
+        "offsetDirection": "Up",
+        "elbowAngleDeg": 45,
+        "distanceFromStartMm": 3000
+      },
+      "expect": {
+        "success": true,
+        "summaryContains": ["Đã kick ống: 3 đoạn"],
+        "summaryNotContains": ["Xem trước"],
+        "maxMs": 60000
+      }
+    },
+    {
+      "name": "Kick lại chính ống đó ở 16 m — phải bị chặn, vì ống đã bị chia (bằng chứng lượt trên đã commit)",
+      "command": "PipeKick",
+      "config": {
+        "elementId": "1591774",
+        "offsetMm": 300,
+        "offsetDirection": "Up",
+        "elbowAngleDeg": 45,
+        "distanceFromStartMm": 16000
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": ["không nằm trong ống"]
+      }
+    },
+    {
+      "name": "Đặt dốc 1 % — GHI THẬT trên một ống đồng nằm ngang",
+      "command": "SlopePipes",
+      "allowWrite": true,
+      "config": {
+        "elementIds": ["1406421"],
+        "slopePercent": 1.0
+      },
+      "expect": {
+        "success": true,
+        "summaryContains": ["Đã đặt dốc 1/1 ống"],
+        "summaryNotContains": ["Xem trước"]
+      }
+    },
+    {
+      "name": "Kiểm lại chính ống đó — phải đạt dốc (bằng chứng lượt trên đã commit)",
+      "command": "SlopePipes",
+      "config": {
+        "elementIds": ["1406421"],
+        "slopePercent": 1.0,
+        "checkOnly": true
+      },
+      "expect": {
+        "success": true,
+        "summaryContains": ["Kiểm 1 ống: 0 chưa đạt dốc"]
+      }
+    }
+  ]
+}

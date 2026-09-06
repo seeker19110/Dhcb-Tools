@@ -2914,3 +2914,32 @@ Survey và giao trục (chuẩn tốt), còn tim cột phải đọc kèm nhãn 
   mà chính grid tham chiếu.
 - `BatchExport` mặc định `dryRun: true` — lượt IFC đầu chỉ liệt kê sheet, không ghi file.
 
+## 53. Bộ ghi thật thứ ba — `PipeKick` và `SlopePipes` lần đầu chạy đường thành công (2026-09-06 11:05 ICT)
+
+§51 ghi *"đường thành công của `PipeKick` vẫn chỉ có ca lỗi"*: bộ `mep` chạy trên model HVAC không có ống, bộ
+`plumbing` chỉ xem trước. Bộ mới `tests/suites/revit-write-plumbing.json` (script nhận `-Suite write-plumbing`,
+chạy trên bản chép kèm 5 model liên kết) lấy `ElementId` cố định của model mẫu qua `query element_geometry Pipes`
+(3.056 ống, 169 ống thẳng nằm ngang > 2,5 m): **1591774** ống đồng 17.451 mm tầng Parking, **1406421** ống đồng
+17.146 mm tầng L4, cả hai nối fitting hai đầu.
+
+| Ca | ms | Summary |
+|---|---:|---|
+| Kick — xem trước | 18 | `[Xem trước] Sẽ chia ống 1591774 thành 3 đoạn + 2 cút.` (Messages: đoạn chéo 424 mm) |
+| Kick — GHI THẬT | 1140 | **`Đã kick ống: 3 đoạn (1716336, 1716338, 1591774), 2/2 cút dựng được.`** |
+| Kick lại chính id ở 16 m | 0 | `distanceFromStartMm quá lớn: kick không nằm trong ống.` |
+| Đặt dốc 1 % — GHI THẬT | 498 | **`Đã đặt dốc 1/1 ống.`** |
+| Kiểm lại chính ống | 14 | **`Kiểm 1 ống: 0 chưa đạt dốc.`** |
+
+**5 đạt / 0 trượt** ngay lượt đầu. Hai điều đáng ghi:
+
+- **Bằng chứng commit không cần đọc model:** ống nguyên 17.451 mm thì kick ở 16.000 mm lọt (16.000 + 300 + 3D <
+  17.451); sau lượt ghi, dù id gốc giữ đoạn đầu 3 m hay đoạn cuối ~14 m thì 16 m đều ngoài ống → phải bị chặn. Lượt ba
+  bị chặn đúng như thế, tức lượt hai đã `Commit()`. Với `SlopePipes`, ống nằm ngang (1706/1794 ống của model chưa
+  đạt dốc — §51) sau khi đặt dốc kiểm lại ra 0 chưa đạt — cùng logic.
+- **Hai nỗi lo ở mục *Còn mở* của `progress.md` không xảy ra trên model này:** routing preference của ống đồng có cút
+  45° (2/2 cút dựng được), và Revit chấp nhận dịch điểm cuối của ống đã nối fitting hai đầu. Vẫn là một model; dự án
+  khác có thể khác, nhưng nay là "đã chạy thật một lần" chứ không còn "chưa bao giờ".
+
+Cái chưa chứng minh: `RouteFromLines` vẫn chỉ có ca lỗi trên model không có model line phù hợp; `AutoRoute` chất lượng
+tuyến chưa đo được (mục *Còn mở*).
+
