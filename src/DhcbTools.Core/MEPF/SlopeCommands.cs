@@ -60,78 +60,62 @@ public sealed class SlopePipesCommand : ICoreCommand<SlopePipesConfig>
         }
 
         var result = CommandResult.Ok(string.Empty);
-        var plan = new List<(Pipe Pipe, XYZ P0, XYZ P1, double RequiredPercent, string? Issue)>();
-        var maxAngle = config.MaxAngleFromHorizontalDeg * Math.PI / 180.0;
-
+        var lowerStart = SlopePlanner.LowerStart(config.LowerEnd);
+        var byId = pipes.ToDictionary(p => RevitCompat.IdValue(p.Id));
+        var inputs = new List<SlopePipeInput>();
         foreach (var pipe in pipes)
         {
             if (pipe.Location is not LocationCurve lc || lc.Curve is not Line line) continue;
             var p0 = line.GetEndPoint(0);
             var p1 = line.GetEndPoint(1);
-            var horizontal = Math.Sqrt(Math.Pow(p1.X - p0.X, 2) + Math.Pow(p1.Y - p0.Y, 2));
-            if (horizontal < 1e-6) continue;
-            var angle = Math.Atan2(Math.Abs(p1.Z - p0.Z), horizontal);
-            if (angle > maxAngle)
-            {
-                result.Messages.Add($"{RevitCompat.IdValue(pipe.Id)}: bỏ qua (gần thẳng đứng).");
-                continue;
-            }
-
-            var diameterMm = RevitCompat.FtToMm(pipe.Diameter);
-            var required = config.SlopePercent ?? SlopeMath.MinSlopePercent(diameterMm);
-            var lowerEnd = config.LowerEnd.Equals("Start", StringComparison.OrdinalIgnoreCase);
-            var dropMm = lowerEnd ? RevitCompat.FtToMm(p0.Z - p1.Z) * -1 : RevitCompat.FtToMm(p0.Z - p1.Z);
-            var issue = SlopeMath.CheckSlope(RevitCompat.FtToMm(horizontal), dropMm, required);
-            plan.Add((pipe, p0, p1, required, issue));
+            inputs.Add(new SlopePipeInput(RevitCompat.IdValue(pipe.Id),
+                RevitCompat.FtToMm(p0.X), RevitCompat.FtToMm(p0.Y), RevitCompat.FtToMm(p0.Z),
+                RevitCompat.FtToMm(p1.X), RevitCompat.FtToMm(p1.Y), RevitCompat.FtToMm(p1.Z),
+                RevitCompat.FtToMm(pipe.Diameter)));
         }
 
-        var toFix = plan.Where(p => p.Issue != null).ToList();
+        // Toàn bộ quyết định (bỏ qua ống gần đứng, dốc yêu cầu, đạt/chưa, cao độ mới) ở tầng thuần — §51.
+        var plan = SlopePlanner.PlanAll(inputs, config.SlopePercent, lowerStart, config.MaxAngleFromHorizontalDeg, result.Messages);
+        var toFix = plan.Where(p => p.NeedsFix).ToList();
         if (config.CheckOnly)
         {
-            result.Summary = $"Kiểm {plan.Count} ống: {toFix.Count} chưa đạt dốc.";
-            result.Messages.AddRange(toFix.Select(p => $"{RevitCompat.IdValue(p.Pipe.Id)} DN{RevitCompat.FtToMm(p.Pipe.Diameter):F0}: {p.Issue}"));
+            result.Summary = SlopePlanner.CheckSummary(plan.Count, toFix.Count);
+            result.Messages.AddRange(toFix.Select(SlopePlanner.CheckLine));
             result.AffectedCount = toFix.Count;
             return result;
         }
 
         if (config.DryRun)
         {
-            result.Summary = $"[Xem trước] Sẽ đặt dốc cho {toFix.Count}/{plan.Count} ống (hạ đầu {(config.LowerEnd.Equals("Start", StringComparison.OrdinalIgnoreCase) ? "đầu" : "cuối")}).";
-            result.Messages.AddRange(toFix.Select(p => $"{RevitCompat.IdValue(p.Pipe.Id)}: {p.Issue} → đặt {p.RequiredPercent:0.##} %"));
+            result.Summary = SlopePlanner.PreviewSummary(toFix.Count, plan.Count, lowerStart);
+            result.Messages.AddRange(toFix.Select(SlopePlanner.PreviewLine));
             result.AffectedCount = toFix.Count;
             return result;
         }
 
         var done = 0;
         using var tx = RevitCompat.StartTransaction(document, "DHCB - Đặt dốc ống");
-        foreach (var (pipe, p0, p1, required, _) in toFix)
+        foreach (var item in toFix)
         {
+            var pipe = byId[item.Id];
             try
             {
-                var horizontalFt = Math.Sqrt(Math.Pow(p1.X - p0.X, 2) + Math.Pow(p1.Y - p0.Y, 2));
-                var dropFt = RevitCompat.MmToFt(SlopeMath.DropMm(RevitCompat.FtToMm(horizontalFt), required));
-                XYZ n0, n1;
-                if (config.LowerEnd.Equals("Start", StringComparison.OrdinalIgnoreCase))
-                {
-                    n1 = p1;
-                    n0 = new XYZ(p0.X, p0.Y, p1.Z - dropFt);
-                }
-                else
-                {
-                    n0 = p0;
-                    n1 = new XYZ(p1.X, p1.Y, p0.Z - dropFt);
-                }
+                var line = (Line)((LocationCurve)pipe.Location).Curve;
+                var p0 = line.GetEndPoint(0);
+                var p1 = line.GetEndPoint(1);
+                var n0 = new XYZ(p0.X, p0.Y, RevitCompat.MmToFt(item.NewZ0Mm));
+                var n1 = new XYZ(p1.X, p1.Y, RevitCompat.MmToFt(item.NewZ1Mm));
                 ((LocationCurve)pipe.Location).Curve = Line.CreateBound(n0, n1);
                 done++;
             }
             catch (Exception ex)
             {
-                result.Errors.Add($"{RevitCompat.IdValue(pipe.Id)}: {ex.Message} (ống đã nối fitting hai đầu có thể không dịch được — tách đoạn trước).");
+                result.Errors.Add(SlopePlanner.WriteError(item.Id, ex.Message));
             }
         }
 
         tx.Commit();
-        result.Summary = $"Đã đặt dốc {done}/{toFix.Count} ống.";
+        result.Summary = SlopePlanner.WriteSummary(done, toFix.Count);
         result.AffectedCount = done;
         return result;
     }
@@ -176,39 +160,28 @@ public sealed class PipeKickCommand : ICoreCommand<PipeKickConfig>
         var geom = SlopeMath.Kick(config.OffsetMm, config.ElbowAngleDeg);
         var diameterMm = RevitCompat.FtToMm(pipe.Diameter);
         var lengthMm = RevitCompat.FtToMm(line.Length);
-        var minLen = SlopeMath.MinPipeLengthForKick(config.OffsetMm, diameterMm, config.ElbowAngleDeg);
-        var result = CommandResult.Ok(string.Empty);
-        if (lengthMm < minLen)
+        var invalid = KickPlanner.Validate(lengthMm, diameterMm, config.OffsetMm, config.ElbowAngleDeg, config.DistanceFromStartMm);
+        if (invalid != null)
         {
-            return CommandResult.Fail($"Ống dài {lengthMm:F0} mm, cần ≥ {minLen:F0} mm để đặt kick {config.OffsetMm} mm với cút {config.ElbowAngleDeg}°.");
-        }
-        if (config.DistanceFromStartMm + geom.AlongAxisMm + 3 * diameterMm > lengthMm)
-        {
-            return CommandResult.Fail($"distanceFromStartMm quá lớn: kick không nằm trong ống.");
+            return CommandResult.Fail(invalid);
         }
 
+        var result = CommandResult.Ok(string.Empty);
         var p0 = line.GetEndPoint(0);
         var p1 = line.GetEndPoint(1);
         var dir = (p1 - p0).Normalize();
-        var horizontal = new XYZ(dir.X, dir.Y, 0);
-        XYZ offsetDir = config.OffsetDirection.ToUpperInvariant() switch
-        {
-            "UP" => XYZ.BasisZ,
-            "DOWN" => -XYZ.BasisZ,
-            "LEFT" => horizontal.GetLength() > 1e-9 ? XYZ.BasisZ.CrossProduct(horizontal).Normalize() : XYZ.BasisY,
-            "RIGHT" => horizontal.GetLength() > 1e-9 ? horizontal.CrossProduct(XYZ.BasisZ).Normalize() : -XYZ.BasisY,
-            _ => XYZ.BasisZ,
-        };
+        var (ox, oy, oz) = KickPlanner.OffsetDirection(config.OffsetDirection, dir.X, dir.Y);
+        var offsetDir = new XYZ(ox, oy, oz);
 
         var a = p0 + dir * RevitCompat.MmToFt(config.DistanceFromStartMm);
         var b = a + dir * RevitCompat.MmToFt(geom.AlongAxisMm);
         var bOff = b + offsetDir * RevitCompat.MmToFt(config.OffsetMm);
         var endOff = p1 + offsetDir * RevitCompat.MmToFt(config.OffsetMm);
 
-        result.Messages.Add($"Kick {config.OffsetDirection} {config.OffsetMm} mm, cút {config.ElbowAngleDeg}°: đoạn chéo {geom.DiagonalMm:F0} mm, bắt đầu cách đầu ống {config.DistanceFromStartMm} mm.");
+        result.Messages.Add(KickPlanner.Note(config.OffsetDirection, config.OffsetMm, config.ElbowAngleDeg, geom.DiagonalMm, config.DistanceFromStartMm));
         if (config.DryRun)
         {
-            result.Summary = $"[Xem trước] Sẽ chia ống {config.ElementId} thành 3 đoạn + 2 cút.";
+            result.Summary = KickPlanner.PreviewSummary(config.ElementId);
             result.AffectedCount = 1;
             return result;
         }
@@ -235,7 +208,7 @@ public sealed class PipeKickCommand : ICoreCommand<PipeKickConfig>
             else
             {
                 // Kick-90: không có đoạn chéo chiếm trục — chèn đoạn thẳng đứng ngắn bằng cách tách thêm một lần sát A.
-                var bb = a + dir * RevitCompat.MmToFt(Math.Max(diameterMm, 50));
+                var bb = a + dir * RevitCompat.MmToFt(KickPlanner.MiddleLengthMm(diameterMm, geom.AlongAxisMm));
                 var id3 = PlumbingUtils.BreakCurve(document, afterA.Id, bb);
                 var pipe3 = (Pipe)document.GetElement(id3);
                 middle = Containing(afterA, pipe3, (a + bb) * 0.5);
@@ -257,7 +230,7 @@ public sealed class PipeKickCommand : ICoreCommand<PipeKickConfig>
             made += TryElbow(document, middle, tail, bOff, result) ? 1 : 0;
 
             tx.Commit();
-            result.Summary = $"Đã kick ống: 3 đoạn ({RevitCompat.IdValue(beforeA.Id)}, {RevitCompat.IdValue(middle.Id)}, {RevitCompat.IdValue(tail.Id)}), {made}/2 cút dựng được.";
+            result.Summary = KickPlanner.WriteSummary(RevitCompat.IdValue(beforeA.Id), RevitCompat.IdValue(middle.Id), RevitCompat.IdValue(tail.Id), made);
             result.AffectedCount = 3;
             if (made < 2) result.Errors.Add("Một số cút không dựng được — kiểm tra routing preference có cút góc " + config.ElbowAngleDeg + "°.");
             return result;

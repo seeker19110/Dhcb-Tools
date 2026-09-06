@@ -5,10 +5,11 @@ trắc đạc **đọc bản vẽ rồi gõ tay** toạ độ tim cột / lỗ m
 mở transaction, chạy được từ Ribbon (*Xuất & Báo cáo → Xuất khác → Toạ độ định vị*), Bridge/MCP, batch đêm
 và lớp AI như mọi lệnh khác.
 
-> **Trạng thái: thử nghiệm.** Mã nguồn biên dịch xanh với API Revit 2023–2027, tầng thuần có 50 ca test
-> trên CI, và có 4 ca kiểm trong `tests/suites/` (`revit-smoke.json`, `revit-mep.json`) — nhưng **chưa
-> chạy thật trong Revit**. Theo nguyên tắc 6 của [`roadmap.md`](roadmap.md), nhãn *(thử nghiệm)* trong
-> catalog và Ribbon chỉ gỡ khi [`bang-chung-test.md`](bang-chung-test.md) ghi nhận lượt chạy đầu tiên.
+> **Đã chạy thật trong Revit 2024 (2026-09-05, [`bang-chung-test.md`](bang-chung-test.md) §28).** Model kiến trúc:
+> **260 điểm** (118 tim cột + 142 giao trục), CSV + DXF có `POINT`/`TEXT` trên layer `DHCB-GRD`, toạ độ Survey thật;
+> model HVAC: 545 điểm thiết bị. Lượt đó lộ một lỗi thật (tên điểm cắt đuôi mất phần phân biệt) đã sửa kèm test.
+> Nhãn *(thử nghiệm)* đã gỡ 2026-09-06. **Còn phải làm tay:** đối chiếu một điểm bằng Spot Coordinate hoặc máy
+> toàn đạc trên model có khai toạ độ chung thật — việc của người trên công trường, không phải của mã.
 
 ## Lấy điểm nào
 

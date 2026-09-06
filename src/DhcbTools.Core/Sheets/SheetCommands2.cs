@@ -149,7 +149,10 @@ public sealed class ViewportCopyCommand : ICoreCommand<ViewportCopyConfig>
                 {
                     if (!Viewport.CanAddViewToSheet(document, t.Id, lg.ViewId)) { result.Messages.Add($"{t.SheetNumber}: legend đã có."); continue; }
                     var vp = Viewport.Create(document, t.Id, lg.ViewId, lg.GetBoxCenter());
-                    try { vp.ChangeTypeId(lg.GetTypeId()); } catch { }
+                    // Không đổi được kiểu viewport thì vẫn copy được, nhưng phải nói ra: trước đây nuốt im lặng
+                    // nên sheet đích mang kiểu viewport mặc định mà không ai biết vì sao.
+                    try { vp.ChangeTypeId(lg.GetTypeId()); }
+                    catch (Exception ex) { result.Messages.Add($"{t.SheetNumber}: giữ kiểu viewport mặc định cho legend \"{document.GetElement(lg.ViewId)?.Name}\" ({ex.Message})."); }
                     if (config.PinAfterCopy) vp.Pinned = true;
                     done++;
                 }

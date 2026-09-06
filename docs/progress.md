@@ -2,14 +2,15 @@
 
 Ảnh chụp tại thời điểm cập nhật gần nhất. Kế hoạch phía trước xem [`roadmap.md`](roadmap.md).
 
-> Cập nhật lần cuối: 2026-09-05 · sau khi mở **chặng thi công** của chuỗi thiết kế → hoàn công: **`SetoutExport`**
-> (đề xuất A1 — toạ độ định vị cho máy toàn đạc, [`toa-do-dinh-vi.md`](toa-do-dinh-vi.md)) và **`ConstructionStatus`
-> + `ProgressReport`** (đề xuất B1 — trạng thái thi công và báo cáo tiến độ, [`tien-do-thi-cong.md`](tien-do-thi-cong.md));
-> trước đó là đêm batch đầu tiên trên **dự án thật** (§20) và vòng đóng vai kỹ sư dùng thử (§21).
+> Cập nhật lần cuối: 2026-09-06 · sau vòng **đánh giá sâu** và sửa điểm yếu (§51): gỡ nhãn *thử nghiệm* lỗi thời của
+> `SetoutExport`, `ConstructionStatus`, `ProgressReport`, `ModelLinesFromCad` (cả bốn đã chạy thật 2026-09-05 — §28, §29,
+> §31 — nhưng catalog, Ribbon, README và tài liệu vẫn nói "chưa chạy"); tách `SlopePipes`/`PipeKick` xuống tầng thuần;
+> `BatchRunner/Program.cs` 905 dòng chia thành 6 file theo đường chạy; `catch {}` cuối cùng ở `ViewportCopy` nay báo
+> ra Messages. Trước đó: mở **chặng thi công** (A1 `SetoutExport`, B1 `ConstructionStatus` + `ProgressReport`), đêm batch
+> đầu tiên trên **dự án thật** (§20) và vòng đóng vai kỹ sư dùng thử (§21).
 >
-> **Ba lệnh mới nhất chưa chạy thật:** cả ba có tầng thuần (50 + 41 ca test), lệnh Core, nút Ribbon và ca kiểm
-> trong `tests/suites/`, nhưng **chưa chạy lần nào trong Revit** — mang nhãn *thử nghiệm* theo nguyên tắc 6.
-> Con số "đã chạy thật" dưới đây vì thế là **49/49** (cập nhật 2026-09-05).
+> **Lệnh còn mang nhãn *thử nghiệm*:** chỉ `AutoRoute` (chất lượng tuyến chưa chứng minh — mục *Còn mở*).
+> Con số "đã chạy thật": **49/49** lệnh Revit trên Revit 2024.3.
 >
 > **Đã kiểm trên Revit thật:** 43/43 lệnh Revit *của vòng đó* có ít nhất một ca kiểm chạy trong Revit, chia ba bộ theo
 > model mẫu (kiến trúc / HVAC / cấp thoát nước) — xem [Kiểm thử](#kiểm-thử) và
@@ -44,8 +45,8 @@
 | Lệnh nền tảng (Revit + AutoCAD) | ✅ |
 | HTTP Bridge cho agent AI | ✅ Token, khoá khi dò token, bind 127.0.0.1, timeout huỷ lệnh, `/tools`, `/chat` |
 | Batch export + Health report | ✅ |
-| Trạng thái thi công và báo cáo tiến độ (đề xuất B1) | ✅ mã nguồn 🧪 chưa chạy thật — `ConstructionStatus` ghi trạng thái từ CSV hiện trường, `ProgressReport` ra HTML + CSV: % theo **số lượng và chiều dài**, gộp theo tầng/hệ/category, luỹ kế theo tuần — [`tien-do-thi-cong.md`](tien-do-thi-cong.md) |
-| Toạ độ định vị ra máy toàn đạc (đề xuất A1) | ✅ mã nguồn 🧪 chưa chạy thật — `SetoutExport`: CSV theo thứ tự cột máy (`PNEZD`/`PENZD`…) + DXF điểm, hệ Survey tự kiểm chiều transform, giao trục, tên điểm ≤ 16 ký tự không trùng — [`toa-do-dinh-vi.md`](toa-do-dinh-vi.md) |
+| Trạng thái thi công và báo cáo tiến độ (đề xuất B1) | ✅ đã chạy thật Revit 2024 (§28, đường ghi 1,4 % trong `revit-write`) — `ConstructionStatus` ghi trạng thái từ CSV hiện trường, `ProgressReport` ra HTML + CSV: % theo **số lượng và chiều dài**, gộp theo tầng/hệ/category, luỹ kế theo tuần — [`tien-do-thi-cong.md`](tien-do-thi-cong.md) |
+| Toạ độ định vị ra máy toàn đạc (đề xuất A1) | ✅ đã chạy thật Revit 2024 (§28: 260 + 545 điểm) — `SetoutExport`: CSV theo thứ tự cột máy (`PNEZD`/`PENZD`…) + DXF điểm, hệ Survey tự kiểm chiều transform, giao trục, tên điểm ≤ 16 ký tự không trùng — [`toa-do-dinh-vi.md`](toa-do-dinh-vi.md) |
 | Khởi tạo dự án | ✅ Grid/Level/Family/Project info + **file từ template, transfer standards, trục/level từ CSV (CAD/Excel), sheet hàng loạt** |
 | MEPF nền tảng (sleeve, cao độ, hanger, chia ống, connector) | ✅ Core + Bridge + batch + Ribbon; đã chạy thật trên model HVAC và cấp thoát nước mẫu |
 | MEPF routing A (theo line), B (rải thiết bị theo phòng) | ✅ Core + Ribbon + Bridge; chờ kiểm thử trên model mẫu |
@@ -60,7 +61,7 @@
 | Giai đoạn 7 P1 — khoảng trống so với tool thị trường ([`nghien-cuu-tool-thi-truong-va-ke-hoach.md`](nghien-cuu-tool-thi-truong-va-ke-hoach.md)) | ✅ Mã nguồn (PR #11): SheetRename, RevisionOnSheets, StylePurge, ColorByParameter, FamilyAudit, WarningsExport, checkset ngưỡng; batch autodetect phiên bản Revit + PlotPdf; AI structured outputs + ≤ 8 ứng viên; MCP read-only/nhóm. ✅ Phần AutoCAD (LayerTranslate, DrawingCompare, BlockQuantity, AttributeIncrement, purge text/dim/regapp) **đã có mã nguồn** — bốn lệnh có lớp `*Command` trong `Core.AutoCAD` và dây vào `AcadCommandTable`, `CleanupConfig` có đủ ba cờ purge; dòng "chưa có mã" ở đây lỗi thời, đối chiếu lại 2026-09-06 (§47) |
 | Giai đoạn 7 P2 | ✅ Mã nguồn (PR #12): SlopePipes, PipeKick, SystemBom, AutoRoute, ScheduleExport, ViewportCopy; vỏ `DhcbTools.AutoCAD.Core` (chỉ AcDbMgd/AcCoreMgd) cho accoreconsole; map năm AutoCAD → package (2026.1+ là .NET 10) |
 | Hướng dẫn cài đặt & kiểm thử thủ công | ✅ (PR #13) [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md) — checklist R1–R48, C1–C17, B1–B12, M1–M4 |
-| Phạm vi cổng phủ 100 % | ⚠️ Chỉ `Shared.Logic` + `Shared.Hosting` (+ test CLI `BatchRunner`, không ngưỡng). `Core`, `Core.AutoCAD`, hai vỏ **không** nằm trong cổng — kiểm bằng bộ ca chạy trong Revit/AutoCAD thật (`tests/suites`, 155 ca) trên một máy. Đang chuyển dần: mỗi lệnh tách phần quyết định xuống `Shared.Logic` (§49–§50: 7 lệnh, 151 ca) |
+| Phạm vi cổng phủ 100 % | ⚠️ Chỉ `Shared.Logic` + `Shared.Hosting` (+ test CLI `BatchRunner`, không ngưỡng). `Core`, `Core.AutoCAD`, hai vỏ **không** nằm trong cổng — kiểm bằng bộ ca chạy trong Revit/AutoCAD thật (`tests/suites`, 155 ca) trên một máy. Đang chuyển dần: mỗi lệnh tách phần quyết định xuống `Shared.Logic` (§49–§51: 9 lệnh, 183 ca) |
 | Kiểm thử tự động | ✅ Bộ test xUnit (`Shared.Logic` + `Shared.Hosting`), gồm bốn bộ đối chiếu mã nguồn với nhau: `RibbonCoverageTests` (vỏ Revit ↔ bảng lệnh), `CatalogFieldTests` (catalog ↔ property config thật), `SuiteCoverageTests` (49/49 lệnh có ca kiểm chạy trong Revit), `VietnameseMessageTests` (không còn thông báo tiếng Anh trong Core) |
 | CI | ✅ `tests.yml` (test + check-build bằng API package, ubuntu) — xanh |
 | CD | ✅ đóng gói Release thật (Revit 2023/2024/2025, **AutoCAD 2024/2025/2026**) + GitHub Release khi đẩy tag (`release.yml`, windows-latest). AutoCAD 2026 là nhánh .NET 10, installer đặt vào `DhcbTools.bundle\Contents6` |
@@ -70,37 +71,6 @@ một lần trong Revit 2024.3** (ba lệnh chặng thi công là phần chưa) 
 động qua `accoreconsole` (§10).
 Việc có giá trị nhất lúc này là **9.4 — đưa cho một nhóm kỹ sư dùng thật**; phản hồi của họ quyết định
 giai đoạn 10/11 đi sâu vào đâu.
-
----
-
-## Phần chưa có mã nguồn
-
-Đối chiếu cây mã nguồn `main` với những gì PR #11/#12 mô tả. Ba nhóm dưới đây được commit message nhắc tới
-nhưng file không có trong repo — CI bắt được vì bảng lệnh và catalog tham chiếu tới chúng.
-
-| Nhóm | Tài liệu nói | Thực tế trong repo |
-|---|---|---|
-| Vỏ Revit (Ribbon) | 6 panel, đủ lệnh MEPF, đăng ký `ElevationUpdater`, hook batch `pending-job.json` | ✅ `App.cs` có **6 panel**, phủ đủ **49/49** lệnh (nút phẳng + nút xổ xuống), có `BatchStartupHook` và đăng ký `ElevationUpdater` (mặc định tắt). ⬜ AI chat WPF vẫn chưa có — lớp AI dùng qua Bridge `/chat` và `dhcb_agent.py` |
-
-### Lệnh AutoCAD — nay đã đủ 15 lệnh có mã nguồn
-
-11 lệnh còn lại từng đánh dấu `.Pending()` trong `CommandCatalog` (`AttributeExport`, `AttributeImport`,
-`TextReplace`, `LayerStandardCheck`, `GridExtract`, `XrefAudit`, `LayerTranslate`, `DrawingCompare`,
-`BlockQuantity`, `AttributeIncrement`, `CadLayerMap`) **đã có mã nguồn** trong `Core.AutoCAD` (thư mục
-`Attributes/`, `TextTools/`, `LayerTools/`, `Reporting/`), dây vào `AcadCommandTable` và có vỏ lệnh
-`[CommandMethod]` tương ứng trong `DhcbTools.AutoCAD`; `.Pending()` đã được gỡ nên giờ chào ra `GET /tools`,
-MCP và lớp ra lệnh tiếng Việt bình thường. **Đã chạy trên AutoCAD thật**: cả 15/15 lệnh có ca kiểm tự động
-qua `accoreconsole` (18/18 ca, §10) — vòng đó lộ 2 lỗi ghi đè im lặng ở `LayerImport`/`AttributeImport`,
-đã sửa kèm ca song sinh.
-
-Hai đơn giản hoá đáng chú ý so với đặc tả gốc:
-- **`DrawingCompare`**: so sánh **mức layer** (đếm entity theo layer giữa hai file) thay vì so từng entity theo
-  Handle như mô tả ban đầu — Handle của hai file DWG độc lập không đáng tin để đối chiếu 1-1.
-- **`GridExtract`**: đặt tên trục là `AXIS-<số thứ tự>` thay vì dò tìm `DBText` gần đường Line để lấy tên thật,
-  vì khớp text theo khoảng cách hình học dễ sai trên bản vẽ dày đặc.
-
-Kéo theo: `jobs/autocad-nightly.sample.json` và các mục `C16`, `B12`, phần `DrawingCompare` trong hướng dẫn kiểm
-thử thủ công nay đã chạy được qua `accoreconsole`; phần **kiểm tay trong giao diện AutoCAD** (C1–C17) thì vẫn còn.
 
 ---
 

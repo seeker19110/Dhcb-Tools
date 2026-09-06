@@ -48,7 +48,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 | `PipeSplitter` | Chia ống/duct theo chiều dài cây | ☐ | ☐ | ☐ | |
 | `ConnectorChecker` | Liệt kê connector MEP hở | ☐ | ☐ | ☐ | |
 | `CadLink` | Link file DWG/DXF vào view mặt bằng của một tầng (bước Insert → Link CAD), để ModelLinesFromCad đọc được | ☐ | ☐ | ☐ | |
-| `ModelLinesFromCad` | Dựng model line từ bản vẽ CAD đã link/import (lọc layer, bỏ đoạn rác và đường vẽ chồng, nối đoạn thẳng hàng) để RouteFromLines dựng ống (thử nghiệm) | ☐ | ☐ | ☐ | |
+| `ModelLinesFromCad` | Dựng model line từ bản vẽ CAD đã link/import (lọc layer, bỏ đoạn rác và đường vẽ chồng, nối đoạn thẳng hàng) để RouteFromLines dựng ống | ☐ | ☐ | ☐ | |
 | `RouteFromLines` | Routing mức A: dựng duct/pipe/tray từ model line vẽ tay | ☐ | ☐ | ☐ | |
 | `DevicePlacement` | Routing mức B: rải thiết bị đầu cuối theo phòng | ☐ | ☐ | ☐ | |
 | `SizingProposal` | Đề xuất kích thước duct/pipe theo lưu lượng → CSV | ☐ | ☐ | ☐ | |
@@ -73,9 +73,9 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 | `AutoRoute` | Routing mức C: A* né chướng ngại giữa 2 điểm *(thử nghiệm)* | ☐ | ☐ | ☐ | |
 | `ScheduleExport` | Xuất schedule ra CSV đúng cột/hàng đang hiển thị | ☐ | ☐ | ☐ | |
 | `ViewportCopy` | Copy legend/schedule sang nhiều sheet, cùng vị trí, ghim lại | ☐ | ☐ | ☐ | |
-| `SetoutExport` | Xuất toạ độ định vị (tim cột, tâm thiết bị, giao trục) ra CSV cho máy toàn đạc + DXF *(thử nghiệm)* | ☐ | ☐ | ☐ | |
-| `ConstructionStatus` | Ghi trạng thái thi công từ CSV hiện trường vào mô hình *(thử nghiệm)* | ☐ | ☐ | ☐ | |
-| `ProgressReport` | Báo cáo tiến độ: % theo số lượng và chiều dài, gộp theo tầng/hệ, luỹ kế theo tuần *(thử nghiệm)* | ☐ | ☐ | ☐ | |
+| `SetoutExport` | Xuất toạ độ định vị (tim cột, tâm thiết bị, giao trục) ra CSV cho máy toàn đạc + DXF | ☐ | ☐ | ☐ | |
+| `ConstructionStatus` | Ghi trạng thái thi công từ CSV hiện trường vào mô hình | ☐ | ☐ | ☐ | |
+| `ProgressReport` | Báo cáo tiến độ: % theo số lượng và chiều dài, gộp theo tầng/hệ, luỹ kế theo tuần | ☐ | ☐ | ☐ | |
 | `ParameterRuleCheck` | Kiểm tra tham số thiếu / sai quy tắc đặt tên → HTML | ☐ | ☐ | ☐ | |
 | `IdsValidate` | Kiểm mô hình theo file IDS 1.0 của chủ đầu tư/thẩm tra → HTML + CSV | ☐ | ☐ | ☐ | |
 | `ClashDetection` | Va chạm giữa hai nhóm category → HTML + 3D view | ☐ | ☐ | ☐ | |

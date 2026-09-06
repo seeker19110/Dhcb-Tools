@@ -56,12 +56,12 @@ public sealed class App : IExternalApplication
                 "Xuất toàn bộ warning của mô hình ra file để phân tích."),
             ("DhcbScheduleExport", "Xuất schedule", "ScheduleExportRibbonCommand",
                 "Xuất các schedule ra CSV/Excel."),
-            ("DhcbSetoutExport", "Toạ độ định vị (thử nghiệm)", "SetoutExportRibbonCommand",
+            ("DhcbSetoutExport", "Toạ độ định vị", "SetoutExportRibbonCommand",
                 "Xuất toạ độ tim cột / thiết bị / giao trục ra CSV cho máy toàn đạc và DXF điểm, theo hệ Survey."));
         Group(export, path, "DhcbSiteProgress", "Tiến độ\nthi công", "Trạng thái lắp đặt từ hiện trường và báo cáo tiến độ.",
-            ("DhcbConstructionStatus", "Nhập trạng thái thi công (thử nghiệm)", "ConstructionStatusRibbonCommand",
+            ("DhcbConstructionStatus", "Nhập trạng thái thi công", "ConstructionStatusRibbonCommand",
                 "Đọc CSV hiện trường (mã cấu kiện → trạng thái/ngày/người) và ghi vào mô hình."),
-            ("DhcbProgressReport", "Báo cáo tiến độ (thử nghiệm)", "ProgressReportRibbonCommand",
+            ("DhcbProgressReport", "Báo cáo tiến độ", "ProgressReportRibbonCommand",
                 "% đã lắp theo số lượng và chiều dài, gộp theo tầng/hệ, luỹ kế theo tuần."));
 
         // ── Panel 3: Khởi tạo dự án ───────────────────────────────
@@ -99,7 +99,7 @@ public sealed class App : IExternalApplication
         Group(mepf, path, "DhcbRouting", "Đi\ntuyến", "Dựng tuyến ống/duct: từ bản vẽ CAD, theo line, theo phòng, hoặc tự tìm đường.",
             ("DhcbCadLink", "Link bản vẽ CAD", "CadLinkRibbonCommand",
                 "Link file DWG/DXF vào view mặt bằng của một tầng — bước đầu của chuỗi CAD → model line → ống."),
-            ("DhcbModelLinesFromCad", "Model line từ CAD (thử nghiệm)", "ModelLinesFromCadRibbonCommand",
+            ("DhcbModelLinesFromCad", "Model line từ CAD", "ModelLinesFromCadRibbonCommand",
                 "Dựng model line từ DWG đã link/import theo layer, để bước sau đi ống theo line."),
             ("DhcbRouteFromLines", "Đi ống theo line (A)", "RouteFromLinesRibbonCommand",
                 "Dựng ống/duct từ model line vẽ tay (routing mức A)."),

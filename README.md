@@ -90,13 +90,13 @@ Ribbon/dòng lệnh, HTTP Bridge, batch runner, lớp AI. Danh mục đầy đ�
 | Dữ liệu ↔ CSV | `ParameterExport` / `ParameterImport` | `LayerExport` / `LayerImport`, `AttributeExport` / `AttributeImport` |
 | Dọn dẹp | `RemoveUnusedViews` | `DrawingCleanup` (an toàn: CLAYER, linetype của layer, xref) |
 | Đánh số | `AutoNumbering` (theo vị trí), `FlowNumbering` (theo dòng chảy) | `AutoNumbering` (block attribute) |
-| Xuất & báo cáo | `BatchExport` (PDF/DWG/IFC/NWC), `HealthReport`, `SetoutExport` (toạ độ định vị cho máy toàn đạc — *thử nghiệm*, [`docs/toa-do-dinh-vi.md`](docs/toa-do-dinh-vi.md)) | `XrefAudit` |
+| Xuất & báo cáo | `BatchExport` (PDF/DWG/IFC/NWC), `HealthReport`, `SetoutExport` (toạ độ định vị cho máy toàn đạc, [`docs/toa-do-dinh-vi.md`](docs/toa-do-dinh-vi.md)) | `XrefAudit` |
 | Kiểm tra | `ParameterRuleCheck`, `ClashDetection` (+ `clash-accepted.json`), `ConnectorChecker`, `IdsValidate` (IDS 1.0 buildingSMART, [`docs/kiem-ids.md`](docs/kiem-ids.md)) | `LayerStandardCheck`, `TextReplace` |
 | Dự án & hồ sơ | `ProjectFromTemplate`, `TransferStandards`, `LevelSetup`, `GridSetup`, `GridFromCsv`, `FamilyLoader`, `ProjectInfo`, `SheetBatchCreate`, `CadLink` (link DWG/DXF vào view của một tầng) | `GridExtract` (layer AXIS → CSV cho `GridFromCsv`) |
-| MEPF | `SleeveAuto`, `ElevationTag`, `HangerAuto`, `PipeSplitter`, `ModelLinesFromCad` (CAD đã link → model line, *thử nghiệm*), `RouteFromLines`, `DevicePlacement`, `SizingProposal` / `ApplySizing`, `SystemColor`, `SystemName` | — |
+| MEPF | `SleeveAuto`, `ElevationTag`, `HangerAuto`, `PipeSplitter`, `ModelLinesFromCad` (CAD đã link → model line), `RouteFromLines`, `DevicePlacement`, `SizingProposal` / `ApplySizing`, `SystemColor`, `SystemName` | — |
 | Hồ sơ & style (giai đoạn 7) | `SheetRename`, `RevisionOnSheets`, `SheetIndex`, `StylePurge`, `ColorByParameter`, `FamilyAudit`, `WarningsExport`, `ScheduleExport`, `ViewportCopy` | `LayerTranslate`, `DrawingCompare`, `BlockQuantity`, `AttributeIncrement` |
 | MEPF nâng cao (P2) | `SlopePipes`, `PipeKick`, `SystemBom`, `AutoRoute` (mức C → mức A) | — |
-| Thi công & hoàn công | `ConstructionStatus`, `ProgressReport` (tiến độ theo tầng/hệ, % theo số lượng và chiều dài — *thử nghiệm*, [`docs/tien-do-thi-cong.md`](docs/tien-do-thi-cong.md)) | — |
+| Thi công & hoàn công | `ConstructionStatus`, `ProgressReport` (tiến độ theo tầng/hệ, % theo số lượng và chiều dài, [`docs/tien-do-thi-cong.md`](docs/tien-do-thi-cong.md)) | — |
 | AI offline | `CadLayerMap`, `SpecToConfig`, `DictionaryLearn`, nút *Ra lệnh tiếng Việt* | `CadLayerMap` (`DHCB_LAYER_MAP`); ra lệnh tiếng Việt qua Bridge `POST /chat` |
 
 Lệnh AutoCAD trên dòng lệnh — đúng các `[CommandMethod]` có trong `src/DhcbTools.AutoCAD`:
@@ -266,7 +266,6 @@ với API Revit/AutoCAD 2023–2027 (ma trận CI, gồm cả đường .NET 10)
 và 15/15 lệnh AutoCAD có ca kiểm qua `accoreconsole`, cộng một đêm batch trên **dự án thật** — bằng chứng và số liệu từng vòng:
 [`docs/bang-chung-test.md`](docs/bang-chung-test.md), NETLOAD trên AutoCAD thật:
 [`docs/bang-chung-test-autocad-live.md`](docs/bang-chung-test-autocad-live.md). Phần **chưa** khép: chất lượng tuyến của `AutoRoute` (còn nhãn
-*thử nghiệm*), ba lệnh chặng thi công mới thêm 2026-09-05 (`SetoutExport` — [`docs/toa-do-dinh-vi.md`](docs/toa-do-dinh-vi.md);
-`ConstructionStatus` và `ProgressReport` — [`docs/tien-do-thi-cong.md`](docs/tien-do-thi-cong.md); đều có ca kiểm, **chưa chạy thật**),
+*thử nghiệm*), đối chiếu một điểm của `SetoutExport` bằng máy toàn đạc trên công trường thật,
 chạy thật trên Revit 2026/2027 (máy chỉ có 2024.3), và 9.4 — đưa cho một nhóm kỹ sư dùng thật. Chi tiết và lỗi còn mở:
 [`docs/progress.md`](docs/progress.md) · lộ trình: [`docs/roadmap.md`](docs/roadmap.md).
