@@ -5,7 +5,8 @@ Tài liệu này mô tả **kế hoạch phía trước**. Hiện trạng thực
 thuật ở [`nghien-cuu-dhcb-revit-tools.md`](nghien-cuu-dhcb-revit-tools.md), khảo sát thị trường ở
 [`nghien-cuu-tool-thi-truong-va-ke-hoach.md`](nghien-cuu-tool-thi-truong-va-ke-hoach.md), khảo sát theo **chặng
 công việc** (thiết kế → BIM → shop → thi công → hoàn công) ở
-[`nghien-cuu-chuoi-den-hoan-cong.md`](nghien-cuu-chuoi-den-hoan-cong.md).
+[`nghien-cuu-chuoi-den-hoan-cong.md`](nghien-cuu-chuoi-den-hoan-cong.md). Đánh giá độc lập toàn dự án và tầm nhìn
+24 tháng (ba chân trời, năm quyết định cần chốt) ở [`danh-gia-va-tam-nhin-2026-09-06.md`](danh-gia-va-tam-nhin-2026-09-06.md).
 
 > **Đổi hướng 2026-09-03.** Giai đoạn 0–7 đã cho 57 lệnh có mã nguồn, nhưng mới 4/42 lệnh Revit chạy thật và
 > ~4.500 dòng chạm Revit API chưa có test nào. Từ đây **dừng mở rộng số lệnh**, chuyển sang **chiều sâu** ở ba hướng
