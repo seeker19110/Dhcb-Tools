@@ -9,6 +9,14 @@ namespace DhcbTools.Shared.Logic
     /// bất kỳ tiến trình nào trên máy cũng gửi được lệnh sửa mô hình với dryRun:false).
     /// Token sinh ngẫu nhiên lúc khởi động, lưu ở %APPDATA%\DHCB\bridge-token.txt, client gửi kèm
     /// header <c>Authorization: Bearer &lt;token&gt;</c>.
+    /// <para>
+    /// Chặn được tới đâu: tiến trình chạy dưới TÀI KHOẢN KHÁC không đọc được file token
+    /// (<see cref="T:DhcbTools.Shared.Hosting.BridgeTokenStore"/> thu ACL về chủ sở hữu), và cổng chỉ
+    /// bind 127.0.0.1 nên không có đường từ máy khác. KHÔNG chặn được: mã chạy dưới CÙNG tài khoản
+    /// người dùng — nó đọc được file token như chính add-in. Đó là giới hạn cố hữu của công cụ
+    /// desktop giữ bí mật trên đĩa; muốn đóng nốt phải đổi sang cơ chế khác (ví dụ cấp handle qua
+    /// IPC có kiểm tiến trình gọi), chưa làm. Đừng đọc dòng "lỗi #8" ở trên thành đã đóng hoàn toàn.
+    /// </para>
     /// </summary>
     public static class BridgeAuth
     {

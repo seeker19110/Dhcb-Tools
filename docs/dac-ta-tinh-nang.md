@@ -61,6 +61,21 @@ công trong `dac-ta-kiem-thu.md` §4.1.
 **DoD:** gọi `/execute` không kèm token trả 401 trên cả hai vỏ; `dhcb_agent.py` chạy được không cần
 sửa tay; token không bao giờ nằm trong log hay trong body trả về.
 
+**Rủi ro còn lại — nói rõ để không hiểu nhầm là đã đóng hết.** Ba lớp trong mối đe doạ ban đầu
+("mọi tiến trình trên máy") được đóng ở ba mức khác nhau:
+
+| Kẻ tấn công | Trạng thái |
+|---|---|
+| Máy khác trong mạng LAN | ✅ đóng — chỉ bind `127.0.0.1` |
+| Trang web đang mở trong trình duyệt | ✅ đóng — bắt buộc `Content-Type: application/json` nên request chỉ gửi được qua CORS preflight, mà không origin nào được phép |
+| Tiến trình dò token | ✅ đóng — token 256 bit, so sánh hằng thời gian, khoá 5 phút sau 5 lần sai |
+| Tiến trình chạy dưới **tài khoản khác** | ✅ đóng — ACL file token thu về chủ sở hữu |
+| Mã chạy dưới **cùng tài khoản người dùng** | ⬜ **không đóng** — nó đọc `bridge-token.txt` được đúng như add-in đọc |
+
+Dòng cuối là giới hạn cố hữu của công cụ desktop giữ bí mật trên đĩa, không phải sơ suất: mã đã
+chạy được dưới tài khoản của kỹ sư thì cũng mở thẳng được file Revit. Đóng nốt cần đổi cơ chế
+(cấp handle qua IPC có kiểm tiến trình gọi) — chưa làm, và chưa có lý do đủ mạnh để làm.
+
 ## 0.2 Tách phần dùng chung (lỗi #9)
 
 Đã tách xong phần **logic thuần**: `src/DhcbTools.Shared.Logic` (CSV, số, đánh số, hình học MEPF,

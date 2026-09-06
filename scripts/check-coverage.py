@@ -18,6 +18,14 @@ MAX_LISTED = 40
 
 
 def main(argv: list[str]) -> int:
+    # Console Windows mặc định cp1252: mọi thông báo tiếng Việt ở dưới sẽ ném UnicodeEncodeError
+    # và cổng phủ sập TRƯỚC khi kịp in dòng nào. CI Linux (UTF-8) không bao giờ lộ lỗi này, nên nó
+    # sống sót tới lúc chạy ở máy thật. errors="replace" để một console lạ cũng chỉ mất dấu, không sập.
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="replace")
+
     results = Path(argv[1] if len(argv) > 1 else "./coverage")
     threshold = float(argv[2]) if len(argv) > 2 else 100.0
 
