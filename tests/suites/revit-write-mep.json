@@ -477,6 +477,63 @@
       }
     },
     {
+      "name": "FamilyUpgrade — xem trước: thấy 2 .rfa FamilyStarter vừa ghi, đích nằm ngoài thư mục nguồn",
+      "//": "§63: chạy ngay sau FamilyStarter nên thư mục nguồn chắc chắn có file. Xem trước không mở document nào.",
+      "command": "FamilyUpgrade",
+      "config": {
+        "sourceFolder": "{outputFolder}/family-mau",
+        "outputFolder": "{outputFolder}/family-nang-cap",
+        "dryRun": true
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 2,
+        "summaryContains": [
+          "[Xem trước] Sẽ nâng cấp 2 family",
+          "Bản gốc giữ nguyên"
+        ],
+        "messagesContain": [
+          "Sẽ nâng cấp DHCB_Sleeve.rfa"
+        ],
+        "neverContains": [
+          "Exception"
+        ],
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "FamilyUpgrade — GHI THẬT: mở 2 .rfa rồi lưu sang thư mục khác theo định dạng Revit đang chạy",
+      "//": "§63: đường nâng cấp thư viện family cho từng phiên bản Revit. Bản gốc trong family-mau phải còn nguyên — ca SleeveAuto ngay sau vẫn dùng family đã nạp.",
+      "command": "FamilyUpgrade",
+      "allowWrite": true,
+      "config": {
+        "sourceFolder": "{outputFolder}/family-mau",
+        "outputFolder": "{outputFolder}/family-nang-cap",
+        "dryRun": false
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 2,
+        "summaryContains": [
+          "Đã nâng cấp 2 family sang Revit"
+        ],
+        "summaryNotContains": [
+          "Xem trước",
+          "lỗi"
+        ],
+        "noErrors": true,
+        "filesExist": [
+          "{outputFolder}/family-nang-cap/DHCB_Sleeve.rfa",
+          "{outputFolder}/family-nang-cap/DHCB_Hanger.rfa",
+          "{outputFolder}/family-mau/DHCB_Sleeve.rfa"
+        ],
+        "neverContains": [
+          "Exception"
+        ],
+        "maxMs": 180000
+      }
+    },
+    {
       "name": "SleeveAuto với DHCB_Sleeve vừa nạp — GHI THẬT, đặt được lên mặt tường/sàn của link",
       "command": "SleeveAuto",
       "allowWrite": true,

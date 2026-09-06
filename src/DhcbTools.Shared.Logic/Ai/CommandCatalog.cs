@@ -151,6 +151,7 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Words("load family", "nạp family"),
 
             // ── Revit — MEPF ────────────────────────────────────────────────
+            new CommandDescriptor("FamilyUpgrade", Revit, "Nâng cấp hàng loạt file .rfa sang định dạng của phiên bản Revit đang chạy, ghi sang thư mục khác — cách duy nhất có thư viện family dùng được cho nhiều phiên bản Revit", true, "NangCapFamily", "FamilyMultiVersion"),
             new CommandDescriptor("FamilyStarter", Revit, "Dựng family mẫu DHCB_Sleeve / DHCB_Hanger từ template Generic Model kèm Revit, ghi .rfa và nạp vào mô hình — để SleeveAuto/HangerAuto chạy được trên dự án chưa có family", true, "StarterFamilies", "FamilyMau")
                 .Field("outputFolder", "thư mục ghi .rfa").Field("families", "Sleeve, Hanger (rỗng = cả hai)")
                 .Field("load", "nạp vào mô hình đang mở (mặc định true)").Field("overwrite", "ghi đè .rfa và tham số family đã có")

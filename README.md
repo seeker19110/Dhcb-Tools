@@ -95,7 +95,7 @@ Ribbon/dòng lệnh, HTTP Bridge, batch runner, lớp AI. Danh mục đầy đ�
 | Xuất & báo cáo | `BatchExport` (PDF/DWG/IFC/NWC), `HealthReport`, `SetoutExport` (toạ độ định vị cho máy toàn đạc, [`docs/toa-do-dinh-vi.md`](docs/toa-do-dinh-vi.md)) | `XrefAudit` |
 | Kiểm tra | `ParameterRuleCheck`, `ClashDetection` (+ `clash-accepted.json`), `ConnectorChecker`, `IdsValidate` (IDS 1.0 buildingSMART, [`docs/kiem-ids.md`](docs/kiem-ids.md)) | `LayerStandardCheck`, `TextReplace` |
 | Dự án & hồ sơ | `ProjectFromTemplate`, `TransferStandards`, `LevelSetup`, `GridSetup`, `GridFromCsv`, `FamilyLoader`, `ProjectInfo`, `SheetBatchCreate`, `CadLink` (link DWG/DXF vào view của một tầng) | `GridExtract` (layer AXIS → CSV cho `GridFromCsv`) |
-| MEPF | `FamilyStarter` (family mẫu sleeve/hanger), `SleeveAuto`, `ElevationTag`, `HangerAuto`, `PipeSplitter`, `ModelLinesFromCad` (CAD đã link → model line), `RouteFromLines`, `DevicePlacement`, `SizingProposal` / `ApplySizing`, `SystemColor`, `SystemName` | — |
+| MEPF | `FamilyStarter` (family mẫu sleeve/hanger), `FamilyUpgrade` (nâng cấp .rfa hàng loạt theo phiên bản Revit), `SleeveAuto`, `ElevationTag`, `HangerAuto`, `PipeSplitter`, `ModelLinesFromCad` (CAD đã link → model line), `RouteFromLines`, `DevicePlacement`, `SizingProposal` / `ApplySizing`, `SystemColor`, `SystemName` | — |
 | Hồ sơ & style (giai đoạn 7) | `SheetRename`, `RevisionOnSheets`, `SheetIndex`, `StylePurge`, `ColorByParameter`, `FamilyAudit`, `WarningsExport`, `ScheduleExport`, `ViewportCopy` | `LayerTranslate`, `DrawingCompare`, `BlockQuantity`, `AttributeIncrement` |
 | MEPF nâng cao (P2) | `SlopePipes`, `PipeKick`, `SystemBom`, `AutoRoute` (mức C → mức A) | — |
 | Thi công & hoàn công | `ConstructionStatus`, `ProgressReport` (tiến độ theo tầng/hệ, % theo số lượng và chiều dài, [`docs/tien-do-thi-cong.md`](docs/tien-do-thi-cong.md)) | — |
@@ -170,6 +170,23 @@ Ra `logs/{yyyy-MM-dd}/run-HHmmss.jsonl` (mỗi lượt chạy một file log), `
 mã thoát 0/1/2 cho Task Scheduler. Job có thêm `saveOnError` (mặc định `false`) và `dwgVersion` (mặc định `"2018"`);
 **bên AutoCAD `saveMode: "Save"` nay lưu đè file gốc thật**. Chi tiết:
 [`docs/batch-runner.md`](docs/batch-runner.md).
+
+## Thư viện family cho nhiều phiên bản Revit
+
+`.rfa` gắn chặt phiên bản và nâng cấp **một chiều**: Revit 2024 không mở nổi family lưu từ 2026, không API nào hạ cấp.
+Nên không có "một bộ family chạy mọi phiên bản" — phải để chính phiên bản đó ghi ra file:
+
+```powershell
+# Dựng family mẫu + nâng cấp, một lượt cho mỗi phiên bản → out/families/<năm>/
+.\scripts\dung-family.ps1 -RevitVersions 2024,2026 -Mode Both
+
+# Nâng cấp thư viện family của công ty sang định dạng 2026 (bản gốc chỉ đọc)
+.\scripts\dung-family.ps1 -RevitVersions 2026 -Mode Upgrade -SourceFolder D:\ThuVienFamily
+```
+
+Script build add-in theo `-p:RevitVersion`, cài vào thư mục add-in của đúng năm, để BatchRunner tự mở Revit rồi chạy
+`FamilyStarter` (dựng mới) và `FamilyUpgrade` (nâng cấp). `FamilyUpgrade` từ chối chạy nếu thư mục đích nằm trong thư
+mục nguồn, nên bản gốc không bao giờ bị nâng cấp đè. Bằng chứng hai chiều: [`docs/bang-chung-test.md`](docs/bang-chung-test.md) §63.
 
 ## Build
 

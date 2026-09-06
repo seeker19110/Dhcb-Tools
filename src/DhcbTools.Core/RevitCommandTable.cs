@@ -3,6 +3,7 @@ using DhcbTools.Core.Ai;
 using DhcbTools.Core.AutoNumbering;
 using DhcbTools.Core.Checks;
 using DhcbTools.Core.Export;
+using DhcbTools.Core.Families;
 using DhcbTools.Core.Health;
 using DhcbTools.Core.MEPF;
 using DhcbTools.Core.ModelCleanup;
@@ -51,6 +52,7 @@ public static class RevitCommandTable
 
                 "SLEEVEAUTO" => new SleeveCommand().Execute(doc, Deserialize<SleeveConfig>(configJson)),
                 "FAMILYSTARTER" => new FamilyStarterCommand().Execute(doc, Deserialize<FamilyStarterConfig>(configJson)),
+                "FAMILYUPGRADE" => new FamilyUpgradeCommand().Execute(doc, Deserialize<FamilyUpgradeConfig>(configJson)),
                 "ELEVATIONTAG" => new ElevationTagCommand().Execute(doc, Deserialize<ElevationTagConfig>(configJson)),
                 "HANGERAUTO" => new HangerCommand().Execute(doc, Deserialize<HangerConfig>(configJson)),
                 "PIPESPLITTER" => new PipeSplitterCommand().Execute(doc, Deserialize<PipeSplitterConfig>(configJson)),

@@ -65,6 +65,7 @@
 - §60 — [`FamilyStarter` — family mẫu sleeve/hanger dựng bằng chính Revit, để `SleeveAuto` không còn "bỏ vì thiếu family" (2026-09-06 13:00 ICT)](#60-familystarter-family-mẫu-sleevehanger-dựng-bằng-chính-revit-để-sleeveauto-không-còn-bỏ-vì-thiếu-family-2026-09-06-1300-ict)
 - §61 — [Rà 40 khối `catch` của Core, dọn tự động sau mỗi lượt và sau job đêm, mục lục cho file này (2026-09-06 13:20 ICT)](#61-rà-40-khối-catch-của-core-dọn-tự-động-sau-mỗi-lượt-và-sau-job-đêm-mục-lục-cho-file-này-2026-09-06-1320-ict)
 - §62 — [`ConnectorChecker` có danh sách đã chấp nhận, family sleeve nhận tham số, `AutoRoute` 5 tuyến nữa trên dự án A (2026-09-06 13:55 ICT)](#62-connectorchecker-có-danh-sách-đã-chấp-nhận-family-sleeve-nhận-tham-số-autoroute-5-tuyến-nữa-trên-dự-án-a-2026-09-06-1355-ict)
+- §63 — [`FamilyUpgrade` — thư viện family cho nhiều phiên bản Revit, hai chiều đều có bằng chứng (2026-09-06 14:30 ICT)](#63-familyupgrade-thư-viện-family-cho-nhiều-phiên-bản-revit-hai-chiều-đều-có-bằng-chứng-2026-09-06-1430-ict)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
@@ -3225,3 +3226,30 @@ Nominal Width điều khiển)"* — tức nhãn gắn thành công trên Revit 
 
 Cộng tuyến §57: **6 tuyến trên dự án thật, 5 tuyến tối ưu tuyệt đối, 1 tuyến đi vòng 19 %**. Con số 80–130 ms mỗi tuyến.
 Đây là thước đo đầu tiên có mẫu đủ để nói *chất lượng tuyến trên dự án thật*, không còn là một điểm dữ liệu.
+
+## 63. `FamilyUpgrade` — thư viện family cho nhiều phiên bản Revit, hai chiều đều có bằng chứng (2026-09-06 14:30 ICT)
+
+**Câu hỏi.** Family Revit gắn chặt phiên bản — auto được không? Được, nhưng chỉ theo hướng "để chính phiên bản đó ghi
+ra file", vì `.rfa` nâng cấp **một chiều** và không API nào hạ cấp.
+
+**Việc đã làm.** Lệnh Core `FamilyUpgrade` mở hàng loạt `.rfa` rồi `SaveAs` sang thư mục khác theo định dạng của Revit
+đang chạy; `outputFolder` bắt buộc nằm ngoài `sourceFolder` (kiểm ở tầng thuần) nên bản gốc không bao giờ bị nâng cấp
+đè. Kèm `scripts/dung-family.ps1`: build add-in theo `-p:RevitVersion` → cài vào thư mục add-in của đúng năm →
+BatchRunner tự mở Revit → chạy `FamilyStarter` và/hoặc `FamilyUpgrade` → gom `.rfa` vào `out/families/<năm>/`.
+
+**Bằng chứng.**
+
+| Lượt | Lệnh | Kết quả |
+|---|---|---|
+| `write-mep` trên Revit **2024** | 21 ca (thêm 2 ca `FamilyUpgrade`) | 21 đạt / 0 trượt — "Đã nâng cấp 2 family sang Revit 2024" |
+| `write-mep` trên Revit **2026** | 21 ca | 21 đạt / 0 trượt — "Đã nâng cấp 2 family sang Revit 2026" |
+| `dung-family.ps1 -RevitVersions 2024,2026 -Mode Both` | dựng + nâng cấp | 4 `.rfa` mỗi phiên bản, `out/families/2024` và `out/families/2026` |
+| **Chiều xuôi**: family 2024 → Revit 2026 nâng cấp | `-Mode Upgrade` | `success:true`, 2 file, "đã nâng cấp sang Revit 2026" |
+| **Chiều ngược**: family 2026 → Revit 2024 mở | `-Mode Upgrade` | `success:false`, 2 lỗi: *"The model was saved by a later version of Revit."* — đúng câu `OpenFailedMessage` đã soạn |
+
+Chiều ngược là bằng chứng quan trọng nhất: nó chốt rằng **không có** cách phát một bộ family dùng chung cho mọi phiên
+bản, và mọi quy trình phải chạy từ bản thấp lên bản cao.
+
+**Một lỗi tìm ra khi chạy thật.** `-SourceFolder` nhận đường dẫn tương đối thì lượt đầu báo "Không có thư mục nguồn" —
+config đi vào job rồi được đọc **bên trong Revit**, mà thư mục làm việc của Revit không phải thư mục gọi script. Script
+nay `Resolve-Path` trước khi ghi job.
