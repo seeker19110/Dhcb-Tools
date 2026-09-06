@@ -2881,14 +2881,30 @@ Lệnh có thêm `pointMode`: `Centre` (mặc định) / `Insertion`, và luôn 
 hình học (tối đa … mm)"* — Snowdon: **20 phần tử, tối đa 102 mm**. Bộ `smoke` chạy lại với bản cuối: 41/41 + 1 bỏ
 qua, `SetoutExport` vẫn 260 điểm.
 
-### Cái chưa phân xử được — nói thẳng
+### Phân xử bằng đường thứ ba — tham số của chính family (2026-09-06 11:20 ICT)
 
-61 cột còn lệch **đều là họ Off Center** (và 4 cột Corinthian 22 mm), lệch có hệ thống theo chiều sâu cột
-(24" → 117 mm, 32" → 160 mm). Ở đó **hình học Revit** (hộp bao thường, hộp bao gốc, trọng tâm solid — ba cách
-cho cùng một tâm) và **bộ xuất IFC của Autodesk** đặt thân cột ở hai chỗ khác nhau; 11 cột trong số đó thân IFC
-còn bị cắt bởi join (267 × 548 mm cho cột 24" × 24"), script tách riêng nhóm này. Lệnh đi theo hình học Revit —
-đó là thứ Revit vẽ trên mặt bằng — nhưng đường thứ ba để phân xử (máy toàn đạc thật, hay mở family để đọc tham số
-offset) chưa có. Ghi ở `toa-do-dinh-vi.md` mục *Còn thiếu*.
+61 cột còn lệch đều là họ *Off Center* (và 4 cột Corinthian 22 mm), lệch có hệ thống theo chiều sâu cột. Mở Revit
+kèm file, Bridge rảnh, `query parameters_of Columns` lộ đúng bộ tham số instance của family:
+`Depth_Center to Front/Back`, `Width_Center to Left/Right`, `Centered Width/Depth`. Tâm thật của thân cột lệch
+điểm chèn đúng bằng `((R − L)/2, (B − F)/2)`. So ba bên trên từng cột (`query elements` + `centre-id.csv`,
+`insertion-id.csv`, thân IFCCOLUMN):
+
+| Cột | Tham số family (ft) | Tâm thật − điểm chèn theo family | Trọng tâm Revit − điểm chèn (lệnh) | Thân IFC − điểm chèn |
+|---|---|---|---|---|
+| 1372504 · 32"D × 24"W | F 1,667 · B 1,0 · L = R | **101,6 mm** | **102 mm** | 186 mm |
+| 1438929 · 24"D × 20"W | L 0,667 · R 1,0 · F = B | **50,8 mm** | **50 mm** | 186 mm |
+| 1441412 · 24"D × 19"W | L 0,583 · R 1,0 | **63,5 mm** | **64 mm** | 186 mm |
+| 1699539 · 24"D × 24"W | L 0,833 · R 1,167 | **50,8 mm** | **51 mm** | 199 mm |
+| 1362616 · 24"D × 24"W, Centered = 1 | F = B, L = R | **0** | **0** | 305 mm (thân IFC 267 × 548, bị cắt) |
+
+Trọng tâm mà `SetoutExport` lấy khớp **từng mm** với tham số family ở mọi cột soi; thân IFCCOLUMN của Autodesk
+thì hoặc bị cắt bởi join (11 cột) hoặc đặt lệch 186–199 mm ở cột lệch tâm không bị cắt — tức bộ xuất IFC dùng một
+gốc khác cho họ này. **Kết luận: lệnh đúng, IFC là bên sai ở 61 cột đó.** Script đối chiếu vẫn dùng IFC cho gốc
+Survey và giao trục (chuẩn tốt), còn tim cột phải đọc kèm nhãn *bị cắt* và biết giới hạn này.
+
+> Ba lượt sai của chính mình trước đó (hộp bao thường, quên transform, hộp bao gốc) đều bị bắt bởi cùng một phép
+> đối chiếu — và khi đối chiếu bắt đầu lệch ở đúng một họ family với con số tỉ lệ theo chiều sâu, thì thứ cần
+> nghi ngờ là trọng tài, không phải mã. Tham số family là thứ không thuộc về bên nào trong hai bên đang cãi.
 
 ### Bẫy môi trường ghi lại
 
