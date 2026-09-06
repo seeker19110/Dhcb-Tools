@@ -71,6 +71,7 @@
 - §66 — [Hai mục nợ kỹ thuật của bản đánh giá 2026-09-06 — `CommandResult.PartialSuccess` và dọn 6 khối `catch` rỗng](#66-hai-mục-nợ-kỹ-thuật-của-bản-đánh-giá-2026-09-06-commandresultpartialsuccess-và-dọn-6-khối-catch-rỗng)
 - §67 — [Xác nhận thật trên Revit — batch thoát êm bằng `PostCommand(ExitRevit)`, không còn phải kill cứng (2026-09-06 22:38 ICT)](#67-xác-nhận-thật-trên-revit-batch-thoát-êm-bằng-postcommandexitrevit-không-còn-phải-kill-cứng-2026-09-06-2238-ict)
 - §68 — [`AutoRoute` tự loại category của chính nó khi dựng route — đóng nốt "chưa phải một nút" ở §4.7 (2026-09-06 23:03 ICT)](#68-autoroute-tự-loại-category-của-chính-nó-khi-dựng-route-đóng-nốt-chưa-phải-một-nút-ở-47-2026-09-06-2303-ict)
+- §69 — [Xác nhận thật trên Revit — facet `partOf`/`relation` của IDS khớp đúng ánh xạ Revit (11.4 roadmap.md) (2026-09-06 23:15 ICT)](#69-xác-nhận-thật-trên-revit-facet-partofrelation-của-ids-khớp-đúng-ánh-xạ-revit-114-roadmapmd-2026-09-06-2315-ict)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
@@ -3486,3 +3487,39 @@ này phải ra "trong chướng ngại" giống hệt ca gõ tay category ở `r
 `0 trong file` xác nhận đúng cơ chế: Ducts trong file HVAC (chủ) bị loại khỏi vật cản như thiết kế —
 64 vật cản còn lại đều từ bốn model liên kết (kiến trúc, kết cấu, cấp thoát nước…), không phải trùng hợp
 tuyến né được. Tuyến 3,7 m tìm được ngay, không cần kỹ sư tự gõ `obstacleCategories` bỏ Ducts.
+
+## 69. Xác nhận thật trên Revit — facet `partOf`/`relation` của IDS khớp đúng ánh xạ Revit (11.4 roadmap.md) (2026-09-06 23:15 ICT)
+
+`roadmap.md` mục 11.4 để ngỏ hai việc từ khi thêm `relation` vào facet `partOf` (§41): *"chưa đối chiếu
+lại với IfcTester cho riêng thuộc tính `relation`… và chưa chạy thật trong Revit."* Solibri/IfcTester
+không có trên máy này nên vế đối chiếu công cụ ngoài vẫn để ngỏ, nhưng vế "chạy thật trong Revit" đóng
+được — không cần công cụ thứ ba, chỉ cần đúng mô hình thật và một fixture tách riêng đúng một biến.
+
+**Fixture** (`ids-relation-revit.ids`, tạm, không đưa vào repo): ba specification, **bỏ hẳn `<entity>`**
+trong `partOf` để không lẫn với vấn đề đã biết "đường Revit trả tên THẬT (`Level 1`) chứ không phải tên
+lớp IFC (`IFCBUILDINGSTOREY`)" — chỉ kiểm đúng biến `relation`:
+
+1. Cửa (`IFCDOOR`) phải `partOf relation="IFCRELCONTAINEDINSPATIALSTRUCTURE"` — kỳ vọng ĐẠT hết (mọi cửa
+   Revit đều có Level).
+2. **Đối chứng**: cùng cửa đó nhưng đòi `relation="IFCRELAGGREGATES"` — quan hệ `RevitIdsElement.PartOf`
+   (`src/DhcbTools.Core/Checks/RevitIdsElement.cs:209`) **không bao giờ sinh ra**. Kỳ vọng TRƯỢT hết. Ca
+   này là đối chứng bắt buộc: không có nó thì "ĐẠT hết" ở ca 1 có thể chỉ vì bộ kiểm **chấp nhận mọi
+   relation** (bug im lặng), không phải vì so đúng `IFCRELCONTAINEDINSPATIALSTRUCTURE`.
+3. Duct (`IFCDUCTSEGMENT`) phải `partOf relation="IFCRELASSIGNSTOGROUP"` — kỳ vọng ĐẠT đúng số duct có
+   tham số System Name/Classification.
+
+**Chạy qua `BatchRunner` trên cả hai model thật (Revit 2024, `detachFromCentral`, không ghi gì):**
+
+| Model | Spec 1 (ContainedInSpatialStructure) | Spec 2 (Aggregates, đối chứng) | Spec 3 (AssignsToGroup) |
+|---|---|---|---|
+| Snowdon Architectural | **142/142 đạt** | **0/142 đạt** (142 phần tử, đúng 142 dòng "thiếu/sai") | 0 phần tử (không có duct) |
+| Snowdon HVAC | 0 phần tử (không có cửa) | 0 phần tử (không có cửa) | **1053/1053 đạt** |
+
+Kết quả đúng như kỳ vọng ở cả ba mặt: quan hệ đúng (`ContainedInSpatialStructure`, `AssignsToGroup`) khớp
+100%, quan hệ đối chứng chưa từng xuất hiện trong ánh xạ Revit (`Aggregates`) trượt 100% — chứng minh bộ
+so `relation` đang **phân biệt được** thật (không phải lỗ hổng "chấp nhận mọi quan hệ"). "0 phần tử" ở hai
+ô kia là đúng bản chất mô hình (Architectural không có duct, HVAC không có cửa), không phải lỗi.
+
+**Còn mở:** đối chiếu với IfcTester/Solibri cho riêng `relation` (đường IFC, `IfcIdsElement`) vẫn chưa làm
+được — hai công cụ đó không có trên máy này; bản đối chiếu 10/10 ở §41 chạy **trước khi** `relation` được
+thêm vào facet `partOf`.
