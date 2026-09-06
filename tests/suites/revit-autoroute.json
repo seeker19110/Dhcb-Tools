@@ -4,7 +4,8 @@
   "//": [
     "Diem dau/cuoi lay tu TIM duct co san (SetoutExport categories Ducts, coordinateSystem Internal, unit mm, curvePoints Ends) nen chac chan nam trong khoang tran ky thuat.",
     "Ca cu (0,0,3000)->(12000,6000,3000) trong revit-mep.json that bai vi z=3000 nam GIUA hai tang (duct L1 o z~1600, L2 o z~4950) — tuc la trong san, khong phai loi bo tim duong.",
-    "Vat can chi la ket cau (o model lien ket). Khong tinh Ducts vi diem nam ngay tren duct — ca cuoi chot dung thong bao cho truong hop do."
+    "Vat can chi la ket cau (o model lien ket). Khong tinh Ducts vi diem nam ngay tren duct — ca cuoi chot dung thong bao cho truong hop do.",
+    "§54: Summary nay mang thước đo chất lượng \"dài X m = R× Manhattan, T rẽ (tối thiểu M)\". Ca đi thẳng qua lỗ mở phải ra đúng 1,00× và 0 rẽ; các ca khác chốt chặn dưới số rẽ theo số trục lệch."
   ],
   "cases": [
     {
@@ -45,7 +46,9 @@
         ],
         "summaryContains": [
           "Tuyến",
-          "từ model liên kết"
+          "từ model liên kết",
+          "× Manhattan",
+          "(tối thiểu 1)"
         ]
       }
     },
@@ -126,7 +129,9 @@
           "KHÔNG có vật cản"
         ],
         "summaryContains": [
-          "Tuyến"
+          "Tuyến",
+          "× Manhattan",
+          "(tối thiểu 1)"
         ]
       }
     },
@@ -283,7 +288,9 @@
         "success": true,
         "maxMs": 60000,
         "summaryContains": [
-          "Tuyến"
+          "Tuyến",
+          "× Manhattan",
+          "(tối thiểu 0)"
         ],
         "neverContains": [
           "Exception",
@@ -438,7 +445,9 @@
         "maxMs": 60000,
         "summaryContains": [
           "Tuyến 1 đoạn",
-          "1 lỗ mở"
+          "1 lỗ mở",
+          "1,00× Manhattan",
+          "0 rẽ (tối thiểu 0)"
         ],
         "neverContains": [
           "Exception",
@@ -515,7 +524,8 @@
         "success": true,
         "maxMs": 60000,
         "summaryContains": [
-          "Tuyến 1 đoạn"
+          "Tuyến 1 đoạn",
+          "1,00× Manhattan"
         ],
         "neverContains": [
           "Exception",

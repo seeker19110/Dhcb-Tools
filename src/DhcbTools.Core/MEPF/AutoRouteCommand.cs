@@ -336,7 +336,7 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
         {
             // Số vật cản phải nằm trong Summary chứ không chỉ Messages: báo cáo batch chỉ in Summary, mà
             // "tuyến đẹp" tìm trong không gian trống là kết quả vô nghĩa trông y hệt kết quả tốt.
-            result.Summary = $"[Xem trước] Tuyến {segments.Count} đoạn, {path.Turns} lần rẽ, né {elements} vật cản ({source}).";
+            result.Summary = $"[Xem trước] Tuyến {segments.Count} đoạn, {path.QualityText()}, né {elements} vật cản ({source}).";
             result.AffectedCount = segments.Count;
             return result;
         }
@@ -366,7 +366,7 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
             tx.Commit();
         }
 
-        result.Summary = $"Đã vẽ {created} model line (line style \"{config.LineStyleName}\"), né {elements} vật cản ({source}).";
+        result.Summary = $"Đã vẽ {created} model line (line style \"{config.LineStyleName}\"), {path.QualityText()}, né {elements} vật cản ({source}).";
         result.AffectedCount = created;
 
         if (config.BuildRoute)

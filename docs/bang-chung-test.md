@@ -2943,3 +2943,50 @@ chạy trên bản chép kèm 5 model liên kết) lấy `ElementId` cố địn
 Cái chưa chứng minh: `RouteFromLines` vẫn chỉ có ca lỗi trên model không có model line phù hợp; `AutoRoute` chất lượng
 tuyến chưa đo được (mục *Còn mở*).
 
+
+## 54. Đánh giá sâu lần hai — tài liệu lệch tái phát, thư mục kết quả 1,8 GB (2026-09-06 11:30 ICT)
+
+Đánh giá lại toàn dự án sau §51–§53. Cái vững: CI xanh liên tục, ~1.560 ca thuần phủ 100 % `Shared.*`, bằng chứng
+chạy thật trên hai phiên bản Revit, Bridge so token hằng thời gian + khoá dò + trần body. Bảy điểm yếu, xếp theo mức
+ảnh hưởng: (1) chưa có kỹ sư thật; (2) **tài liệu lệch bằng chứng tái phát** đúng kiểu §51 vừa sửa — `roadmap.md`
+còn "máy chỉ có Revit 2024.3, `release.yml` chưa đóng gói 2026" dù §51 đã chạy 2026 và ma trận đã có 2026, 9.4 còn ⬜
+"phát hành v1.1" dù v1.1.1 đã ra, `agent-khep-vong.md` hứa Revit 2021–2026 trong khi release chỉ 2023–2026; (3) ~52 %
+src ngoài cổng phủ; (4) `AutoRoute` chưa có thước đo, `RouteFromLines` chưa có đường thành công; (5) bộ ca ghi thật
+gắn ElementId của model mẫu 2024; (6) `DHCB-test-results` 1,8 GB / 41 lượt không có chính sách dọn; (7)
+`bang-chung-test.md` 2.945 dòng một file.
+
+PR #115 sửa (2) và (6): `DocReleaseClaimTests` đối chiếu câu *chưa đóng gói/phát hành <n>* và khoảng phiên bản ở tiêu
+đề với `revit:`/`acad:` của `release.yml` + installer — trên tài liệu cũ đỏ 3/4 ca, tức lỗi này từ nay có máy bắt.
+`scripts/don-ket-qua.ps1` giữ bản chép model ở lượt mới nhất mỗi bộ, mặc định xem trước, test pwsh trên thư mục giả;
+chạy thật giải phóng 321 MB. Còn thấy `%APPDATA%\DHCB` chứa 142 journal Revit (~70 MB) từ các lượt batch — ghi lại,
+chưa dọn.
+
+## 55. Thước đo chất lượng tuyến, và `RouteFromLines` lần đầu chạy đường thành công (2026-09-06 12:05 ICT)
+
+Điểm (4) của §54. Trước đó `AutoRoute` chỉ báo *"N đoạn, M lần rẽ"* — không ai biết tuyến tốt hay dở, nên nhãn *thử
+nghiệm* treo từ §18. Nay `PathResult` tính `LengthMm`, `ManhattanMm` (|dx|+|dy|+|dz|, chặn dưới của mọi tuyến trục),
+`DetourRatio` và `MinTurns` (số trục lệch − 1); Summary in *dài X m = R× Manhattan, T rẽ (tối thiểu M)*. 4 ca thuần
+(`PathQualityTests`): không vật cản → 1,00× và rẽ đúng tối thiểu; bức chắn ngang → tỉ số > 1, và chiều dài bằng đúng
+đường vòng ngắn nhất tính tay (4750 + 2 × 4000).
+
+**Revit 2024.3, bộ `autoroute` 13/13** — số thật trên Snowdon HVAC (chỉ vật cản từ model liên kết):
+
+| Ca | Kết quả |
+|---|---|
+| Nhảy cao độ giữa hai duct (3,7 m) | 2 đoạn, **1,00×**, 1 rẽ (tối thiểu 1) |
+| 12,6 m qua dầm/cột/sàn | 2 đoạn, **1,00×**, 1 rẽ (tối thiểu 1) |
+| Qua lỗ mở tường thật, mức D (hai ca) | 1 đoạn, **1,00×**, 0 rẽ (tối thiểu 0) |
+| Riser L3→L4 qua lỗ sàn | 3 đoạn, **3,48×**, 2 rẽ (tối thiểu 0) — phải đi ngang tới lỗ sàn rồi quay lại: 14,6 m cho 4,1 m chênh cao |
+
+Ba tuyến đầu tối ưu tuyệt đối theo chặn dưới; tuyến riser cho thấy đúng thứ thước đo sinh ra để chỉ: cái giá của
+việc lỗ sàn không nằm trên trục. Gỡ nhãn *thử nghiệm* — không còn lệnh nào mang nhãn.
+
+**Bộ `write-mep` 15/15** (4 ca mới, trên bản chép kèm 5 model liên kết): `AutoRoute` riser `dryRun: false` **vẽ 3 model
+line** style `DHCB-Route-Test` (106 ms) → `RouteFromLines` xem trước *3 đoạn Duct (Mitered Elbows / Taps), 2 elbow* →
+**GHI THẬT: "Đã dựng 3/3 đoạn Duct, 2 fitting OK, 0 fitting lỗi"** (433 ms, `deleteLines: true`) → chạy lại: *"Không có
+model/detail line nào dùng line style DHCB-Route-Test"*. Lần bốn chỉ có thể ra thế nếu lần ba đã `Commit()` (line bị xoá
+nằm trong cùng transaction với duct). Đây là lần đầu `RouteFromLines` dựng được gì trong Revit thật — trước đó bộ `mep`
+chỉ có ca lỗi vì model mẫu không có model line nào mang line style tuyến; nay ca tự dựng fixture bằng chính `AutoRoute`.
+
+Cái chưa chứng minh: elbow dựng được với duct type mặc định của Snowdon (Mitered Elbows / Taps); dự án có routing
+preference khác có thể ra *fitting lỗi* — lệnh đã đếm và báo riêng từng đỉnh. Chưa có số chất lượng tuyến trên dự án thật.
