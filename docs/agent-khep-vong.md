@@ -1,4 +1,4 @@
-# Agent khép vòng cho Revit 2021–2026
+# Agent khép vòng cho Revit 2023–2026
 
 Giai đoạn 10 của [`roadmap.md`](roadmap.md) — hướng khác biệt lớn nhất của dự án.
 
@@ -6,7 +6,7 @@ Giai đoạn 10 của [`roadmap.md`](roadmap.md) — hướng khác biệt lớn
 
 | | Revit 2027 MCP Server (Autodesk) | revit-mcp mã mở | DHCB |
 |---|---|---|---|
-| Phiên bản Revit | Chỉ 2027 | 2023–2027 | **2021–2026** |
+| Phiên bản Revit | Chỉ 2027 | 2023–2027 | **2023–2026** (2027 build được, chưa chạy thật; 2021–2022 biên dịch được trên net48 nhưng chưa phát hành) |
 | Ghi vào mô hình | Không (chỉ đọc) | Có, không có rào | Có, **`dryRun` mặc định + xác nhận** |
 | Xác thực | Tài khoản Autodesk | Không | Token + khoá khi dò |
 | Chạy đêm không người | Không | Không | Batch runner |
