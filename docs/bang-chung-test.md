@@ -3304,6 +3304,7 @@ chèn vào giữa — 8 `<param>` trỏ vào hư không, còn `NetloadFailure` t
 | `run-in-revit-tests.ps1 -Suite smoke` (Revit 2024.3) | **41 đạt / 0 trượt / 1 bỏ qua** trên 42 ca |
 | `run-in-revit-tests.ps1 -Suite mep` (Revit 2024.3) | **29 đạt / 0 trượt** trên 29 ca |
 | `run-in-revit-tests.ps1 -Suite mep` (Revit **2026**) | **29 đạt / 0 trượt** trên 29 ca |
+| `run-in-revit-tests.ps1 -Suite smoke` (Revit **2026**) | **41 đạt / 0 trượt / 1 bỏ qua** trên 42 ca |
 
 Trong lượt `mep`, `SleeveAuto` cho *"[Xem trước] Sẽ đặt 445 sleeve"* **không kèm** dòng cảnh báo mới — tức trên mô
 hình này mọi phần tử MEP đều đọc được solid và ghi chú không nổ bừa. Đó là phần kiểm mà một ca test thuần không làm
@@ -3314,3 +3315,12 @@ trùng bản 2024.3 — 445 sleeve, 1.120 hanger, 1.053 phần tử cao độ, 7
 nhận, 546 điểm định vị. Chỗ duy nhất lệch là `SizingProposal` **799 đoạn thay vì 266** (và `ApplySizing` 793 thay vì
 260) — đã biết từ §59: **model mẫu kèm Revit 2026 khác model mẫu kèm 2024**, không phải khác biệt của mã.
 `SleeveAuto` trên 2026 cũng không kèm dòng cảnh báo mới.
+
+Bộ `smoke` trên **Revit 2026** cũng **41/41 + 1 bỏ qua**. Các chỗ lệch so với 2024.3 — `WarningsExport` 49 warning
+(25 loại) thay 34 (10 loại), `ScheduleExport` 40/40 thay 36/36, `RemoveUnusedViews` 93 thay 90 — **trùng đúng ba con
+số đã ghi ở §51** cho model mẫu 2026, tức đây là khác biệt của file mẫu chứ không phải của mã. Những con số
+không phụ thuộc model mẫu — 142 phần tử, 1.270 phần tử IDS, 987 vi phạm, 55 sheet, 93 va chạm, 260 điểm định vị —
+trùng nguyên.
+
+**Chốt hai phiên bản.** §64 có bằng chứng đủ trên **cả Revit 2024.3 và 2026**, hai bộ `smoke` + `mep`:
+**140 ca chạy thật, 0 trượt**.
