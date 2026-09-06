@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
 using DhcbTools.Shared.Logic;
+using DhcbTools.Shared.Logic.Mep;
 using Autodesk.Revit.DB.Electrical;
 using Autodesk.Revit.DB.Mechanical;
 using Autodesk.Revit.DB.Plumbing;
@@ -12,6 +13,11 @@ namespace DhcbTools.Core.MEPF;
 /// <summary>
 /// Tìm giao cắt MEP × Tường/Sàn và đặt sleeve/opening family tại điểm giao.
 /// Dùng hai lớp lọc: BoundingBoxIntersectsFilter (nhanh) → ElementIntersectsSolidFilter (chính xác).
+/// <para>
+/// Phần quyết định (cắt tuyến với hộp, chọn cỡ, lọc, gom lý do, viết Summary) nằm ở
+/// <see cref="SleevePlanner"/> trong Shared.Logic để có test trên CI; file này chỉ còn phần
+/// dịch qua lại với API Revit.
+/// </para>
 /// </summary>
 public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
 {
@@ -86,8 +92,7 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
                     continue;
                 }
 
-                if (config.LinkNameContains.Count > 0 &&
-                    !config.LinkNameContains.Any(f => linkInstance.Name.IndexOf(f, StringComparison.OrdinalIgnoreCase) >= 0))
+                if (!SleevePlanner.LinkNameMatches(linkInstance.Name, config.LinkNameContains))
                 {
                     continue;
                 }
@@ -101,6 +106,9 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
                 linkSummary.Add($"{linkInstance.Name}: {hosts.Count} tường/sàn");
             }
         }
+
+        var hostsInDocument = hostCandidatesAll.Count(h => h.Transform == null);
+        var hostsInLinks = hostCandidatesAll.Count - hostsInDocument;
 
         foreach (var mepElem in mepElements)
         {
@@ -145,7 +153,8 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
             }
 
             // Get MEP size
-            if (!GetMepSize(mepElem, config, out double widthFt, out double heightFt))
+            var size = GetMepSize(mepElem, config);
+            if (!size.Resolved)
             {
                 unknownSize.Add(RevitCompat.IdValue(mepElem.Id));
             }
@@ -155,19 +164,9 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
                 var host = candidate.Host;
 
                 // Filter by host type name if configured
-                if (config.HostTypeNames.Count > 0)
+                if (!SleevePlanner.HostTypeMatches(GetElementTypeName(host.Document, host), config.HostTypeNames))
                 {
-                    var typeName = GetElementTypeName(host.Document, host);
-                    bool matched = false;
-                    foreach (var tn in config.HostTypeNames)
-                    {
-                        if (typeName.IndexOf(tn, StringComparison.OrdinalIgnoreCase) >= 0)
-                        {
-                            matched = true;
-                            break;
-                        }
-                    }
-                    if (!matched) continue;
+                    continue;
                 }
 
                 var intersectionPt = FindIntersectionPoint(curve, candidate, out var usedMidpoint);
@@ -193,29 +192,23 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
                 }
                 if (alreadyPlanned) continue;
 
-                placements.Add((intersectionPt, null!, host as Wall, host as Floor, widthFt, heightFt, mepElem, candidate.LinkName));
+                placements.Add((intersectionPt, null!, host as Wall, host as Floor, size.WidthFt, size.HeightFt, mepElem, candidate.LinkName));
             }
         }
 
+        var whyNothing = SleevePlanner.WhyNothing(hostsInDocument, hostsInLinks, mepElements.Count, skippedExisting, config.IncludeLinkedModels);
+
         if (config.DryRun)
         {
-            var previewSummary = $"[Xem trước] Sẽ đặt {placements.Count} sleeve tại giao cắt MEP × Tường/Sàn.";
-            if (placements.Count == 0)
-            {
-                previewSummary += " " + WhyNothing(hostCandidatesAll, mepElements.Count, skippedExisting, config);
-            }
-
-            var preview = CommandResult.Ok(previewSummary, placements.Count);
-            AddUnknownSizeWarning(preview, unknownSize, config);
-            AddMidpointFallbackNote(preview, midpointFallback);
-            AddHostSourceNote(preview, hostCandidatesAll, linkSummary, placements.Count, mepElements.Count, config);
+            var preview = CommandResult.Ok(SleevePlanner.PreviewSummary(placements.Count, whyNothing), placements.Count);
+            AddNotes(preview, unknownSize, midpointFallback, hostsInDocument, hostsInLinks, linkSummary, placements.Count, mepElements.Count, config);
             foreach (var p in placements)
             {
-                var hostDesc = p.HostWall != null ? $"Tường {p.HostWall.Id}" : $"Sàn {p.HostFloor?.Id}";
-                if (p.LinkName != null) hostDesc += $" (link \"{p.LinkName}\")";
-                preview.Messages.Add(
-                    $"  → {hostDesc} tại ({RevitCompat.FtToMm(p.Point.X):F0}, {RevitCompat.FtToMm(p.Point.Y):F0}, {RevitCompat.FtToMm(p.Point.Z):F0}) mm" +
-                    $"  W={RevitCompat.FtToMm(p.WidthFt):F0}mm H={RevitCompat.FtToMm(p.HeightFt):F0}mm");
+                var hostId = p.HostWall != null ? p.HostWall.Id : p.HostFloor?.Id;
+                preview.Messages.Add(SleevePlanner.PreviewLine(
+                    p.HostWall != null, hostId == null ? 0 : RevitCompat.IdValue(hostId), p.LinkName,
+                    RevitCompat.FtToMm(p.Point.X), RevitCompat.FtToMm(p.Point.Y), RevitCompat.FtToMm(p.Point.Z),
+                    RevitCompat.FtToMm(p.WidthFt), RevitCompat.FtToMm(p.HeightFt)));
             }
             return preview;
         }
@@ -289,7 +282,7 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
                 else
                 {
                     failedPlacements++;
-                    AddDistinct(failureReasons, "NewFamilyInstance trả về null");
+                    SleevePlanner.AddDistinctReason(failureReasons, "NewFamilyInstance trả về null");
                 }
             }
             catch (System.Exception ex)
@@ -297,72 +290,46 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
                 // Không huỷ cả lô vì một cái lỗi — nhưng PHẢI ghi lý do, trước đây nuốt im lặng nên
                 // "0 sleeve" bị đổ oan cho "không có giao cắt".
                 failedPlacements++;
-                AddDistinct(failureReasons, ex.Message);
+                SleevePlanner.AddDistinctReason(failureReasons, ex.Message);
             }
         }
 
         tx.Commit();
-        var summary = $"Đã đặt {placed} sleeve tại giao cắt MEP × Tường/Sàn.";
-        if (failedPlacements > 0)
-        {
-            summary += $" {failedPlacements}/{placements.Count} vị trí đặt lỗi (xem chi tiết trong thông báo).";
-        }
 
-        if (placed == 0 && failedPlacements == 0)
+        var result = CommandResult.Ok(
+            SleevePlanner.WriteSummary(placed, failedPlacements, placements.Count, placedOnLink, skippedExisting, whyNothing),
+            placed).WithChanged(placedIds);
+        var failureLine = SleevePlanner.FailureReasonsLine(failedPlacements, failureReasons);
+        if (failureLine != null)
         {
-            // Con số 0 trơ trọi khiến người dùng tưởng model không có giao cắt. Nói ngay trong Summary
-            // vì báo cáo batch chỉ in Summary — Messages không lọt tới mắt người đọc báo cáo.
-            summary += " " + WhyNothing(hostCandidatesAll, mepElements.Count, skippedExisting, config);
+            result.Messages.Add(failureLine);
         }
-        if (placedOnLink > 0)
-        {
-            summary += $" Trong đó {placedOnLink} cái bám tường/sàn của model liên kết nên đặt tự do (không host được vào link).";
-        }
-
-        if (skippedExisting > 0 && placed > 0)
-        {
-            summary += $" Bỏ qua, đã có sleeve: {skippedExisting} vị trí.";
-        }
-
-        var result = CommandResult.Ok(summary, placed).WithChanged(placedIds);
-        if (failedPlacements > 0)
-        {
-            result.Messages.Add($"{failedPlacements} vị trí không đặt được sleeve. Lý do (tối đa {MaxFailureReasons} loại): "
-                                + string.Join(" | ", failureReasons));
-        }
-        AddUnknownSizeWarning(result, unknownSize, config);
-        AddMidpointFallbackNote(result, midpointFallback);
-        AddHostSourceNote(result, hostCandidatesAll, linkSummary, placed, mepElements.Count, config);
+        AddNotes(result, unknownSize, midpointFallback, hostsInDocument, hostsInLinks, linkSummary, placed, mepElements.Count, config);
         return result;
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Một câu ngắn giải thích vì sao không đặt được cái nào — ghép thẳng vào Summary. Báo cáo batch chỉ
-    /// in Summary, nên lời giải thích nằm trong Messages là lời giải thích không ai đọc.
-    /// </summary>
-    private static string WhyNothing(List<HostCandidate> hosts, int mepCount, int skippedExisting, SleeveConfig config)
+    /// <summary>Ba nhóm ghi chú dùng chung cho xem trước và ghi thật, theo đúng thứ tự cũ.</summary>
+    private static void AddNotes(
+        CommandResult result, List<long> unknownSize, int midpointFallback,
+        int hostsInDocument, int hostsInLinks, List<string> linkSummary,
+        int placedCount, int mepCount, SleeveConfig config)
     {
-        var inDocument = hosts.Count(h => h.Transform == null);
-        var inLinks = hosts.Count - inDocument;
-
-        // Chạy lại lần hai là trường hợp phổ biến nhất của "0 sleeve" — và nó KHÔNG phải "không có giao
-        // cắt". Nói đúng chuyện đang xảy ra, vì đây cũng là bằng chứng lần trước đã ghi thật.
-        if (skippedExisting > 0)
+        var unknown = SleevePlanner.UnknownSizeWarning(unknownSize, RevitCompat.LookupFailed("diameter"));
+        if (unknown != null)
         {
-            return $"Bỏ qua, đã có sleeve: {skippedExisting} vị trí.";
+            result.Messages.Add(unknown);
         }
 
-        if (hosts.Count == 0)
+        var midpoint = SleevePlanner.MidpointFallbackNote(midpointFallback);
+        if (midpoint != null)
         {
-            return config.IncludeLinkedModels
-                ? "Không có tường/sàn nào để xét, kể cả trong model liên kết — kiểm lại link đã nạp chưa."
-                : "Không có tường/sàn nào trong file này và includeLinkedModels đang tắt — bật lên nếu tường nằm ở model liên kết.";
+            result.Messages.Add(midpoint);
         }
 
-        return $"Đã xét {inDocument} tường/sàn trong file + {inLinks} từ model liên kết trên {mepCount} phần tử MEP " +
-               "nhưng không có giao cắt nào (thường do lệch cao độ hoặc hostTypeNames lọc quá chặt).";
+        result.Messages.AddRange(SleevePlanner.HostSourceNotes(
+            hostsInDocument, hostsInLinks, linkSummary, placedCount, mepCount, config.IncludeLinkedModels));
     }
 
     /// <summary>Một ứng viên host: tường/sàn trong chính file, hoặc trong một model liên kết.</summary>
@@ -380,48 +347,24 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
             var bb = host.get_BoundingBox(null);
             if (bb == null)
             {
-                HasBox = false;
+                Box = null;
                 return;
             }
 
-            HasBox = true;
-            if (transform == null)
-            {
-                MinX = bb.Min.X; MinY = bb.Min.Y; MinZ = bb.Min.Z;
-                MaxX = bb.Max.X; MaxY = bb.Max.Y; MaxZ = bb.Max.Z;
-                return;
-            }
-
-            // Link xoay thì hộp bao phải dựng lại từ tám đỉnh, không chỉ hai điểm min/max.
-            double minX = double.MaxValue, minY = double.MaxValue, minZ = double.MaxValue;
-            double maxX = double.MinValue, maxY = double.MinValue, maxZ = double.MinValue;
-            for (var i = 0; i < 8; i++)
-            {
-                var corner = transform.OfPoint(new XYZ(
-                    (i & 1) == 0 ? bb.Min.X : bb.Max.X,
-                    (i & 2) == 0 ? bb.Min.Y : bb.Max.Y,
-                    (i & 4) == 0 ? bb.Min.Z : bb.Max.Z));
-                minX = Math.Min(minX, corner.X); maxX = Math.Max(maxX, corner.X);
-                minY = Math.Min(minY, corner.Y); maxY = Math.Max(maxY, corner.Y);
-                minZ = Math.Min(minZ, corner.Z); maxZ = Math.Max(maxZ, corner.Z);
-            }
-            MinX = minX; MinY = minY; MinZ = minZ;
-            MaxX = maxX; MaxY = maxY; MaxZ = maxZ;
+            var local = new Box3(bb.Min.X, bb.Min.Y, bb.Min.Z, bb.Max.X, bb.Max.Y, bb.Max.Z);
+            Box = transform == null
+                ? local
+                : SleevePlanner.TransformedBox(local, (x, y, z) =>
+                {
+                    var p = transform.OfPoint(new XYZ(x, y, z));
+                    return (p.X, p.Y, p.Z);
+                });
         }
 
-        public bool HasBox { get; }
+        /// <summary>Hộp bao ở toạ độ file chủ; null khi host không có hộp bao.</summary>
+        public Box3? Box { get; }
 
-        public double MinX { get; }
-
-        public double MinY { get; }
-
-        public double MinZ { get; }
-
-        public double MaxX { get; }
-
-        public double MaxY { get; }
-
-        public double MaxZ { get; }
+        public bool HasBox => Box != null;
 
         public Element Host { get; }
 
@@ -441,49 +384,13 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
 
     /// <summary>
     /// Hộp bao của host (đã đưa về toạ độ file chủ nếu nằm trong link) có giao với vùng quan tâm không.
-    /// Link xoay thì hộp bao phải dựng lại từ tám đỉnh, không chỉ hai điểm min/max.
     /// </summary>
     private static bool PassesBox(HostCandidate candidate, Outline outline) =>
-        candidate.HasBox && MepLayout.BoundingBoxesIntersect(
-            candidate.MinX, candidate.MinY, candidate.MinZ,
-            candidate.MaxX, candidate.MaxY, candidate.MaxZ,
+        candidate.Box != null && MepLayout.BoundingBoxesIntersect(
+            candidate.Box.MinX, candidate.Box.MinY, candidate.Box.MinZ,
+            candidate.Box.MaxX, candidate.Box.MaxY, candidate.Box.MaxZ,
             outline.MinimumPoint.X, outline.MinimumPoint.Y, outline.MinimumPoint.Z,
             outline.MaximumPoint.X, outline.MaximumPoint.Y, outline.MaximumPoint.Z);
-
-    /// <summary>
-    /// Nói rõ host lấy từ đâu, và khi không đặt được cái nào thì VÌ SAO. "Đã đặt 0 sleeve" trơ trọi là
-    /// thứ khiến người dùng tưởng model không có giao cắt, trong khi thật ra tường nằm ở link chưa nạp
-    /// hoặc bị bộ lọc loại hết.
-    /// </summary>
-    private static void AddHostSourceNote(
-        CommandResult result, List<HostCandidate> hosts, List<string> linkSummary,
-        int placedCount, int mepCount, SleeveConfig config)
-    {
-        var inDocument = hosts.Count(h => h.Transform == null);
-        var inLinks = hosts.Count - inDocument;
-        result.Messages.Add($"Tường/sàn xét tới: {inDocument} trong file, {inLinks} từ model liên kết.");
-        foreach (var line in linkSummary)
-        {
-            result.Messages.Add("  Link — " + line);
-        }
-
-        if (placedCount > 0)
-        {
-            return;
-        }
-
-        if (hosts.Count == 0)
-        {
-            result.Messages.Add(!config.IncludeLinkedModels
-                ? "Không có tường/sàn nào để xét. File này không có tường/sàn, và includeLinkedModels đang tắt — bật lên nếu tường nằm ở model liên kết."
-                : "Không có tường/sàn nào để xét, kể cả trong model liên kết. Kiểm lại link đã nạp chưa (Manage → Manage Links).");
-        }
-        else
-        {
-            result.Messages.Add($"Có {hosts.Count} tường/sàn và {mepCount} phần tử MEP nhưng không tìm ra giao cắt nào. " +
-                                "Thường là do MEP và kết cấu lệch cao độ, hoặc hostTypeNames lọc quá chặt.");
-        }
-    }
 
     private static List<Element> CollectMepElements(Document doc, List<string> categoryFilter)
     {
@@ -498,23 +405,9 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         var result = new List<Element>();
         foreach (var bic in allCategories)
         {
-            if (categoryFilter.Count > 0)
+            if (!SleevePlanner.CategoryIncluded(SleevePlanner.ShortCategoryName(bic.ToString()), categoryFilter))
             {
-                var catName = bic.ToString()
-                    .Replace("OST_", string.Empty)
-                    .Replace("Curves", string.Empty)
-                    .Replace("Curve", string.Empty);
-                bool include = false;
-                foreach (var f in categoryFilter)
-                {
-                    if (catName.IndexOf(f, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                        f.IndexOf(catName, StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        include = true;
-                        break;
-                    }
-                }
-                if (!include) continue;
+                continue;
             }
 
             var elems = new FilteredElementCollector(doc)
@@ -576,25 +469,6 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         return null;
     }
 
-    private const int MaxFailureReasons = 5;
-
-    private static void AddDistinct(List<string> reasons, string message)
-    {
-        if (reasons.Count < MaxFailureReasons && !reasons.Contains(message))
-        {
-            reasons.Add(message);
-        }
-    }
-
-    private static void AddMidpointFallbackNote(CommandResult result, int midpointFallback)
-    {
-        if (midpointFallback > 0)
-        {
-            result.Messages.Add($"{midpointFallback} giao cắt không tính được bằng solid lẫn hộp bao của host — "
-                                + "dùng tạm trung điểm tuyến MEP, vị trí sleeve có thể lệch, kiểm lại.");
-        }
-    }
-
     /// <summary>Hướng tuyến MEP (đơn vị), null nếu không có LocationCurve.</summary>
     private static XYZ? MepDirection(Element mepElement)
     {
@@ -606,8 +480,8 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
     /// <summary>
     /// Điểm giao thật giữa tuyến MEP và host (toạ độ file chủ). Thứ tự: (1) solid của host ×
     /// tuyến — <see cref="Solid.IntersectWithCurve"/>, lấy trung điểm đoạn nằm trong host;
-    /// (2) cắt tuyến với hộp bao host (Liang–Barsky) khi host không có solid; (3) bất đắc dĩ mới
-    /// dùng trung điểm tuyến MEP và báo qua <paramref name="usedMidpoint"/>.
+    /// (2) cắt tuyến với hộp bao host (Liang–Barsky, <see cref="SleevePlanner.ClipLineToBox"/>) khi host
+    /// không có solid; (3) bất đắc dĩ mới dùng trung điểm tuyến MEP và báo qua <paramref name="usedMidpoint"/>.
     /// Bản trước luôn trả trung điểm tuyến, nên ống dài xuyên nhiều tường thì mọi sleeve dồn về một chỗ.
     /// </summary>
     private static XYZ? FindIntersectionPoint(Curve mepCurve, HostCandidate candidate, out bool usedMidpoint)
@@ -655,14 +529,11 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
 
         // 2. Cắt tuyến với hộp bao host — hộp bao của HostCandidate đã ở toạ độ file chủ, nên dùng
         // tuyến gốc (file chủ). Chỉ áp dụng cho tuyến thẳng.
-        if (candidate.HasBox && mepCurve is Line)
+        if (candidate.Box != null && mepCurve is Line)
         {
             var p0 = mepCurve.GetEndPoint(0);
             var p1 = mepCurve.GetEndPoint(1);
-            if (ClipLineToBox(p0, p1,
-                    candidate.MinX, candidate.MinY, candidate.MinZ,
-                    candidate.MaxX, candidate.MaxY, candidate.MaxZ,
-                    out var t0, out var t1))
+            if (SleevePlanner.ClipLineToBox(p0.X, p0.Y, p0.Z, p1.X, p1.Y, p1.Z, candidate.Box, out var t0, out var t1))
             {
                 var tm = (t0 + t1) * 0.5;
                 return p0 + (p1 - p0) * tm;
@@ -672,103 +543,31 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         // 3. Bất đắc dĩ: trung điểm tuyến.
         usedMidpoint = true;
         var mid = mepCurve.Evaluate(0.5, true);
-        if (candidate.HasBox && candidate.Host is Floor)
+        if (candidate.Box != null && candidate.Host is Floor)
         {
-            return new XYZ(mid.X, mid.Y, (candidate.MinZ + candidate.MaxZ) * 0.5);
+            return new XYZ(mid.X, mid.Y, (candidate.Box.MinZ + candidate.Box.MaxZ) * 0.5);
         }
 
         return mid;
     }
 
-    /// <summary>Liang–Barsky: khoảng tham số [t0, t1] ⊂ [0, 1] của đoạn p0→p1 nằm trong hộp; false nếu không cắt.</summary>
-    private static bool ClipLineToBox(XYZ p0, XYZ p1,
-        double minX, double minY, double minZ, double maxX, double maxY, double maxZ,
-        out double t0, out double t1)
-    {
-        t0 = 0.0;
-        t1 = 1.0;
-        var d = p1 - p0;
-        var starts = new[] { p0.X, p0.Y, p0.Z };
-        var deltas = new[] { d.X, d.Y, d.Z };
-        var mins = new[] { minX, minY, minZ };
-        var maxs = new[] { maxX, maxY, maxZ };
-
-        for (var axis = 0; axis < 3; axis++)
-        {
-            if (Math.Abs(deltas[axis]) < 1e-12)
-            {
-                if (starts[axis] < mins[axis] || starts[axis] > maxs[axis]) return false;
-                continue;
-            }
-
-            var tA = (mins[axis] - starts[axis]) / deltas[axis];
-            var tB = (maxs[axis] - starts[axis]) / deltas[axis];
-            if (tA > tB) { var tmp = tA; tA = tB; tB = tmp; }
-            t0 = Math.Max(t0, tA);
-            t1 = Math.Min(t1, tB);
-            if (t0 > t1) return false;
-        }
-
-        return true;
-    }
-
-    /// <summary>
-    /// Cảnh báo các phần tử không tra được kích thước — kèm tên tham số đã thử và chỗ khai báo thêm,
-    /// để kỹ sư sửa được chứ không chỉ biết là "có gì đó sai".
-    /// </summary>
-    private static void AddUnknownSizeWarning(CommandResult result, List<long> unknownSize, SleeveConfig config)
-    {
-        if (unknownSize.Count == 0)
-        {
-            return;
-        }
-
-        result.Messages.Add(
-            $"{unknownSize.Count} phần tử MEP không tra được kích thước, dùng tạm 152 mm — sleeve có thể sai cỡ. "
-            + RevitCompat.LookupFailed("diameter")
-            + " Phần tử: " + string.Join(", ", unknownSize.Take(20))
-            + (unknownSize.Count > 20 ? ", …" : string.Empty));
-    }
+    /// <summary>Giá trị double dương của tham số, hoặc null khi không có/không phải double/≤ 0.</summary>
+    private static double? PositiveDouble(Parameter? param) =>
+        param != null && param.StorageType == StorageType.Double && param.AsDouble() > 0
+            ? param.AsDouble()
+            : (double?)null;
 
     /// <summary>
     /// Kích thước phần tử MEP để tính lỗ mở. Tra qua từ điển tên tham số (giai đoạn 9.2) thay vì
     /// tên tiếng Anh cứng — trên Revit tiếng Việt thì "Outer Diameter"/"Width" không tồn tại.
+    /// Quyết định cỡ nằm ở <see cref="SleevePlanner.SizeFrom"/>; ở đây chỉ đọc ba tham số.
     /// </summary>
-    /// <returns>false khi không tra được kích thước nào: người gọi phải báo, không được im lặng
-    /// dùng giá trị mặc định rồi đặt sleeve sai cỡ.</returns>
-    private static bool GetMepSize(Element elem, SleeveConfig config,
-        out double widthFt, out double heightFt)
-    {
-        double clearFt = RevitCompat.MmToFt(config.ClearanceMm) * 2; // both sides
-        widthFt = 0.5; // 6 inch — chỉ dùng khi đã báo cho người dùng biết là không tra được
-        heightFt = 0.5;
-
-        var outerDiam = RevitCompat.Lookup(elem, "diameter");
-        if (outerDiam != null && outerDiam.StorageType == StorageType.Double && outerDiam.AsDouble() > 0)
-        {
-            widthFt = outerDiam.AsDouble() + clearFt;
-            heightFt = widthFt;
-            return true;
-        }
-
-        var widthParam = RevitCompat.Lookup(elem, "width", config.WidthParamName);
-        var heightParam = RevitCompat.Lookup(elem, "height", config.HeightParamName);
-        var found = false;
-
-        if (widthParam != null && widthParam.StorageType == StorageType.Double && widthParam.AsDouble() > 0)
-        {
-            widthFt = widthParam.AsDouble() + clearFt;
-            found = true;
-        }
-
-        if (heightParam != null && heightParam.StorageType == StorageType.Double && heightParam.AsDouble() > 0)
-        {
-            heightFt = heightParam.AsDouble() + clearFt;
-            found = true;
-        }
-
-        return found;
-    }
+    private static SleevePlanner.SleeveSize GetMepSize(Element elem, SleeveConfig config) =>
+        SleevePlanner.SizeFrom(
+            PositiveDouble(RevitCompat.Lookup(elem, "diameter")),
+            PositiveDouble(RevitCompat.Lookup(elem, "width", config.WidthParamName)),
+            PositiveDouble(RevitCompat.Lookup(elem, "height", config.HeightParamName)),
+            RevitCompat.MmToFt(config.ClearanceMm));
 
     /// <summary>
     /// Mặt host gần điểm nhất, ƯU TIÊN mặt phẳng có pháp tuyến gần song song <paramref name="preferredNormal"/>
