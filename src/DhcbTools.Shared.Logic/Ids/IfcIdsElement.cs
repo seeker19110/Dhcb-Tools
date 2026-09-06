@@ -26,7 +26,7 @@ namespace DhcbTools.Shared.Logic.Ids
         private readonly Dictionary<int, int> _typeOf = new Dictionary<int, int>();
         private readonly Dictionary<int, List<string>> _materials = new Dictionary<int, List<string>>();
         private readonly Dictionary<int, List<KeyValuePair<string, string>>> _classifications = new Dictionary<int, List<KeyValuePair<string, string>>>();
-        private readonly Dictionary<int, List<string>> _partOf = new Dictionary<int, List<string>>();
+        private readonly Dictionary<int, List<(string? Relation, string Entity)>> _partOf = new Dictionary<int, List<(string?, string)>>();
 
         private IfcIdsModel(IfcModel model)
         {
@@ -81,8 +81,8 @@ namespace DhcbTools.Shared.Logic.Ids
         internal IReadOnlyList<KeyValuePair<string, string>> ClassificationsOf(int id) =>
             _classifications.TryGetValue(id, out var list) ? list : (IReadOnlyList<KeyValuePair<string, string>>)Array.Empty<KeyValuePair<string, string>>();
 
-        internal IReadOnlyList<string> PartOfOf(int id) =>
-            _partOf.TryGetValue(id, out var list) ? list : (IReadOnlyList<string>)Array.Empty<string>();
+        internal IReadOnlyList<(string? Relation, string Entity)> PartOfOf(int id) =>
+            _partOf.TryGetValue(id, out var list) ? list : (IReadOnlyList<(string?, string)>)Array.Empty<(string?, string)>();
 
         private void BuildTypes()
         {
@@ -285,14 +285,21 @@ namespace DhcbTools.Shared.Logic.Ids
         }
 
         /// <summary>
-        /// "Thuộc về": tên lớp của cấu trúc không gian chứa phần tử và tổ tiên của nó
-        /// (<c>IfcRelContainedInSpatialStructure</c> + <c>IfcRelAggregates</c>), của tổ hợp chứa phần tử,
-        /// và của nhóm/hệ (<c>IfcRelAssignsToGroup</c>). IDS khai <c>partOf</c> bằng <b>tên lớp</b>
-        /// (<c>IFCBUILDINGSTOREY</c>, <c>IFCSYSTEM</c>…), nên ở đây trả tên lớp chứ không trả tên tầng.
+        /// "Thuộc về": mỗi tổ tiên gắn đúng loại quan hệ IFC đã dùng để tới đó, theo
+        /// <c>Documentation/UserManual/partof-facet.md</c> của buildingSMART/IDS — <c>partOf</c> khai
+        /// <c>relation</c> thì chỉ chuỗi <b>thuần một loại quan hệ đó</b> mới hợp lệ (không được rơi
+        /// xuống loại khác giữa chừng); không khai <c>relation</c> thì mọi cấu trúc quan hệ hợp lệ, kể cả
+        /// <b>trộn nhiều loại</b>, đều tính — hai trường hợp này không phải cùng một tập hợp (chuỗi trộn
+        /// A→B bằng <c>IfcRelNests</c> rồi B→C bằng <c>IfcRelAggregates</c> làm C "thuộc về" A khi không
+        /// khai <c>relation</c>, nhưng KHÔNG khi khai <c>relation="IFCRELAGGREGATES"</c>), nên tính riêng:
+        /// năm chuỗi thuần (<c>Relation</c> khác <c>null</c>) và một chuỗi trộn
+        /// (<c>Relation</c> <c>null</c>, đi qua hợp của cả năm loại quan hệ).
+        /// IDS khai <c>partOf</c> bằng <b>tên lớp</b> (<c>IFCBUILDINGSTOREY</c>, <c>IFCSYSTEM</c>…), nên ở
+        /// đây trả tên lớp chứ không trả tên tầng.
         /// </summary>
         private void BuildPartOf()
         {
-            var parentOf = new Dictionary<int, int>();
+            var aggregates = new Dictionary<int, int>();
             // IfcRelAggregates: (…, RelatingObject=4, RelatedObjects=5)
             foreach (var rel in _model.OfType("IFCRELAGGREGATES"))
             {
@@ -304,10 +311,11 @@ namespace DhcbTools.Shared.Logic.Ids
 
                 foreach (var child in References(rel.At(5)))
                 {
-                    parentOf[child] = parent.Value;
+                    aggregates[child] = parent.Value;
                 }
             }
 
+            var nests = new Dictionary<int, int>();
             // IfcRelNests: cùng bố cục với IfcRelAggregates
             foreach (var rel in _model.OfType("IFCRELNESTS"))
             {
@@ -319,14 +327,11 @@ namespace DhcbTools.Shared.Logic.Ids
 
                 foreach (var child in References(rel.At(5)))
                 {
-                    if (!parentOf.ContainsKey(child))
-                    {
-                        parentOf[child] = parent.Value;
-                    }
+                    nests[child] = parent.Value;
                 }
             }
 
-            var containerOf = new Dictionary<int, int>();
+            var contained = new Dictionary<int, int>();
             // IfcRelContainedInSpatialStructure: (…, RelatedElements=4, RelatingStructure=5)
             foreach (var rel in _model.OfType("IFCRELCONTAINEDINSPATIALSTRUCTURE"))
             {
@@ -338,11 +343,135 @@ namespace DhcbTools.Shared.Logic.Ids
 
                 foreach (var element in References(rel.At(4)))
                 {
-                    containerOf[element] = container.Value;
+                    contained[element] = container.Value;
                 }
             }
 
-            void AddAncestors(List<string> list, int start)
+            var groups = new Dictionary<int, List<int>>();
+            // IfcRelAssignsToGroup: (…, RelatedObjects=4, RelatedObjectsType=5, RelatingGroup=6). Một phần
+            // tử có thể vào nhiều nhóm (member của cả hệ điện lẫn hệ điều khiển), nên gom danh sách chứ
+            // không ghi đè.
+            foreach (var rel in _model.OfType("IFCRELASSIGNSTOGROUP"))
+            {
+                var group = rel.At(6).AsReference();
+                if (group == null)
+                {
+                    continue;
+                }
+
+                foreach (var member in References(rel.At(4)))
+                {
+                    if (!groups.TryGetValue(member, out var list))
+                    {
+                        list = new List<int>();
+                        groups[member] = list;
+                    }
+
+                    list.Add(group.Value);
+                }
+            }
+
+            var voidsAndFills = new Dictionary<int, int>();
+            {
+                // IfcRelVoidsElement: (…, RelatingBuildingElement=4, RelatedOpeningElement=5) — tường/dầm
+                // "khoét" một opening. IfcRelFillsElement: (…, RelatingOpeningElement=4,
+                // RelatedBuildingElement=5) — cửa/cửa sổ "lấp" opening đó. IDS gộp cặp này thành MỘT loại
+                // quan hệ (giá trị enum có khoảng trắng ở giữa trong chính ids.xsd) nối thẳng cửa → phần tử
+                // chủ nhà, bỏ qua opening trung gian — opening tự nó không phải là điều IDS author cần nói.
+                var openingHost = new Dictionary<int, int>();
+                foreach (var rel in _model.OfType("IFCRELVOIDSELEMENT"))
+                {
+                    var host = rel.At(4).AsReference();
+                    var opening = rel.At(5).AsReference();
+                    if (host != null && opening != null)
+                    {
+                        openingHost[opening.Value] = host.Value;
+                    }
+                }
+
+                foreach (var rel in _model.OfType("IFCRELFILLSELEMENT"))
+                {
+                    var opening = rel.At(4).AsReference();
+                    var filled = rel.At(5).AsReference();
+                    if (opening != null && filled != null && openingHost.TryGetValue(opening.Value, out var host))
+                    {
+                        voidsAndFills[filled.Value] = host;
+                    }
+                }
+            }
+
+            // Chuỗi THUẦN một loại quan hệ: đi tới hết theo đúng một bảng cha-con, dừng khi hết cạnh hoặc
+            // gặp lại (chắn vòng lặp — mô hình lỗi có thể tự tham chiếu).
+            List<string> WalkSingle(IReadOnlyDictionary<int, int> parentOf, int start)
+            {
+                var list = new List<string>();
+                var visited = new HashSet<int> { start };
+                var current = start;
+                while (parentOf.TryGetValue(current, out var next) && visited.Add(next))
+                {
+                    var entity = _model.ById(next);
+                    if (entity != null && !list.Contains(entity.Type))
+                    {
+                        list.Add(entity.Type);
+                    }
+
+                    current = next;
+                }
+
+                return list;
+            }
+
+            // Chuỗi THUẦN của quan hệ có thể rẽ nhánh (nhóm/hệ): BFS qua đúng một bảng, có thể nhiều cha.
+            List<string> WalkMulti(IReadOnlyDictionary<int, List<int>> parentsOf, int start)
+            {
+                var list = new List<string>();
+                var visited = new HashSet<int> { start };
+                var queue = new Queue<int>();
+                queue.Enqueue(start);
+                while (queue.Count > 0)
+                {
+                    if (!parentsOf.TryGetValue(queue.Dequeue(), out var parents))
+                    {
+                        continue;
+                    }
+
+                    foreach (var parent in parents)
+                    {
+                        if (!visited.Add(parent))
+                        {
+                            continue;
+                        }
+
+                        var entity = _model.ById(parent);
+                        if (entity != null && !list.Contains(entity.Type))
+                        {
+                            list.Add(entity.Type);
+                        }
+
+                        queue.Enqueue(parent);
+                    }
+                }
+
+                return list;
+            }
+
+            // Chuỗi TRỘN cho trường hợp không khai relation: y NGUYÊN thuật toán trước bản sửa này (một
+            // "cha kế tiếp" mỗi bước — ưu tiên aggregates rồi mới container, KHÔNG rẽ nhánh qua nhóm/hệ),
+            // để không âm thầm đổi hành vi đã có test giữ từ trước. Rẽ nhánh đầy đủ qua mọi quan hệ (kể cả
+            // nhóm/hệ) từng làm cho phụ kiện lồng trong cửa "thuộc về" luôn cả hệ của chính cửa — hợp lý
+            // theo nghĩa đồ thị, nhưng KHÁC kết luận cũ mà chưa ai xác nhận lại là đúng hơn (không có
+            // IfcTester ở đây để đối chiếu). Chỉ phần "khai relation cụ thể" là mục 11.4 phải sửa, không
+            // phải phần này.
+            var singleParent = new Dictionary<int, int>(aggregates);
+            foreach (var pair in nests)
+            {
+                if (!singleParent.ContainsKey(pair.Key))
+                {
+                    singleParent[pair.Key] = pair.Value;
+                }
+            }
+
+            void AddMixedAncestors(List<string> list, int start)
             {
                 var guard = 0;
                 var current = start;
@@ -354,9 +483,9 @@ namespace DhcbTools.Shared.Logic.Ids
                         list.Add(entity.Type);
                     }
 
-                    if (!parentOf.TryGetValue(current, out var next))
+                    if (!singleParent.TryGetValue(current, out var next))
                     {
-                        if (containerOf.TryGetValue(current, out var container))
+                        if (contained.TryGetValue(current, out var container))
                         {
                             next = container;
                         }
@@ -370,45 +499,60 @@ namespace DhcbTools.Shared.Logic.Ids
                 }
             }
 
-            foreach (var id in containerOf.Keys.Concat(parentOf.Keys).Distinct())
+            var mixed = new Dictionary<int, List<string>>();
+            foreach (var id in contained.Keys.Concat(singleParent.Keys).Distinct())
             {
                 var list = new List<string>();
-                if (parentOf.TryGetValue(id, out var parent))
+                if (singleParent.TryGetValue(id, out var parent))
                 {
-                    AddAncestors(list, parent);
+                    AddMixedAncestors(list, parent);
                 }
 
-                if (containerOf.TryGetValue(id, out var container))
+                if (contained.TryGetValue(id, out var container))
                 {
-                    AddAncestors(list, container);
+                    AddMixedAncestors(list, container);
                 }
 
-                _partOf[id] = list;
+                mixed[id] = list;
             }
 
-            // IfcRelAssignsToGroup: (…, RelatedObjects=4, RelatedObjectsType=5, RelatingGroup=6)
-            foreach (var rel in _model.OfType("IFCRELASSIGNSTOGROUP"))
+            // Nhóm/hệ: một bước phẳng, KHÔNG đệ quy — chỉ gắn cho đúng phần tử là RelatedObjects của
+            // IfcRelAssignsToGroup, không lan lên/xuống theo aggregates/nests/contained. Y nguyên bản cũ.
+            foreach (var pair in groups)
             {
-                var groupId = rel.At(6).AsReference();
-                var group = groupId == null ? null : _model.ById(groupId.Value);
-                if (group == null)
+                if (!mixed.TryGetValue(pair.Key, out var list))
                 {
-                    continue;
+                    list = new List<string>();
+                    mixed[pair.Key] = list;
                 }
 
-                foreach (var member in References(rel.At(4)))
+                foreach (var groupId in pair.Value)
                 {
-                    if (!_partOf.TryGetValue(member, out var list))
-                    {
-                        list = new List<string>();
-                        _partOf[member] = list;
-                    }
-
-                    if (!list.Contains(group.Type))
+                    var group = _model.ById(groupId);
+                    if (group != null && !list.Contains(group.Type))
                     {
                         list.Add(group.Type);
                     }
                 }
+            }
+
+            var everyChild = aggregates.Keys.Concat(nests.Keys).Concat(contained.Keys)
+                .Concat(groups.Keys).Concat(voidsAndFills.Keys).Distinct();
+
+            foreach (var id in everyChild)
+            {
+                var entries = new List<(string?, string)>();
+                if (mixed.TryGetValue(id, out var mixedList))
+                {
+                    entries.AddRange(mixedList.Select(type => ((string?)null, type)));
+                }
+
+                entries.AddRange(WalkSingle(aggregates, id).Select(type => ((string?)IdsRelations.Aggregates, type)));
+                entries.AddRange(WalkSingle(nests, id).Select(type => ((string?)IdsRelations.Nests, type)));
+                entries.AddRange(WalkSingle(contained, id).Select(type => ((string?)IdsRelations.ContainedInSpatialStructure, type)));
+                entries.AddRange(WalkMulti(groups, id).Select(type => ((string?)IdsRelations.AssignsToGroup, type)));
+                entries.AddRange(WalkSingle(voidsAndFills, id).Select(type => ((string?)IdsRelations.VoidsAndFills, type)));
+                _partOf[id] = entries;
             }
         }
 
@@ -623,7 +767,7 @@ namespace DhcbTools.Shared.Logic.Ids
         public IEnumerable<string> Materials => _model.MaterialsOf(_entity.Id);
 
         /// <summary>Tên lớp của tầng/toà nhà/tổ hợp/hệ chứa phần tử.</summary>
-        public IEnumerable<string> PartOf => _model.PartOfOf(_entity.Id);
+        public IEnumerable<(string? Relation, string Entity)> PartOf => _model.PartOfOf(_entity.Id);
 
         private static bool IsType(IfcEntity entity) => entity.Type.EndsWith("TYPE", StringComparison.OrdinalIgnoreCase);
 

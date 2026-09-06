@@ -136,6 +136,37 @@ namespace DhcbTools.Shared.Logic.Ids
         PartOf,
     }
 
+    /// <summary>
+    /// Năm giá trị hợp lệ của thuộc tính <c>relation</c> trên facet <c>partOf</c>, chép nguyên văn từ
+    /// <c>simpleType "relations"</c> trong <c>Schema/ids.xsd</c> 1.0 (buildingSMART/IDS) — kể cả
+    /// <see cref="VoidsAndFills"/> có khoảng trắng bên trong đúng như enum của lược đồ gốc. Dùng chung ở
+    /// ba chỗ: đọc file (kiểm giá trị hợp lệ), <c>IfcIdsElement</c> (đường IFC), <c>RevitIdsElement</c>
+    /// (đường Revit) — một nguồn duy nhất, đổi tên quan hệ không phải sửa ba nơi.
+    /// </summary>
+    public static class IdsRelations
+    {
+        /// <summary>Tổ hợp lớn hơn gồm nhiều phần tử nhỏ hơn (nhiều tầng làm nên một toà nhà).</summary>
+        public const string Aggregates = "IFCRELAGGREGATES";
+
+        /// <summary>Nhóm/hệ tuỳ mục đích (thiết bị vào một hệ phân phối).</summary>
+        public const string AssignsToGroup = "IFCRELASSIGNSTOGROUP";
+
+        /// <summary>Vị trí chứa chính của phần tử (tầng, site).</summary>
+        public const string ContainedInSpatialStructure = "IFCRELCONTAINEDINSPATIALSTRUCTURE";
+
+        /// <summary>Gắn vật lý vào vật chủ lớn hơn (phụ kiện lồng trong khối lớn).</summary>
+        public const string Nests = "IFCRELNESTS";
+
+        /// <summary>Cặp quan hệ khoét lỗ/lấp lỗ — IDS gộp thành một loại (cửa/cửa sổ lấp opening của tường).</summary>
+        public const string VoidsAndFills = "IFCRELVOIDSELEMENT IFCRELFILLSELEMENT";
+
+        /// <summary>Tập hợp cả năm giá trị, so không phân biệt hoa/thường.</summary>
+        public static readonly HashSet<string> All = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            Aggregates, AssignsToGroup, ContainedInSpatialStructure, Nests, VoidsAndFills,
+        };
+    }
+
     /// <summary>Một facet: một điều kiện áp lên phần tử.</summary>
     public sealed class IdsFacet
     {
@@ -150,6 +181,14 @@ namespace DhcbTools.Shared.Logic.Ids
 
         /// <summary>Giá trị phải thoả (không ràng buộc = chỉ cần tồn tại).</summary>
         public IdsValue Value { get; set; } = new IdsValue();
+
+        /// <summary>
+        /// Chỉ có ở <see cref="IdsFacetKind.PartOf"/>: một trong năm giá trị của <see cref="IdsRelations"/>
+        /// (thuộc tính <c>relation</c> của <c>partOf</c>), hoặc <c>null</c> khi IDS không khai — nghĩa là
+        /// chấp nhận mọi cấu trúc quan hệ IFC hợp lệ, kể cả trộn nhiều loại (xem <c>partof-facet.md</c>
+        /// của buildingSMART). Khác <c>null</c> ở mọi facet khác không có ý nghĩa gì.
+        /// </summary>
+        public string? Relation { get; set; }
 
         /// <summary>
         /// <c>required</c> (mặc định) | <c>optional</c> | <c>prohibited</c>. Bên phần yêu cầu,
@@ -181,7 +220,7 @@ namespace DhcbTools.Shared.Logic.Ids
                 case IdsFacetKind.Material:
                     return "vật liệu " + Value.Describe();
                 default:
-                    return "thuộc về " + Value.Describe();
+                    return "thuộc về " + (Relation != null ? "(qua " + Relation + ") " : string.Empty) + Value.Describe();
             }
         }
     }
@@ -305,7 +344,24 @@ namespace DhcbTools.Shared.Logic.Ids
                         yield return Facet(element, IdsFacetKind.Material, "value", null, "value");
                         break;
                     case "partof":
-                        yield return Facet(element, IdsFacetKind.PartOf, "entity", null, "entity");
+                        var partOf = Facet(element, IdsFacetKind.PartOf, "entity", null, "entity");
+                        var relation = ((string?)element.Attribute("relation"))?.Trim();
+                        if (!string.IsNullOrEmpty(relation))
+                        {
+                            // Sai một chữ trong "relation" (viết thiếu, sai chính tả) mà nhận thì facet lặng
+                            // lẽ rơi về "chuỗi trộn" — kiểm lỏng hơn điều IDS author thật sự đòi, và báo cáo
+                            // không có cách nào biết. Từ chối rõ, giống mọi facet/ràng buộc lạ khác ở đây.
+                            if (!IdsRelations.All.Contains(relation!))
+                            {
+                                throw new IdsParseException(
+                                    "Facet \"partOf\" khai relation=\"" + relation + "\" không hợp lệ. Hợp lệ: "
+                                    + string.Join(", ", new[] { IdsRelations.Aggregates, IdsRelations.AssignsToGroup, IdsRelations.ContainedInSpatialStructure, IdsRelations.Nests, IdsRelations.VoidsAndFills }) + ".");
+                            }
+
+                            partOf.Relation = relation.ToUpperInvariant();
+                        }
+
+                        yield return partOf;
                         break;
                     default:
                         // Facet lạ (bản IDS mới hơn) — bỏ qua im lặng thì bộ kiểm báo "đạt" cho một điều

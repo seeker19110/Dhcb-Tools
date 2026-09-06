@@ -23,7 +23,8 @@ internal sealed class FakeIdsElement : IIdsElement
 
     public List<string> MaterialNames { get; } = new();
 
-    public List<string> Parents { get; } = new();
+    /// <summary>Tổ tiên "thuộc về" (quan hệ, tên lớp) — quan hệ rỗng ("") nghĩa là chuỗi trộn (relation null).</summary>
+    public List<(string Relation, string Entity)> Parents { get; } = new();
 
     public string? Attribute(string name) => Attributes.TryGetValue(name, out var value) ? value : null;
 
@@ -38,7 +39,8 @@ internal sealed class FakeIdsElement : IIdsElement
 
     public IEnumerable<string> Materials => MaterialNames;
 
-    public IEnumerable<string> PartOf => Parents;
+    public IEnumerable<(string? Relation, string Entity)> PartOf =>
+        Parents.Select(p => (string.IsNullOrEmpty(p.Relation) ? null : p.Relation, p.Entity));
 }
 
 public class IdsValueTests
@@ -202,6 +204,29 @@ public class IdsSpecTests
         Assert.Equal("phân loại = \"Uniclass\": = \"EF_25_10\"", facets[3].Describe());
         Assert.Equal("vật liệu = \"Bê tông\"", facets[4].Describe());
         Assert.Equal("thuộc về = \"Tầng 1\"", facets[5].Describe());
+    }
+
+    [Fact]
+    public void PartOf_DocThuocTinhRelation_VaMoTaKemTheo()
+    {
+        var specs = Parse(
+            "<specification name=\"Trong khong gian\"><applicability/><requirements>"
+            + "<partOf relation=\"ifcRelContainedInSpatialStructure\"><entity><simpleValue>IFCSPACE</simpleValue></entity></partOf>"
+            + "</requirements></specification>");
+
+        var facet = Assert.Single(Assert.Single(specs).Requirements);
+        Assert.Equal(IdsRelations.ContainedInSpatialStructure, facet.Relation);
+        Assert.Equal("thuộc về (qua IFCRELCONTAINEDINSPATIALSTRUCTURE) = \"IFCSPACE\"", facet.Describe());
+    }
+
+    [Fact]
+    public void PartOf_RelationLa_KhongThuoc5GiaTri_TuChoiFile()
+    {
+        var ex = Assert.Throws<IdsParseException>(() => Parse(
+            "<specification name=\"Sai\"><applicability/><requirements>"
+            + "<partOf relation=\"IFCRELCONTAINS\"><entity><simpleValue>IFCSPACE</simpleValue></entity></partOf>"
+            + "</requirements></specification>"));
+        Assert.Contains("relation=\"IFCRELCONTAINS\"", ex.Message);
     }
 
     [Fact]
@@ -435,7 +460,7 @@ public class IdsEvaluatorTests
         good.Properties["Pset_WallCommon.FireRating"] = "EI60";
         good.ClassificationCodes.Add("EF_25_10");
         good.MaterialNames.Add("Bê tông");
-        good.Parents.Add("Tầng 1");
+        good.Parents.Add(("", "Tầng 1"));
 
         var bad = new FakeIdsElement { IfcEntity = "IfcWall", Label = "2 — Walls" };
         bad.Properties["FireRating"] = "EI30";
@@ -447,6 +472,36 @@ public class IdsEvaluatorTests
         Assert.Contains("phân loại", reason);
         Assert.Contains("vật liệu", reason);
         Assert.Contains("thuộc về", reason);
+    }
+
+    [Fact]
+    public void PartOf_KhaiRelation_ChiNhanDungMotLoaiQuanHe_KhongRoiVeChuoiTron()
+    {
+        var specs = Spec(
+            "<specification name=\"Thuoc he\"><applicability/><requirements>"
+            + "<partOf relation=\"IFCRELASSIGNSTOGROUP\"><entity><simpleValue>IFCSYSTEM</simpleValue></entity></partOf>"
+            + "</requirements></specification>");
+
+        // "viaGroup": tới IFCSYSTEM đúng bằng IFCRELASSIGNSTOGROUP — phải đạt.
+        var viaGroup = new FakeIdsElement { Label = "1" };
+        viaGroup.Parents.Add((IdsRelations.AssignsToGroup, "IFCSYSTEM"));
+
+        // "viaAggregates": tới IFCSYSTEM nhưng bằng IFCRELAGGREGATES (hình học sai, chỉ mượn tên lớp) —
+        // relation không khớp nên không được tính là "thuộc hệ" theo đúng quan hệ IDS đòi.
+        var viaAggregates = new FakeIdsElement { Label = "2" };
+        viaAggregates.Parents.Add((IdsRelations.Aggregates, "IFCSYSTEM"));
+
+        // "viaMixed": chỉ có entry "chuỗi trộn" (relation null, đại diện cho trường hợp không khai
+        // relation) — không đủ để thoả một facet ĐÃ khai relation cụ thể.
+        var viaMixed = new FakeIdsElement { Label = "3" };
+        viaMixed.Parents.Add(("", "IFCSYSTEM"));
+
+        var result = IdsEvaluator.Check(specs, new IIdsElement[] { viaGroup, viaAggregates, viaMixed });
+        var spec = Assert.Single(result.Specifications);
+        Assert.Equal(1, spec.Passed);
+        Assert.Equal(2, spec.Failed);
+        Assert.Contains(spec.Failures, f => f.Element.StartsWith("2"));
+        Assert.Contains(spec.Failures, f => f.Element.StartsWith("3"));
     }
 
     [Fact]
