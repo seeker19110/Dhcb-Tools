@@ -17,7 +17,6 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
 {
     public string CommandName => "PipeSplitter";
 
-
     public CommandResult Execute(Document document, PipeSplitterConfig config)
     {
         if (config.MaxSegmentMm <= 0)
@@ -172,7 +171,7 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
             foreach (var e in elems)
             {
                 var pln = config.LevelName ?? string.Empty;
-                if (!string.IsNullOrEmpty(pln) && !BelongsToLevel(doc, e, pln))
+                if (!string.IsNullOrEmpty(pln) && !RevitCompat.BelongsToLevel(doc, e, pln))
                     continue;
                 if (e.Location is LocationCurve)
                     result.Add((e, kvp.Key));
@@ -182,17 +181,4 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
         return result;
     }
 
-    private static bool BelongsToLevel(Document doc, Element elem, string levelName)
-    {
-        var levelParam = RevitCompat.Lookup(elem, "level")
-            ?? elem.get_Parameter(BuiltInParameter.FAMILY_LEVEL_PARAM)
-            ?? elem.get_Parameter(BuiltInParameter.LEVEL_PARAM)
-            ?? elem.get_Parameter(BuiltInParameter.RBS_START_LEVEL_PARAM);
-
-        if (levelParam == null || levelParam.StorageType != StorageType.ElementId) return false;
-        var levelId = levelParam.AsElementId();
-        if (levelId == null || levelId == ElementId.InvalidElementId) return false;
-        var level = doc.GetElement(levelId) as Level;
-        return level != null && string.Equals(level.Name, levelName, StringComparison.OrdinalIgnoreCase);
-    }
 }

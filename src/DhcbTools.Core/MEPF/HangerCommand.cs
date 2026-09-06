@@ -15,7 +15,6 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
 {
     public string CommandName => "HangerAuto";
 
-
     private static readonly BuiltInCategory[] DefaultCategories =
     {
         BuiltInCategory.OST_DuctCurves,
@@ -202,7 +201,7 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
             foreach (var e in elems)
             {
                 var ln = config.LevelName ?? string.Empty;
-                if (!string.IsNullOrEmpty(ln) && !BelongsToLevel(doc, e, ln))
+                if (!string.IsNullOrEmpty(ln) && !RevitCompat.BelongsToLevel(doc, e, ln))
                     continue;
                 if (e.Location is LocationCurve)
                     result.Add(e);
@@ -220,20 +219,6 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
     {
         var result = RevitCompat.ResolveMepCategories(names, out unknown);
         return result.Count > 0 ? result.ToArray() : DefaultCategories;
-    }
-
-    private static bool BelongsToLevel(Document doc, Element elem, string levelName)
-    {
-        var levelParam = RevitCompat.Lookup(elem, "level")
-            ?? elem.get_Parameter(BuiltInParameter.FAMILY_LEVEL_PARAM)
-            ?? elem.get_Parameter(BuiltInParameter.LEVEL_PARAM)
-            ?? elem.get_Parameter(BuiltInParameter.RBS_START_LEVEL_PARAM);
-
-        if (levelParam == null || levelParam.StorageType != StorageType.ElementId) return false;
-        var levelId = levelParam.AsElementId();
-        if (levelId == null || levelId == ElementId.InvalidElementId) return false;
-        var level = doc.GetElement(levelId) as Level;
-        return level != null && string.Equals(level.Name, levelName, StringComparison.OrdinalIgnoreCase);
     }
 
     private static XYZ GetCurveTangent(Curve curve, double normalizedParam)

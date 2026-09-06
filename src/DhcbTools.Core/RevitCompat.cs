@@ -121,6 +121,25 @@ public static class RevitCompat
         return Safe(() => import.Name);
     }
 
+    /// <summary>
+    /// Phần tử có thuộc tầng <paramref name="levelName"/> không, tra qua từ điển "level" rồi các tham số
+    /// Level dựng sẵn (FAMILY_LEVEL/LEVEL/RBS_START_LEVEL). Trước đây ba lệnh MEPF mỗi lệnh chép một
+    /// bản y hệt; sửa một nơi là hai nơi kia lệch.
+    /// </summary>
+    public static bool BelongsToLevel(Document doc, Element elem, string levelName)
+    {
+        var levelParam = Lookup(elem, "level")
+            ?? elem.get_Parameter(BuiltInParameter.FAMILY_LEVEL_PARAM)
+            ?? elem.get_Parameter(BuiltInParameter.LEVEL_PARAM)
+            ?? elem.get_Parameter(BuiltInParameter.RBS_START_LEVEL_PARAM);
+
+        if (levelParam == null || levelParam.StorageType != StorageType.ElementId) return false;
+        var levelId = levelParam.AsElementId();
+        if (levelId == null || levelId == ElementId.InvalidElementId) return false;
+        var level = doc.GetElement(levelId) as Level;
+        return level != null && string.Equals(level.Name, levelName, StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>Tìm Level theo tên (không phân biệt hoa thường).</summary>
     public static Level? FindLevel(Document doc, string? name)
     {
