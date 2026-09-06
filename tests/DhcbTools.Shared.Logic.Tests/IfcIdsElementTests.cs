@@ -85,6 +85,12 @@ public class IfcIdsElementTests
         + "#105=IFCPROPERTYSINGLEVALUE('Handicap',$,IFCLOGICAL(.U.),$);\n"
         + $"#106=IFCPROPERTYSET('{G("Pset3")}',$,'Pset_SpaceCommon',$,(#105));\n"
         + $"#107=IFCRELDEFINESBYPROPERTIES('{G("RelProp2")}',$,$,$,(#104),#106);\n"
+        // Cửa sổ lấp một ô mở của tường 2: IfcRelVoidsElement (tường → ô mở) + IfcRelFillsElement
+        // (ô mở → cửa sổ) — IDS gộp cặp này thành MỘT quan hệ nối thẳng cửa sổ → tường, bỏ qua ô mở.
+        + $"#108=IFCOPENINGELEMENT('{G("Opening1")}',$,'O mo',$,$,$,$,$,$);\n"
+        + $"#109=IFCRELVOIDSELEMENT('{G("RelVoids")}',$,$,$,#12,#108);\n"
+        + $"#110=IFCWINDOW('{G("Window1")}',$,'Cua so 1',$,$,$,$,'CS-01',1200.,1500.,.WINDOW.,.SINGLE_PANEL.,$);\n"
+        + $"#111=IFCRELFILLSELEMENT('{G("RelFills")}',$,$,$,#108,#110);\n"
         + "ENDSEC;\nEND-ISO-10303-21;\n";
 
     private static IfcIdsModel Model() => IfcIdsModel.Parse(Ifc);
@@ -278,6 +284,18 @@ public class IfcIdsElementTests
         // Cửa vào hệ qua IfcRelAssignsToGroup, không phải qua CONTAINEDINSPATIALSTRUCTURE.
         Assert.Contains((IdsRelations.AssignsToGroup, "IFCSYSTEM"), door);
         Assert.DoesNotContain((IdsRelations.ContainedInSpatialStructure, "IFCSYSTEM"), door);
+    }
+
+    [Fact]
+    public void ThuocVe_CuaSoLapOMoQuaVoidsVaFills_NoiThangToiTuong_BoQuaOMo()
+    {
+        var model = Model();
+        // Cửa sổ #110 lấp ô mở #108 (IfcRelFillsElement), ô mở #108 do tường #12 khoét (IfcRelVoidsElement).
+        // IDS gộp cặp này thành một quan hệ nối thẳng cửa sổ → tường, KHÔNG đi qua ô mở.
+        var window = Element(model, 110).PartOf.ToList();
+        Assert.Contains((IdsRelations.VoidsAndFills, "IFCWALL"), window);
+        // Ô mở không hiện ra như một tổ tiên — nó chỉ là điểm nối trung gian, IDS author không nói tới nó.
+        Assert.DoesNotContain(window, p => p.Entity == "IFCOPENINGELEMENT");
     }
 
     [Fact]
