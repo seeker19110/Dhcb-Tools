@@ -2194,8 +2194,8 @@ family" — đó là **đường lỗi có thật và nói rõ**, và cũng là 
 - **Nhóm MEPF chưa bấm tay trên model HVAC**, nên con số thật của `SleeveAuto`/`HangerAuto`/`SizingProposal`
   từ Ribbon vẫn chưa thấy.
 - Ngoại lệ .NET vẫn hiện **nguyên văn tiếng Anh** trong ô kết quả (`VietnameseMessageTests` chỉ soi Core).
-- `overwriteExisting` của `FamilyLoader` hiện là **ô chữ** chứ không phải ô tick — luật đoán bool không có
-  tiền tố "overwrite". Không sai kết quả (Newtonsoft đọc được "true"), nhưng lệch với các lệnh khác.
+- ~~`overwriteExisting` của `FamilyLoader` hiện là **ô chữ** chứ không phải ô tick~~ — sửa 2026-09-06
+  (`BoolPrefixes` thêm "overwrite"), xem §65.
 - Thông báo của `PipeKick`/`FlowNumbering` in id dạng **`0.0`** thay vì `0` khi ô số để trống mặc định.
 
 ## 35. `AutoRoute` — ngân sách A* cố định 400.000 thua ở bài có lời giải, và 61 lớp cao độ không ai gọi tới (2026-09-05 20:45 ICT)
@@ -3368,3 +3368,19 @@ thật: **18/18**, trùng đúng con số §51/§57 — NETLOAD chạy, 15/15 l�
 `plumbing`, `write`, `write-mep`, `write-plumbing`, `autoroute`: **266 ca chạy thật, 0 trượt**. Toàn bộ bộ ca kiểm
 Revit của dự án đã chạy lại sau thay đổi này; cộng `autocad-smoke` là **284 ca**. Mọi chỗ lệch giữa hai phiên bản đều đối chiếu được với con số đã
 ghi ở §51/§59 cho model mẫu, không chỗ nào là khác biệt của mã.
+
+## 65. Đóng một phần nợ checklist tay 8.4 — `overwriteExisting` nay ra checkbox (2026-09-06)
+
+§34 liệt kê năm lỗi nhỏ do bấm tay 47 nút Ribbon phát hiện nhưng chưa sửa hết. Lượt này đóng lỗi đầu:
+`FamilyLoader.overwriteExisting` là `bool` nhưng `FieldKindGuess` không có tiền tố "overwrite" trong
+`BoolPrefixes`, nên form dựng ô chữ thay vì checkbox — không sai kết quả (Newtonsoft đọc được chuỗi
+`"true"`) nhưng lệch trải nghiệm so với mọi trường bool khác của catalog.
+
+Sửa: thêm `"overwrite"` vào `BoolPrefixes` (`FieldKind.cs`), thêm ca `overwriteExisting` vào
+`FieldKindTests.Bool_NhanDungCoBatTat`. `FieldKindGuess` là tầng thuần chạy trên CI — không cần mở Revit
+để chứng minh, chỉ cần đối chiếu tên trường ↔ kiểu property thật (đúng cách `CatalogFieldTests` đã chốt ở
+§34). 73/73 ca `FieldKindTests` xanh, toàn bộ `Shared.Logic.Tests` **1618/1618** không hồi quy.
+
+Bốn mục còn lại của §34 ("Cái chưa chứng minh") — bấm *Chạy thật* trên Ribbon, nhóm MEPF trên model HVAC,
+ngoại lệ .NET tiếng Anh, id hiện `0.0` ở PipeKick/FlowNumbering — cần một vòng bấm tay mới qua giao diện
+thật (không phải sửa mã đơn thuần), để dành cho vòng kiểm 8.4 kế tiếp.

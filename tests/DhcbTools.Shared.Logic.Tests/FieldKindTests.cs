@@ -41,6 +41,7 @@ public class FieldKindTests
     [InlineData("create3dView")]   // "create" + '3' nên luật tiền tố không bắt được, phải khai riêng
     [InlineData("remove")]
     [InlineData("reset")]
+    [InlineData("overwriteExisting")]   // FamilyLoader — bấm tay 2026-09-05 (§34) thấy hiện ô chữ thay vì checkbox
     public void Bool_NhanDungCoBatTat(string name) =>
         Assert.Equal(FieldKind.Bool, FieldKindGuess.Of(name));
 
