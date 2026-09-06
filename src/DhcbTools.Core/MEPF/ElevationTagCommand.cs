@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
 using DhcbTools.Shared.Logic;
+using DhcbTools.Shared.Logic.Mep;
 
 namespace DhcbTools.Core.MEPF;
 
@@ -12,7 +13,6 @@ namespace DhcbTools.Core.MEPF;
 public sealed class ElevationTagCommand : ICoreCommand<ElevationTagConfig>
 {
     public string CommandName => "ElevationTag";
-
 
     private static readonly BuiltInCategory[] DefaultCategories =
     {
@@ -45,13 +45,10 @@ public sealed class ElevationTagCommand : ICoreCommand<ElevationTagConfig>
 
         if (config.DryRun)
         {
-            var preview = CommandResult.Ok(
-                $"[Xem trước] Sẽ gán cao độ cho {plan.Count} phần tử MEP.",
-                plan.Count);
+            var preview = CommandResult.Ok(ElevationTagPlanner.PreviewSummary(plan.Count), plan.Count);
             foreach (var (elem, bottom, top, centre) in plan)
             {
-                preview.Messages.Add(
-                    $"  {elem.Id}: đáy={bottom:F1}mm, đỉnh={top:F1}mm, tim={centre:F1}mm");
+                preview.Messages.Add(ElevationTagPlanner.PreviewLine(RevitCompat.IdValue(elem.Id), bottom, top, centre));
             }
             return preview;
         }
@@ -77,16 +74,16 @@ public sealed class ElevationTagCommand : ICoreCommand<ElevationTagConfig>
 
         tx.Commit();
 
-        var final = CommandResult.Ok($"Đã gán cao độ cho {updated}/{plan.Count} phần tử MEP.", updated)
+        var final = CommandResult.Ok(ElevationTagPlanner.WriteSummary(updated, plan.Count), updated)
             .WithChanged(result.ChangedIds);
         final.Messages.AddRange(result.Messages);
 
         // Không phần tử nào ghi được nghĩa là dự án không có tham số cao độ nào trong từ điển —
         // trước đây lệnh vẫn báo "Đã gán cao độ cho 0/N" như thể mọi thứ bình thường.
-        if (updated == 0 && plan.Count > 0)
+        if (ElevationTagPlanner.NothingWritten(updated, plan.Count))
         {
             final.Success = false;
-            final.Summary = $"Không gán được cao độ cho phần tử nào trong {plan.Count} phần tử.";
+            final.Summary = ElevationTagPlanner.NothingWrittenSummary(plan.Count);
             final.Errors.Add(RevitCompat.LookupFailed("bottomElevation", config.BottomElevParamName));
         }
 
@@ -102,22 +99,9 @@ public sealed class ElevationTagCommand : ICoreCommand<ElevationTagConfig>
 
         foreach (var bic in DefaultCategories)
         {
-            if (filterCat)
+            if (filterCat && !ElevationTagPlanner.CategoryIncluded(bic.ToString(), config.Categories))
             {
-                var catKey = bic.ToString()
-                    .Replace("OST_", string.Empty)
-                    .Replace("Curves", string.Empty);
-                bool include = false;
-                foreach (var cat in config.Categories ?? new System.Collections.Generic.List<string>())
-                {
-                    if (catKey.IndexOf(cat, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                        cat.IndexOf(catKey, StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        include = true;
-                        break;
-                    }
-                }
-                if (!include) continue;
+                continue;
             }
 
             var elems = new FilteredElementCollector(doc)
@@ -128,27 +112,13 @@ public sealed class ElevationTagCommand : ICoreCommand<ElevationTagConfig>
             foreach (var e in elems)
             {
                 var eln = config.LevelName ?? string.Empty;
-                if (!string.IsNullOrEmpty(eln) && !BelongsToLevel(doc, e, eln))
+                if (!string.IsNullOrEmpty(eln) && !RevitCompat.BelongsToLevel(doc, e, eln))
                     continue;
                 result.Add(e);
             }
         }
 
         return result;
-    }
-
-    private static bool BelongsToLevel(Document doc, Element elem, string levelName)
-    {
-        var levelParam = RevitCompat.Lookup(elem, "level")
-            ?? elem.get_Parameter(BuiltInParameter.FAMILY_LEVEL_PARAM)
-            ?? elem.get_Parameter(BuiltInParameter.LEVEL_PARAM)
-            ?? elem.get_Parameter(BuiltInParameter.RBS_START_LEVEL_PARAM);
-
-        if (levelParam == null || levelParam.StorageType != StorageType.ElementId) return false;
-        var levelId = levelParam.AsElementId();
-        if (levelId == null || levelId == ElementId.InvalidElementId) return false;
-        var level = doc.GetElement(levelId) as Level;
-        return level != null && string.Equals(level.Name, levelName, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -173,7 +143,7 @@ public sealed class ElevationTagCommand : ICoreCommand<ElevationTagConfig>
         }
         catch (System.Exception ex)
         {
-            log.Messages.Add($"Không gán được {paramName} cho {elem.Id}: {ex.Message}");
+            log.Messages.Add(ElevationTagPlanner.SetFailedLine(paramName, RevitCompat.IdValue(elem.Id), ex.Message));
             return false;
         }
     }

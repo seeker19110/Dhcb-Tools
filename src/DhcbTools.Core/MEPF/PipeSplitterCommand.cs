@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
 using DhcbTools.Shared.Logic;
+using DhcbTools.Shared.Logic.Mep;
 using Autodesk.Revit.DB.Mechanical;
 using Autodesk.Revit.DB.Plumbing;
 
@@ -15,7 +16,6 @@ namespace DhcbTools.Core.MEPF;
 public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
 {
     public string CommandName => "PipeSplitter";
-
 
     public CommandResult Execute(Document document, PipeSplitterConfig config)
     {
@@ -60,7 +60,7 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
             }
 
             if (splitPoints.Count > 0)
-                plan.Add((elem, category, splitPoints, IsSplittable(category)));
+                plan.Add((elem, category, splitPoints, PipeSplitPlanner.IsSplittable(category)));
         }
 
         var splittable = plan.Where(p => p.Splittable).ToList();
@@ -69,17 +69,10 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
         if (config.DryRun)
         {
             int totalSplits = splittable.Sum(p => p.SplitPoints.Count);
-            var preview = CommandResult.Ok(
-                $"[Xem trước] Sẽ cắt {splittable.Count} phần tử, tạo {totalSplits} điểm cắt."
-                + (reportOnly.Count > 0
-                    ? $" {reportOnly.Count} CableTray/Conduit quá dài chỉ liệt kê (Revit không có API cắt), không tính vào tổng."
-                    : string.Empty),
-                totalSplits);
+            var preview = CommandResult.Ok(PipeSplitPlanner.PreviewSummary(splittable.Count, totalSplits, reportOnly.Count), totalSplits);
             foreach (var (elem, cat, pts, ok) in plan)
             {
-                preview.Messages.Add(
-                    $"  {cat} {elem.Id}{(ok ? string.Empty : " [chỉ báo cáo]")}: {pts.Count} điểm cắt tại " +
-                    string.Join(", ", pts.Select(p => $"({RevitCompat.FtToMm(p.X):F0},{RevitCompat.FtToMm(p.Y):F0},{RevitCompat.FtToMm(p.Z):F0})mm")));
+                preview.Messages.Add(PipeSplitPlanner.PreviewLine(cat, RevitCompat.IdValue(elem.Id), ok, pts.Select(Mm).ToList()));
             }
             return preview;
         }
@@ -94,7 +87,7 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
 
         foreach (var (elem, category, splitPoints, _) in splittable)
         {
-            bool isPipe = category.IndexOf("Pipe", StringComparison.OrdinalIgnoreCase) >= 0;
+            bool isPipe = PipeSplitPlanner.IsPipe(category);
 
             // BreakCurve trả về id của đoạn MỚI (phần đuôi); đoạn gốc giữ id cũ nhưng ngắn lại.
             // Điểm cắt tiếp theo (đã sắp xếp dọc tuyến) nằm trên phần đuôi, nên sau mỗi lần cắt phải
@@ -111,7 +104,8 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
 
                     if (newSegmentId == null || newSegmentId == ElementId.InvalidElementId)
                     {
-                        failures.Add($"{category} {elem.Id}: BreakCurve không tạo được đoạn mới tại {Fmt(splitPoint)}.");
+                        var (fx, fy, fz) = Mm(splitPoint);
+                        failures.Add(PipeSplitPlanner.BreakReturnedNothing(category, RevitCompat.IdValue(elem.Id), fx, fy, fz));
                         continue;
                     }
 
@@ -120,7 +114,8 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
                 }
                 catch (System.Exception ex)
                 {
-                    failures.Add($"{category} {elem.Id}: không cắt được tại {Fmt(splitPoint)} — {ex.Message}");
+                    var (fx, fy, fz) = Mm(splitPoint);
+                    failures.Add(PipeSplitPlanner.BreakFailed(category, RevitCompat.IdValue(elem.Id), fx, fy, fz, ex.Message));
                 }
             }
         }
@@ -128,15 +123,11 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
         tx.Commit();
 
         var result = CommandResult.Ok(
-            $"Đã cắt {totalSplitsDone} điểm trên {splittable.Count} phần tử MEP"
-            + (failures.Count > 0 ? $", {failures.Count} điểm cắt lỗi" : string.Empty)
-            + (reportOnly.Count > 0 ? $"; {reportOnly.Count} CableTray/Conduit quá dài chỉ báo cáo (không có API cắt)" : string.Empty)
-            + ".",
-            totalSplitsDone);
+            PipeSplitPlanner.WriteSummary(totalSplitsDone, splittable.Count, failures.Count, reportOnly.Count), totalSplitsDone);
         result.Messages.AddRange(failures);
         foreach (var (elem, cat, pts, _) in reportOnly)
         {
-            result.Messages.Add($"  {cat} {elem.Id} [chỉ báo cáo]: cần {pts.Count} điểm cắt, cắt tay.");
+            result.Messages.Add(PipeSplitPlanner.ReportOnlyLine(cat, RevitCompat.IdValue(elem.Id), pts.Count));
         }
 
         return result;
@@ -144,12 +135,8 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private static bool IsSplittable(string category) =>
-        category.IndexOf("Pipe", StringComparison.OrdinalIgnoreCase) >= 0
-        || category.IndexOf("Duct", StringComparison.OrdinalIgnoreCase) >= 0;
-
-    private static string Fmt(XYZ p) =>
-        $"({RevitCompat.FtToMm(p.X):F0},{RevitCompat.FtToMm(p.Y):F0},{RevitCompat.FtToMm(p.Z):F0})mm";
+    private static (double X, double Y, double Z) Mm(XYZ p) =>
+        (RevitCompat.FtToMm(p.X), RevitCompat.FtToMm(p.Y), RevitCompat.FtToMm(p.Z));
 
     private static List<(Element Element, string Category)> CollectElements(Document doc, PipeSplitterConfig config, List<string> unknown)
     {
@@ -184,7 +171,7 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
             foreach (var e in elems)
             {
                 var pln = config.LevelName ?? string.Empty;
-                if (!string.IsNullOrEmpty(pln) && !BelongsToLevel(doc, e, pln))
+                if (!string.IsNullOrEmpty(pln) && !RevitCompat.BelongsToLevel(doc, e, pln))
                     continue;
                 if (e.Location is LocationCurve)
                     result.Add((e, kvp.Key));
@@ -194,17 +181,4 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
         return result;
     }
 
-    private static bool BelongsToLevel(Document doc, Element elem, string levelName)
-    {
-        var levelParam = RevitCompat.Lookup(elem, "level")
-            ?? elem.get_Parameter(BuiltInParameter.FAMILY_LEVEL_PARAM)
-            ?? elem.get_Parameter(BuiltInParameter.LEVEL_PARAM)
-            ?? elem.get_Parameter(BuiltInParameter.RBS_START_LEVEL_PARAM);
-
-        if (levelParam == null || levelParam.StorageType != StorageType.ElementId) return false;
-        var levelId = levelParam.AsElementId();
-        if (levelId == null || levelId == ElementId.InvalidElementId) return false;
-        var level = doc.GetElement(levelId) as Level;
-        return level != null && string.Equals(level.Name, levelName, StringComparison.OrdinalIgnoreCase);
-    }
 }
