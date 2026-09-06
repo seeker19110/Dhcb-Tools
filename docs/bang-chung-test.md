@@ -2796,3 +2796,56 @@ Cùng cách §49. | PR | Tầng thuần | Ca | Revit thật (`mep`, 26 ca) |
 
 Shared.Logic 1487 → **1519**, phủ 100 %. Đã đọc `StyleCommands` (504 dòng): gần như toàn thu thập tham chiếu qua API Revit, tách không lợi — dừng. Ứng viên còn lại: `AcadQueryHandler` (687 dòng, cần accoreconsole để đối chiếu).
 
+
+## 51. Sửa điểm yếu sau đánh giá sâu — nhãn lỗi thời, SlopePipes/PipeKick xuống tầng thuần, Revit 2026 lần đầu (2026-09-06 09:40 ICT)
+
+Đánh giá sâu toàn dự án chỉ ra sáu điểm yếu. Ba điểm sửa được bằng mã và tài liệu trong vòng này; hai điểm
+(chưa có nhóm kỹ sư dùng thật, đối chiếu điểm định vị ngoài công trường) là việc của người; một điểm
+(bằng chứng chạy thật chỉ trên một phiên bản Revit) khép được ngay trong vòng vì user vừa cài **Revit 2026**.
+
+### Nhãn *thử nghiệm* lỗi thời — tài liệu nói ngược với bằng chứng của chính nó
+
+`SetoutExport`, `ConstructionStatus`, `ProgressReport` và `ModelLinesFromCad` đều đã chạy thật ngày 2026-09-05
+(§28 — 260/545 điểm định vị, 1.599 cấu kiện; đường ghi trạng thái 1,4 %; §29/§31 — DXF và DWG link dựng đúng 2 model
+line). Nhưng `CommandCatalog`, `App.cs` (Ribbon), README, `progress.md` (cả đầu trang lẫn bảng tóm tắt) và
+`toa-do-dinh-vi.md` vẫn ghi *"chưa chạy lần nào trong Revit"*. Không test đối chiếu nào bắt được vì cả bốn nơi
+đều **nhất quán với nhau** — chỉ lệch với `bang-chung-test.md`. Gỡ nhãn ở đủ sáu chỗ; lệnh còn mang nhãn chỉ còn
+`AutoRoute`. Bỏ luôn mục "Phần chưa có mã nguồn" của `progress.md` (nội dung đã lỗi thời từ §47).
+
+### `SlopePipes` / `PipeKick` xuống `Shared.Logic` (cùng cách §49–§50)
+
+| Tầng thuần | Quyết định chuyển xuống | Ca |
+|---|---|---|
+| `Mep/SlopePlanner` | ống đứng thuần bỏ qua im lặng / gần đứng bỏ qua có báo, dốc yêu cầu theo DN hay theo config, đạt/chưa (`CheckSlope`), đầu nào hạ và cao độ mới hai đầu, toàn bộ Summary/Messages | 20 |
+| `Mep/KickPlanner` | ống đủ dài không, điểm bắt đầu có nằm trong ống, vector hướng dịch Up/Down/Left/Right từ hướng ống (ống đứng lấy ±Y), độ dài đoạn giữa cho kick-90, Summary | 12 |
+
+`SlopeCommands.cs` 312 → 285 dòng; Core chỉ còn đọc đầu mút, đổi ft ↔ mm và gán `LocationCurve`. Shared.Logic
+**1519 → 1551 ca**, phủ 100 %. Một chuỗi đổi có chủ ý: preview ghi `(hạ cuối)`/`(hạ đầu)` thay cho
+`(hạ đầu cuối)`/`(hạ đầu đầu)` — bản cũ đọc như lỗi đánh máy.
+
+### Ba việc nhỏ còn lại của đánh giá
+
+- `BatchRunner/Program.cs` 905 dòng → 6 file partial theo đường chạy (`Program` chỉ còn `Main`, `.Handover`,
+  `.Verify`, `.Revit`, `.AutoCad`, `Options`). Không đổi dòng logic nào; 21 ca CLI vẫn xanh.
+- `catch { }` cuối cùng còn nuốt lỗi trên đường ghi (`ViewportCopy` đổi kiểu viewport) nay ghi vào Messages tên
+  legend và lý do — sheet đích mang kiểu mặc định thì kỹ sư biết vì sao.
+- `release.yml` + Inno Setup thêm **Revit 2026** (net8.0-windows), vì lý do dưới đây.
+
+### Revit thật — 2024.3 và **lần đầu 2026**
+
+| Bộ | Revit 2024.3 | Revit 2026 | Con số chốt |
+|---|---|---|---|
+| `plumbing` (8 ca) | **8/8** | **8/8** | `SlopePipes` kiểm 1794 ống / 1706 chưa đạt / preview 1732 — **bằng đúng lượt 2026-09-05** trước khi tách; trên model mẫu 2026 là 1796 / 1708 / 1734 (model kèm Revit 2026 khác hai ống) |
+| `mep` (26 ca) | **26/26** | **26/26** | 445 sleeve, 1120 hanger, 7 va chạm với link — trùng §22/§50 trên cả hai phiên bản |
+| `smoke` (42 ca) | 41/41 + 1 bỏ qua (§50) | **41/41 + 1 bỏ qua** | 142 phần tử, 1270 phần tử IDS, 987 vi phạm, 55 sheet, 93 va chạm — trùng; lệch chỉ ở model mẫu 2026 (49 warning thay 34, 40 schedule thay 36, 93 view thừa thay 90) |
+
+Revit 2026 tự mở, chạy, tự đóng bằng đúng script `run-in-revit-tests.ps1 -RevitVersion 2026`, không vướng hộp thoại
+add-in chưa ký, add-in cài vào `%APPDATA%\Autodesk\Revit\Addins\2026`. Đây là lần đầu nhánh **net8.0-windows** của
+vỏ Revit chạy trên phần mềm thật — trước đó nó chỉ có CI build.
+
+### Cái chưa chứng minh
+
+- **Đường thành công của `PipeKick`** vẫn chỉ có ca lỗi (`Id 0`) trong bộ `mep`; tách planner không đổi điều đó.
+  Cần một ca trong `revit-write-mep` trên một ống thẳng đủ dài của Snowdon HVAC/Plumbing.
+- Revit 2025 và 2027: chưa có trên máy. 2027 vẫn chỉ build.
+- Hai việc của người: nhóm kỹ sư dùng thật (9.4) và đối chiếu một điểm `SetoutExport` bằng máy toàn đạc.

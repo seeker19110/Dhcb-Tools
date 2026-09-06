@@ -17,7 +17,7 @@ hiện trạng ở [`docs/progress.md`](docs/progress.md).
 |---|---|---|
 | Windows | 10/11 x64 | Chạy add-in (chỉ để build/test thuần thì Linux/macOS cũng được) |
 | .NET SDK | 8.0.x **+ 10.0.x** | SDK 8 build net48/net8.0-windows; SDK 10 cho AutoCAD ≥ 2026 và Revit ≥ 2027 (net10.0-windows) |
-| Revit | 2023–2025 (2026/2027 build được, chưa chạy thật) | Dùng add-in Revit |
+| Revit | 2023–2026 (2027 build được, chưa chạy thật) | Dùng add-in Revit |
 | AutoCAD | 2024–2026 | Dùng plugin AutoCAD (2026.1 dùng .NET 10 — đã chạy thật qua accoreconsole) |
 | Python | 3.9+ | Dùng `scripts/*.py` (client Bridge, MCP server, AI offline) |
 | Node/npx | bất kỳ LTS | **Chỉ** khi đóng gói `.mcpb` bằng `scripts/pack-mcpb.ps1` |
@@ -205,7 +205,7 @@ AutoCAD ≥ 2026 (package 25.1.x) và Revit ≥ 2027 dùng **net10.0-windows** �
 - **CI** (`.github/workflows/tests.yml`, ubuntu-latest, mọi push/PR): test `Shared.Logic` + `dotnet build` toàn bộ
   Core/vỏ (kể cả vỏ core-only) bằng API package NuGet, `UseWPF=false` — bắt lỗi biên dịch không cần Windows.
 - **CD** (`.github/workflows/release.yml`, windows-latest, khi đẩy tag `vX.Y.Z` hoặc chạy tay): build **Release thật**
-  (đủ WPF) cho Revit 2023/2024/2025 và AutoCAD 2024/2025/2026 + vỏ core-only, đóng gói zip kèm hướng dẫn cài đặt, và tạo
+  (đủ WPF) cho Revit 2023/2024/2025/2026 và AutoCAD 2024/2025/2026 + vỏ core-only, đóng gói zip kèm hướng dẫn cài đặt, và tạo
   GitHub Release đính kèm toàn bộ gói.
 
 ```powershell
@@ -267,5 +267,5 @@ và 15/15 lệnh AutoCAD có ca kiểm qua `accoreconsole`, cộng một đêm b
 [`docs/bang-chung-test.md`](docs/bang-chung-test.md), NETLOAD trên AutoCAD thật:
 [`docs/bang-chung-test-autocad-live.md`](docs/bang-chung-test-autocad-live.md). Phần **chưa** khép: chất lượng tuyến của `AutoRoute` (còn nhãn
 *thử nghiệm*), đối chiếu một điểm của `SetoutExport` bằng máy toàn đạc trên công trường thật,
-chạy thật trên Revit 2026/2027 (máy chỉ có 2024.3), và 9.4 — đưa cho một nhóm kỹ sư dùng thật. Chi tiết và lỗi còn mở:
+chạy thật trên Revit 2025/2027 (máy có 2024.3 và 2026), và 9.4 — đưa cho một nhóm kỹ sư dùng thật. Chi tiết và lỗi còn mở:
 [`docs/progress.md`](docs/progress.md) · lộ trình: [`docs/roadmap.md`](docs/roadmap.md).

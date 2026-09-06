@@ -8,7 +8,7 @@
 ;   iscc /DVersion=1.0.0 /DStageDir=..\dist\stage installer\dhcb-tools.iss
 ;
 ; StageDir phải có cấu trúc (release.yml dựng sẵn):
-;   revit-2023\  revit-2024\  revit-2025\   (DLL + .addin cho từng phiên bản)
+;   revit-2023\  revit-2024\  revit-2025\  revit-2026\   (DLL + .addin cho từng phiên bản)
 ;   autocad-2024\ autocad-2025\ autocad-2026\  (DLL vỏ đầy đủ + vỏ core-only; 2026 là .NET 10)
 ;   batchrunner\                            (exe + jobs/ configs/ scripts/)
 
@@ -45,6 +45,7 @@ Name: "custom"; Description: "Tự chọn"; Flags: iscustom
 Name: "revit2023";  Description: "Add-in Revit 2023";      Types: full
 Name: "revit2024";  Description: "Add-in Revit 2024";      Types: full
 Name: "revit2025";  Description: "Add-in Revit 2025";      Types: full
+Name: "revit2026";  Description: "Add-in Revit 2026";      Types: full
 Name: "acad2024";   Description: "Plugin AutoCAD 2024";    Types: full
 Name: "acad2025";   Description: "Plugin AutoCAD 2025";    Types: full
 Name: "acad2026";   Description: "Plugin AutoCAD 2026";    Types: full
@@ -59,6 +60,8 @@ Source: "{#StageDir}\revit-2024\*"; DestDir: "{userappdata}\Autodesk\Revit\Addin
   Components: revit2024; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#StageDir}\revit-2025\*"; DestDir: "{userappdata}\Autodesk\Revit\Addins\2025"; Excludes: "*.md"; \
   Components: revit2025; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#StageDir}\revit-2026\*"; DestDir: "{userappdata}\Autodesk\Revit\Addins\2026"; Excludes: "*.md"; \
+  Components: revit2026; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; ── AutoCAD: bundle tự nạp trong %APPDATA%\Autodesk\ApplicationPlugins\ ──────
 Source: "{#StageDir}\autocad-2024\*"; DestDir: "{userappdata}\Autodesk\ApplicationPlugins\DhcbTools.bundle\Contents\2024"; Excludes: "*.md"; \
