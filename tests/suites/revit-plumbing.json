@@ -105,11 +105,18 @@
       "name": "Kiểm connector hở",
       "command": "ConnectorChecker",
       "config": {
-        "create3dView": false
+        "create3dView": false,
+        "outputPath": "{outputFolder}/connectors.csv"
       },
       "expect": {
         "success": true,
-        "maxMs": 120000
+        "maxMs": 120000,
+        "filesExist": [
+          "{outputFolder}/connectors.csv"
+        ],
+        "summaryContains": [
+          "CSV"
+        ]
       }
     },
     {

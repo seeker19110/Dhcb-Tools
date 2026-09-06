@@ -2,6 +2,7 @@
 using System.IO;
 using System.Globalization;
 using Autodesk.Revit.DB;
+using DhcbTools.Shared.Logic.Mep;
 using DhcbTools.Shared.Logic;
 
 namespace DhcbTools.Core;
@@ -298,6 +299,24 @@ public static class RevitCompat
     /// trong Revit (2026-09-03) cho thấy cùng một tên: Hanger tra được, Sleeve thì không.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Mọi FamilySymbol của mô hình kèm số instance — nguyên liệu cho <see cref="FamilyCandidates.NotFoundMessage"/>
+    /// khi kỹ sư khai sai tên family (§58).
+    /// </summary>
+    public static List<FamilySymbolInfo> FamilySymbolCandidates(Document doc)
+    {
+        var counts = new Dictionary<ElementId, int>();
+        foreach (var fi in new FilteredElementCollector(doc).OfClass(typeof(FamilyInstance)).Cast<FamilyInstance>())
+        {
+            var id = fi.GetTypeId();
+            counts[id] = counts.TryGetValue(id, out var n) ? n + 1 : 1;
+        }
+
+        return new FilteredElementCollector(doc).OfClass(typeof(FamilySymbol)).Cast<FamilySymbol>()
+            .Select(s => new FamilySymbolInfo(s.FamilyName, s.Name, s.Category?.Name ?? "?", counts.TryGetValue(s.Id, out var n) ? n : 0))
+            .ToList();
+    }
+
     public static FamilySymbol? FindFamilySymbol(Document doc, string? name)
     {
         if (string.IsNullOrWhiteSpace(name))

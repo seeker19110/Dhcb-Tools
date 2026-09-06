@@ -35,7 +35,7 @@ Dữ liệu: Snowdon Architectural (55 sheet) vì dự án A không có sheet; p
 | `SlopePipes` | ☑ | | | Kiểm 2738 ống, 2582 chưa đạt — con số để bàn với thiết kế |
 | `AutoRoute` | ☑ | | | Lần đầu trên **dự án thật**: hai đầu duct cách 6 m cùng cao độ 11.400 → **tuyến 2 đoạn 7,9 m = 1,00× Manhattan, 1 rẽ (tối thiểu 1)**, né 1 dầm ở link ARC. Phải lấy điểm bằng `SetoutExport` (Ducts, Internal, mm) trước, và phải bỏ Ducts khỏi `obstacleCategories` — để mặc định thì "điểm nằm trong chướng ngại" (đúng, vì điểm là đầu duct) |
 | `SetoutExport` | ☑ | | | 2322 đầu duct, 130 ms — dùng làm nguồn điểm cho AutoRoute |
-| `ConnectorChecker` | ☑ | | | 1040 connector hở / 875 phần tử. Lần đầu khai `outputPath` bị `E-CONFIG-UNKNOWN` (lệnh chỉ tạo 3D view, không có CSV) — muốn có CSV để giao việc |
+| `ConnectorChecker` | ☑ | | | 1040 connector hở / 875 phần tử. Lần đầu khai `outputPath` bị `E-CONFIG-UNKNOWN` (lệnh chỉ tạo 3D view, không có CSV) — muốn có CSV để giao việc. **Đã thêm `outputPath` CSV (§58)** |
 
 ## Vai 5 — BIM manager, dự án A ARC L01
 
@@ -68,9 +68,9 @@ dòng nào vào `run.jsonl` dù có step thì ghi một dòng lỗi `NETLOAD` k�
    (MEP), `IdsValidate` (BIM manager), `AttributeIncrement` (AutoCAD).
 2. **Vướng nhiều nhất ở đâu?** Tên family/block/tag/tham số của **dự án** — bốn lệnh (`SleeveAuto`, `HangerAuto`,
    `AttributeIncrement`, `ElevationTag`) đều đòi biết tên có thật. Hướng đã đi: lỗi và xem trước **liệt kê cái có thật**
-   (block, tag từ vòng này; tham số từ `DictionaryLearn`). Còn thiếu: `SleeveAuto`/`HangerAuto` liệt kê family ứng viên
-   ngay trong lỗi thay vì bắt chạy `FamilyAudit`.
-3. **Thiếu gì?** CSV cho `ConnectorChecker`; family sleeve/hanger mẫu kèm bộ cài.
+   (block, tag từ vòng này; tham số từ `DictionaryLearn`). **`SleeveAuto`/`HangerAuto` nay liệt kê 8 family ứng viên ngay
+   trong lỗi (§58)** — không còn phải chạy `FamilyAudit` trước.
+3. **Thiếu gì?** ~~CSV cho `ConnectorChecker`~~ (đã có, §58); family sleeve/hanger mẫu kèm bộ cài.
 4. **Có dùng tiếp không?** Không trả lời được bằng đóng vai — cần người thật hai tuần.
 
 ## Tổng hợp theo lệnh (như hướng dẫn cuối mẫu)
