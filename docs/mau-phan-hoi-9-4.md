@@ -28,7 +28,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 
 ---
 
-## Revit — 52 lệnh
+## Revit — 53 lệnh
 
 | Lệnh | Việc nó làm | Tuần | Bỏ | Chưa | Nếu bỏ: vì sao |
 |---|---|:--:|:--:|:--:|---|
@@ -65,6 +65,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 | `SheetRename` | Đổi số/tên sheet hoặc view theo mẫu token + regex, chống trùng | ☐ | ☐ | ☐ | |
 | `RevisionOnSheets` | Gán hoặc bỏ một revision trên nhiều sheet | ☐ | ☐ | ☐ | |
 | `SheetIndex` | Danh mục bản vẽ: số, tên, revision hiện hành, ngày phát hành, người vẽ/kiểm ra CSV/HTML | ☐ | ☐ | ☐ | |
+| `AsBuiltStamp` | Vẽ dấu bản vẽ hoàn công (Phụ lục IIb, NĐ 207/2026/NĐ-CP) lên loạt sheet, điền tên/ngày từ config | ☐ | ☐ | ☐ | |
 | `StylePurge` | Liệt kê và xoá style không được tham chiếu | ☐ | ☐ | ☐ | |
 | `ColorByParameter` | Tô màu phần tử theo giá trị tham số + chú giải CSV | ☐ | ☐ | ☐ | |
 | `FamilyAudit` | Kiểm kê family/type ra CSV; đổi tên theo mẫu | ☐ | ☐ | ☐ | |

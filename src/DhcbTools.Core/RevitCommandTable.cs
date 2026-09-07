@@ -1,5 +1,6 @@
 using Autodesk.Revit.DB;
 using DhcbTools.Core.Ai;
+using DhcbTools.Core.AsBuilt;
 using DhcbTools.Core.AutoNumbering;
 using DhcbTools.Core.Checks;
 using DhcbTools.Core.Export;
@@ -73,6 +74,7 @@ public static class RevitCommandTable
                 "SHEETRENAME" => new SheetRenameCommand().Execute(doc, Deserialize<SheetRenameConfig>(configJson)),
                 "REVISIONONSHEETS" => new RevisionOnSheetsCommand().Execute(doc, Deserialize<RevisionOnSheetsConfig>(configJson)),
                 "SHEETINDEX" => new SheetIndexCommand().Execute(doc, Deserialize<SheetIndexConfig>(configJson)),
+                "ASBUILTSTAMP" => new AsBuiltStampCommand().Execute(doc, Deserialize<AsBuiltStampConfig>(configJson)),
                 "WARNINGSEXPORT" => new WarningsExportCommand().Execute(doc, Deserialize<WarningsExportConfig>(configJson)),
                 "STYLEPURGE" => new StylePurgeCommand().Execute(doc, Deserialize<StylePurgeConfig>(configJson)),
                 "COLORBYPARAMETER" => new ColorByParameterCommand().Execute(doc, Deserialize<ColorByParameterConfig>(configJson)),

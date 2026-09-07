@@ -118,7 +118,7 @@ Ribbon/dòng lệnh, HTTP Bridge, batch runner, lớp AI. Danh mục đầy đ�
 | MEPF | `FamilyStarter` (family mẫu sleeve/hanger), `FamilyUpgrade` (nâng cấp .rfa hàng loạt theo phiên bản Revit), `SleeveAuto`, `ElevationTag`, `HangerAuto`, `PipeSplitter`, `ModelLinesFromCad` (CAD đã link → model line), `RouteFromLines`, `DevicePlacement`, `SizingProposal` / `ApplySizing`, `SystemColor`, `SystemName` | — |
 | Hồ sơ & style (giai đoạn 7) | `SheetRename`, `RevisionOnSheets`, `SheetIndex`, `StylePurge`, `ColorByParameter`, `FamilyAudit`, `WarningsExport`, `ScheduleExport`, `ViewportCopy` | `LayerTranslate`, `DrawingCompare`, `BlockQuantity`, `AttributeIncrement` |
 | MEPF nâng cao (P2) | `SlopePipes`, `PipeKick`, `SystemBom`, `AutoRoute` (mức C → mức A) | — |
-| Thi công & hoàn công | `ConstructionStatus`, `ProgressReport` (tiến độ theo tầng/hệ, % theo số lượng và chiều dài, [`docs/tien-do-thi-cong.md`](docs/tien-do-thi-cong.md)) | — |
+| Thi công & hoàn công | `ConstructionStatus`, `ProgressReport` (tiến độ theo tầng/hệ, % theo số lượng và chiều dài, [`docs/tien-do-thi-cong.md`](docs/tien-do-thi-cong.md)), `AsBuiltStamp` (dấu bản vẽ hoàn công theo Phụ lục IIb NĐ 207/2026/NĐ-CP) | — |
 | AI offline | `CadLayerMap`, `SpecToConfig`, `DictionaryLearn`, nút *Ra lệnh tiếng Việt* | `CadLayerMap` (`DHCB_LAYER_MAP`); ra lệnh tiếng Việt qua Bridge `POST /chat` |
 
 Lệnh AutoCAD trên dòng lệnh — đúng các `[CommandMethod]` có trong `src/DhcbTools.AutoCAD`:

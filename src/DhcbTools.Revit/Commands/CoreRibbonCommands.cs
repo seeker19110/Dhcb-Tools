@@ -262,6 +262,15 @@ public sealed class SheetIndexRibbonCommand : IExternalCommand
         => CommandRunner.Run(commandData, "SheetIndex");
 }
 
+/// <summary>Dấu bản vẽ hoàn công theo Phụ lục IIb, NĐ 207/2026/NĐ-CP (mục 11.6).</summary>
+[Transaction(TransactionMode.Manual)]
+[Regeneration(RegenerationOption.Manual)]
+public sealed class AsBuiltStampRibbonCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        => CommandRunner.Run(commandData, "AsBuiltStamp");
+}
+
 /// <summary>Xoá text style, dimension style, line pattern không dùng.</summary>
 [Transaction(TransactionMode.Manual)]
 [Regeneration(RegenerationOption.Manual)]

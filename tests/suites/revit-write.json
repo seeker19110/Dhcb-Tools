@@ -379,6 +379,77 @@
       }
     },
     {
+      "name": "Dấu bản vẽ hoàn công Mẫu 1 — GHI THẬT lên toàn bộ sheet",
+      "command": "AsBuiltStamp",
+      "allowWrite": true,
+      "config": {
+        "tenNhaThau": "Công ty TNHH Xây dựng DHCB",
+        "nguoiLap": "Nguyễn Văn A",
+        "chiHuyTruongHoacGiamDocDuAn": "Trần Văn B",
+        "tuVanGiamSatTruong": "Lê Văn C",
+        "dryRun": false
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 40,
+        "summaryContains": [
+          "Đã vẽ dấu hoàn công"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 300000
+      }
+    },
+    {
+      "name": "Vẽ lại — đã có dấu ở mọi sheet, phải bỏ qua toàn bộ (overwrite=false)",
+      "command": "AsBuiltStamp",
+      "allowWrite": true,
+      "config": {
+        "tenNhaThau": "Công ty TNHH Xây dựng DHCB",
+        "nguoiLap": "Nguyễn Văn A",
+        "chiHuyTruongHoacGiamDocDuAn": "Trần Văn B",
+        "tuVanGiamSatTruong": "Lê Văn C",
+        "dryRun": false
+      },
+      "//": "Cung hinh dang voi SheetBatchCreate: sheet da co dau (Comments danh dau) thi bo qua. maxAffected 0 chot rang dau lan truoc con nam that tren sheet.",
+      "expect": {
+        "success": true,
+        "maxAffected": 0,
+        "messagesContain": [
+          "đã có dấu"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 300000
+      }
+    },
+    {
+      "name": "Vẽ đè — overwrite=true, phải vẽ lại đúng số sheet đã có dấu",
+      "command": "AsBuiltStamp",
+      "allowWrite": true,
+      "config": {
+        "tenNhaThau": "Công ty TNHH Xây dựng DHCB",
+        "nguoiLap": "Nguyễn Văn A",
+        "chiHuyTruongHoacGiamDocDuAn": "Trần Văn B",
+        "tuVanGiamSatTruong": "Lê Văn C",
+        "overwrite": true,
+        "dryRun": false
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 40,
+        "summaryContains": [
+          "Đã vẽ dấu hoàn công"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 300000
+      }
+    },
+    {
       "name": "Xuất IFC4 — GHI THẬT ra file, để kiểm lại bằng --verify-ifc",
       "command": "BatchExport",
       "allowWrite": true,
