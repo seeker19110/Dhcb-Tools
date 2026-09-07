@@ -74,6 +74,7 @@
 - §69 — [Xác nhận thật trên Revit — facet `partOf`/`relation` của IDS khớp đúng ánh xạ Revit (11.4 roadmap.md) (2026-09-06 23:15 ICT)](#69-xác-nhận-thật-trên-revit-facet-partofrelation-của-ids-khớp-đúng-ánh-xạ-revit-114-roadmapmd-2026-09-06-2315-ict)
 - §70 — [`roadmap.md` mục B1 nói sai hiện trạng — đường ghi của `ConstructionStatus` đã có ca kiểm tự động từ PR #77, chạy lại xác nhận vẫn xanh (2026-09-06 23:26 ICT)](#70-roadmapmd-mục-b1-nói-sai-hiện-trạng-đường-ghi-của-constructionstatus-đã-có-ca-kiểm-tự-động-từ-pr-77-chạy-lại-xác-nhận-vẫn-xanh-2026-09-06-2326-ict)
 - §71 — [Đối chiếu `relation` của `partOf` với IfcTester trên chính file IFC — 13/13 khớp sau khi sửa một chỗ báo nhầm (2026-09-07)](#71-đối-chiếu-relation-của-partof-với-ifctester-trên-chính-file-ifc-1313-khớp-sau-khi-sửa-một-chỗ-báo-nhầm-2026-09-07)
+- §72 — [Đường Revit của `partOf`/`relation` — không có lỗi "phần của tổ hợp" mà §71 vừa sửa ở đường IFC (2026-09-07)](#72-đường-revit-của-partofrelation-không-có-lỗi-phần-của-tổ-hợp-mà-71-vừa-sửa-ở-đường-ifc-2026-09-07)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
@@ -3619,3 +3620,29 @@ tới đường đó).
 **Còn mở:** Solibri (phần mềm thương mại) vẫn chưa có trên máy. Và đường **Revit** dùng `Element.LevelId`
 (`RevitIdsElement.cs:213`), tức cùng lớp vấn đề có thể tồn tại ở đó với cấu kiện lồng trong curtain wall /
 assembly — chưa chạy thật nên chưa kết luận, ghi vào 11.4 của `roadmap.md`.
+
+## 72. Đường Revit của `partOf`/`relation` — không có lỗi "phần của tổ hợp" mà §71 vừa sửa ở đường IFC (2026-09-07)
+
+§71 để lại một câu hỏi: `RevitIdsElement.PartOf` (`src/DhcbTools.Core/Checks/RevitIdsElement.cs:213`) có
+cùng lớp lỗi "phần của một tổ hợp không thừa vị trí không gian của tổng" mà đường IFC (`IfcIdsElement`)
+vừa sửa không? Câu hỏi hợp lý vì cửa của curtain wall trên Revit cũng là phần tử lồng trong một host lớn
+hơn (`CurtainSystem`/`Wall` chứa panel).
+
+**Chạy thật trên Snowdon Architectural, Revit 2024** với fixture tạm hai specification (không đưa vào
+repo — chỉ dùng để trả lời câu hỏi này, không phải một khả năng cần giữ mãi):
+
+1. Mọi `IFCDOOR` phải `partOf relation="IFCRELCONTAINEDINSPATIALSTRUCTURE"` (bỏ `<entity>`, chỉ xét
+   `relation`) — **142/142 đạt**.
+2. Cùng điều kiện đó, thu hẹp về đúng 7 cửa curtain wall (lọc bằng `Name` khớp mẫu
+   `Door-Curtain-Wall.*`) — **7/7 đạt**.
+
+Cả 142 cửa, kể cả 7 cửa curtain wall mà đường IFC từng báo nhầm ở §71, đều đạt trên đường Revit. **Không
+có lỗi tương tự.** Lý do nằm ở cách hai đường lấy vị trí không gian khác hẳn nhau: đường IFC dựng lại quan
+hệ từ các thực thể `IfcRelAggregates`/`IfcRelContainedInSpatialStructure` của chính file — cửa curtain
+wall không có quan hệ chứa trực tiếp nên phải suy luận qua cha. Đường Revit đọc thẳng
+`Element.LevelId` — thuộc tính này Revit gán **trực tiếp** cho mọi phần tử kể cả phần tử lồng trong một
+host khác (panel của curtain wall vẫn có `LevelId` riêng), nên không cần và không có bước suy luận qua cha
+nào để mà sai.
+
+Đóng nốt việc còn để ngỏ ở §71 và mục 11.4 của `roadmap.md`. Không có thay đổi mã nguồn — chỉ xác nhận
+bằng chạy thật rồi ghi lại kết luận.
