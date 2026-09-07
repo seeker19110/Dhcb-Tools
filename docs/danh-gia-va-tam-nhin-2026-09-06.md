@@ -232,3 +232,64 @@ Bảng "Chỉ số để biết đang đúng hướng" trong roadmap có 5 dòng
 - Hỗ trợ Revit 2023 và AutoCAD 2024 ở bản mới sau khi .NET 8 hết hạn — giữ bản cuối, không phát triển tiếp.
 - Panel web AutoCAD + Hermes: đã "không đầu tư thêm"; nên gỡ khỏi README chính để thông điệp dữ liệu nhất quán.
 - Viết thêm playbook `skills/` cho agent trước khi có trang A4 cho người.
+
+## 9. Cập nhật 2026-09-07 — một ngày sau, kết luận không đổi
+
+> Đọc lại toàn bộ số liệu tại PR #148 (chưa merge lúc viết). Đây **không** phải bản đánh giá lại từ đầu — 24 giờ
+> không đủ để bất cứ điều gì ở mục 4–7 thay đổi thật. Mục này chỉ ghi lại cái gì đã đổi, cái gì chưa, và một phát
+> hiện củng cố đúng luận điểm nguy hiểm nhất (4.1).
+
+### 9.1 Số liệu đổi
+
+| Chỉ số | 06/9 | 07/9 |
+|---|---|---|
+| Dòng C# (`src/`) | 43.700 | 47.524 (+3.800, chủ yếu 11.6 `AsBuiltStamp` và audit Bridge) |
+| Test thuần | 1.232 | 1.266 khai báo, 1.660 ca chạy (đếm theo `[Theory]` giãn) |
+| Lệnh Revit + AutoCAD | 49 + 15 = 64 | 55 + 16 = 71 |
+| LICENSE ở gốc | Không có | **Vẫn không có** |
+| Chứng chỉ ký DLL thật | Không có | **Vẫn không có** — `sign-addin.ps1` vẫn tự ký mặc định |
+| Người dùng thật có tên | 0 | **Vẫn 0** — không có `UsageReport` hay phản hồi kỹ sư ngoài nào mới |
+| Người thứ hai merge PR không cần hỏi | 0 | **Vẫn 0** |
+
+Không có chỉ số nào trong bảng "5 quyết định cần chốt" (mục 6) hay "chỉ số thay thế" (mục 7) nhích khỏi vị trí
+06/9. Cả năm quyết định vẫn treo.
+
+### 9.2 Việc mới: audit bảo mật/tin cậy Bridge (PR #148)
+
+Việc thật đã làm trong 24 giờ là rà lại đường **ghi qua Bridge/MCP** và sửa 8 phát hiện — xem
+[`audit-nang-cap-2026-09-07.md`](audit-nang-cap-2026-09-07.md). Ba phát hiện đáng chú ý nhất, xếp theo mức
+nghiêm trọng nếu không sửa:
+
+1. **MCP từng coi chuỗi `"false"` là xác nhận chạy thật** (kiểm `truthy` thay vì kiểm kiểu boolean). Nghĩa là
+   một agent AI gửi `dryRun: "false"` (chuỗi, không phải giá trị bool) có thể vô tình **kích hoạt ghi thật**
+   thay vì xem trước — đúng lớp lỗi mà nguyên tắc 2 của roadmap ("`DryRun` mặc định bật") được dựng lên để
+   chặn, và nó lọt qua 1.232 ca test cũ vì không ca nào gửi sai kiểu.
+2. **Bridge có thể ghi nhầm vào model đang mở khác** model mà client vừa xem trước — không có gì ràng buộc
+   giữa lần `POST /query` xem trước và lần `POST /execute` ghi thật nếu kỹ sư đổi tab Revit ở giữa. Sửa bằng
+   `documentId` (`BridgeDocumentContext`) kiểm ngay trước dispatch.
+3. **`--read-only` từng cho qua lệnh không có trong catalog thật** khi dùng cache catalog cũ — một client
+   Bridge tưởng đang ở chế độ chỉ đọc vẫn có thể gọi được lệnh ghi mới thêm sau khi cache được tạo.
+
+Cả ba đều là lỗi **lớp tin cậy giữa AI/agent và hành động thật trên mô hình** — không phải lỗi thuật toán. Đây
+chính là bằng chứng cụ thể nhất cho luận điểm 4.1 của bản đánh giá 06/9: *"84 ca 0 trượt... đều do một người
+sinh ra trên máy của mình"* — 1.232 ca test xanh tuyệt đối không có nghĩa là đường ghi an toàn khi có một AI ở
+đầu gửi request, vì không ai viết ca kiểm cho *kiểu dữ liệu sai mà một agent thật có thể gửi* cho tới khi tự
+audit lại bằng đúng câu hỏi đó. Giá trị của audit này không nằm ở 8 chỗ sửa, mà ở việc nó là **lần đầu tiên có
+một vòng rà tìm lỗi khác với "viết lệnh rồi tự viết ca kiểm cho lệnh đó"** — cùng một người, nhưng đổi vai
+sang tấn công giả định thay vì xác nhận tính năng. Đáng làm thường xuyên hơn, và đáng làm bởi người thứ hai
+khi có.
+
+### 9.3 Vẫn treo, không đổi
+
+Không có gì ở mục 4.2 (hệ số xe buýt = 1), 4.4 (ma sát tên riêng gia đình/tham số), 4.5 (ba căng thẳng định vị),
+4.6 (chưa sẵn sàng phân phối — vẫn không LICENSE, không ký DLL) thay đổi. PR #148 tự nó cũng là ví dụ của 4.2:
+một commit gộp 8 sửa đổi rải trên 34 file, tài liệu hoá kỹ nhưng lại **thêm** vào khối lượng đọc cho người kế
+nhiệm, không giảm.
+
+### 9.4 Kết luận
+
+Khuyến nghị mục 6 và tầm nhìn chân trời 1 (mục 5) của bản 06/9 **giữ nguyên, không cập nhật gì thêm**: việc
+duy nhất còn thiếu vẫn là đưa sản phẩm cho người dùng thật, và audit hôm nay — dù có giá trị — không thay
+thế được điều đó. Không nên đọc PR #148 như "đã an toàn hơn để phát hành"; nên đọc nó như bằng chứng thêm rằng
+**cần một vòng rà độc lập định kỳ** (không phải tác giả gốc) trước khi bất cứ hồ sơ hoàn công hay dấu pháp lý
+nào (11.6 `AsBuiltStamp`) được kỹ sư thật ký tên chịu trách nhiệm.
