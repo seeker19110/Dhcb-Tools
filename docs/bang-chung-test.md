@@ -75,6 +75,7 @@
 - §70 — [`roadmap.md` mục B1 nói sai hiện trạng — đường ghi của `ConstructionStatus` đã có ca kiểm tự động từ PR #77, chạy lại xác nhận vẫn xanh (2026-09-06 23:26 ICT)](#70-roadmapmd-mục-b1-nói-sai-hiện-trạng-đường-ghi-của-constructionstatus-đã-có-ca-kiểm-tự-động-từ-pr-77-chạy-lại-xác-nhận-vẫn-xanh-2026-09-06-2326-ict)
 - §71 — [Đối chiếu `relation` của `partOf` với IfcTester trên chính file IFC — 13/13 khớp sau khi sửa một chỗ báo nhầm (2026-09-07)](#71-đối-chiếu-relation-của-partof-với-ifctester-trên-chính-file-ifc-1313-khớp-sau-khi-sửa-một-chỗ-báo-nhầm-2026-09-07)
 - §72 — [Đường Revit của `partOf`/`relation` — không có lỗi "phần của tổ hợp" mà §71 vừa sửa ở đường IFC (2026-09-07)](#72-đường-revit-của-partofrelation-không-có-lỗi-phần-của-tổ-hợp-mà-71-vừa-sửa-ở-đường-ifc-2026-09-07)
+- §73 — [`AsBuiltStamp` — dấu bản vẽ hoàn công (Phụ lục IIb, NĐ 207/2026/NĐ-CP) chạy thật lần đầu, khép mục 11.6 (2026-09-07)](#73-asbuiltstamp-dấu-bản-vẽ-hoàn-công-phụ-lục-iib-nđ-2072026nđ-cp-chạy-thật-lần-đầu-khép-mục-116-2026-09-07)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
@@ -3646,3 +3647,91 @@ nào để mà sai.
 
 Đóng nốt việc còn để ngỏ ở §71 và mục 11.4 của `roadmap.md`. Không có thay đổi mã nguồn — chỉ xác nhận
 bằng chạy thật rồi ghi lại kết luận.
+
+## 73. `AsBuiltStamp` — dấu bản vẽ hoàn công (Phụ lục IIb, NĐ 207/2026/NĐ-CP) chạy thật lần đầu, khép mục 11.6 (2026-09-07)
+
+Mục 11.6 để lại một việc: "`AsBuiltStamp`: family dấu theo Phụ lục IIb phải dựng trong trình soạn family
+của Revit." Mở lại văn bản gốc trên `vanban.chinhphu.vn` (file PDF ký số của Nghị định 207/2026/NĐ-CP,
+trang 3–4 của Phụ lục IIb) mới thấy hướng "family mẫu dấu" không làm được qua API công khai: phản chiếu
+toàn bộ `RevitAPI.dll` 2024 (`Autodesk.Revit.Creation.FamilyItemFactory` và mọi type khác trong assembly)
+không có phương thức `NewLabel` nào cả — tạo phần tử "Label" gắn tham số trong family annotation, thứ duy
+nhất làm được một khuôn dấu tự điền tên/ngày, không có đường vào từ API. Đổi hướng: vẽ thẳng
+`DetailCurve`/`TextNote` lên sheet, cùng kết quả cuối (dấu có tên/ngày thật khi in) mà không cần quản lý
+một file family riêng.
+
+### Đọc đúng Phụ lục IIb từ văn bản gốc
+
+`thuvienphapluat.vn` chặn (403, đúng ghi chú cũ). `vanban.chinhphu.vn` cho link PDF ký số:
+`datafiles.chinhphu.vn/cpp/files/vbpq/2026/6/207-ndcp.signed.pdf` (100 trang, quét ảnh — không có lớp
+văn bản, phải đọc bằng mắt qua từng trang render). Phụ lục IIb nằm ở trang PDF 78–79 (đánh số riêng
+"3"–"4" trong Phụ lục II): **Mẫu số 1** (không áp dụng hợp đồng thầu chính/phụ/EPC/chìa khoá trao tay) —
+ba dòng tiêu đề (tên nhà thầu / "BẢN VẼ HOÀN CÔNG" / "Ngày… tháng… năm…") rồi một hàng ba cột *Người lập*
+/ *Chỉ huy trưởng công trình hoặc giám đốc dự án* / *Tư vấn giám sát trưởng*. **Mẫu số 2** (áp dụng đúng
+bốn hình thức hợp đồng đó) — cùng ba dòng tiêu đề, hàng dưới tách **bốn** cột: *Người lập* / *Chỉ huy
+trưởng hoặc giám đốc dự án của nhà thầu phụ* / *…của nhà thầu chính* / *Tư vấn giám sát trưởng*. Chép
+nguyên văn nhãn cột vào `AsBuiltStampBuilder` (`Shared.Logic/AsBuilt`) — đây là khuôn dấu pháp luật quy
+định, không đổi theo dự án, khác với danh mục hồ sơ ở `DossierIndex` phải để trong file cấu hình.
+
+### Tầng thuần
+
+`AsBuiltStampBuilder.Validate`/`Build`: 15 ca test, gồm việc bắt buộc theo đúng Mẫu (`chiHuyTruongHoacGiamDocDuAn`
+chỉ đòi ở Mẫu 1, `chiHuyTruongNhaThauChinh` chỉ đòi ở Mẫu 2, `chiHuyTruongNhaThauPhu` **không** bắt buộc vì
+không phải hợp đồng nào cũng có thầu phụ — bắt buộc thứ đó là bịa dữ liệu), Ngày/tháng/năm rỗng giữ nguyên
+chấm chờ điền tay như bản mẫu gốc, và một hàm nhỏ `ToAnchorRelative` lật trục Y cục bộ (gốc trên-trái) sang
+hệ Revit trên sheet (gốc dưới-trái) — tách riêng vì nhầm chiều một lần là cả khuôn dấu vẽ lộn ngược, lỗi chỉ
+thấy được khi mở Revit lên nhìn.
+
+### Chạy thật trên Revit 2024 — hai lỗi lộ ra
+
+**Lỗi 1 — `OfClass(typeof(DetailLine))` ném `ArgumentException`.** `DetailLine` không phải kiểu collector
+"gốc" của Revit; thông báo lỗi của chính Revit chỉ thẳng cách sửa (`OfClass(typeof(CurveElement))` rồi lọc
+lại kiểu bằng LINQ). Bắt được ngay ở ca xem trước (dry-run) đầu tiên — dry-run cũng gọi `FindExisting` nên
+lỗi lộ ra dù chưa ghi gì.
+
+**Lỗi 2 — chống trùng dùng tham số `Comments` không tồn tại trên category này.** Thiết kế đầu: đánh dấu
+mỗi `TextNote`/`DetailLine` vừa vẽ bằng `BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS`, chạy lại tìm phần
+tử có Comments bắt đầu bằng tiền tố đó để nhận biết "đã có dấu". Chạy thật: `element.get_Parameter(...)`
+trả **null** trên category Text Notes/Lines của chính model mẫu Snowdon — tham số đó không được bind cho
+hai category annotation này trong dự án. `Set` bị bỏ qua im lặng (đúng guard `if (p != null …)` đã viết),
+nên lần chạy lại không bao giờ thấy "đã có dấu" và vẽ chồng vô hạn. Ba lượt sửa liên tiếp không thấy hết:
+đổi từ `Comments` sang tra theo `BoundingBox` rồi sang tra theo `Coord`/`GeometryCurve` (toạ độ đặt phần
+tử) — mỗi lần build lại **không** copy sang thư mục Addins vì chạy với `-SkipBuild` (chỉ dùng để bỏ qua
+build khi *không* đổi mã Core) trong lúc mã Core đang đổi liên tục, nên ba lượt "sửa" đầu chạy trên đúng
+một bản .dll cũ y hệt. Bài học: `-SkipBuild` chỉ an toàn khi thật sự không đổi gì ở Core/Revit — đổi mã
+Core thì phải bỏ cờ đó để script tự copy `.dll` vào `%APPDATA%\Autodesk\Revit\Addins`, nếu không mọi lần
+"chạy thật" chỉ đang chạy lại đúng bản cũ. Sau khi bỏ `-SkipBuild`: bản `Coord`/`GeometryCurve` đúng ngay
+— không cần đổi thuật toán, chỉ cần **thật sự** chạy bản mới. Bản chốt: nhận diện dấu đã vẽ bằng vùng chữ
+nhật của khuôn dấu tại đúng điểm neo hiện tại (so toạ độ `Coord`/hai đầu `GeometryCurve` với hộp toạ độ,
+nới 2 mm) — không phụ thuộc tham số nào của dự án.
+
+### Số liệu — Snowdon Architectural, Revit 2024 (bản chép, không đụng file gốc)
+
+Bộ `revit-write` (55–57 sheet tuỳ lượt chép model liên kết, xem ghi chú cũ về placeholder sheet):
+
+| Ca | Kết quả |
+|---|---|
+| Vẽ Mẫu 1 lên toàn bộ sheet — GHI THẬT | 57/57 sheet, không lỗi |
+| Vẽ lại — chưa đổi gì, overwrite=false | **0/57** sheet (đúng — toàn bộ đã có dấu, giữ nguyên) |
+| Vẽ đè — overwrite=true | 57/57 sheet (xoá dấu cũ trong đúng vùng, vẽ lại) |
+
+Bộ `revit-smoke` (dry-run, chỉ đọc): Mẫu 1 xem trước đúng **55/55 sheet**, Mẫu 2 thiếu
+`chiHuyTruongNhaThauChinh` báo `E-CONFIG-MISSING` đúng tên trường. Toàn bộ `revit-smoke`: **43 đạt / 0
+trượt / 1 bỏ qua trên 44 ca**. Toàn bộ `revit-write`: **19 đạt / 0 trượt trên 19 ca** (gồm cả chuỗi cũ:
+đánh số → ghi trạng thái → khôi phục Mark → tạo tầng/sheet → xuất IFC).
+
+### Kiểm thử
+
+- `AsBuiltStampLayoutTests` (Shared.Logic): 15 ca — bắt buộc theo đúng Mẫu, layout nằm khít biên khuôn
+  dấu, lưới dọc đúng số cột, `ToAnchorRelative` lật trục đúng chiều (kiểm cả xuôi lẫn ngược: bỏ hàm ra thì
+  ca đỏ).
+  `dotnet test` toàn bộ Shared.Logic: **1651 đạt / 0 trượt**, phủ 100% dòng.
+- Ribbon: nút *Dấu bản vẽ hoàn công* trong panel *Hồ sơ & Style*.
+
+### Còn mở
+
+- Vị trí neo mặc định là góc dưới-trái vùng in + lề 15 mm — vùng trống thường gặp nhất trên khổ giấy
+  chuẩn, nhưng khung tên mỗi công ty một khác; dự án có khung tên đè lên góc đó thì khai `anchorXMm`/
+  `anchorYMm` đè. Không tự dò khung tên (không có API đọc bố cục khung tên đủ tin cậy).
+  `chiHuyTruongHoacGiamDocDuAn`/`chiHuyTruongNhaThauChinh` chưa hỗ trợ ghi cứng vào tham số dự án (mới điền
+  vào chính khuôn dấu trên sheet) — DHCB không giữ "ai đã ký" như một dữ liệu có cấu trúc riêng, đúng ranh
+  giới "doanh nghiệp chịu trách nhiệm nội dung" đã đặt từ đầu mục 11.6.

@@ -268,6 +268,12 @@ namespace DhcbTools.Shared.Logic.Ai
             new CommandDescriptor("SheetIndex", Revit, "Danh mục bản vẽ: số, tên, revision hiện hành, ngày phát hành, người vẽ/kiểm ra CSV/HTML", false, "DrawingIndex", "DrawingList")
                 .Field("outputPath", "file CSV danh mục").Field("htmlPath", "file HTML để in (tuỳ chọn)").Field("sheetNumberContains", "lọc sheet").Field("skipPlaceholders", "bỏ sheet giữ chỗ")
                 .Words("danh mục bản vẽ", "danh sách bản vẽ", "sheet index", "drawing list", "mục lục bản vẽ"),
+            new CommandDescriptor("AsBuiltStamp", Revit, "Vẽ dấu bản vẽ hoàn công (Phụ lục IIb, NĐ 207/2026/NĐ-CP) lên loạt sheet, điền tên/ngày từ config", true, "HoanCongStamp", "AsBuiltSeal")
+                .Field("mau", "1 hoặc 2, theo Phụ lục IIb").Field("tenNhaThau", "tên nhà thầu thi công").Field("nguoiLap", "người lập")
+                .Field("chiHuyTruongHoacGiamDocDuAn", "Mẫu 1").Field("chiHuyTruongNhaThauPhu", "Mẫu 2, tuỳ chọn").Field("chiHuyTruongNhaThauChinh", "Mẫu 2")
+                .Field("tuVanGiamSatTruong", "mọi Mẫu").Field("ngay", "tuỳ chọn").Field("thang", "tuỳ chọn").Field("nam", "tuỳ chọn")
+                .Field("sheetNumberContains", "lọc sheet").Field("sheetNumbers", "danh sách số sheet chính xác").Field("overwrite", "ghi đè dấu đã có").Field("dryRun", "xem trước")
+                .Words("dấu hoàn công", "dấu bản vẽ hoàn công", "as-built stamp", "phụ lục IIb", "khuôn dấu hoàn công"),
             new CommandDescriptor("StylePurge", Revit, "Liệt kê và xoá style không được tham chiếu: view template, filter, line/fill pattern, text/dim type, material", true, "PurgeStyles", "Wipe")
                 .Field("kinds", "ViewTemplates/Filters/LinePatterns/FillPatterns/TextTypes/DimensionTypes/Materials").Field("keepNameContains", "giữ lại").Field("keepIfUncertain", "không xoá nhóm nào kiểm tham chiếu bị lỗi (mặc định bật)").Field("dryRun", "xem trước")
                 .Words("purge style", "xoá view template thừa", "xoá filter thừa", "dọn style", "wipe"),

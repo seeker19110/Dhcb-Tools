@@ -147,6 +147,8 @@ public sealed class App : IExternalApplication
                 "Copy bố trí viewport từ sheet mẫu sang các sheet khác."),
             ("DhcbSheetIndex", "Danh mục bản vẽ", "SheetIndexRibbonCommand",
                 "Xuất danh mục bản vẽ (số, tên, revision, ngày phát hành) ra CSV/HTML cho gói bàn giao."));
+        Add(sheets, path, "DhcbAsBuiltStamp", "Dấu bản vẽ\nhoàn công", "AsBuiltStampRibbonCommand",
+            "Vẽ dấu bản vẽ hoàn công (Phụ lục IIb, NĐ 207/2026/NĐ-CP) lên loạt sheet, điền tên/ngày từ config.");
         Add(sheets, path, "DhcbColorByParameter", "Tô màu theo\ntham số", "ColorByParameterRibbonCommand",
             "Tô màu phần tử theo giá trị một tham số (kiểu Colour Splasher).");
         Group(sheets, path, "DhcbStyleTools", "Dọn &\nkiểm kê", "Dọn style thừa, kiểm kê family.",
@@ -322,7 +324,7 @@ public sealed class App : IExternalApplication
             or "DhcbTransferStandards" or "DhcbSheetBatchCreate"
             => RibbonIcons.Init,
         "DhcbSheetTools" or "DhcbSheetRename" or "DhcbRevisionOnSheets" or "DhcbViewportCopy" or "DhcbSheetIndex"
-            or "DhcbColorByParameter" or "DhcbStyleTools" or "DhcbStylePurge" or "DhcbFamilyAudit"
+            or "DhcbAsBuiltStamp" or "DhcbColorByParameter" or "DhcbStyleTools" or "DhcbStylePurge" or "DhcbFamilyAudit"
             => RibbonIcons.Sheets,
         "DhcbFamilyStarter" => RibbonIcons.Mepf,
         "DhcbFamilyUpgrade" => RibbonIcons.Mepf,

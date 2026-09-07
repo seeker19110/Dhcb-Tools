@@ -417,6 +417,47 @@
       }
     },
     {
+      "name": "Dấu bản vẽ hoàn công Mẫu 1 — xem trước (mục 11.6)",
+      "command": "AsBuiltStamp",
+      "//": "DryRun mac dinh bat, chi doc, khong dung toi sheet nao. Snowdon Architectural co 55 sheet.",
+      "config": {
+        "tenNhaThau": "Công ty TNHH Xây dựng DHCB",
+        "nguoiLap": "Nguyễn Văn A",
+        "chiHuyTruongHoacGiamDocDuAn": "Trần Văn B",
+        "tuVanGiamSatTruong": "Lê Văn C"
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 120000,
+        "minAffected": 40,
+        "summaryContains": [
+          "Xem trước",
+          "Mẫu 1"
+        ],
+        "neverContains": [
+          "Exception"
+        ]
+      }
+    },
+    {
+      "name": "Dấu bản vẽ hoàn công Mẫu 2 — E-CONFIG-MISSING khi thiếu chỉ huy trưởng nhà thầu chính",
+      "command": "AsBuiltStamp",
+      "config": {
+        "mau": 2,
+        "tenNhaThau": "Công ty TNHH Xây dựng DHCB",
+        "nguoiLap": "Nguyễn Văn A",
+        "tuVanGiamSatTruong": "Lê Văn C"
+      },
+      "expect": {
+        "success": false,
+        "maxMs": 30000,
+        "summaryContains": [
+          "E-CONFIG-MISSING",
+          "chiHuyTruongNhaThauChinh"
+        ]
+      }
+    },
+    {
       "name": "Danh mục bản vẽ — E-PRECOND khi bộ lọc không khớp sheet nào",
       "command": "SheetIndex",
       "config": {
