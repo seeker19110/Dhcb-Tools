@@ -484,5 +484,80 @@ class MainTests(unittest.TestCase):
         self.assertEqual("C:/a.csv", run.call_args[0][2]["outputPath"])
 
 
+class CliSafetyRegressionTests(unittest.TestCase):
+    _run = MainTests._run
+
+    def test_raw_preserves_preview_document_in_sync_and_background(self):
+        for app in ("revit", "autocad"):
+            for background in (False, True):
+                with self.subTest(app=app, background=background):
+                    payload = {"command": "AutoNumbering", "documentId": "preview-A",
+                               "config": {"dryRun": False}}
+                    responses = ([FakeResponse({"id": "job1"}),
+                                  FakeResponse({"status": "done", "result": {"success": True}})]
+                                 if background else [FakeResponse({"success": True})])
+                    with mock.patch.object(dhcb_agent.urllib.request, "urlopen",
+                                           side_effect=responses) as send:
+                        args = [app, "raw", json.dumps(payload), "--no-dry-run"]
+                        if background:
+                            args.append("--background")
+                        code, _, _ = self._run(args)
+                    self.assertEqual(0, code)
+                    sent = send.call_args_list[0].args[0]
+                    self.assertTrue(sent.full_url.endswith("/execute"))
+                    self.assertEqual("preview-A", json.loads(sent.data)["documentId"])
+                    self.assertIs(False, json.loads(sent.data)["config"]["dryRun"])
+                    self.assertEqual(2 if background else 1, send.call_count)
+
+    def test_changed_document_error_does_not_retry_or_retarget(self):
+        payload = {"command": "AutoNumbering", "documentId": "preview-A",
+                   "config": {"dryRun": False}}
+        with fake_urlopen({"success": False, "summary": "E-DOCUMENT-CHANGED"}) as send:
+            code, out, _ = self._run(["revit", "raw", json.dumps(payload), "--no-dry-run"])
+        self.assertEqual(1, code)
+        self.assertIn("E-DOCUMENT-CHANGED", out)
+        send.assert_called_once()
+        self.assertEqual("preview-A", json.loads(send.call_args.args[0].data)["documentId"])
+
+    def test_cli_dry_run_overrides_json_in_every_mode(self):
+        for mode in ("raw", "exec"):
+            for flags, expected in (([], True), (["--dry-run"], True), (["--no-dry-run"], False)):
+                for configured in (True, False):
+                    with self.subTest(mode=mode, flags=flags, configured=configured):
+                        config = {"dryRun": configured}
+                        if mode == "raw":
+                            args = ["revit", mode, json.dumps({"command": "AutoNumbering",
+                                    "documentId": "preview-A", "config": config})]
+                        else:
+                            args = ["revit", mode, "AutoNumbering", "--config", json.dumps(config)]
+                        with fake_urlopen({"success": True, "documentId": "current-A"}) as send:
+                            code, _, _ = self._run(args + flags)
+                        self.assertEqual(0, code)
+                        body = json.loads(send.call_args.args[0].data)
+                        self.assertIs(expected, body["config"]["dryRun"])
+
+    def test_non_object_file_is_rejected_before_inline_merge(self):
+        for value in ([], [1], None, False, 3, "text"):
+            with self.subTest(value=value), mock.patch(
+                    "builtins.open", mock.mock_open(read_data=json.dumps(value))), \
+                    mock.patch.object(dhcb_agent.urllib.request, "urlopen") as send:
+                code, _, err = self._run(["revit", "exec", "AutoNumbering",
+                                         "--config-file", "bad.json", "--config", "{}"])
+            self.assertEqual(2, code)
+            self.assertIn("phải là JSON object", err)
+            send.assert_not_called()
+
+    def test_raw_rejects_invalid_document_and_config_without_http(self):
+        invalid = ([{"documentId": value} for value in ("", " ", None, 4, [], {})]
+                   + [{"config": value} for value in ([], None, False, "")])
+        for fields in invalid:
+            with self.subTest(fields=fields), mock.patch.object(
+                    dhcb_agent.urllib.request, "urlopen") as send:
+                payload = {"command": "AutoNumbering", **fields}
+                code, _, _ = self._run(["revit", "raw", json.dumps(payload), "--no-dry-run"])
+            self.assertEqual(2, code)
+            send.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
