@@ -7,6 +7,7 @@ public sealed class QueryRequest
 {
     /// <summary>
     /// Loại truy vấn. Các giá trị hợp lệ:
+    ///   document_context — định danh phiên bản vẽ cho lệnh ghi qua Bridge (vỏ AutoCAD)
     ///   drawing_info  — thông tin chung về file DWG
     ///   layers        — danh sách layer + thuộc tính
     ///   blocks        — block definitions + insert count

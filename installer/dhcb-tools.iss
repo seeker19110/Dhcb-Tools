@@ -48,7 +48,7 @@ Name: "revit2025";  Description: "Add-in Revit 2025";      Types: full
 Name: "revit2026";  Description: "Add-in Revit 2026";      Types: full
 Name: "acad2024";   Description: "Plugin AutoCAD 2024";    Types: full
 Name: "acad2025";   Description: "Plugin AutoCAD 2025";    Types: full
-Name: "acad2026";   Description: "Plugin AutoCAD 2026";    Types: full
+Name: "acad2026";   Description: "Plugin AutoCAD 2026 Update 1.2 trở lên (.NET 10)"; Types: full
 Name: "batch";      Description: "Batch runner chạy đêm";  Types: full
 Name: "scripts";    Description: "Script Python (agent client, MCP server, AI offline)"; Types: full
 
@@ -103,6 +103,41 @@ Filename: "{app}"; Description: "Mở thư mục batch runner"; \
 Type: filesandordirs; Name: "{userappdata}\Autodesk\ApplicationPlugins\DhcbTools.bundle"
 
 [Code]
+var
+  Acad2026Page: TInputDirWizardPage;
+
+procedure InitializeWizard();
+begin
+  Acad2026Page := CreateInputDirPage(wpSelectComponents,
+    'AutoCAD 2026 Update 1.2 trở lên', 'Chọn thư mục AutoCAD cần cài plugin',
+    'Gói này cần AutoCAD 2026 Update 1.2 trở lên dùng .NET 10. Bộ cài sẽ kiểm tra runtime của AutoCAD trong thư mục đã chọn.',
+    False, '');
+  Acad2026Page.Add('Thư mục AutoCAD 2026:');
+  Acad2026Page.Values[0] := ExpandConstant('{autopf}\Autodesk\AutoCAD 2026');
+end;
+
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := (PageID = Acad2026Page.ID) and not WizardIsComponentSelected('acad2026');
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  RuntimeText: AnsiString;
+  AcadFolder: String;
+begin
+  Result := '';
+  if not WizardIsComponentSelected('acad2026') then Exit;
+  AcadFolder := ExpandConstant('{param:ACAD2026DIR|}') ;
+  if AcadFolder = '' then AcadFolder := Acad2026Page.Values[0];
+  if not FileExists(AddBackslash(AcadFolder) + 'acad.exe') then
+    Result := 'Không tìm thấy AutoCAD 2026. Chọn đúng thư mục hoặc bỏ thành phần AutoCAD 2026.'
+  else if not LoadStringFromFile(AddBackslash(AcadFolder) + 'acdbmgd.runtimeconfig.json', RuntimeText) then
+    Result := 'Không đọc được cấu hình runtime AutoCAD. Cần AutoCAD 2026 Update 1.2 trở lên.'
+  else if Pos('"net10.0"', String(RuntimeText)) = 0 then
+    Result := 'AutoCAD tại thư mục này chưa dùng .NET 10. Cập nhật AutoCAD 2026 lên Update 1.2 trở lên rồi cài lại.';
+end;
+
 function InitializeSetup(): Boolean;
 begin
   Result := True;

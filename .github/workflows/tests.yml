@@ -3,6 +3,7 @@
 name: tests
 
 on:
+  workflow_call:
   push:
     branches: [main]
   pull_request:
@@ -11,7 +12,7 @@ on:
 # mà vẫn chiếm runner, lượt mới phải xếp hàng. Chỉ huỷ trên PR — trên main mỗi commit phải có
 # kết quả CI riêng (release.yml và bằng chứng kiểm thử tra theo commit).
 concurrency:
-  group: tests-${{ github.ref }}
+  group: tests-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:

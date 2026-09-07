@@ -115,6 +115,33 @@ class FetchAutocadTests(unittest.TestCase):
         self.assertFalse(result["connected"])
 
 
+class DocumentTargetTests(unittest.TestCase):
+    @staticmethod
+    def response(payload):
+        result = mock.MagicMock()
+        result.__enter__.return_value = result
+        result.read.return_value = json.dumps(payload).encode()
+        return result
+
+    def test_write_requires_context_and_preserves_explicit_target(self):
+        for target in (None, "chosen"):
+            with self.subTest(target=target):
+                body = {"config": {"dryRun": False}}
+                responses = [self.response({"success": True})]
+                if target:
+                    body["documentId"] = target
+                else:
+                    responses.insert(0, self.response({"documentId": "active"}))
+                with mock.patch.object(panel_api.urllib.request, "urlopen", side_effect=responses) as send:
+                    self.assertTrue(panel_api.fetch_autocad("/execute", body)["success"])
+                    self.assertEqual(target or "active", json.loads(send.call_args.args[0].data)["documentId"])
+
+    def test_context_failure_blocks_write(self):
+        with mock.patch.object(panel_api.urllib.request, "urlopen", return_value=self.response({"error": "no model"})) as send:
+            self.assertFalse(panel_api.fetch_autocad("/execute", {"config": {"dryRun": False}})["success"])
+            self.assertEqual(1, send.call_count)
+
+
 class RunHermesTests(unittest.TestCase):
     def test_prompt_qua_dai_bi_chan_truoc_khi_goi(self) -> None:
         with self.assertRaises(ValueError):

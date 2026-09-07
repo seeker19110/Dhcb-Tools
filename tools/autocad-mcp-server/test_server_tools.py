@@ -19,6 +19,12 @@ import server
 
 
 class FetchTests(unittest.TestCase):
+    def test_write_uses_gateway_document_guard(self):
+        body = {"config": {"dryRun": False}}
+        with mock.patch.object(server.panel_api, "fetch_autocad", return_value={"success": True}) as send:
+            self.assertEqual({"success": True}, server._fetch("/execute", body))
+            send.assert_called_once_with("/execute", body)
+
     @staticmethod
     def _response(payload):
         response = mock.MagicMock()

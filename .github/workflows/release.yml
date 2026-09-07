@@ -20,6 +20,11 @@ permissions:
   contents: write
 
 jobs:
+  verify:
+    uses: ./.github/workflows/tests.yml
+    permissions:
+      contents: read
+
   version:
     runs-on: ubuntu-latest
     outputs:
@@ -211,7 +216,7 @@ jobs:
 
   publish:
     if: github.ref_type == 'tag'
-    needs: [version, build-revit, build-autocad, build-batchrunner, installer]
+    needs: [verify, version, build-revit, build-autocad, build-batchrunner, installer]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4

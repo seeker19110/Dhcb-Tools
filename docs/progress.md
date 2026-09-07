@@ -2,6 +2,11 @@
 
 Ảnh chụp tại thời điểm cập nhật gần nhất. Kế hoạch phía trước xem [`roadmap.md`](roadmap.md).
 
+> Bổ sung 2026-09-07: triển khai sửa lỗi từ audit (MCP, preview, định danh model Bridge,
+> cổng test trước publish, tương thích AutoCAD 2026 và cố định API package).
+> Xem [báo cáo nâng cấp](audit-nang-cap-2026-09-07.md) để phân biệt kiểm chứng tại máy với
+> các ca còn cần chạy trên Revit/AutoCAD thật; số liệu lịch sử bên dưới không chứng nhận bản sửa mới.
+
 > Cập nhật lần cuối: 2026-09-06 · sau vòng **đánh giá sâu lần hai** (§54–§55: tài liệu lệch tái phát → test đối chiếu
 > `release.yml`; script dọn kết quả; thước đo chất lượng tuyến, `RouteFromLines` ghi thật). Trước đó vòng **đánh giá sâu** thứ nhất (§51): gỡ nhãn *thử nghiệm* lỗi thời của
 > `SetoutExport`, `ConstructionStatus`, `ProgressReport`, `ModelLinesFromCad` (cả bốn đã chạy thật 2026-09-05 — §28, §29,
@@ -52,7 +57,7 @@
 | Toạ độ định vị ra máy toàn đạc (đề xuất A1) | ✅ đã chạy thật Revit 2024 (§28: 260 + 545 điểm) — `SetoutExport`: CSV theo thứ tự cột máy (`PNEZD`/`PENZD`…) + DXF điểm, hệ Survey tự kiểm chiều transform, giao trục, tên điểm ≤ 16 ký tự không trùng — [`toa-do-dinh-vi.md`](toa-do-dinh-vi.md) |
 | Khởi tạo dự án | ✅ Grid/Level/Family/Project info + **file từ template, transfer standards, trục/level từ CSV (CAD/Excel), sheet hàng loạt** |
 | MEPF nền tảng (sleeve, cao độ, hanger, chia ống, connector) | ✅ Core + Bridge + batch + Ribbon; đã chạy thật trên model HVAC và cấp thoát nước mẫu |
-| MEPF routing A (theo line), B (rải thiết bị theo phòng) | ✅ Core + Ribbon + Bridge; chờ kiểm thử trên model mẫu |
+| MEPF routing A (theo line), B (rải thiết bị theo phòng) | ✅ Core + Ribbon + Bridge; bằng chứng theo từng vòng ở `bang-chung-test.md`, gồm đường ghi `RouteFromLines` §55 |
 | MEPF sizing (đề xuất → CSV → áp), màu/tên hệ, đánh số theo dòng chảy | ✅ |
 | Batch runner chạy đêm (Revit + AutoCAD accoreconsole) | ✅ [`batch-runner.md`](batch-runner.md) |
 | Chuỗi băm nhật ký batch (NĐ 207/2026, điều kiện ①) | ✅ `Shared.Logic/Evidence/HashChain` gắn ở `RunLog.Append`; kiểm bằng `BatchRunner --verify-log` — §23, và chạy thật cả hai đường Revit/AutoCAD ở §24 |
@@ -70,7 +75,7 @@
 | CD | ✅ đóng gói Release thật (Revit 2023/2024/2025/**2026**, **AutoCAD 2024/2025/2026**) + GitHub Release khi đẩy tag (`release.yml`, windows-latest). AutoCAD 2026 là nhánh .NET 10, installer đặt vào `DhcbTools.bundle\Contents6` |
 
 Toàn bộ 64 lệnh đã có mã nguồn và biên dịch xanh với API package. **49/49 lệnh Revit đã chạy thật ít nhất
-một lần trong Revit 2024.3** (ba lệnh chặng thi công là phần chưa) và **15/15 lệnh AutoCAD** đã có ca kiểm tự
+một lần trong Revit 2024.3** (mốc của vòng kiểm đã ghi nhận, không phải chứng nhận mọi commit mới) và **15/15 lệnh AutoCAD** đã có ca kiểm tự
 động qua `accoreconsole` (§10).
 Việc có giá trị nhất lúc này là **9.4 — đưa cho một nhóm kỹ sư dùng thật**; phản hồi của họ quyết định
 giai đoạn 10/11 đi sâu vào đâu.
@@ -82,7 +87,7 @@ giai đoạn 10/11 đi sâu vào đâu.
 ### Khung solution
 `Shared.Logic` (netstandard2.0, thuần) ← `Shared.Hosting` (CommandResult, ICoreCommand<TConfig,TDocument>,
 HttpBridgeServer, BridgeTokenStore, AuthLockout, BridgeWorkItem) ← `Core` (Revit) / `Core.AutoCAD` ← vỏ Revit / AutoCAD.
-`BatchRunner` (net8.0 console) chỉ tham chiếu `Shared.Logic`. Không còn class trùng tên giữa hai Core
+`BatchRunner` (net10.0 console) chỉ tham chiếu `Shared.Logic`. Không còn class trùng tên giữa hai Core
 (`git grep -c "class CommandResult"` = 1).
 
 ### Bảng lệnh và danh mục

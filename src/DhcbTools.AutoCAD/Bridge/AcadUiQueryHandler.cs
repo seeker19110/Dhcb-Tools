@@ -8,6 +8,7 @@ using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.GraphicsSystem;
 using DhcbTools.Core.AutoCAD.Query;
 using DhcbTools.Shared.Logic.Cad;
+using DhcbTools.Shared.Hosting;
 
 namespace DhcbTools.AutoCAD.Bridge;
 
@@ -31,6 +32,7 @@ internal static class AcadUiQueryHandler
     {
         return request.Query.ToUpperInvariant() switch
         {
+            "DOCUMENT_CONTEXT" => new { documentId = BridgeDocumentContext.IdFor(document.Database), name = document.Name },
             "SELECTION" => Selection(document, request.Params),
             "SHOW_ENTITIES" => ShowEntities(document, request.Params),
             "ACTIVE_LAYOUT" => ActiveLayout(document),

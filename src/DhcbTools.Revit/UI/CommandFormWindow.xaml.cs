@@ -32,6 +32,7 @@ public partial class CommandFormWindow : Window
     private readonly CommandDescriptor _descriptor;
     private readonly string _configPath;
     private readonly List<IFieldEditor> _editors = new();
+    private string? _previewSnapshot;
 
     public CommandFormWindow(Document document, CommandDescriptor descriptor, JObject config, string configPath)
     {
@@ -46,6 +47,14 @@ public partial class CommandFormWindow : Window
         DescriptionText.Text = descriptor.Description;
 
         BuildFields(config);
+        FieldsPanel.AddHandler(System.Windows.Controls.Primitives.TextBoxBase.TextChangedEvent,
+            new TextChangedEventHandler((_, _) => InvalidatePreview()));
+        FieldsPanel.AddHandler(System.Windows.Controls.Primitives.Selector.SelectionChangedEvent,
+            new SelectionChangedEventHandler((_, _) => InvalidatePreview()));
+        FieldsPanel.AddHandler(System.Windows.Controls.Primitives.ToggleButton.CheckedEvent,
+            new RoutedEventHandler((_, _) => InvalidatePreview()));
+        FieldsPanel.AddHandler(System.Windows.Controls.Primitives.ToggleButton.UncheckedEvent,
+            new RoutedEventHandler((_, _) => InvalidatePreview()));
     }
 
     /// <summary>Lệnh đã chạy thật (không phải xem trước) chưa — vỏ dùng để trả Result cho Revit.</summary>
@@ -107,6 +116,16 @@ public partial class CommandFormWindow : Window
 
     private void OnPreview(object sender, RoutedEventArgs e) => Execute(dryRun: true);
 
+    private void InvalidatePreview()
+    {
+        _previewSnapshot = null;
+        RunButton.IsEnabled = false;
+    }
+
+    private string Snapshot(JObject config) => PreviewSnapshot.Capture(config.ToString(),
+        _editors.Where(e => e.Field.Kind == FieldKind.FilePath)
+            .Select(e => config[e.Field.Name]?.ToString() ?? string.Empty));
+
     private void OnRun(object sender, RoutedEventArgs e)
     {
         var confirm = MessageBox.Show(
@@ -126,12 +145,20 @@ public partial class CommandFormWindow : Window
     private void Execute(bool dryRun)
     {
         JObject config;
+        if (dryRun) InvalidatePreview();
         try
         {
             config = Collect();
+            if (!dryRun && (_previewSnapshot == null || _previewSnapshot != Snapshot(config)))
+            {
+                InvalidatePreview();
+                ShowText("Cấu hình hoặc nội dung file đã thay đổi. Hãy Xem trước lại trước khi Chạy thật.");
+                return;
+            }
         }
-        catch (FormatException ex)
+        catch (Exception ex) when (ex is FormatException || ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException)
         {
+            InvalidatePreview();
             ShowText("Giá trị nhập chưa hợp lệ: " + ex.Message);
             return;
         }
@@ -139,6 +166,7 @@ public partial class CommandFormWindow : Window
         SaveConfig(config);
 
         config["dryRun"] = dryRun;
+        InvalidatePreview();
         CommandResult result;
         var cursor = Cursor;
         try
@@ -162,7 +190,19 @@ public partial class CommandFormWindow : Window
         ShowText(Format(result));
 
         // Chỉ mở nút chạy thật sau khi xem trước thành công — đúng nguyên tắc DryRun mặc định của roadmap.
-        RunButton.IsEnabled = dryRun && result.Success;
+        if (dryRun && result.Success)
+        {
+            config.Remove("dryRun");
+            try
+            {
+                _previewSnapshot = Snapshot(config);
+                RunButton.IsEnabled = true;
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException)
+            {
+                ShowText(Format(result) + "\nKhông xác minh được file đầu vào: " + ex.Message);
+            }
+        }
         if (!dryRun)
         {
             Executed = result.Success;

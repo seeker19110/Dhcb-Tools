@@ -14,7 +14,7 @@
       Hoặc dùng package cộng đồng Nice3point.Revit.Api.RevitAPI (khuyến nghị cho CI).
       Core CHỈ tham chiếu RevitAPI (đọc/ghi Document), KHÔNG tham chiếu RevitAPIUI.
     -->
-    <PackageReference Include="Nice3point.Revit.Api.RevitAPI" Version="$(RevitVersion).*" />
+    <PackageReference Include="Nice3point.Revit.Api.RevitAPI" Version="$(RevitApiVersion)" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 

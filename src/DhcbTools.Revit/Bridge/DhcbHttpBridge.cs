@@ -93,7 +93,9 @@ internal sealed class BridgeEventHandler : IExternalEventHandler
                     continue;
                 }
 
-                item.Completion.TrySetResult(DispatchWithFailurePolicy(doc, item.Request.Command, item.Request.ConfigJson));
+                var error = BridgeDocumentContext.Validate("revit", item.Request, BridgeDocumentContext.IdFor(doc));
+                item.Completion.TrySetResult(error != null ? CommandResult.Fail(error)
+                    : DispatchWithFailurePolicy(doc, item.Request.Command, item.Request.ConfigJson));
             }
             catch (Exception ex)
             {

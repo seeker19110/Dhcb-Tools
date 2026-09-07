@@ -108,6 +108,8 @@ mcp = FastMCP(
 
 def _fetch(path: str, body: dict | None = None) -> dict:
     """Gọi HTTP bridge."""
+    if path == "/execute" and body and body.get("config", {}).get("dryRun") is False:
+        return panel_api.fetch_autocad(path, body)
     try:
         import urllib.request
         import urllib.error
