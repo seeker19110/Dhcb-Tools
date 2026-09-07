@@ -38,7 +38,7 @@ phải bước bắt buộc để bắt đầu dùng.
 | Windows | 10/11 x64 | Chạy add-in (chỉ để build/test thuần thì Linux/macOS cũng được) |
 | .NET SDK | 8.0.x **+ 10.0.x** | SDK 8 build net48/net8.0-windows; SDK 10 cho AutoCAD ≥ 2026 và Revit ≥ 2027 (net10.0-windows) |
 | Revit | 2023–2026 (2027 build được, chưa chạy thật) | Dùng add-in Revit |
-| AutoCAD | 2024–2026 | Dùng plugin AutoCAD (2026.1 dùng .NET 10 — đã chạy thật qua accoreconsole) |
+| AutoCAD | 2024–2026 | Gói 2026 yêu cầu **Update 1.2 trở lên (.NET 10)**; installer kiểm runtime. Các bản 2026 cũ dùng .NET 8 không thuộc phạm vi gói này |
 | Python | 3.9+ | Dùng `scripts/*.py` (client Bridge, MCP server, AI offline) |
 | Node/npx | bất kỳ LTS | **Chỉ** khi đóng gói `.mcpb` bằng `scripts/pack-mcpb.ps1` |
 | Hermes CLI | — | **Chỉ** cho panel web AutoCAD (`tools/autocad-mcp-server`) |
@@ -134,6 +134,14 @@ Nút Ribbon Revit dùng chung **một form động** dựng từ `CommandCatalog
 lưu ở `%APPDATA%\DHCB\configs\revit\<Lệnh>.json` cho lần sau.
 
 ## HTTP Bridge, agent và MCP
+
+**Nâng cấp an toàn 2026-09-07:** cập nhật Bridge và các script client cùng nhau. Lệnh ghi thật qua
+`POST /execute` cần `documentId` của phiên model. Lấy bằng `POST /query` với
+`{"query":"document_context"}`, rồi gửi `documentId` ở cấp ngoài, cạnh `command` và `config`.
+Bridge kiểm lại model trên luồng UI ngay trước thực thi; đổi model hoặc đóng/mở lại sẽ bị từ chối.
+Client Python và panel tự lấy context trước khi gửi `dryRun:false`; caller có thể truyền rõ
+`documentId` ở payload HTTP để giữ nguyên model đã xem trước. Chi tiết và giới hạn:
+[`docs/audit-nang-cap-2026-09-07.md`](docs/audit-nang-cap-2026-09-07.md).
 
 Revit `http://127.0.0.1:8765`, AutoCAD `http://127.0.0.1:8766`. Token sinh lần đầu ở `%APPDATA%\DHCB\bridge-token.txt`
 (header `Authorization: Bearer …`, sai 5 lần/60 s → khoá 5 phút). Endpoint: `GET /health`, `GET /tools`,
@@ -236,7 +244,7 @@ Chi tiết: [`docs/kiem-thu-trong-revit.md`](docs/kiem-thu-trong-revit.md), bằ
 
 Packages: Revit `Nice3point.Revit.Api.RevitAPI/RevitAPIUI`, AutoCAD `AutoCAD.NET` (vỏ đầy đủ) và `AutoCAD.NET.Core/.Model`
 (Core + vỏ core-only). Revit 2021–2024 và AutoCAD ≤2024 dùng net48; Revit 2025–2026 và AutoCAD 2025 dùng net8.0-windows;
-AutoCAD ≥ 2026 (package 25.1.x) và Revit ≥ 2027 dùng **net10.0-windows** — `Directory.Build.props` là nơi duy nhất quyết
+Gói AutoCAD 2026 Update 1.2+ (package 25.1.1) và Revit ≥ 2027 dùng **net10.0-windows** — `Directory.Build.props` là nơi duy nhất quyết
 định TFM theo `-p:RevitVersion` / `-p:AcadVersion`; `release.yml` hỏi lại MSBuild thay vì tự tính.
 
 ## CI/CD

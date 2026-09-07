@@ -12,6 +12,10 @@ namespace DhcbTools.Shared.Hosting
         [JsonProperty("config")]
         public JObject? Config { get; set; }
 
+        /// <summary>Định danh phiên document từ POST /query {query: document_context}; bắt buộc với lệnh ghi thật.</summary>
+        [JsonProperty("documentId")]
+        public string? DocumentId { get; set; }
+
         /// <summary>
         /// Thời gian chờ riêng cho lệnh này, tính bằng giây (giai đoạn 10.5). Bỏ trống = dùng mặc định
         /// của server (30 s).

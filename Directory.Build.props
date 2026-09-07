@@ -13,6 +13,12 @@
   -->
   <PropertyGroup>
     <RevitVersion Condition="'$(RevitVersion)'==''">2024</RevitVersion>
+    <!-- API đã được restore/kiểm tại audit 2026-09-07; không tự trôi theo wildcard khi phát hành. -->
+    <RevitApiVersion Condition="'$(RevitVersion)'=='2023'">2023.1.90</RevitApiVersion>
+    <RevitApiVersion Condition="'$(RevitVersion)'=='2024'">2024.3.60</RevitApiVersion>
+    <RevitApiVersion Condition="'$(RevitVersion)'=='2025'">2025.4.60</RevitApiVersion>
+    <RevitApiVersion Condition="'$(RevitVersion)'=='2026'">2026.4.10</RevitApiVersion>
+    <RevitApiVersion Condition="'$(RevitVersion)'=='2027'">2027.2.0</RevitApiVersion>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -44,7 +50,8 @@
     <DhcbIsAcadProject Condition="$(MSBuildProjectName.Contains('AutoCAD'))">true</DhcbIsAcadProject>
   </PropertyGroup>
 
-  <!-- Vỏ/Core AutoCAD: ≤2024 → net48 (.NET Framework), 2025 → .NET 8, 2026+ → .NET 10. -->
+  <!-- Gói AutoCAD 2026 chỉ hỗ trợ Update 1.2+ (.NET 10); installer kiểm runtime.
+       AutoCAD 2026 RTM–Update 1.1 (.NET 8) không thuộc phạm vi gói 2026 này. -->
   <PropertyGroup Condition="'$(DhcbIsAcadProject)'=='true'">
     <TargetFramework Condition="'$(AcadVersion)'=='' Or $(AcadVersion) &lt;= 2024">net48</TargetFramework>
     <TargetFramework Condition="'$(AcadVersion)' != '' And $(AcadVersion) == 2025">net8.0-windows</TargetFramework>
@@ -95,9 +102,9 @@
       Phiên bản package AutoCAD.NET.Core/.Model theo năm: ≤2024 → 24.* (net48), 2025 → 25.0.* (net8),
       2026+ → 25.1.* (AutoCAD 2026.1 đã chuyển sang .NET 10 — xem mục giới hạn công nghệ trong docs).
     -->
-    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And $(AcadVersion) &lt;= 2024">24.*</AcadNetVersion>
-    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And $(AcadVersion) == 2025">25.0.*</AcadNetVersion>
-    <AcadNetVersion Condition="'$(AcadNetVersion)'==''">25.1.*</AcadNetVersion>
+    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And $(AcadVersion) &lt;= 2024">24.3.0</AcadNetVersion>
+    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And $(AcadVersion) == 2025">25.0.1</AcadNetVersion>
+    <AcadNetVersion Condition="'$(AcadNetVersion)'==''">25.1.1</AcadNetVersion>
   </PropertyGroup>
 
 

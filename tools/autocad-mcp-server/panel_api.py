@@ -167,6 +167,11 @@ def bridge_headers(has_body: bool) -> dict[str, str]:
 
 
 def fetch_autocad(path: str, body: dict[str, Any] | None = None, timeout: int = 35) -> dict[str, Any]:
+    if path == "/execute" and body and body.get("config", {}).get("dryRun") is False and not body.get("documentId"):
+        context = fetch_autocad("/query", {"query": "document_context"}, timeout)
+        if not context.get("documentId"):
+            return {"success": False, "error": "Không xác minh được phiên bản vẽ; chưa gửi lệnh ghi. Hãy cập nhật Bridge."}
+        body = {**body, "documentId": context["documentId"]}
     data = None if body is None else json.dumps(body).encode("utf-8")
     request = urllib.request.Request(
         AUTOCAD_URL + path,

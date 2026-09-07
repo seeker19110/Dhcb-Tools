@@ -8,6 +8,7 @@ public sealed class QueryRequest
 {
     /// <summary>
     /// Loại truy vấn. Các giá trị hợp lệ:
+    ///   document_context — định danh phiên model cho lệnh ghi qua Bridge (vỏ Revit)
     ///   document_info  — thông tin chung về file/project
     ///   elements       — danh sách phần tử theo category + tham số tuỳ chọn
     ///   levels         — danh sách tầng + cao độ

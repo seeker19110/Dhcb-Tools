@@ -2,6 +2,7 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using DhcbTools.Core;
 using DhcbTools.Core.Query;
+using DhcbTools.Shared.Hosting;
 
 namespace DhcbTools.Revit.Bridge;
 
@@ -25,6 +26,7 @@ internal static class UiQueryHandler
 
         return request.Query.ToUpperInvariant() switch
         {
+            "DOCUMENT_CONTEXT" => new { documentId = BridgeDocumentContext.IdFor(document), name = document.Title },
             "SELECTION" => Selection(uiDocument, request.Params),
             "SHOW_ELEMENTS" => ShowElements(uiDocument, request.Params),
             "ACTIVE_VIEW" => ActiveView(uiDocument),

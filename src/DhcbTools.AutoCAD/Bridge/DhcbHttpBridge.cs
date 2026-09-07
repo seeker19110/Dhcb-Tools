@@ -34,7 +34,12 @@ public sealed class DhcbHttpBridge : IDisposable
         {
             ExecuteAsync = item => RunOnAutoCadThread(
                 item,
-                database => AcadCommandTable.Dispatch(database, item.Request.Command, item.Request.ConfigJson),
+                database =>
+                {
+                    var error = BridgeDocumentContext.Validate("autocad", item.Request, BridgeDocumentContext.IdFor(database));
+                    return error != null ? CommandResult.Fail(error)
+                        : AcadCommandTable.Dispatch(database, item.Request.Command, item.Request.ConfigJson);
+                },
                 message => CommandResult.Fail(message)),
 
             // Giai đoạn 10.1: truy vấn cần Editor (selection, show_entities, active_layout) đi qua vỏ;

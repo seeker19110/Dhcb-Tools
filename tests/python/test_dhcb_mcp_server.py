@@ -149,6 +149,26 @@ class ToolListTests(unittest.TestCase):
 
 
 class CallToolTests(unittest.TestCase):
+    def test_confirmation_rejects_non_boolean(self) -> None:
+        for value in ("false", "true", 0, 1, None, [], {}):
+            with self.subTest(value=value), load() as (module, agent):
+                result = module.call_tool("AutoNumbering", {"confirm": value})
+                self.assertFalse(result["success"])
+                agent.send.assert_not_called()
+
+    def test_false_confirmation_preserves_preview(self) -> None:
+        with load() as (module, agent):
+            module.call_tool("AutoNumbering", {"confirm": False, "dryRun": False})
+            self.assertTrue(agent.send.call_args[0][2]["dryRun"])
+
+    def test_readonly_rejects_command_missing_from_cached_catalog(self) -> None:
+        with load(("revit", "--read-only")) as (module, agent):
+            module._load_catalog()
+            agent.request.return_value = {"success": False}
+            result = module.call_tool("FutureWriteCommand", {"confirm": True})
+            self.assertFalse(result["success"])
+            agent.send.assert_not_called()
+
     def test_query_va_chat_di_thang_sang_bridge(self) -> None:
         with load() as (module, agent):
             module.call_tool("query", {"query": "levels", "params": {"limit": 5}})

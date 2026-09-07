@@ -53,6 +53,12 @@ def load_token() -> str:
 
 
 def request(app: str, method: str, path: str, payload=None, timeout: int = 35) -> dict:
+    # Chốt model ngay trước khi gửi; server kiểm lại trên luồng UI, không tự đổi đích khi xếp hàng.
+    if path == "/execute" and payload and payload.get("config", {}).get("dryRun") is False and not payload.get("documentId"):
+        context = request(app, "POST", "/query", {"query": "document_context"}, timeout=timeout)
+        if not context.get("documentId"):
+            return {"success": False, "summary": "Không xác minh được phiên mô hình; chưa gửi lệnh ghi. Hãy cập nhật Bridge.", "context": context}
+        payload = {**payload, "documentId": context["documentId"]}
     url = base_url(app) + path
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
     headers = {"Authorization": "Bearer " + load_token()}

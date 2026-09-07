@@ -23,7 +23,10 @@ thêm mã mà quên ghi vào đây (hoặc ngược lại) là test đỏ.
 | `E-PRECOND` | Tiền đề của lệnh không thoả — con số lệnh sắp trả ra sẽ nói về trạng thái mô hình/đầu vào chứ không về chất lượng công trình | Mọi model liên kết đều chưa nạp (hay gặp nhất: bản sao sau `SaveAs`/`DetachFromCentral` không giữ trạng thái đã nạp), hoặc category trong config không khớp phần tử nào | Thông báo nói rõ đường đi tiếp: nạp lại link (Manage → Manage Links → Reload) rồi chạy lại, hoặc đặt `includeLinkedModels: false` nếu cố ý chỉ kiểm trong file này; với đầu vào rỗng thì kiểm lại `categories*`. **Không có mã này thì lệnh trả "0" và trông y hệt kết quả sạch** — xem bug #14 trong [`progress.md`](progress.md) |
 | `E-CONFIG-AMBIGUOUS` | Tên type/family trong config khớp nhiều ứng viên trong mô hình | Ghi tên rút gọn (`"Pipe"`) trong dự án có nhiều type cùng chứa chuỗi đó | Ghi đủ dạng `"Family: Type"`; thông báo có liệt kê tối đa 20 ứng viên đang khớp |
 
-## Vì sao chỉ có bảy mã
+| `E-DOCUMENT-REQUIRED` | Thiếu định danh phiên model cho lệnh Bridge ghi thật | Client cũ hoặc JSON tự gửi chưa có `documentId` | Gọi `POST /query` với `query: document_context`, dùng `documentId` nhận được ở cấp ngoài của `/execute`; cập nhật client cùng Bridge |
+| `E-DOCUMENT-CHANGED` | Model hiện hành khác phiên đã chọn | Chuyển tab, đóng/mở lại model trong khi request đang chờ | Kiểm tra đúng model, đọc lại context và xem trước lại trước khi gửi lệnh ghi |
+
+## Nguyên tắc đặt mã
 
 Mã lỗi chỉ đặt cho tình trạng **người dùng xử lý được và lặp lại nhiều lệnh**. Lỗi chỉ xảy ra ở một
 lệnh, hoặc lỗi mà người dùng không làm gì được (Revit từ chối dịch điểm cuối ống đã nối hai đầu), thì

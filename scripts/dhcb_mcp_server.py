@@ -99,7 +99,7 @@ def tool_list() -> list:
     tools.append({
         "name": "query",
         "description": (
-            f"Đọc ngữ cảnh {APP} (không ghi). Revit: document_info, levels, views, sheets, rooms, elements, "
+            f"Đọc ngữ cảnh {APP} (không ghi). document_context trả định danh phiên model. Revit: document_info, levels, views, sheets, rooms, elements, "
             "families, warnings, links, stats; element_geometry (hộp bao/đường tâm/connector, params: elementIds "
             "hoặc categories), parameters_of (tham số của category — dùng trước khi dựng config), schedule_rows "
             "(bảng thống kê dạng hàng), snapshot (ảnh PNG base64 của view — để NHÌN kết quả), selection (đang chọn "
@@ -133,11 +133,13 @@ def call_tool(name: str, arguments: dict) -> dict:
             return {"success": False,
                     "summary": f"Server đang chạy --read-only nhưng chưa có danh mục lệnh để xác minh '{name}' "
                                "là lệnh đọc (Bridge chưa mở và chưa có cache) — từ chối cho an toàn."}
-        writes = {t["name"].lower() for t in tools if t.get("writesModel")}
-        if name.lower() in writes:
-            return {"success": False, "summary": f"Server đang chạy --read-only; lệnh ghi '{name}' bị chặn."}
+        readable = {t["name"].lower() for t in tools if not t.get("writesModel")}
+        if name.lower() not in readable:
+            return {"success": False, "summary": f"Server đang chạy --read-only; lệnh ghi hoặc chưa xác minh '{name}' bị chặn."}
     config = dict(arguments)
-    confirm = bool(config.pop("confirm", False))
+    confirm = config.pop("confirm", False)
+    if type(confirm) is not bool:
+        return {"success": False, "summary": "confirm phải là boolean true/false, không nhận chuỗi hoặc số."}
     # Lệnh nặng (SleeveAuto, AutoRoute, ClashDetection) vượt 30 s mặc định trên model thật;
     # server chặn trên ở 10 phút nên không sợ giữ hàng đợi mãi (giai đoạn 10.5).
     timeout_seconds = int(config.pop("timeoutSeconds", 0) or 0)

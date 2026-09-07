@@ -34,6 +34,30 @@ class FakeResponse:
         return False
 
 
+class DocumentTargetTests(unittest.TestCase):
+    def test_write_is_bound_to_queried_document_without_mutating_payload(self):
+        payload = {"command": "AutoNumbering", "config": {"dryRun": False}}
+        with mock.patch.object(dhcb_agent.urllib.request, "urlopen", side_effect=[
+            FakeResponse({"documentId": "session-A"}), FakeResponse({"success": True})
+        ]) as send:
+            self.assertTrue(dhcb_agent.request("revit", "POST", "/execute", payload)["success"])
+            self.assertEqual("document_context", json.loads(send.call_args_list[0].args[0].data)["query"])
+            self.assertEqual("session-A", json.loads(send.call_args_list[1].args[0].data)["documentId"])
+            self.assertNotIn("documentId", payload)
+
+    def test_missing_context_does_not_send_write(self):
+        with fake_urlopen({"error": "no document"}) as send:
+            result = dhcb_agent.request("revit", "POST", "/execute", {"config": {"dryRun": False}})
+            self.assertFalse(result["success"])
+            self.assertEqual(1, send.call_count)
+
+    def test_explicit_target_is_never_replaced(self):
+        with fake_urlopen({"success": False, "summary": "E-DOCUMENT-CHANGED"}) as send:
+            dhcb_agent.request("revit", "POST", "/execute", {"documentId": "old", "config": {"dryRun": False}})
+            self.assertEqual(1, send.call_count)
+            self.assertEqual("old", json.loads(send.call_args.args[0].data)["documentId"])
+
+
 def fake_urlopen(payload):
     return mock.patch.object(dhcb_agent.urllib.request, "urlopen", return_value=FakeResponse(payload))
 

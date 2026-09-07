@@ -1,5 +1,7 @@
 # Lộ trình phát triển DHCB Tools
 
+> Ưu tiên sau audit 2026-09-07: [bản sửa, tiêu chí nghiệm thu và kế hoạch thí điểm](audit-nang-cap-2026-09-07.md).
+
 Tài liệu này mô tả **kế hoạch phía trước**. Hiện trạng thực tế nằm ở [`progress.md`](progress.md). Đặc tả chi tiết ở
 [`dac-ta-tinh-nang.md`](dac-ta-tinh-nang.md), kế hoạch kiểm thử ở [`dac-ta-kiem-thu.md`](dac-ta-kiem-thu.md), cơ sở kỹ
 thuật ở [`nghien-cuu-dhcb-revit-tools.md`](nghien-cuu-dhcb-revit-tools.md), khảo sát thị trường ở
