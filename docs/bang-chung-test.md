@@ -72,6 +72,7 @@
 - §67 — [Xác nhận thật trên Revit — batch thoát êm bằng `PostCommand(ExitRevit)`, không còn phải kill cứng (2026-09-06 22:38 ICT)](#67-xác-nhận-thật-trên-revit-batch-thoát-êm-bằng-postcommandexitrevit-không-còn-phải-kill-cứng-2026-09-06-2238-ict)
 - §68 — [`AutoRoute` tự loại category của chính nó khi dựng route — đóng nốt "chưa phải một nút" ở §4.7 (2026-09-06 23:03 ICT)](#68-autoroute-tự-loại-category-của-chính-nó-khi-dựng-route-đóng-nốt-chưa-phải-một-nút-ở-47-2026-09-06-2303-ict)
 - §69 — [Xác nhận thật trên Revit — facet `partOf`/`relation` của IDS khớp đúng ánh xạ Revit (11.4 roadmap.md) (2026-09-06 23:15 ICT)](#69-xác-nhận-thật-trên-revit-facet-partofrelation-của-ids-khớp-đúng-ánh-xạ-revit-114-roadmapmd-2026-09-06-2315-ict)
+- §70 — [`roadmap.md` mục B1 nói sai hiện trạng — đường ghi của `ConstructionStatus` đã có ca kiểm tự động từ PR #77, chạy lại xác nhận vẫn xanh (2026-09-06 23:26 ICT)](#70-roadmapmd-mục-b1-nói-sai-hiện-trạng-đường-ghi-của-constructionstatus-đã-có-ca-kiểm-tự-động-từ-pr-77-chạy-lại-xác-nhận-vẫn-xanh-2026-09-06-2326-ict)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
@@ -3523,3 +3524,27 @@ so `relation` đang **phân biệt được** thật (không phải lỗ hổng 
 **Còn mở:** đối chiếu với IfcTester/Solibri cho riêng `relation` (đường IFC, `IfcIdsElement`) vẫn chưa làm
 được — hai công cụ đó không có trên máy này; bản đối chiếu 10/10 ở §41 chạy **trước khi** `relation` được
 thêm vào facet `partOf`.
+
+## 70. `roadmap.md` mục B1 nói sai hiện trạng — đường ghi của `ConstructionStatus` đã có ca kiểm tự động từ PR #77, chạy lại xác nhận vẫn xanh (2026-09-06 23:26 ICT)
+
+Đọc lại `roadmap.md` để chọn việc tiếp theo, thấy dòng B1 vẫn ghi *"🧪 đường ghi của `ConstructionStatus`
+chưa có ca kiểm tự động (mã cấu kiện là ElementId của đúng file đang mở nên không viết sẵn vào fixture
+được)"* — nhưng PR #77 (`584e54e`, 2026-09-05) đã giải quyết đúng việc này bằng cách khai `keyParameter`
+(vd `Mark`): CSV khớp theo mã hiện trường thay vì ElementId nên fixture nằm được trong repo
+(`tests/suites/fixtures/trang-thai-theo-mark*.csv`), và `tests/suites/revit-write.json` đã có chuỗi 4 ca
+ghi thật cho đúng việc này từ commit đó. Tài liệu chỉ đơn giản chưa được cập nhật lại sau khi PR #77 khép
+lại nợ mà chính nó ghi ra.
+
+**Xác nhận lại bằng chạy thật** (không tin nguyên commit cũ, chạy lại đo bằng tay): `scripts/run-in-revit-tests.ps1
+-Suite write -RevitVersion 2024 -AllowWrites` trên bản chép Snowdon Architectural — **16/16 đạt**, đúng
+chuỗi 4 ca của PR #77 vẫn xanh:
+
+```
+Trạng thái thi công — GHI THẬT, khớp theo Mark vừa đánh số   → 3 phần tử đã đổi trạng thái thi công
+Ghi lại chính CSV đó — phải 0 phần tử đổi                    → 0 đổi, 3 đã đúng sẵn
+CSV lùi trạng thái — phải bị chặn                            → 0 đổi
+Báo cáo tiến độ — lần đầu tiên % KHÁC 0 trên model thật       → Tiến độ 1.4% (2/142 cấu kiện)
+```
+
+Đã sửa dòng B1 trong `roadmap.md` cho khớp thực tế. Không có thay đổi mã nguồn nào ở đây — chỉ chạy lại
+để xác nhận tài liệu cũ đúng, rồi sửa tài liệu mới sai.
