@@ -252,6 +252,14 @@ class QueryToolTests(unittest.TestCase):
 
 
 class ExecuteToolTests(unittest.TestCase):
+    def test_preview_token_display_and_commit_forwarding(self):
+        with mock.patch.object(server, "_fetch", return_value={"success": True, "documentId": "A",
+                                                              "previewToken": "token-A"}) as send:
+            text = server.autocad_execute("DrawingCleanup", document_id="A", preview_token="token-A")
+        self.assertIn("preview_token: token-A", text)
+        self.assertEqual("A", send.call_args.args[1]["documentId"])
+        self.assertEqual("token-A", send.call_args.args[1]["previewToken"])
+
     def test_dry_run_co_ghi_chu_chua_ghi_that(self) -> None:
         result = {"success": True, "summary": "sẽ đánh số 12 block", "affectedCount": 12}
         with mock.patch.object(server, "_fetch", return_value=result):

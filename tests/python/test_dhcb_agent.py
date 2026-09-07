@@ -487,6 +487,28 @@ class MainTests(unittest.TestCase):
 class CliSafetyRegressionTests(unittest.TestCase):
     _run = MainTests._run
 
+    def test_preview_metadata_reaches_http_and_is_printed(self):
+        result = {"success": True, "documentId": "A", "previewToken": "token-A", "previewExpiresUtc": "later"}
+        for mode in ("raw", "exec", "AutoNumbering"):
+            for background in (False, True):
+                with self.subTest(mode=mode, background=background):
+                    if mode == "raw":
+                        args = ["revit", mode, json.dumps({"command": "AutoNumbering",
+                                "documentId": "A", "previewToken": "token-A"})]
+                    else:
+                        args = ["revit", mode] + (["AutoNumbering"] if mode == "exec" else [])
+                        args += ["--document-id", "A", "--preview-token", "token-A"]
+                    if background:
+                        args += ["--background"]
+                    responses = ([FakeResponse({"id": "job"}), FakeResponse({"status": "done", "result": result})]
+                                 if background else [FakeResponse(result)])
+                    with mock.patch.object(dhcb_agent.urllib.request, "urlopen", side_effect=responses) as send:
+                        code, out, _ = self._run(args)
+                    self.assertEqual(0, code)
+                    self.assertIn("previewToken: token-A", out)
+                    self.assertIn("documentId: A", out)
+                    self.assertEqual("token-A", json.loads(send.call_args_list[0].args[0].data)["previewToken"])
+
     def test_raw_preserves_preview_document_in_sync_and_background(self):
         for app in ("revit", "autocad"):
             for background in (False, True):

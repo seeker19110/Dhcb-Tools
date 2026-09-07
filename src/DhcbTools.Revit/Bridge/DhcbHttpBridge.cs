@@ -68,6 +68,7 @@ public sealed class DhcbHttpBridge : IDisposable
 /// <summary>Chạy trên main thread Revit. Kiểm tra <c>TryClaim()</c> trước khi chạy để bỏ việc client đã timeout.</summary>
 internal sealed class BridgeEventHandler : IExternalEventHandler
 {
+    private readonly BridgeCommitGuard _commits = new(BridgeCommitGuard.DefaultDirectory("revit"));
     public ConcurrentQueue<BridgeWorkItem<BridgeRequest, CommandResult>> Commands { get; } = new();
 
     public ConcurrentQueue<BridgeWorkItem<BridgeQuery, object>> Queries { get; } = new();
@@ -93,9 +94,9 @@ internal sealed class BridgeEventHandler : IExternalEventHandler
                     continue;
                 }
 
-                var error = BridgeDocumentContext.Validate("revit", item.Request, BridgeDocumentContext.IdFor(doc));
-                item.Completion.TrySetResult(error != null ? CommandResult.Fail(error)
-                    : DispatchWithFailurePolicy(doc, item.Request.Command, item.Request.ConfigJson));
+                item.Completion.TrySetResult(_commits.Execute("revit", item.Request,
+                    BridgeDocumentContext.IdFor(doc), () => BridgeDocumentContext.RevisionFor(doc),
+                    request => DispatchWithFailurePolicy(doc, request.Command, request.ConfigJson)));
             }
             catch (Exception ex)
             {

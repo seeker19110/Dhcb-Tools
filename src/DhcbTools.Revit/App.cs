@@ -27,6 +27,7 @@ public sealed class App : IExternalApplication
 
     public Result OnStartup(UIControlledApplication application)
     {
+        application.ControlledApplication.DocumentChanged += OnDocumentChanged;
         DhcbLog.Prune("Revit");
         DhcbLog.Write("Revit", $"Add-in khởi động — phiên bản {DhcbVersion.Of(Assembly.GetExecutingAssembly())}, "
                              + $"Revit {application.ControlledApplication.VersionNumber}.");
@@ -206,11 +207,15 @@ public sealed class App : IExternalApplication
 
     public Result OnShutdown(UIControlledApplication application)
     {
+        application.ControlledApplication.DocumentChanged -= OnDocumentChanged;
         _elevationUpdater?.Unregister();
         _bridge?.Stop();
         _bridge?.Dispose();
         return Result.Succeeded;
     }
+
+    private static void OnDocumentChanged(object? sender, Autodesk.Revit.DB.Events.DocumentChangedEventArgs e) =>
+        BridgeDocumentContext.Touch(e.GetDocument());
 
     /// <summary>Mục 4.1: mặc định TẮT, chỉ bật khi settings.json khai báo rõ.</summary>
     private void RegisterElevationUpdater(UIControlledApplication application)

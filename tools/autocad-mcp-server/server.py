@@ -266,6 +266,8 @@ def build_execute_payload(
     create_missing: bool = False,
     dry_run: bool = True,
     confirm: str = "",
+    document_id: str = "",
+    preview_token: str = "",
 ) -> dict[str, Any]:
     """Dựng payload /execute rồi đưa qua ĐÚNG bộ validate của gateway (panel_api).
 
@@ -298,6 +300,10 @@ def build_execute_payload(
         config = {"inputPath": input_path, "createMissing": create_missing, "dryRun": dry_run}
 
     payload: dict[str, Any] = {"command": command, "config": config}
+    if document_id:
+        payload["documentId"] = document_id
+    if preview_token:
+        payload["previewToken"] = preview_token
     if confirm:
         payload["confirmation"] = confirm
     return panel_api.prepare_bridge_payload("/execute", payload)
@@ -319,12 +325,15 @@ def autocad_execute(
     create_missing: bool = False,
     dry_run: bool = True,
     confirm: str = "",
+    document_id: str = "",
+    preview_token: str = "",
 ) -> str:
     """
     Thực thi lệnh vào AutoCAD.
 
     command: AutoNumbering | DrawingCleanup | LayerExport | LayerImport
     dry_run: True = xem trước không ghi thật (mặc định True để an toàn)
+    document_id, preview_token: lấy từ kết quả preview đã duyệt; giữ nguyên khi gửi lại lần ghi.
     confirm: BẮT BUỘC khi dry_run=False — chuỗi xác nhận theo lệnh:
              DrawingCleanup → "DELETE_UNUSED", AutoNumbering → "WRITE_AUTONUMBER",
              LayerImport → "IMPORT_LAYERS". Chỉ truyền sau khi kỹ sư đã xem trước và đồng ý.
@@ -341,7 +350,7 @@ def autocad_execute(
             start_number=start_number, step=step, pad_width=pad_width,
             purge_unused=purge_unused, audit_errors=audit_errors,
             output_path=output_path, input_path=input_path, create_missing=create_missing,
-            dry_run=dry_run, confirm=confirm,
+            dry_run=dry_run, confirm=confirm, document_id=document_id, preview_token=preview_token,
         )
     except ValueError as exc:
         return f"❌ {exc}"
@@ -358,6 +367,8 @@ def autocad_execute(
     dry_note = " [DRY RUN — chưa ghi thật]" if dry_run and command != "LayerExport" else ""
 
     lines = [f"{icon} {summary}{dry_note}", f"   Affected: {count}"]
+    if result.get("previewToken"):
+        lines.append(f"   document_id: {result['documentId']} · preview_token: {result['previewToken']}")
     if messages:
         lines.append("   Chi tiết:")
         for m in messages[:10]:

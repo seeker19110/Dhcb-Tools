@@ -26,6 +26,8 @@ public sealed class DhcbHttpBridge : IDisposable
     public const int Port = 8766;
 
     private readonly HttpBridgeServer _server;
+    private readonly BridgeCommitGuard _commits = new(BridgeCommitGuard.DefaultDirectory("autocad"));
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Autodesk.AutoCAD.DatabaseServices.Database, object> Tracked = new();
     private bool _disposed;
 
     public DhcbHttpBridge()
@@ -36,9 +38,16 @@ public sealed class DhcbHttpBridge : IDisposable
                 item,
                 database =>
                 {
-                    var error = BridgeDocumentContext.Validate("autocad", item.Request, BridgeDocumentContext.IdFor(database));
-                    return error != null ? CommandResult.Fail(error)
-                        : AcadCommandTable.Dispatch(database, item.Request.Command, item.Request.ConfigJson);
+                    Tracked.GetValue(database, db =>
+                    {
+                        db.ObjectModified += (_, _) => BridgeDocumentContext.Touch(db);
+                        db.ObjectAppended += (_, _) => BridgeDocumentContext.Touch(db);
+                        db.ObjectErased += (_, _) => BridgeDocumentContext.Touch(db);
+                        return new object();
+                    });
+                    return _commits.Execute("autocad", item.Request, BridgeDocumentContext.IdFor(database),
+                        () => BridgeDocumentContext.RevisionFor(database),
+                        request => AcadCommandTable.Dispatch(database, request.Command, request.ConfigJson));
                 },
                 message => CommandResult.Fail(message)),
 

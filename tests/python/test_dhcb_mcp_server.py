@@ -107,6 +107,14 @@ class LoadCatalogTests(unittest.TestCase):
 
 
 class ToolListTests(unittest.TestCase):
+    def test_commit_metadata_is_forwarded_separately_from_config(self):
+        with load() as (module, agent):
+            module.call_tool("AutoNumbering", {"confirm": True, "documentId": "A",
+                                               "previewToken": "token-A", "prefix": "D-"})
+            self.assertEqual({"prefix": "D-", "dryRun": False}, agent.send.call_args.args[2])
+            self.assertEqual("A", agent.send.call_args.kwargs["document_id"])
+            self.assertEqual("token-A", agent.send.call_args.kwargs["preview_token"])
+
     def test_liet_ke_du_lenh_kem_query_va_chat(self) -> None:
         with load() as (module, _):
             names = [t["name"] for t in module.tool_list()]

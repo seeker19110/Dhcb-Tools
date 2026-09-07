@@ -89,6 +89,8 @@ def tool_list() -> list:
         props = dict(t.get("inputSchema", {}).get("properties", {}))
         if t.get("writesModel"):
             props["confirm"] = {"type": "boolean", "description": "true = chạy THẬT (mặc định chỉ xem trước dryRun)"}
+            props["documentId"] = {"type": "string", "description": "ID model từ kết quả preview đã duyệt"}
+            props["previewToken"] = {"type": "string", "description": "Token preview đã duyệt; giữ nguyên khi gửi lại, không tự preview lại để vượt lỗi"}
         tools.append({
             "name": t["name"],
             "description": t.get("description", "")
@@ -145,7 +147,12 @@ def call_tool(name: str, arguments: dict) -> dict:
     timeout_seconds = int(config.pop("timeoutSeconds", 0) or 0)
     # Nguyên tắc: AI chỉ đề xuất, kỹ sư xác nhận — không confirm thì luôn xem trước.
     config["dryRun"] = not confirm
-    return dhcb_agent.send(APP, name, config, timeout_seconds=timeout_seconds)
+    context = {}
+    if "documentId" in config:
+        context["document_id"] = config.pop("documentId")
+    if "previewToken" in config:
+        context["preview_token"] = config.pop("previewToken")
+    return dhcb_agent.send(APP, name, config, timeout_seconds=timeout_seconds, **context)
 
 
 def respond(msg_id, result=None, error=None):
