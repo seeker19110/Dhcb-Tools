@@ -223,6 +223,19 @@ public sealed class BridgeCommitGuardTests : IDisposable
     }
 
     [Fact]
+    public void Expiry_during_input_capture_also_blocks_commit()
+    {
+        var request = Approved();
+        var result = _guard.Execute("revit", request, "A", () =>
+        {
+            _now += TimeSpan.FromMinutes(11);
+            return 0;
+        }, Dispatch);
+        Assert.Contains("E-PREVIEW-CHANGED", result.Summary);
+        Assert.Equal(0, _writes);
+    }
+
+    [Fact]
     public void File_contents_are_bound_even_with_same_length_and_timestamp()
     {
         var file = Path.Combine(_root, "input.csv");

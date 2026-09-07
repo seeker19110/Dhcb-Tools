@@ -123,7 +123,7 @@ namespace DhcbTools.Shared.Hosting
                 return result;
             }
 
-            if (_plans[token!].Snapshot != snapshot)
+            if (_plans[token!].Snapshot != snapshot || _plans[token!].ExpiresUtc <= _utcNow())
             {
                 _plans.Remove(token!);
                 return CommandResult.Fail("E-PREVIEW-CHANGED: Mô hình/file đầu vào đã đổi sau preview. Xem trước lại.");
