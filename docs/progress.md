@@ -127,6 +127,7 @@ Core/vỏ (kể cả vỏ core-only) trên Linux với API Revit 2025 + AutoCAD 
 
 | Vòng | Ngày | Kết quả |
 |---|---|---|
+| **11.4 — đối chiếu `relation` của `partOf` với IfcTester** | 2026-09-07 | Fixture 13 specification phủ cả năm giá trị enum `relations` của `ids.xsd`, chạy trên chính IFC Snowdon Architectural (180 MB, 3,12 triệu thực thể): **13/13 khớp từng con số** với IfcTester 0.8.5, ba ca đối chứng trượt 100 % ở cả hai bên. Lộ lỗi thứ tư mà bộ tham chiếu độc lập bắt được: **phần của một tổ hợp không thừa vị trí không gian của tổng** → 7 cửa curtain wall bị báo nhầm "không thuộc tầng nào"; sửa + test thuần chốt cả hai chiều, Shared.Logic 1636, phủ 100 % — §71 |
 | Revit 2024.3 — tay, qua Bridge (R1–R14) | 2026-09-02 | Xanh sau khi sửa 6 lỗi — [`bang-chung-test.md`](bang-chung-test.md) §6 |
 | Revit — batch tự động, bộ smoke | 2026-09-03 | 11/12, lộ 3 lỗi chặn (journal, add-in không nạp) — §7 |
 | **Revit — batch tự động, đủ 42/42 lệnh** | 2026-09-03 | **52 đạt / 0 trượt / 1 bỏ qua trên 53 ca**, ba model mẫu; lộ 7 lỗi runtime + 4 chỗ lệch tài liệu↔mã — §8 |

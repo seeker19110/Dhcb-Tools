@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Fixture IDS để ĐỐI CHIẾU riêng thuộc tính `relation` của facet `partOf` (mục 11.4 roadmap.md).
+  Bản đối chiếu 10/10 ở bang-chung-test.md §41 chạy TRƯỚC khi DHCB xét `relation`, nên không nói gì
+  về đường này. Mỗi specification nhắm một loại quan hệ của `ids.xsd` 1.0 và một tình huống mà hai bộ
+  kiểm có thể hiểu khác nhau: quan hệ đúng loại, quan hệ sai loại (phải trượt hết), chuỗi nhiều bậc,
+  chuỗi trộn khi không khai relation, cặp gộp voids/fills, và `prohibited`.
+  Số liệu đối chiếu ghi ở bang-chung-test.md §71. File IFC: Snowdon Towers Sample Architectural (IFC2X3).
+-->
+<ids xmlns="http://standards.buildingsmart.org/IDS" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <info>
+    <title>DHCB — đối chiếu thuộc tính relation của partOf với IfcTester</title>
+  </info>
+  <specifications>
+    <specification name="R01 Cua thuoc tang qua CONTAINEDINSPATIALSTRUCTURE" ifcVersion="IFC2X3">
+      <applicability><entity><name><simpleValue>IFCDOOR</simpleValue></name></entity></applicability>
+      <requirements>
+        <partOf relation="IFCRELCONTAINEDINSPATIALSTRUCTURE"><entity><name><simpleValue>IFCBUILDINGSTOREY</simpleValue></name></entity></partOf>
+      </requirements>
+    </specification>
+
+    <specification name="R02 Cua thuoc toa nha qua CONTAINEDINSPATIALSTRUCTURE (chuoi nhieu bac)" ifcVersion="IFC2X3">
+      <applicability><entity><name><simpleValue>IFCDOOR</simpleValue></name></entity></applicability>
+      <requirements>
+        <partOf relation="IFCRELCONTAINEDINSPATIALSTRUCTURE"><entity><name><simpleValue>IFCBUILDING</simpleValue></name></entity></partOf>
+      </requirements>
+    </specification>
+
+    <specification name="R03 Cua thuoc tang qua AGGREGATES (quan he sai loai)" ifcVersion="IFC2X3">
+      <applicability><entity><name><simpleValue>IFCDOOR</simpleValue></name></entity></applicability>
+      <requirements>
+        <partOf relation="IFCRELAGGREGATES"><entity><name><simpleValue>IFCBUILDINGSTOREY</simpleValue></name></entity></partOf>
+      </requirements>
+    </specification>
+
+    <specification name="R04 Tang thuoc toa nha qua AGGREGATES" ifcVersion="IFC2X3">
+      <applicability><entity><name><simpleValue>IFCBUILDINGSTOREY</simpleValue></name></entity></applicability>
+      <requirements>
+        <partOf relation="IFCRELAGGREGATES"><entity><name><simpleValue>IFCBUILDING</simpleValue></name></entity></partOf>
+      </requirements>
+    </specification>
+
+    <specification name="R05 Tang thuoc du an qua AGGREGATES (ba bac)" ifcVersion="IFC2X3">
+      <applicability><entity><name><simpleValue>IFCBUILDINGSTOREY</simpleValue></name></entity></applicability>
+      <requirements>
+        <partOf relation="IFCRELAGGREGATES"><entity><name><simpleValue>IFCPROJECT</simpleValue></name></entity></partOf>
+      </requirements>
+    </specification>
+
+    <specification name="R06 Cua thuoc toa nha khong khai relation (chuoi tron)" ifcVersion="IFC2X3">
+      <applicability><entity><name><simpleValue>IFCDOOR</simpleValue></name></entity></applicability>
+      <requirements>
+        <partOf><entity><name><simpleValue>IFCBUILDING</simpleValue></name></entity></partOf>
+      </requirements>
+    </specification>
+
+    <specification name="R07 Cua lap lo cua IFCWALL qua VOIDS/FILLS" ifcVersion="IFC2X3">
+      <applicability><entity><name><simpleValue>IFCDOOR</simpleValue></name></entity></applicability>
+      <requirements>
+        <partOf relation="IFCRELVOIDSELEMENT IFCRELFILLSELEMENT"><entity><name><simpleValue>IFCWALL</simpleValue></name></entity></partOf>
+      </requirements>
+    </specification>
+
+    <specification name="R08 Cua lap lo cua IFCWALLSTANDARDCASE qua VOIDS/FILLS" ifcVersion="IFC2X3">
+      <applicability><entity><name><simpleValue>IFCDOOR</simpleValue></name></entity></applicability>
+      <requirements>
+        <partOf relation="IFCRELVOIDSELEMENT IFCRELFILLSELEMENT"><entity><name><simpleValue>IFCWALLSTANDARDCASE</simpleValue></name></entity></partOf>
+      </requirements>
+    </specification>
+
+    <specification name="R09 Cua so lap lo cua IFCWALL qua VOIDS/FILLS" ifcVersion="IFC2X3">
+      <applicability><entity><name><simpleValue>IFCWINDOW</simpleValue></name></entity></applicability>
+      <requirements>
+        <partOf relation="IFCRELVOIDSELEMENT IFCRELFILLSELEMENT"><entity><name><simpleValue>IFCWALL</simpleValue></name></entity></partOf>
+      </requirements>
+    </specification>
+
+    <specification name="R10 Cua long trong tuong qua NESTS (mo hinh khong co quan he nay)" ifcVersion="IFC2X3">
+      <applicability><entity><name><simpleValue>IFCDOOR</simpleValue></name></entity></applicability>
+      <requirements>
+        <partOf relation="IFCRELNESTS"><entity><name><simpleValue>IFCWALL</simpleValue></name></entity></partOf>
+      </requirements>
+    </specification>
+
+    <specification name="R11 Khong gian thuoc mot nhom qua ASSIGNSTOGROUP" ifcVersion="IFC2X3">
+      <applicability><entity><name><simpleValue>IFCSPACE</simpleValue></name></entity></applicability>
+      <requirements>
+        <partOf relation="IFCRELASSIGNSTOGROUP"><entity><name><simpleValue>IFCGROUP</simpleValue></name></entity></partOf>
+      </requirements>
+    </specification>
+
+    <specification name="R12 Cua thuoc mot nhom qua ASSIGNSTOGROUP" ifcVersion="IFC2X3">
+      <applicability><entity><name><simpleValue>IFCDOOR</simpleValue></name></entity></applicability>
+      <requirements>
+        <partOf relation="IFCRELASSIGNSTOGROUP"><entity><name><simpleValue>IFCGROUP</simpleValue></name></entity></partOf>
+      </requirements>
+    </specification>
+
+    <specification name="R13 Cua khong duoc thuoc tang qua AGGREGATES (prohibited)" ifcVersion="IFC2X3">
+      <applicability><entity><name><simpleValue>IFCDOOR</simpleValue></name></entity></applicability>
+      <requirements>
+        <partOf cardinality="prohibited" relation="IFCRELAGGREGATES"><entity><name><simpleValue>IFCBUILDINGSTOREY</simpleValue></name></entity></partOf>
+      </requirements>
+    </specification>
+  </specifications>
+</ids>

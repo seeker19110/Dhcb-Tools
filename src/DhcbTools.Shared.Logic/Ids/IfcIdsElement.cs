@@ -400,6 +400,60 @@ namespace DhcbTools.Shared.Logic.Ids
                 }
             }
 
+            // Phần tử không có IfcRelContainedInSpatialStructure của RIÊNG nó nhưng nằm trong một tổ hợp
+            // (cửa của một curtain wall, cấu kiện của một assembly) vẫn thuộc về đúng tầng của tổ hợp: IFC
+            // không cho phép xếp phần và tổng vào hai vị trí không gian khác nhau, nên vị trí của tổng LÀ
+            // vị trí của phần. IfcOpenShell/IfcTester kết luận đúng như vậy (`get_container` rơi về cha
+            // phân rã khi không có quan hệ trực tiếp). Bản trước chỉ đọc quan hệ trực tiếp nên báo 7 cửa
+            // curtain wall của Snowdon "không thuộc tầng nào" trong khi IfcTester nói 142/142 — báo nhầm,
+            // xem bang-chung-test.md §71. Cha phân rã lấy theo đúng thứ tự của IfcOpenShell `get_parent`:
+            // aggregates → nests → cặp voids/fills.
+            {
+                var decompositionParent = new Dictionary<int, int>(aggregates);
+                foreach (var table in new[] { nests, voidsAndFills })
+                {
+                    foreach (var pair in table)
+                    {
+                        if (!decompositionParent.ContainsKey(pair.Key))
+                        {
+                            decompositionParent[pair.Key] = pair.Value;
+                        }
+                    }
+                }
+
+                foreach (var child in decompositionParent.Keys.ToList())
+                {
+                    if (contained.ContainsKey(child))
+                    {
+                        continue;
+                    }
+
+                    var chain = new List<int>();
+                    var visited = new HashSet<int> { child };
+                    var current = child;
+                    int? inherited = null;
+                    while (decompositionParent.TryGetValue(current, out var parent) && visited.Add(parent))
+                    {
+                        chain.Add(current);
+                        if (contained.TryGetValue(parent, out var container))
+                        {
+                            inherited = container;
+                            break;
+                        }
+
+                        current = parent;
+                    }
+
+                    if (inherited != null)
+                    {
+                        foreach (var id in chain)
+                        {
+                            contained[id] = inherited.Value;
+                        }
+                    }
+                }
+            }
+
             // Chuỗi THUẦN một loại quan hệ: đi tới hết theo đúng một bảng cha-con, dừng khi hết cạnh hoặc
             // gặp lại (chắn vòng lặp — mô hình lỗi có thể tự tham chiếu).
             List<string> WalkSingle(IReadOnlyDictionary<int, int> parentOf, int start)

@@ -286,6 +286,50 @@ public class IfcIdsElementTests
         Assert.DoesNotContain((IdsRelations.ContainedInSpatialStructure, "IFCSYSTEM"), door);
     }
 
+    /// <summary>
+    /// Cửa của một curtain wall: bản thân cửa KHÔNG có <c>IfcRelContainedInSpatialStructure</c> nào, chỉ
+    /// curtain wall mới có. IFC không cho phép xếp phần và tổng vào hai vị trí không gian khác nhau, nên
+    /// cửa vẫn thuộc đúng tầng của curtain wall — IfcTester kết luận như vậy, DHCB trước bản này thì không
+    /// (7 cửa của Snowdon bị báo nhầm "không thuộc tầng nào", bang-chung-test.md §71).
+    /// </summary>
+    private static readonly string IfcThuaViTri =
+        "ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION((''),'2;1');\nFILE_NAME('','',(''),(''),'','','');\nFILE_SCHEMA(('IFC4'));\nENDSEC;\nDATA;\n"
+        + $"#1=IFCBUILDING('{G("Bldg")}',$,'Toa A',$,$,$,$,$,.ELEMENT.,$,$,$);\n"
+        + $"#2=IFCBUILDINGSTOREY('{G("Storey")}',$,'L1',$,$,$,$,$,.ELEMENT.,0.);\n"
+        + $"#3=IFCRELAGGREGATES('{G("RelAgg")}',$,$,$,#1,(#2));\n"
+        + $"#4=IFCCURTAINWALL('{G("Cw")}',$,'Curtain Wall',$,$,$,$,'CW-01');\n"
+        + $"#5=IFCRELCONTAINEDINSPATIALSTRUCTURE('{G("RelCont")}',$,$,$,(#4),#2);\n"
+        + $"#6=IFCDOOR('{G("Door")}',$,'Cua CW',$,$,$,$,'D-CW',2100.,900.,.DOOR.,.SINGLE_SWING_LEFT.,$);\n"
+        + $"#7=IFCRELAGGREGATES('{G("RelAgg2")}',$,$,$,#4,(#6));\n"
+        + $"#8=IFCPLATE('{G("Plate")}',$,'Panel',$,$,$,$,'P-01',.NOTDEFINED.);\n"
+        + $"#9=IFCRELNESTS('{G("RelNest")}',$,$,$,#6,(#8));\n"
+        + $"#10=IFCDOOR('{G("Door2")}',$,'Cua roi',$,$,$,$,'D-02',2100.,900.,.DOOR.,.SINGLE_SWING_LEFT.,$);\n"
+        + "ENDSEC;\nEND-ISO-10303-21;\n";
+
+    [Fact]
+    public void ThuocVe_PhanCuaMotToHop_ThuaViTriKhongGianCuaTong()
+    {
+        var model = IfcIdsModel.Parse(IfcThuaViTri);
+
+        // Cửa nằm trong curtain wall: không có quan hệ chứa của riêng nó, vẫn thuộc tầng của curtain wall.
+        var door = Element(model, 6).PartOf.ToList();
+        Assert.Contains((IdsRelations.ContainedInSpatialStructure, "IFCBUILDINGSTOREY"), door);
+
+        // Kế thừa đi tiếp qua IfcRelNests: panel lồng trong cửa cũng thuộc đúng tầng đó.
+        Assert.Contains(
+            (IdsRelations.ContainedInSpatialStructure, "IFCBUILDINGSTOREY"),
+            Element(model, 8).PartOf.ToList());
+
+        // Kế thừa chỉ đi tới vị trí không gian GẦN NHẤT, không leo tiếp lên toà nhà — IfcTester cũng chỉ
+        // xét đúng một bậc chứa, nên "cửa thuộc IFCBUILDING qua CONTAINEDINSPATIALSTRUCTURE" phải trượt.
+        Assert.DoesNotContain((IdsRelations.ContainedInSpatialStructure, "IFCBUILDING"), door);
+
+        // Và không bịa vị trí cho phần tử không thuộc tổ hợp nào: cửa rời vẫn không thuộc tầng nào.
+        Assert.DoesNotContain(
+            Element(model, 10).PartOf.ToList(),
+            p => p.Relation == IdsRelations.ContainedInSpatialStructure);
+    }
+
     [Fact]
     public void ThuocVe_CuaSoLapOMoQuaVoidsVaFills_NoiThangToiTuong_BoQuaOMo()
     {

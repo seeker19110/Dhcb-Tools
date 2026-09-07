@@ -29,8 +29,12 @@ public class IdsSchemaLintTests
     [Fact]
     public void FixtureThat_KhongCanhBao()
     {
-        // Hai fixture trong repo đã được IfcTester 0.8.5 mở được (§39) — bộ soát không được kêu oan.
-        foreach (var name in new[] { "yeu-cau-thong-tin.ids", "yeu-cau-thong-tin-rong.ids" })
+        // Các fixture trong repo đã được IfcTester 0.8.5 mở được (§39, §41, §71) — bộ soát không được kêu oan.
+        foreach (var name in new[]
+                 {
+                     "yeu-cau-thong-tin.ids", "yeu-cau-thong-tin-rong.ids",
+                     "doi-chieu-ifctester.ids", "doi-chieu-ifctester-relation.ids",
+                 })
         {
             var path = System.IO.Path.Combine(FixtureDir(), name);
             Assert.Empty(IdsSchemaLint.Check(System.IO.File.ReadAllText(path)));
