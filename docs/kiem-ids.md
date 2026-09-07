@@ -126,6 +126,7 @@ như fixture cố ý gài. Bằng chứng: [`bang-chung-test.md`](bang-chung-tes
   **Phần của một tổ hợp thừa vị trí không gian của tổng** ở đường IFC: cửa của curtain wall không có
   `IfcRelContainedInSpatialStructure` của riêng nó vẫn thuộc đúng tầng của curtain wall — kế thừa qua cha
   phân rã gần nhất (aggregates → nests → voids/fills), chỉ một bậc không gian, giống `get_container` của
-  IfcOpenShell (§71). Đường **Revit** dùng `Element.LevelId` nên cùng lớp vấn đề có thể còn ở đó — chưa
-  chạy thật nên chưa kết luận.
+  IfcOpenShell (§71). Đường **Revit** dùng `Element.LevelId` — **đã xác nhận thật không có lỗi tương tự**
+  (§72): Revit gán `LevelId` trực tiếp cho mọi phần tử kể cả phần tử lồng trong host khác, nên không có
+  bước suy luận qua cha nào để mà sai.
 - Bảng category → lớp IFC là **bảng rút gọn** cho nhóm hay gặp; family lạ thì khai `IfcExportAs` để chắc chắn.
