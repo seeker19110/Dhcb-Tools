@@ -106,8 +106,10 @@ như fixture cố ý gài. Bằng chứng: [`bang-chung-test.md`](bang-chung-tes
 
 ## Còn thiếu
 
-- **Đã đối chiếu với IfcTester** trên chính IFC xuất từ Snowdon (§39: khớp cả 3 specification sau khi sửa ánh
-  xạ tường kính). Solibri không có trên máy.
+- **Đã đối chiếu với IfcTester** trên chính IFC xuất từ Snowdon: §39 (3 specification, sau khi sửa ánh xạ
+  tường kính), §41 (10 specification, mỗi loại facet một cái), §71 (13 specification chỉ về thuộc tính
+  `relation` của `partOf`) — cả ba lượt khớp từng con số sau khi sửa lỗi của DHCB mà chính lượt đó lộ ra.
+  Solibri không có trên máy.
 - **Tên facet khai bằng `xs:pattern`** (ví dụ "mọi property khớp `Fire.*`") không suy ngược ra tên được, nên
   facet đó **trượt** thay vì âm thầm coi như đạt.
 - Ràng buộc độ dài chuỗi (`minLength`/`maxLength`) chưa hỗ trợ.
@@ -119,6 +121,11 @@ như fixture cố ý gài. Bằng chứng: [`bang-chung-test.md`](bang-chung-tes
   `PartOf_KhaiRelation_ChiNhanDungMotLoaiQuanHe_KhongRoiVeChuoiTron`, `PartOf_DocThuocTinhRelation_VaMoTaKemTheo`,
   `PartOf_RelationLa_KhongThuoc5GiaTri_TuChoiFile` — cùng ba ca cũ về vòng lặp hai chiều aggregate của §16 vẫn
   giữ nguyên kết luận). Đường Revit khớp gần đúng hai trong năm loại (tầng ↔ `CONTAINEDINSPATIALSTRUCTURE`, hệ ↔
-  `ASSIGNSTOGROUP`) vì Revit không có đối tượng quan hệ IFC thật để đọc — **chưa chạy thật trong Revit**, chỉ có
-  test thuần trên CI.
+  `ASSIGNSTOGROUP`) vì Revit không có đối tượng quan hệ IFC thật để đọc — **đã chạy thật trong Revit 2024**
+  (§69: cửa khớp 142/142, đối chứng `IFCRELAGGREGATES` trượt 142/142, duct khớp 1053/1053).
+  **Phần của một tổ hợp thừa vị trí không gian của tổng** ở đường IFC: cửa của curtain wall không có
+  `IfcRelContainedInSpatialStructure` của riêng nó vẫn thuộc đúng tầng của curtain wall — kế thừa qua cha
+  phân rã gần nhất (aggregates → nests → voids/fills), chỉ một bậc không gian, giống `get_container` của
+  IfcOpenShell (§71). Đường **Revit** dùng `Element.LevelId` nên cùng lớp vấn đề có thể còn ở đó — chưa
+  chạy thật nên chưa kết luận.
 - Bảng category → lớp IFC là **bảng rút gọn** cho nhóm hay gặp; family lạ thì khai `IfcExportAs` để chắc chắn.

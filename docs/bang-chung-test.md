@@ -73,6 +73,7 @@
 - §68 — [`AutoRoute` tự loại category của chính nó khi dựng route — đóng nốt "chưa phải một nút" ở §4.7 (2026-09-06 23:03 ICT)](#68-autoroute-tự-loại-category-của-chính-nó-khi-dựng-route-đóng-nốt-chưa-phải-một-nút-ở-47-2026-09-06-2303-ict)
 - §69 — [Xác nhận thật trên Revit — facet `partOf`/`relation` của IDS khớp đúng ánh xạ Revit (11.4 roadmap.md) (2026-09-06 23:15 ICT)](#69-xác-nhận-thật-trên-revit-facet-partofrelation-của-ids-khớp-đúng-ánh-xạ-revit-114-roadmapmd-2026-09-06-2315-ict)
 - §70 — [`roadmap.md` mục B1 nói sai hiện trạng — đường ghi của `ConstructionStatus` đã có ca kiểm tự động từ PR #77, chạy lại xác nhận vẫn xanh (2026-09-06 23:26 ICT)](#70-roadmapmd-mục-b1-nói-sai-hiện-trạng-đường-ghi-của-constructionstatus-đã-có-ca-kiểm-tự-động-từ-pr-77-chạy-lại-xác-nhận-vẫn-xanh-2026-09-06-2326-ict)
+- §71 — [Đối chiếu `relation` của `partOf` với IfcTester trên chính file IFC — 13/13 khớp sau khi sửa một chỗ báo nhầm (2026-09-07)](#71-đối-chiếu-relation-của-partof-với-ifctester-trên-chính-file-ifc-1313-khớp-sau-khi-sửa-một-chỗ-báo-nhầm-2026-09-07)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
@@ -3548,3 +3549,73 @@ Báo cáo tiến độ — lần đầu tiên % KHÁC 0 trên model thật      
 
 Đã sửa dòng B1 trong `roadmap.md` cho khớp thực tế. Không có thay đổi mã nguồn nào ở đây — chỉ chạy lại
 để xác nhận tài liệu cũ đúng, rồi sửa tài liệu mới sai.
+
+## 71. Đối chiếu `relation` của `partOf` với IfcTester trên chính file IFC — 13/13 khớp sau khi sửa một chỗ báo nhầm (2026-09-07)
+
+Việc còn treo cuối cùng của mục 11.4 (`roadmap.md`): §41 đối chiếu 10/10 specification với IfcTester
+**trước khi** DHCB xét thuộc tính `relation`, còn §69 chỉ chạy được đường Revit — không có công cụ thứ ba.
+Nay IfcTester 0.8.5 + IfcOpenShell 0.8.5 đã có trên máy này, nên vế đối chiếu công cụ ngoài đóng được.
+
+**Bộ đôi để so:** file IFC thật *Snowdon Towers Sample Architectural* (IFC2X3, 180 MB, 3.120.782 thực thể,
+8.717 phần tử IDS nói tới được) và fixture mới
+[`doi-chieu-ifctester-relation.ids`](../tests/suites/fixtures/doi-chieu-ifctester-relation.ids) — **13
+specification, mỗi cái tách riêng đúng một biến** của `relation`: quan hệ đúng loại, quan hệ **sai loại**
+(phải trượt hết), chuỗi nhiều bậc, chuỗi trộn khi *không* khai `relation`, cặp gộp voids/fills, và
+`prohibited`. Cả năm giá trị của enum `relations` trong `ids.xsd` 1.0 đều có mặt.
+
+Chạy: `DhcbTools.BatchRunner --verify-ifc "…Architectural.ifc" --verify-ids
+tests/suites/fixtures/doi-chieu-ifctester-relation.ids` (DHCB 9,0 s cả đọc lẫn kiểm) và `ids.open(...)` +
+`specs.validate(model)` của IfcTester (mở 10,2 s + kiểm 0,1 s).
+
+| # | Specification | DHCB (trước) | DHCB (sau) | IfcTester | |
+|---|---|---|---|---|---|
+| R01 | Cửa thuộc tầng qua CONTAINEDINSPATIALSTRUCTURE | **135** / 142 | **142** / 142 | 142 / 142 | ✅ sau khi sửa |
+| R02 | Cửa thuộc toà nhà qua CONTAINEDINSPATIALSTRUCTURE | 0 / 142 | 0 / 142 | 0 / 142 | khớp |
+| R03 | Cửa thuộc tầng qua AGGREGATES (quan hệ sai loại) | 0 / 142 | 0 / 142 | 0 / 142 | khớp |
+| R04 | Tầng thuộc toà nhà qua AGGREGATES | 18 / 18 | 18 / 18 | 18 / 18 | khớp |
+| R05 | Tầng thuộc dự án qua AGGREGATES (ba bậc) | 18 / 18 | 18 / 18 | 18 / 18 | khớp |
+| R06 | Cửa thuộc toà nhà, **không khai** relation (chuỗi trộn) | 142 / 142 | 142 / 142 | 142 / 142 | khớp |
+| R07 | Cửa lấp lỗ của `IFCWALL` qua VOIDS/FILLS | 57 / 142 | 57 / 142 | 57 / 142 | khớp |
+| R08 | Cửa lấp lỗ của `IFCWALLSTANDARDCASE` qua VOIDS/FILLS | 78 / 142 | 78 / 142 | 78 / 142 | khớp |
+| R09 | Cửa sổ lấp lỗ của `IFCWALL` qua VOIDS/FILLS | 66 / 106 | 66 / 106 | 66 / 106 | khớp |
+| R10 | Cửa lồng trong tường qua NESTS (mô hình không có quan hệ này) | 0 / 142 | 0 / 142 | 0 / 142 | khớp |
+| R11 | Không gian thuộc một nhóm qua ASSIGNSTOGROUP | 100 / 154 | 100 / 154 | 100 / 154 | khớp |
+| R12 | Cửa thuộc một nhóm qua ASSIGNSTOGROUP | 37 / 142 | 37 / 142 | 37 / 142 | khớp |
+| R13 | Cửa **không được** thuộc tầng qua AGGREGATES (prohibited) | 142 / 142 | 142 / 142 | 142 / 142 | khớp |
+
+R02, R03, R10 là **ba ca đối chứng**: nếu bộ so `relation` của DHCB có lỗ hổng "chấp nhận mọi quan hệ" thì
+chúng phải đạt chứ không trượt. Cả ba trượt 100% ở cả hai phần mềm. R07/R08 tách được đúng chỗ mà **cả hai
+bên đều không suy ra lớp con** (`IFCWALL` ≠ `IFCWALLSTANDARDCASE`): 57 + 78 = 135 cửa có chủ nhà, cộng 7
+cửa curtain wall không lấp ô mở nào = 142.
+
+### Lỗi lộ ra: phần của một tổ hợp không thừa vị trí không gian của tổng
+
+R01 lệch 7 phần tử. Cả 7 đều là cửa của **curtain wall** (`Door-Curtain-Wall-Single/Double-Storefront`):
+bản thân cửa không có `IfcRelContainedInSpatialStructure` nào, chỉ curtain wall mới có, và cửa gắn vào
+curtain wall bằng `IfcRelAggregates`. DHCB đọc đúng một bảng quan hệ trực tiếp nên kết luận "không thuộc
+tầng nào" — **báo nhầm**: IFC không cho phép xếp phần và tổng vào hai vị trí không gian khác nhau, nên vị
+trí của tổng *là* vị trí của phần. IfcOpenShell kết luận đúng như vậy (`get_container` rơi về cha phân rã
+khi không có quan hệ trực tiếp, `ifcopenshell/util/element.py:1081`).
+
+Sửa ở `IfcIdsElement.BuildPartOf`: phần tử không có quan hệ chứa của riêng nó **thừa** vị trí của cha phân
+rã gần nhất — cha lấy theo đúng thứ tự của `get_parent` (aggregates → nests → cặp voids/fills), có chắn
+vòng lặp. Kế thừa chỉ đi tới **vị trí không gian gần nhất**, không leo tiếp lên toà nhà: R02 vẫn phải là
+0/142 và vẫn là 0/142 sau khi sửa (nếu leo tiếp thì R02 đã thành 142 — đó chính là ca canh chừng cho việc
+sửa quá tay).
+
+Đây là **lỗi thứ tư của DHCB** mà bộ tham chiếu độc lập bắt được, sau ba lỗi của §41 (boolean `.F.`, thuộc
+tính riêng của lớp, số không đạt bị cắt ở 200) — và là lỗi duy nhất trong đợt này; không có lỗi nào của
+IfcTester lộ ra lần này (§41 đã ghi một lỗi của IfcTester với `FALSE` viết hoa; fixture lần này không đụng
+tới đường đó).
+
+### Kiểm thử
+
+- Test thuần mới `ThuocVe_PhanCuaMotToHop_ThuaViTriKhongGianCuaTong` (`IfcIdsElementTests`) trên một file
+  IFC nhỏ dựng tay: cửa trong curtain wall thừa tầng, panel lồng trong cửa đó thừa tiếp (kế thừa đi qua
+  `IfcRelNests`), **không** leo lên `IFCBUILDING`, và cửa rời không thuộc tổ hợp nào thì vẫn không có tầng
+  (không bịa vị trí). Đã kiểm ngược: bỏ bản sửa ra thì ca này đỏ.
+- `dotnet test` toàn bộ `Shared.Logic`: **1.636 đạt / 0 trượt**.
+
+**Còn mở:** Solibri (phần mềm thương mại) vẫn chưa có trên máy. Và đường **Revit** dùng `Element.LevelId`
+(`RevitIdsElement.cs:213`), tức cùng lớp vấn đề có thể tồn tại ở đó với cấu kiện lồng trong curtain wall /
+assembly — chưa chạy thật nên chưa kết luận, ghi vào 11.4 của `roadmap.md`.
