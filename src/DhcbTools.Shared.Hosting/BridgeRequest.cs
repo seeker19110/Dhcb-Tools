@@ -16,6 +16,10 @@ namespace DhcbTools.Shared.Hosting
         [JsonProperty("documentId")]
         public string? DocumentId { get; set; }
 
+        /// <summary>Token của preview đã duyệt; cũng là khóa chống thực thi lặp khi gửi lại.</summary>
+        [JsonProperty("previewToken")]
+        public string? PreviewToken { get; set; }
+
         /// <summary>
         /// Thời gian chờ riêng cho lệnh này, tính bằng giây (giai đoạn 10.5). Bỏ trống = dùng mặc định
         /// của server (30 s).

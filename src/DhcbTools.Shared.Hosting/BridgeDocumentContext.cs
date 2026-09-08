@@ -8,10 +8,20 @@ namespace DhcbTools.Shared.Hosting
     /// <summary>Định danh theo đối tượng document trong phiên mở, không theo tên/đường dẫn file.</summary>
     public static class BridgeDocumentContext
     {
-        private sealed class Identity { public string Id { get; } = Guid.NewGuid().ToString("N"); }
+        private sealed class Identity
+        {
+            public string Id { get; } = Guid.NewGuid().ToString("N");
+            public long Revision;
+        }
         private static readonly ConditionalWeakTable<object, Identity> Identities = new ConditionalWeakTable<object, Identity>();
 
         public static string IdFor(object document) => Identities.GetValue(document, _ => new Identity()).Id;
+
+        public static long RevisionFor(object document) =>
+            System.Threading.Interlocked.Read(ref Identities.GetValue(document, _ => new Identity()).Revision);
+
+        public static void Touch(object document) =>
+            System.Threading.Interlocked.Increment(ref Identities.GetValue(document, _ => new Identity()).Revision);
 
         public static string? Validate(string app, BridgeRequest request, string currentId)
         {

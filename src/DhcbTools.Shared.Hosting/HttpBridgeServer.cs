@@ -472,6 +472,10 @@ namespace DhcbTools.Shared.Hosting
         private static object Describe(CommandResult result) => new
         {
             success = result.Success,
+            partialSuccess = result.PartialSuccess,
+            previewToken = result.PreviewToken,
+            documentId = result.DocumentId,
+            previewExpiresUtc = result.PreviewExpiresUtc,
             summary = result.Summary,
             affectedCount = result.AffectedCount,
             affectedElementCount = result.AffectedCount,

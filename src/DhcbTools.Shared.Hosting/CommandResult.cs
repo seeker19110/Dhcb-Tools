@@ -11,6 +11,10 @@ namespace DhcbTools.Shared.Hosting
     {
         public bool Success { get; set; }
 
+        public string? PreviewToken { get; set; }
+        public string? DocumentId { get; set; }
+        public System.DateTime? PreviewExpiresUtc { get; set; }
+
         /// <summary>
         /// Lệnh chạy xong nhưng chỉ xử lý được <b>một phần</b> đối tượng (ví dụ 3/5 schedule xuất được,
         /// 2 cái lỗi nằm trong <see cref="Errors"/>) — không phải đúng/sai nhị phân.

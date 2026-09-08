@@ -91,12 +91,14 @@ def request(app: str, method: str, path: str, payload=None, timeout: int = 35) -
         return {"success": False, "summary": f"Không kết nối được ({e.reason}). {app.capitalize()} có đang mở và plugin đã load chưa?"}
 
 
-def send(app: str, command: str, config: dict, timeout_seconds: int = 0, *, document_id=None) -> dict:
+def send(app: str, command: str, config: dict, timeout_seconds: int = 0, *, document_id=None, preview_token=None) -> dict:
     """Chạy một lệnh. timeout_seconds > 0 thì xin server chờ lâu hơn mặc định 30 s —
     cần cho lệnh nặng như SleeveAuto/AutoRoute trên model thật (giai đoạn 10.5)."""
     payload = {"command": command, "config": config}
     if document_id is not None:
         payload["documentId"] = document_id
+    if preview_token is not None:
+        payload["previewToken"] = preview_token
     if timeout_seconds > 0:
         payload["timeoutSeconds"] = timeout_seconds
 
@@ -107,7 +109,7 @@ def send(app: str, command: str, config: dict, timeout_seconds: int = 0, *, docu
 
 def send_background(app: str, command: str, config: dict,
                     poll_seconds: float = 2.0, max_wait_seconds: int = 1800,
-                    on_tick=None, *, document_id=None) -> dict:
+                    on_tick=None, *, document_id=None, preview_token=None) -> dict:
     """Chạy một lệnh ở chế độ nền rồi hỏi /progress/<id> cho tới khi xong (giai đoạn 10.5).
 
     Dùng cho lệnh chạy hàng chục giây trở lên: kết quả nằm ở server theo id, nên đứt kết nối
@@ -116,6 +118,8 @@ def send_background(app: str, command: str, config: dict,
     payload = {"command": command, "config": config, "async": True}
     if document_id is not None:
         payload["documentId"] = document_id
+    if preview_token is not None:
+        payload["previewToken"] = preview_token
     accepted = request(app, "POST", "/execute", payload, timeout=35)
     job_id = accepted.get("id")
     if not job_id:
@@ -140,19 +144,23 @@ def send_background(app: str, command: str, config: dict,
         time.sleep(poll_seconds)
 
 
-def run(app: str, command: str, config: dict, args, *, document_id=None) -> dict:
+def run(app: str, command: str, config: dict, args, *, document_id=None, preview_token=None) -> dict:
     """Một chỗ duy nhất quyết định chạy đồng bộ hay chạy nền, để ba lối gọi lệnh cư xử giống nhau."""
     if getattr(args, "background", False):
         return send_background(app, command, config,
                                on_tick=lambda ms: print(f"  … đang chạy {ms / 1000:.0f} s", flush=True),
-                               document_id=document_id)
-    return send(app, command, config, document_id=document_id)
+                               document_id=document_id, preview_token=preview_token)
+    return send(app, command, config, document_id=document_id, preview_token=preview_token)
 
 
 def print_result(result: dict):
     if "success" in result:
         icon = "✓" if result.get("success") else "✗"
         print(f"\n{icon} {result.get('summary', '')}")
+        if result.get("previewToken"):
+            print(f"  documentId: {result['documentId']}")
+            print(f"  previewToken: {result['previewToken']}")
+            print(f"  Hết hạn: {result.get('previewExpiresUtc', '')}")
         changed = result.get("changedIds") or []
         if changed:
             # Giai đoạn 10.2 — in ra để còn zoom tới đúng phần tử vừa đổi.
@@ -199,6 +207,8 @@ def main():
     parser.add_argument("arg", nargs="?", help="chat: câu tiếng Việt · query: tên query · raw: JSON · exec: tên lệnh")
     parser.add_argument("--config", help="(exec) JSON config inline")
     parser.add_argument("--config-file", help="(exec) file JSON config")
+    parser.add_argument("--document-id", help="ID model từ kết quả preview đã duyệt")
+    parser.add_argument("--preview-token", help="Token preview; giữ nguyên khi gửi lại cùng lần ghi")
     parser.add_argument("--params", nargs="+", help="(ParameterExport) tham số; (query) key=value")
     parser.add_argument("--categories", nargs="+")
     parser.add_argument("--output")
@@ -278,7 +288,8 @@ def main():
             sys.exit(2)
         # CLI quyết định chế độ; JSON không được âm thầm bật ghi thật.
         config["dryRun"] = args.dry_run
-        result = run(app, data["command"], config, args, document_id=document_id)
+        result = run(app, data["command"], config, args, document_id=document_id,
+                     preview_token=data.get("previewToken"))
         print_result(result)
         sys.exit(0 if result.get("success") else 1)
 
@@ -312,11 +323,13 @@ def main():
                 sys.exit(2)
             config.update(inline)
         config["dryRun"] = args.dry_run
-        result = run(app, args.arg, config, args)
+        result = run(app, args.arg, config, args, document_id=args.document_id,
+                     preview_token=args.preview_token)
         print_result(result)
         sys.exit(0 if result.get("success") else 1)
 
-    result = run(app, args.command, build_config(args, app, dry_run), args)
+    result = run(app, args.command, build_config(args, app, dry_run), args,
+                 document_id=args.document_id, preview_token=args.preview_token)
     print_result(result)
     sys.exit(0 if result.get("success") else 1)
 

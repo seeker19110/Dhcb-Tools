@@ -186,7 +186,7 @@ namespace DhcbTools.Shared.Logic.Ai
             new CommandDescriptor("PipeSplitter", Revit, "Chia ống/duct theo chiều dài cây", true, "PipeSplit", "SplitPipes")
                 .Field("maxSegmentMm", "chiều dài tối đa").Field("dryRun", "xem trước")
                 .Words("chia ống", "cắt ống", "split pipe", "chia đoạn"),
-            new CommandDescriptor("ConnectorChecker", Revit, "Liệt kê connector MEP hở", false, "ConnectorCheck", "CheckConnectors")
+            new CommandDescriptor("ConnectorChecker", Revit, "Liệt kê connector MEP hở", true, "ConnectorCheck", "CheckConnectors")
                 .Field("categories", "danh sách category (rỗng = mọi category MEP)").Field("domains", "Piping/Hvac/Electrical (rỗng = tất cả)")
                 .Field("create3dView", "true = GHI một 3D view khoanh vùng vào mô hình (thao tác ghi duy nhất của lệnh, mặc định false)")
                 .Field("viewName", "tên 3D view").Field("dryRun", "xem trước: không tạo view")
@@ -365,7 +365,7 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Words("tiến độ", "báo cáo tiến độ", "phần trăm hoàn thành", "progress report", "tiến độ lắp đặt"),
 
             // ── Revit — kiểm tra (cấp 2) ────────────────────────────────────
-            new CommandDescriptor("ParameterRuleCheck", Revit, "Kiểm tra tham số thiếu / sai quy tắc đặt tên → HTML", false, "RuleCheck")
+            new CommandDescriptor("ParameterRuleCheck", Revit, "Kiểm tra tham số thiếu / sai quy tắc đặt tên → HTML", true, "RuleCheck")
                 .Field("rulesPath", "file JSON quy tắc").Field("outputPath", "file HTML").Field("create3dView", "true = GHI một 3D view isolate phần tử vi phạm (chỉ khi dryRun=false)").Field("dryRun", "xem trước: không tạo view")
                 .Words("kiểm tra tham số", "rule check", "kiểm tra đặt tên").Endorsed(),
             new CommandDescriptor("IdsValidate", Revit, "Kiểm mô hình theo file IDS 1.0 của chủ đầu tư/thẩm tra (buildingSMART) → HTML + CSV", false, "KiemIds", "IDS")
@@ -375,7 +375,7 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("categories", "category cần kiểm (rỗng = mọi phần tử mô hình)")
                 .Field("levelName", "chỉ tầng này")
                 .Words("kiểm ids", "ids", "yêu cầu thông tin", "kiểm theo yêu cầu chủ đầu tư", "information delivery specification").Endorsed(),
-            new CommandDescriptor("ClashDetection", Revit, "Va chạm nội bộ giữa hai nhóm category → HTML + 3D view", false, "Clash")
+            new CommandDescriptor("ClashDetection", Revit, "Va chạm nội bộ giữa hai nhóm category → HTML + 3D view", true, "Clash")
                 .Field("categoriesA", "nhóm A").Field("categoriesB", "nhóm B").Field("outputPath", "file HTML").Field("acceptedPath", "clash-accepted.json")
                 .Field("includeLinkedModels", "xét cả model liên kết cho nhóm B (mặc định bật)", FieldKind.Bool).Field("create3dView", "true = GHI một 3D view isolate phần tử va chạm (chỉ khi dryRun=false)").Field("dryRun", "xem trước: không tạo view")
                 .Words("clash", "va chạm", "kiểm tra va chạm").Endorsed(),

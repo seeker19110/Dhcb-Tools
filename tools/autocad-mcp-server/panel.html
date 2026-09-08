@@ -1001,14 +1001,26 @@
 const BASE = location.protocol === 'http:' ? location.origin : 'http://127.0.0.1:8767';
 const PANEL_TOKEN = '__PANEL_TOKEN__';
 let allLayers = [];
+const previews = new Map();
 
 // ── Helpers ──────────────────────────────────────
 async function apiFetch(path, body) {
+  const executing = path === '/execute' && body && body.command;
+  if (executing && body.config?.dryRun === false && !body.previewToken) {
+    const preview = previews.get(body.command);
+    if (!preview) return {success:false, summary:'Hãy xem trước và duyệt kết quả trước khi ghi.'};
+    body = {...body, documentId:preview.documentId, previewToken:preview.previewToken};
+  }
   const opts = body
     ? { method:'POST', headers:{'Content-Type':'application/json', 'X-Panel-Token':PANEL_TOKEN}, body: JSON.stringify(body) }
     : { method:'GET', headers:{'X-Panel-Token':PANEL_TOKEN} };
   const r = await fetch(BASE + path, opts);
-  return r.json();
+  const result = await r.json();
+  if (executing && body.config?.dryRun !== false) {
+    previews.delete(body.command);
+    if (result.success && result.previewToken) previews.set(body.command, result);
+  }
+  return result;
 }
 
 function setLoading(el, msg = 'Đang tải...') {
