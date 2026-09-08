@@ -17,6 +17,10 @@ Cách dùng:
 
     python dhcb_agent.py autocad LayerExport --output C:/tmp/layers.csv
     python dhcb_agent.py autocad exec GridExtract --config '{"gridLayer":"AXIS","outputPath":"C:/tmp/grids.csv"}'
+
+CLI luôn xem trước nếu không có --no-dry-run, kể cả khi JSON chứa dryRun:false.
+Với raw, giữ documentId đã nhận từ document_context trong cả preview và lần ghi thật;
+không lấy ID mới để vượt qua E-DOCUMENT-CHANGED. --background cũng giữ nguyên ID này.
 """
 
 import argparse
@@ -87,10 +91,12 @@ def request(app: str, method: str, path: str, payload=None, timeout: int = 35) -
         return {"success": False, "summary": f"Không kết nối được ({e.reason}). {app.capitalize()} có đang mở và plugin đã load chưa?"}
 
 
-def send(app: str, command: str, config: dict, timeout_seconds: int = 0) -> dict:
+def send(app: str, command: str, config: dict, timeout_seconds: int = 0, *, document_id=None) -> dict:
     """Chạy một lệnh. timeout_seconds > 0 thì xin server chờ lâu hơn mặc định 30 s —
     cần cho lệnh nặng như SleeveAuto/AutoRoute trên model thật (giai đoạn 10.5)."""
     payload = {"command": command, "config": config}
+    if document_id is not None:
+        payload["documentId"] = document_id
     if timeout_seconds > 0:
         payload["timeoutSeconds"] = timeout_seconds
 
@@ -101,14 +107,16 @@ def send(app: str, command: str, config: dict, timeout_seconds: int = 0) -> dict
 
 def send_background(app: str, command: str, config: dict,
                     poll_seconds: float = 2.0, max_wait_seconds: int = 1800,
-                    on_tick=None) -> dict:
+                    on_tick=None, *, document_id=None) -> dict:
     """Chạy một lệnh ở chế độ nền rồi hỏi /progress/<id> cho tới khi xong (giai đoạn 10.5).
 
     Dùng cho lệnh chạy hàng chục giây trở lên: kết quả nằm ở server theo id, nên đứt kết nối
     giữa chừng không làm mất kết quả của việc đã chạy xong — hỏi lại bằng id là thấy.
     """
-    accepted = request(app, "POST", "/execute",
-                       {"command": command, "config": config, "async": True}, timeout=35)
+    payload = {"command": command, "config": config, "async": True}
+    if document_id is not None:
+        payload["documentId"] = document_id
+    accepted = request(app, "POST", "/execute", payload, timeout=35)
     job_id = accepted.get("id")
     if not job_id:
         return accepted  # lỗi (401, 400…) — trả nguyên để print_result hiện ra
@@ -132,12 +140,13 @@ def send_background(app: str, command: str, config: dict,
         time.sleep(poll_seconds)
 
 
-def run(app: str, command: str, config: dict, args) -> dict:
+def run(app: str, command: str, config: dict, args, *, document_id=None) -> dict:
     """Một chỗ duy nhất quyết định chạy đồng bộ hay chạy nền, để ba lối gọi lệnh cư xử giống nhau."""
     if getattr(args, "background", False):
         return send_background(app, command, config,
-                               on_tick=lambda ms: print(f"  … đang chạy {ms / 1000:.0f} s", flush=True))
-    return send(app, command, config)
+                               on_tick=lambda ms: print(f"  … đang chạy {ms / 1000:.0f} s", flush=True),
+                               document_id=document_id)
+    return send(app, command, config, document_id=document_id)
 
 
 def print_result(result: dict):
@@ -259,11 +268,17 @@ def main():
             print("JSON sau 'raw' phải là object có trường \"command\" (chuỗi) và tuỳ chọn \"config\" (object).",
                   file=sys.stderr)
             sys.exit(2)
-        config = data.get("config") or {}
+        config = data.get("config", {})
         if not isinstance(config, dict):
             print("\"config\" trong JSON raw phải là object.", file=sys.stderr)
             sys.exit(2)
-        result = run(app, data["command"], config, args)
+        document_id = data.get("documentId")
+        if "documentId" in data and (not isinstance(document_id, str) or not document_id.strip()):
+            print('"documentId" phải là chuỗi không rỗng.', file=sys.stderr)
+            sys.exit(2)
+        # CLI quyết định chế độ; JSON không được âm thầm bật ghi thật.
+        config["dryRun"] = args.dry_run
+        result = run(app, data["command"], config, args, document_id=document_id)
         print_result(result)
         sys.exit(0 if result.get("success") else 1)
 
@@ -282,6 +297,9 @@ def main():
             except json.JSONDecodeError as ex:
                 print(f"--config-file không phải JSON hợp lệ ({ex}).", file=sys.stderr)
                 sys.exit(2)
+        if not isinstance(config, dict):
+            print("Config phải là JSON object.", file=sys.stderr)
+            sys.exit(2)
         if args.config:
             try:
                 inline = json.loads(args.config)
@@ -293,13 +311,7 @@ def main():
                 print("--config phải là JSON object.", file=sys.stderr)
                 sys.exit(2)
             config.update(inline)
-        if not isinstance(config, dict):
-            print("Config phải là JSON object.", file=sys.stderr)
-            sys.exit(2)
-        if not args.dry_run:
-            config["dryRun"] = False
-        elif "dryRun" not in config:
-            config["dryRun"] = True
+        config["dryRun"] = args.dry_run
         result = run(app, args.arg, config, args)
         print_result(result)
         sys.exit(0 if result.get("success") else 1)
