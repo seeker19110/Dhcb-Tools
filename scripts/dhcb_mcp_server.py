@@ -142,6 +142,18 @@ def call_tool(name: str, arguments: dict) -> dict:
     confirm = config.pop("confirm", False)
     if type(confirm) is not bool:
         return {"success": False, "summary": "confirm phải là boolean true/false, không nhận chuỗi hoặc số."}
+    # Trường object/mảng (PointMm, RouteSizeMm, levels...) khai type "string" trong inputSchema MCP
+    # (FieldKind.Json — xem CommandCatalog) để client coi là ô JSON thô. Client tuân theo schema đó
+    # nên gửi lên một CHUỖI chứa JSON; Bridge lại cần object/mảng thật trong config, nên parse lại
+    # ở đây trước khi forward — nếu không .NET báo lỗi convert string sang PointMm/... (mục 6.2).
+    for key, value in list(config.items()):
+        if isinstance(value, str):
+            stripped = value.strip()
+            if stripped[:1] in "{[":
+                try:
+                    config[key] = json.loads(stripped)
+                except ValueError:
+                    pass
     # Lệnh nặng (SleeveAuto, AutoRoute, ClashDetection) vượt 30 s mặc định trên model thật;
     # server chặn trên ở 10 phút nên không sợ giữ hàng đợi mãi (giai đoạn 10.5).
     timeout_seconds = int(config.pop("timeoutSeconds", 0) or 0)
