@@ -120,6 +120,16 @@ def tool_list() -> list:
     return tools
 
 
+def _json_field_names(name: str) -> set:
+    """Tên field JSON thô của một lệnh, lấy từ schema chuẩn do Bridge công bố."""
+    catalog, _live = _load_catalog()
+    for tool in catalog.get("tools", []):
+        if tool.get("name", "").lower() == name.lower():
+            properties = tool.get("inputSchema", {}).get("properties", {})
+            return {key for key, schema in properties.items() if schema.get("jsonEncoded") is True}
+    return set()
+
+
 def call_tool(name: str, arguments: dict) -> dict:
     if name == "query":
         return dhcb_agent.request(APP, "POST", "/query", {"query": arguments.get("query", ""), "params": arguments.get("params", {})})
@@ -142,18 +152,15 @@ def call_tool(name: str, arguments: dict) -> dict:
     confirm = config.pop("confirm", False)
     if type(confirm) is not bool:
         return {"success": False, "summary": "confirm phải là boolean true/false, không nhận chuỗi hoặc số."}
-    # Trường object/mảng (PointMm, RouteSizeMm, levels...) khai type "string" trong inputSchema MCP
-    # (FieldKind.Json — xem CommandCatalog) để client coi là ô JSON thô. Client tuân theo schema đó
-    # nên gửi lên một CHUỖI chứa JSON; Bridge lại cần object/mảng thật trong config, nên parse lại
-    # ở đây trước khi forward — nếu không .NET báo lỗi convert string sang PointMm/... (mục 6.2).
+    # FieldKind.Json được Bridge công bố bằng jsonEncoded: true. Chỉ những field đó mới được
+    # giải mã từ chuỗi JSON; text tự do như "{Discipline}-{Number}" phải đi nguyên vẹn.
+    json_fields = _json_field_names(name)
     for key, value in list(config.items()):
-        if isinstance(value, str):
-            stripped = value.strip()
-            if stripped[:1] in "{[":
-                try:
-                    config[key] = json.loads(stripped)
-                except ValueError:
-                    pass
+        if key in json_fields and isinstance(value, str):
+            try:
+                config[key] = json.loads(value)
+            except ValueError:
+                pass
     # Lệnh nặng (SleeveAuto, AutoRoute, ClashDetection) vượt 30 s mặc định trên model thật;
     # server chặn trên ở 10 phút nên không sợ giữ hàng đợi mãi (giai đoạn 10.5).
     timeout_seconds = int(config.pop("timeoutSeconds", 0) or 0)

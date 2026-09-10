@@ -23,6 +23,12 @@ CATALOG = {"tools": [
     {"name": "HealthReport", "description": "Báo cáo sức khoẻ", "inputSchema": {"properties": {"outputPath": {}}}},
     {"name": "AutoNumbering", "description": "Đánh số", "writesModel": True,
      "inputSchema": {"properties": {"category": {}}}},
+    {"name": "AutoRoute", "description": "Tìm tuyến", "writesModel": True,
+     "inputSchema": {"properties": {
+         "startMm": {"type": "string", "jsonEncoded": True},
+         "endMm": {"type": "string", "jsonEncoded": True},
+         "lineStyleName": {"type": "string"},
+     }}},
     {"name": "ParameterExport", "description": "Xuất tham số", "inputSchema": {"properties": {}}},
 ]}
 
@@ -119,7 +125,7 @@ class ToolListTests(unittest.TestCase):
         with load() as (module, _):
             names = [t["name"] for t in module.tool_list()]
 
-        self.assertEqual(["HealthReport", "AutoNumbering", "ParameterExport", "query", "chat"], names)
+        self.assertEqual(["HealthReport", "AutoNumbering", "AutoRoute", "ParameterExport", "query", "chat"], names)
 
     def test_lenh_ghi_duoc_them_tham_so_confirm(self) -> None:
         with load() as (module, _):
@@ -225,6 +231,12 @@ class CallToolTests(unittest.TestCase):
             module.call_tool("AutoRoute", {"startMm": "{khong-phai-json"})
 
         self.assertEqual("{khong-phai-json", agent.send.call_args[0][2]["startMm"])
+
+    def test_chuoi_json_o_truong_text_khong_bi_doi_kieu(self) -> None:
+        with load() as (module, agent):
+            module.call_tool("AutoNumbering", {"category": '{"literal": true}'})
+
+        self.assertEqual('{"literal": true}', agent.send.call_args[0][2]["category"])
 
     def test_read_only_van_cho_lenh_doc(self) -> None:
         with load(("revit", "--read-only")) as (module, agent):
