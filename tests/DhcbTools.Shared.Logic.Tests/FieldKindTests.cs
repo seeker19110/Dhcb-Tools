@@ -158,10 +158,13 @@ public class FieldKindTests
     public void McpSchema_CoKieuJsonDung()
     {
         var json = Newtonsoft.Json.Linq.JObject.FromObject(CommandCatalog.Describe(CommandCatalog.Revit));
-        var properties = json["tools"]!.First(t => (string?)t["name"] == "HangerAuto")!["inputSchema"]!["properties"]!;
+        var hangerProperties = json["tools"]!.First(t => (string?)t["name"] == "HangerAuto")!["inputSchema"]!["properties"]!;
+        var deviceProperties = json["tools"]!.First(t => (string?)t["name"] == "DevicePlacement")!["inputSchema"]!["properties"]!;
 
-        Assert.Equal("number", (string?)properties["spacingMm"]!["type"]);
-        Assert.Equal("string", (string?)properties["hangerFamilyName"]!["type"]);
+        Assert.Equal("number", (string?)hangerProperties["spacingMm"]!["type"]);
+        Assert.Equal("string", (string?)hangerProperties["hangerFamilyName"]!["type"]);
+        Assert.True((bool?)deviceProperties["pattern"]!["jsonEncoded"] == true);
+        Assert.True((bool?)deviceProperties["roomFilter"]!["jsonEncoded"] == true);
     }
 
     /// <summary>

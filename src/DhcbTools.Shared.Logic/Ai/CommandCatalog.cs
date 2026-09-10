@@ -535,7 +535,14 @@ namespace DhcbTools.Shared.Logic.Ai
                         type = "object",
                         properties = c.Fields.ToDictionary(
                             f => f.Name,
-                            f => (object)new { type = JsonTypeOf(f.Kind), description = f.Description }),
+                            f => (object)new
+                            {
+                                type = JsonTypeOf(f.Kind),
+                                description = f.Description,
+                                // MCP vẫn nhận JSON thô dưới dạng string để client điền vào ô nhiều dòng;
+                                // metadata này cho adapter biết chính xác trường nào phải parse lại trước Bridge.
+                                jsonEncoded = f.Kind == FieldKind.Json,
+                            }),
                     },
                 }).ToList(),
             };
