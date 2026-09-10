@@ -212,6 +212,20 @@ class CallToolTests(unittest.TestCase):
         self.assertIn("bị chặn", result["summary"])
         agent.send.assert_not_called()
 
+    def test_truong_json_dang_chuoi_duoc_parse_lai_thanh_object(self) -> None:
+        with load() as (module, agent):
+            module.call_tool("AutoRoute", {"startMm": '{"x": 1, "y": 2, "z": 3}', "endMm": "[1, 2]"})
+
+        config = agent.send.call_args[0][2]
+        self.assertEqual({"x": 1, "y": 2, "z": 3}, config["startMm"])
+        self.assertEqual([1, 2], config["endMm"])
+
+    def test_truong_json_hong_thi_giu_nguyen_chuoi(self) -> None:
+        with load() as (module, agent):
+            module.call_tool("AutoRoute", {"startMm": "{khong-phai-json"})
+
+        self.assertEqual("{khong-phai-json", agent.send.call_args[0][2]["startMm"])
+
     def test_read_only_van_cho_lenh_doc(self) -> None:
         with load(("revit", "--read-only")) as (module, agent):
             module.call_tool("HealthReport", {})
