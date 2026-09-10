@@ -99,12 +99,15 @@
     <AcadVersion Condition="'$(AcadVersion)'==''">2024</AcadVersion>
     <AcadRoot Condition="'$(AcadRoot)'==''">$(ProgramFiles)\Autodesk\AutoCAD $(AcadVersion)</AcadRoot>
     <!--
-      Phiên bản package AutoCAD.NET.Core/.Model theo năm: ≤2024 → 24.* (net48), 2025 → 25.0.* (net8),
+      Phiên bản package AutoCAD.NET: ≤2024 → 24.* (net48), 2025 → 25.0.1 (net8),
       2026+ → 25.1.* (AutoCAD 2026.1 đã chuyển sang .NET 10 — xem mục giới hạn công nghệ trong docs).
+      Riêng Core/Model 2025 chỉ có bản 25.0.0; meta-package 25.0.1 phụ thuộc đúng bản đó.
     -->
     <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And $(AcadVersion) &lt;= 2024">24.3.0</AcadNetVersion>
     <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And $(AcadVersion) == 2025">25.0.1</AcadNetVersion>
     <AcadNetVersion Condition="'$(AcadNetVersion)'==''">25.1.1</AcadNetVersion>
+    <AcadCoreNetVersion Condition="'$(AcadCoreNetVersion)'=='' And $(AcadVersion) == 2025">25.0.0</AcadCoreNetVersion>
+    <AcadCoreNetVersion Condition="'$(AcadCoreNetVersion)'==''">$(AcadNetVersion)</AcadCoreNetVersion>
   </PropertyGroup>
 
 
