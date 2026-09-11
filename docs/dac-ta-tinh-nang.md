@@ -461,8 +461,10 @@ hash vị trí, để cặp cũ không quay lại báo sau mỗi lần chạy đ
 
 **Xuất BCF 2.1** (đề xuất B3 của [`nghien-cuu-chuoi-den-hoan-cong.md`](nghien-cuu-chuoi-den-hoan-cong.md)):
 khai thêm `bcfPath` (ví dụ `C:\...\clash.bcf`, tuỳ chọn `bcfProjectName`) thì ngoài HTML, lệnh ghi một
-file BCF mở thẳng được trong Navisworks / Solibri / BIMcollab — mỗi va chạm là một topic có camera phối
-cảnh nhìn vào tâm va chạm và hai phần tử liên quan (ElementId hai phía, phía link ghi kèm tên link).
+file BCF mở được trong Solibri/BIMcollab và trong Navisworks khi đã cài trình đọc BCF (ví dụ
+[BIMcollab BCF Manager trên Autodesk App Store](https://apps.autodesk.com/navis/en/Detail/HelpDoc?appId=141413648989600422&appLang=en&os=Win64);
+Navisworks không có trình nhập BCF tích hợp) — mỗi va chạm là một topic có camera phối cảnh nhìn vào tâm
+va chạm và hai phần tử liên quan (ElementId hai phía, phía link ghi kèm tên link).
 GUID của topic sinh từ chính `key` trong `clash-accepted.json`, nên **xuất lại cùng một va chạm vẫn ra
 đúng topic cũ** thay vì đẻ ra vấn đề mới bên phần mềm điều phối. Toạ độ trong file là **mét** theo chuẩn
 BCF. Ghi BCF hỏng thì chỉ báo trong `Messages`, không làm hỏng lượt quét đã ghi HTML xong.

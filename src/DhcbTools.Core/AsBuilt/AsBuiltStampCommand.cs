@@ -124,23 +124,32 @@ public sealed class AsBuiltStampCommand : ICoreCommand<AsBuiltStampConfig>
         var layout = StampBuilder.Build(stampConfig);
 
         var result = CommandResult.Ok(string.Empty);
-        var toStamp = new List<(ViewSheet Sheet, XYZ Anchor)>();
+        var anchors = Anchors(sheets, config);
+        var existingBySheet = FindExisting(
+            document,
+            sheets,
+            anchors,
+            layout,
+            includeAllStampElements: config.Overwrite && !config.DryRun);
+        var toStamp = new List<(ViewSheet Sheet, XYZ Anchor, List<Element> Existing)>();
         foreach (var sheet in sheets)
         {
-            var anchor = Anchor(sheet, config);
-            var existing = FindExisting(document, sheet, anchor, layout);
+            var anchor = anchors[sheet.Id];
+            var existing = existingBySheet.TryGetValue(sheet.Id, out var found)
+                ? found
+                : new List<Element>();
             if (existing.Count > 0 && !config.Overwrite)
             {
                 result.Messages.Add($"{sheet.SheetNumber}: đã có dấu hoàn công trong vùng này — giữ nguyên (overwrite=false).");
                 continue;
             }
 
-            toStamp.Add((sheet, anchor));
+            toStamp.Add((sheet, anchor, existing));
         }
 
         if (config.DryRun)
         {
-            foreach (var (sheet, _) in toStamp)
+            foreach (var (sheet, _, _) in toStamp)
             {
                 result.Messages.Add($"[Xem trước] {sheet.SheetNumber} \"{sheet.Name}\": sẽ vẽ dấu Mẫu {config.Mau} ({layout.WidthMm:0} × {layout.HeightMm:0} mm).");
             }
@@ -155,11 +164,10 @@ public sealed class AsBuiltStampCommand : ICoreCommand<AsBuiltStampConfig>
         var stamped = 0;
         using (var tx = RevitCompat.StartTransaction(document, "DHCB - Dấu bản vẽ hoàn công"))
         {
-            foreach (var (sheet, anchor) in toStamp)
+            foreach (var (sheet, anchor, existing) in toStamp)
             {
                 try
                 {
-                    var existing = FindExisting(document, sheet, anchor, layout);
                     if (existing.Count > 0)
                     {
                         document.Delete(existing.Select(e => e.Id).ToList());
@@ -184,12 +192,19 @@ public sealed class AsBuiltStampCommand : ICoreCommand<AsBuiltStampConfig>
         return result;
     }
 
-    private static XYZ Anchor(ViewSheet sheet, AsBuiltStampConfig config)
+    private static Dictionary<ElementId, XYZ> Anchors(
+        IReadOnlyCollection<ViewSheet> sheets,
+        AsBuiltStampConfig config)
     {
-        var outline = sheet.Outline;
-        var u = config.AnchorXMm.HasValue ? RevitCompat.MmToFt(config.AnchorXMm.Value) : outline.Min.U + RevitCompat.MmToFt(config.MarginMm);
-        var v = config.AnchorYMm.HasValue ? RevitCompat.MmToFt(config.AnchorYMm.Value) : outline.Min.V + RevitCompat.MmToFt(config.MarginMm);
-        return new XYZ(u, v, 0);
+        var margin = RevitCompat.MmToFt(config.MarginMm);
+        // Revit định nghĩa paper space của sheet với [0,0] ở góc dưới-trái. ViewSheet.Outline.Min trả
+        // chính gốc đó nhưng lần truy cập đầu có thể buộc Revit dựng vùng hiển thị; profile Snowdon đo
+        // 190 giây/55 sheet. Dùng trực tiếp hệ paper space giữ nguyên vị trí mà không phụ thuộc hình học
+        // hoặc điểm chèn tùy ý của family khung tên.
+        // Source: https://help.autodesk.com/cloudhelp/2024/ENU/Revit-API/files/Revit_API_Developers_Guide/Basic_Interaction_with_Revit_Elements/Views/View_Types/Revit_API_Revit_API_Developers_Guide_Basic_Interaction_with_Revit_Elements_Views_View_Types_ViewSheet_html.html
+        var u = config.AnchorXMm.HasValue ? RevitCompat.MmToFt(config.AnchorXMm.Value) : margin;
+        var v = config.AnchorYMm.HasValue ? RevitCompat.MmToFt(config.AnchorYMm.Value) : margin;
+        return sheets.ToDictionary(sheet => sheet.Id, _ => new XYZ(u, v, 0));
     }
 
     /// <summary>
@@ -202,25 +217,79 @@ public sealed class AsBuiltStampCommand : ICoreCommand<AsBuiltStampConfig>
     /// hiệu đáng tin — dùng thẳng toạ độ đặt phần tử (<c>Coord</c>/<c>GeometryCurve</c>), đúng hệ U/V với
     /// lúc dựng nên không có bất ngờ nào về hệ trục. Đã chạy thật xác nhận đúng trên Revit 2024 (§73).
     /// </summary>
-    private static List<Element> FindExisting(Document document, ViewSheet sheet, XYZ anchor, Shared.Logic.AsBuilt.AsBuiltStampLayout layout)
+    private static Dictionary<ElementId, List<Element>> FindExisting(
+        Document document,
+        IReadOnlyCollection<ViewSheet> sheets,
+        IReadOnlyDictionary<ElementId, XYZ> anchors,
+        Shared.Logic.AsBuilt.AsBuiltStampLayout layout,
+        bool includeAllStampElements)
     {
         var pad = RevitCompat.MmToFt(2);
-        var minX = anchor.X - pad;
-        var maxX = anchor.X + RevitCompat.MmToFt(layout.WidthMm) + pad;
-        var minY = anchor.Y - pad;
-        var maxY = anchor.Y + RevitCompat.MmToFt(layout.HeightMm) + pad;
+        var width = RevitCompat.MmToFt(layout.WidthMm);
+        var height = RevitCompat.MmToFt(layout.HeightMm);
+        var sheetIds = new HashSet<ElementId>(sheets.Select(sheet => sheet.Id));
 
-        bool PointInRegion(XYZ p) => p.X >= minX && p.X <= maxX && p.Y >= minY && p.Y <= maxY;
+        bool PointInRegion(ElementId sheetId, XYZ point)
+        {
+            var anchor = anchors[sheetId];
+            return point.X >= anchor.X - pad
+                && point.X <= anchor.X + width + pad
+                && point.Y >= anchor.Y - pad
+                && point.Y <= anchor.Y + height + pad;
+        }
 
-        var found = new List<Element>();
-        found.AddRange(new FilteredElementCollector(document, sheet.Id).OfClass(typeof(TextNote)).Cast<TextNote>()
-            .Where(n => PointInRegion(n.Coord)));
-        // DetailLine không phải kiểu collector "gốc" của Revit (ArgumentException nếu OfClass thẳng nó —
-        // lỗi lộ ra khi chạy thật, thông báo Revit tự chỉ cách sửa) — lọc qua CurveElement rồi kiểm lại kiểu.
-        found.AddRange(new FilteredElementCollector(document, sheet.Id).OfClass(typeof(CurveElement))
-            .OfType<DetailLine>()
-            .Where(l => PointInRegion(l.GeometryCurve.GetEndPoint(0)) && PointInRegion(l.GeometryCurve.GetEndPoint(1))));
-        return found;
+        // Không dùng FilteredElementCollector(document, viewId): tài liệu Autodesk cảnh báo lần đầu
+        // dựng collector theo view có thể tái dựng hình học hiển thị. Với hàng chục sheet, hai collector
+        // mỗi sheet biến preview chỉ đọc thành công việc kéo dài nhiều phút. Quét TextNote toàn document
+        // đúng một lần và dùng OwnerViewId (quick filter) để lập chỉ mục theo sheet.
+        var notesBySheet = new FilteredElementCollector(document).OfClass(typeof(TextNote)).Cast<TextNote>()
+            .Where(note => sheetIds.Contains(note.OwnerViewId))
+            .GroupBy(note => note.OwnerViewId)
+            .ToDictionary(group => group.Key, group => group.ToList());
+
+        var foundBySheet = new Dictionary<ElementId, List<Element>>();
+        foreach (var sheet in sheets)
+        {
+            if (!notesBySheet.TryGetValue(sheet.Id, out var notes))
+            {
+                continue;
+            }
+
+            // Giữ đúng quy tắc tương thích đã chạy thật từ bản đầu: bất kỳ TextNote nào trong vùng khuôn
+            // đều chứng minh vùng đã có dấu. Không dựa vào note.Text vì Revit có thể trả nội dung đã qua
+            // định dạng khác chuỗi đầu vào; bộ revit-write chốt việc chạy lần hai phải bỏ qua toàn bộ.
+            var regionNotes = notes.Where(note => PointInRegion(sheet.Id, note.Coord)).Cast<Element>().ToList();
+            if (regionNotes.Count == 0)
+            {
+                continue;
+            }
+
+            foundBySheet[sheet.Id] = regionNotes;
+        }
+
+        if (!includeAllStampElements || foundBySheet.Count == 0)
+        {
+            return foundBySheet;
+        }
+
+        var stampedSheetIds = new HashSet<ElementId>(foundBySheet.Keys);
+        // DetailLine không phải kiểu collector "gốc" của Revit; lọc CurveElement rồi kiểm lại kiểu.
+        foreach (var line in new FilteredElementCollector(document).OfClass(typeof(CurveElement)).OfType<DetailLine>())
+        {
+            var sheetId = line.OwnerViewId;
+            if (!stampedSheetIds.Contains(sheetId))
+            {
+                continue;
+            }
+
+            var curve = line.GeometryCurve;
+            if (PointInRegion(sheetId, curve.GetEndPoint(0)) && PointInRegion(sheetId, curve.GetEndPoint(1)))
+            {
+                foundBySheet[sheetId].Add(line);
+            }
+        }
+
+        return foundBySheet;
     }
 
     private static void Draw(Document document, ViewSheet sheet, Shared.Logic.AsBuilt.AsBuiltStampLayout layout, XYZ anchor)
