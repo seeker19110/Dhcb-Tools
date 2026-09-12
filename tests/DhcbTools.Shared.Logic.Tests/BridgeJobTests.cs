@@ -472,9 +472,11 @@ public class BridgeJobTests
         var port = FreePort();
         var tokenPath = Path.Combine(Path.GetTempPath(), "dhcb-test-" + Guid.NewGuid().ToString("N") + ".txt");
         using var server = new HttpBridgeServer(port, "TestA", "9.9", maxInFlight: 1);
+        var daVaoXuLy = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var giu = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         server.QueryAsync = async item =>
         {
+            daVaoXuLy.TrySetResult(true);
             await giu.Task.ConfigureAwait(false);
             item.Completion.SetResult(new { ok = true });
         };
@@ -486,7 +488,7 @@ public class BridgeJobTests
             http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", server.Token);
 
             var busy = http.PostAsync("http://127.0.0.1:" + port + "/query", new StringContent("{\"query\":\"x\"}", Encoding.UTF8, "application/json"));
-            await Task.Delay(200);
+            await daVaoXuLy.Task;
             var overflow = await http.GetAsync("http://127.0.0.1:" + port + "/tools");
             Assert.Equal(HttpStatusCode.ServiceUnavailable, overflow.StatusCode);
             Assert.Contains("quá tải", await overflow.Content.ReadAsStringAsync());
