@@ -129,5 +129,52 @@ namespace DhcbTools.Shared.Logic.Tests
             Assert.Empty(result.MissingMandatoryKinds);
             Assert.Contains("ĐẠT CHUẨN NĐ 207", result.Summary);
         }
+
+        [Fact]
+        public void SetoutDeviationAnalyzer_AnalyzesSurveyDeviations()
+        {
+            var design = new List<(string Code, string Name, double X, double Y, double Z)>
+            {
+                ("C1", "Column 1", 1000, 2000, 0)
+            };
+            var actual = new List<(string Code, double X, double Y, double Z)>
+            {
+                ("C1", 1004, 2003, 0) // 5mm error
+            };
+
+            var records = DhcbTools.Shared.Logic.Setout.SetoutDeviationAnalyzer.AnalyzeDeviations(design, actual, maxToleranceMm: 10);
+            Assert.Single(records);
+            Assert.Equal(DhcbTools.Shared.Logic.Setout.SetoutDeviationStatus.InTolerance, records[0].Status);
+            Assert.Equal(5.0, records[0].TotalDistanceErrorMm, precision: 1);
+        }
+
+        [Fact]
+        public void ProgressVarianceEngine_CalculatesScheduleVariance()
+        {
+            var now = new DateTime(2026, 9, 15);
+            var tasks = new List<(string TaskId, DateTime PlannedStart, DateTime PlannedEnd, DateTime? ActualEnd, double ProgressWeight)>
+            {
+                ("T1", new DateTime(2026, 9, 1), new DateTime(2026, 9, 10), new DateTime(2026, 9, 10), 1.0),
+                ("T2", new DateTime(2026, 9, 5), new DateTime(2026, 9, 12), null, 1.0)
+            };
+
+            var summary = DhcbTools.Shared.Logic.Progress.ProgressVarianceEngine.CalculateVariance(tasks, now);
+            Assert.Equal(2, summary.TotalTasks);
+            Assert.Equal(1, summary.CompletedTasks);
+            Assert.Equal(1, summary.DelayedTasks);
+            Assert.Contains("CHẬM TIẾN ĐỘ", summary.StatusSummary);
+        }
+
+        [Fact]
+        public void ParameterNormalizationEngine_StandardizesParamNames()
+        {
+            var rawParams = new[] { "Ten_Thiet_Bi", "Cong_Suat_KW", "Custom Param" };
+            var result = DhcbTools.Shared.Logic.Families.ParameterNormalizationEngine.NormalizeParameters(rawParams);
+
+            Assert.Equal(3, result.TotalParametersChecked);
+            Assert.Equal(3, result.NormalizedCount);
+            Assert.Contains(result.Changes, c => c.StandardizedName == "Pset_Equipment:Name");
+            Assert.Contains(result.Changes, c => c.StandardizedName == "Custom_Param");
+        }
     }
 }
