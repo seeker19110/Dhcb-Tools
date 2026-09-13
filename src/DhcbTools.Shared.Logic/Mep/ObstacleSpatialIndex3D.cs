@@ -55,20 +55,12 @@ namespace DhcbTools.Shared.Logic.Mep
         /// </summary>
         public bool IsBlocked(double x, double y, double z, double clearance = 0)
         {
-            int gx = (int)Math.Floor(x / _cellSize);
-            int gy = (int)Math.Floor(y / _cellSize);
-            int gz = (int)Math.Floor(z / _cellSize);
-
-            var key = (gx, gy, gz);
-            if (!_grid.TryGetValue(key, out var indices))
-                return false;
-
-            for (int i = 0; i < indices.Count; i++)
+            var candidates = GetCandidateIndices(x, y, z, clearance);
+            foreach (int index in candidates)
             {
-                if (_obstacles[indices[i]].Contains(x, y, z, clearance))
+                if (_obstacles[index].Contains(x, y, z, clearance))
                     return true;
             }
-
             return false;
         }
 
