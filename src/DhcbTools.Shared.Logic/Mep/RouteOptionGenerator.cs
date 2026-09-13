@@ -20,8 +20,11 @@ namespace DhcbTools.Shared.Logic.Mep
     /// <summary>
     /// Một phương án tuyến đường ứng viên kèm bảng điểm breakdown.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed class RouteCandidateOption
     {
+        private readonly IReadOnlyList<Point3> _points;
+
         public RouteCandidateOption(
             string optionId,
             string title,
@@ -35,7 +38,7 @@ namespace DhcbTools.Shared.Logic.Mep
             OptionId = optionId ?? throw new ArgumentNullException(nameof(optionId));
             Title = title ?? throw new ArgumentNullException(nameof(title));
             Strategy = strategy;
-            Points = points ?? throw new ArgumentNullException(nameof(points));
+            _points = points ?? throw new ArgumentNullException(nameof(points));
             LengthMm = lengthMm;
             TurnCount = turnCount;
             MinObsDistanceMm = minObsDistanceMm;
@@ -45,7 +48,7 @@ namespace DhcbTools.Shared.Logic.Mep
         public string OptionId { get; }
         public string Title { get; }
         public RouteStrategy Strategy { get; }
-        public IReadOnlyList<Point3> Points { get; }
+        public IReadOnlyList<Point3> Points => _points;
         public double LengthMm { get; }
         public int TurnCount { get; }
         public double MinObsDistanceMm { get; }

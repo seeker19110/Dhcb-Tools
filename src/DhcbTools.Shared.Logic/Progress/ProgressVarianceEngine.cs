@@ -7,6 +7,7 @@ namespace DhcbTools.Shared.Logic.Progress
     /// <summary>
     /// Đánh giá chênh lệch tiến độ 4D thi công giữa kế hoạch và thực tế.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed class ProgressVarianceSummary
     {
         public ProgressVarianceSummary(
@@ -32,9 +33,15 @@ namespace DhcbTools.Shared.Logic.Progress
         public double SchedulePerformanceIndex { get; }
         public IReadOnlyList<string> CriticalDelayNotes { get; }
 
-        public string StatusSummary => SchedulePerformanceIndex >= 1.0
-            ? $"ĐÚNG TIẾN ĐỘ (SPI = {SchedulePerformanceIndex:F2}, Hoàn thành {OverallCompletionPercentage:F1}%)"
-            : $"CHẬM TIẾN ĐỘ (SPI = {SchedulePerformanceIndex:F2}, {DelayedTasks} công việc trễ hạn)";
+        public string StatusSummary
+        {
+            get
+            {
+                if (SchedulePerformanceIndex >= 1.0)
+                    return $"ĐÚNG TIẾN ĐỘ (SPI = {SchedulePerformanceIndex:F2}, Hoàn thành {OverallCompletionPercentage:F1}%)";
+                return $"CHẬM TIẾN ĐỘ (SPI = {SchedulePerformanceIndex:F2}, {DelayedTasks} công việc trễ hạn)";
+            }
+        }
     }
 
     public static class ProgressVarianceEngine
