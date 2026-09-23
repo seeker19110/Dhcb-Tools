@@ -1031,7 +1031,7 @@ function clearResult(id) { document.getElementById(id).innerHTML = ''; }
 
 function syntaxHL(json) {
   return escHtml(JSON.stringify(json, null, 2))
-    .replace(/(&quot;[\w\s\u00C0-\u024F\u1E00-\u1EFF]+&quot;)(\s*:)/g,
+    .replace(/(&quot;[\w\s.\-\u00C0-\u024F\u1E00-\u1EFF]+&quot;)(\s*:)/g,
       '<span class="key">$1</span>$2')
     .replace(/:\s*(&quot;((?:(?!&quot;).)*)&quot;)/g,
       ': <span class="str">&quot;$2&quot;</span>')

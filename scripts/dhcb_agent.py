@@ -66,8 +66,13 @@ def request(app: str, method: str, path: str, payload=None, timeout: int = 35) -
     url = base_url(app) + path
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
     token = load_token()
-    # Không có token thì không gửi header rỗng: Bridge đếm đó là một lần sai token, 5 lần là khoá 5 phút.
-    headers = {"Authorization": "Bearer " + token} if token else {}
+    if not token:
+        # Không gửi header rỗng: Bridge đếm đó là một lần sai token, 5 lần là tự khoá 5 phút — và 401 chung
+        # chung không nói cho người dùng biết lý do thật là chưa có file token.
+        return {"success": False,
+                "summary": "Không tìm thấy token Bridge: chưa có %APPDATA%\\DHCB\\bridge-token.txt và không đặt DHCB_BRIDGE_TOKEN. "
+                           "Khởi động Revit/AutoCAD có add-in DHCB (Bridge tự sinh token) rồi chạy lại."}
+    headers = {"Authorization": "Bearer " + token}
     if data is not None:
         headers["Content-Type"] = "application/json; charset=utf-8"
     req = urllib.request.Request(url, data=data, headers=headers, method=method)

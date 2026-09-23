@@ -276,7 +276,7 @@ namespace DhcbTools.Shared.Logic.AsBuilt
                     item.Files.Count.ToString(CultureInfo.InvariantCulture),
                     string.Join(" | ", item.Files),
                     item.Item.Note,
-                })).Append("\r\n");
+                }, true)).Append("\r\n");
             }
 
             return sb.ToString();

@@ -82,7 +82,8 @@ namespace DhcbTools.Shared.Logic.Progress
             DateTime currentDate)
         {
             var mapped = tasks?
-                .Select(t => new ProgressTask(t.TaskId, t.PlannedStart, t.PlannedEnd, t.ActualEnd, t.ProgressWeight, t.ActualEnd.HasValue ? 100 : 0))
+                .Select(t => new ProgressTask(t.TaskId, t.PlannedStart, t.PlannedEnd, t.ActualEnd, t.ProgressWeight,
+                    t.ActualEnd.HasValue && t.ActualEnd.Value <= currentDate ? 100 : 0))
                 .ToList();
             return CalculateVariance(mapped, currentDate);
         }

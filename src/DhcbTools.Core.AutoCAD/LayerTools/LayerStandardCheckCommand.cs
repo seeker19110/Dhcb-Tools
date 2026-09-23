@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Autodesk.AutoCAD.DatabaseServices;
 using DhcbTools.Shared.Logic;
+using DhcbTools.Shared.Logic.Checks;
 using Newtonsoft.Json;
 
 namespace DhcbTools.Core.AutoCAD.LayerTools;
@@ -24,7 +25,7 @@ public sealed class LayerStandardCheckCommand : ICoreCommand<LayerStandardCheckC
         List<LayerNamingRule>? rules;
         try
         {
-            rules = ParseRules(File.ReadAllText(config.RulesPath));
+            rules = LayerRuleSet.Parse(File.ReadAllText(config.RulesPath));
         }
         catch (JsonException ex)
         {
@@ -87,7 +88,7 @@ public sealed class LayerStandardCheckCommand : ICoreCommand<LayerStandardCheckC
             transaction.Commit();
         }
 
-        var html = BuildHtml(allLayers, invalidLayers, rules);
+        var html = LayerRuleSet.Html(allLayers, invalidLayers, rules);
         AcadHelpers.EnsureParentDirectory(config.OutputPath);
         File.WriteAllText(config.OutputPath, html, Encoding.UTF8);
 
@@ -101,53 +102,5 @@ public sealed class LayerStandardCheckCommand : ICoreCommand<LayerStandardCheckC
         }
 
         return result;
-    }
-
-    /// <summary>
-    /// Chấp nhận cả hai dạng: mảng thuần <c>[{...}]</c> và object bọc <c>{"rules":[{...}]}</c>.
-    /// File mẫu của repo (configs/layer-rules.sample.json) dùng dạng thứ hai, nên chỉ nhận dạng
-    /// mảng thuần khiến người dùng làm theo đúng mẫu vẫn gặp lỗi deserialize.
-    /// </summary>
-    internal static List<LayerNamingRule>? ParseRules(string json)
-    {
-        var trimmed = json.TrimStart();
-        if (trimmed.StartsWith("{", StringComparison.Ordinal))
-        {
-            var wrapper = JsonConvert.DeserializeObject<LayerRulesFile>(json);
-            return wrapper?.Rules;
-        }
-
-        return JsonConvert.DeserializeObject<List<LayerNamingRule>>(json);
-    }
-
-    private static string BuildHtml(List<string> allLayers, List<string> invalidLayers, List<LayerNamingRule> rules)
-    {
-        var sb = new StringBuilder();
-        sb.Append("<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Kiểm tra chuẩn layer</title>")
-          .Append("<style>body{font-family:Arial,sans-serif;margin:24px}table{border-collapse:collapse;width:100%}")
-          .Append("th,td{border:1px solid #ccc;padding:6px 10px;text-align:left}th{background:#f0f0f0}")
-          .Append(".invalid{background:#ffdddd;color:#a00}.valid{background:#eaffea}</style></head><body>");
-
-        sb.Append("<h1>Báo cáo kiểm tra chuẩn layer</h1>");
-        sb.Append($"<p>Tổng số layer: {allLayers.Count} — Không đúng chuẩn: <b>{invalidLayers.Count}</b></p>");
-
-        sb.Append("<h2>Quy tắc áp dụng</h2><ul>");
-        foreach (var rule in rules)
-        {
-            sb.Append($"<li><code>{HtmlText.Escape(rule.Pattern)}</code> — {HtmlText.Escape(rule.Description)}</li>");
-        }
-        sb.Append("</ul>");
-
-        sb.Append("<h2>Danh sách layer</h2><table><tr><th>Tên layer</th><th>Trạng thái</th></tr>");
-        foreach (var name in allLayers)
-        {
-            var isInvalid = invalidLayers.Contains(name);
-            var cssClass = isInvalid ? "invalid" : "valid";
-            var status = isInvalid ? "Không đúng chuẩn" : "Hợp lệ";
-            sb.Append($"<tr class=\"{cssClass}\"><td>{HtmlText.Escape(name)}</td><td>{status}</td></tr>");
-        }
-        sb.Append("</table></body></html>");
-
-        return sb.ToString();
     }
 }

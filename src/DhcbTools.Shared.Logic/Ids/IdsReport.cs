@@ -66,7 +66,7 @@ namespace DhcbTools.Shared.Logic.Ids
             sb.Append(CsvText.JoinLine(new[] { "Specification", "Phần tử", "Không đạt vì" })).Append("\r\n");
             foreach (var failure in check.Specifications.SelectMany(s => s.Failures))
             {
-                sb.Append(CsvText.JoinLine(new[] { failure.Specification, failure.Element, failure.Reason })).Append("\r\n");
+                sb.Append(CsvText.JoinLine(new[] { failure.Specification, failure.Element, failure.Reason }, true)).Append("\r\n");
             }
 
             return sb.ToString();

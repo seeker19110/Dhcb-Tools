@@ -94,7 +94,7 @@ if (-not $SkipBuild) {
 # DLL MỚI NHẤT trong mọi thư mục TFM: máy vừa build 2024 (net48) rồi -SkipBuild với -AcadVersion 2026 là
 # NETLOAD nhầm DLL sai runtime vào accoreconsole.
 $coreProj = Join-Path $repo 'src\DhcbTools.AutoCAD.Core\DhcbTools.AutoCAD.Core.csproj'
-$acadTfm = (& dotnet build $coreProj -getProperty:TargetFramework -p:AcadVersion=$AcadVersion).Trim()
+$acadTfm = (& dotnet build $coreProj --nologo -v q -getProperty:TargetFramework -p:AcadVersion=$AcadVersion | Select-Object -Last 1).Trim()
 if (-not $acadTfm) { Stop-WithMessage "Không hỏi được TargetFramework của vỏ AutoCAD.Core cho AcadVersion=$AcadVersion" }
 $pluginPath = Join-Path $repo "src\DhcbTools.AutoCAD.Core\bin\Release\$acadTfm\DhcbTools.AutoCAD.Core.dll"
 $plugin = Get-Item $pluginPath -ErrorAction SilentlyContinue

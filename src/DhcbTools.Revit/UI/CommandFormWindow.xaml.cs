@@ -129,6 +129,7 @@ public partial class CommandFormWindow : Window
     private string Snapshot(JObject config)
     {
         var paths = new List<string>();
+        var folderStamps = new JObject();
         foreach (var editor in _editors)
         {
             var value = config[editor.Field.Name]?.ToString() ?? string.Empty;
@@ -138,18 +139,27 @@ public partial class CommandFormWindow : Window
             }
             else if (editor.Field.Kind == FieldKind.FolderPath && !string.IsNullOrWhiteSpace(value) && Directory.Exists(value))
             {
+                // Thư viện 30.000 .rfa: không băm từng file (chậm, thứ tự liệt kê không ổn định) — đủ để
+                // "thêm/bớt/sửa file" đổi ảnh chụp là: số file, mtime mới nhất, tổng cỡ.
                 try
                 {
-                    paths.AddRange(Directory.EnumerateFiles(value, "*", SearchOption.AllDirectories).Take(4096));
+                    long count = 0, size = 0; var newest = DateTime.MinValue;
+                    foreach (var f in Directory.EnumerateFiles(value, "*", SearchOption.AllDirectories))
+                    {
+                        var info = new FileInfo(f);
+                        count++; size += info.Length;
+                        if (info.LastWriteTimeUtc > newest) newest = info.LastWriteTimeUtc;
+                    }
+                    folderStamps[editor.Field.Name] = $"{count}|{size}|{newest:O}";
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-                    paths.Add(value); // không duyệt được thì ít nhất ghi tên thư mục
+                    folderStamps[editor.Field.Name] = "lỗi:" + ex.Message;
                 }
             }
         }
 
-        return PreviewSnapshot.Capture(config.ToString(), paths);
+        return PreviewSnapshot.Capture(config.ToString() + "\n" + folderStamps.ToString(Newtonsoft.Json.Formatting.None), paths);
     }
 
     private void OnRun(object sender, RoutedEventArgs e)

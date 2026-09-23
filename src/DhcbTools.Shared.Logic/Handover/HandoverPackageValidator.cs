@@ -235,7 +235,9 @@ namespace DhcbTools.Shared.Logic.Handover
             }
 
             var full = Path.GetFullPath(Path.Combine(root, relative));
-            return full.StartsWith(root, StringComparison.OrdinalIgnoreCase) ? full : null;
+            // Windows không phân biệt hoa thường trong đường dẫn; Linux (CI) thì có.
+            var comparison = Path.DirectorySeparatorChar == '\\' ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            return full.StartsWith(root, comparison) ? full : null;
         }
 
         private static string Short(string? hash)

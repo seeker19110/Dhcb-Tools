@@ -105,11 +105,16 @@ class RequestTests(unittest.TestCase):
         self.assertIsNone(sent.data)
         self.assertEqual("Bearer tk", sent.get_header("Authorization"))
 
-    def test_khong_co_token_thi_khong_gui_header_rong(self) -> None:
-        # Header "Bearer " rỗng bị Bridge đếm là một lần sai token; 5 lần là tự khoá mình 5 phút.
-        with mock.patch.dict(dhcb_agent.os.environ, {"DHCB_BRIDGE_TOKEN": ""}),                 mock.patch.object(dhcb_agent, "load_token", return_value=""),                 fake_urlopen({"tools": []}) as urlopen:
-            dhcb_agent.request("revit", "GET", "/tools")
-        self.assertIsNone(urlopen.call_args[0][0].get_header("Authorization"))
+    def test_khong_co_token_thi_bao_tai_cho_khong_gui_request(self) -> None:
+        # Header "Bearer " rỗng bị Bridge đếm là một lần sai token; 5 lần là tự khoá mình 5 phút — và 401
+        # chung chung không nói lý do thật. Nên không gửi gì, báo thẳng thiếu file token.
+        env = mock.patch.dict(dhcb_agent.os.environ, {"DHCB_BRIDGE_TOKEN": ""})
+        no_token = mock.patch.object(dhcb_agent, "load_token", return_value="")
+        with env, no_token, fake_urlopen({"tools": []}) as urlopen:
+            result = dhcb_agent.request("revit", "GET", "/tools")
+        urlopen.assert_not_called()
+        self.assertFalse(result["success"])
+        self.assertIn("bridge-token.txt", result["summary"])
 
     def test_post_gui_json(self) -> None:
         with fake_urlopen({"success": True}) as urlopen:

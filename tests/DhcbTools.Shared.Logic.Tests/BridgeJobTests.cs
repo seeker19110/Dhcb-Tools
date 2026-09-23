@@ -65,6 +65,20 @@ public class BridgeJobTests
         Assert.Contains("family", job.Error);
     }
 
+    /// <summary>Vỏ ném SAU khi Completion đã trả kết quả: job đã Done không được lật thành Error (client sẽ chạy lại lệnh ghi).</summary>
+    [Fact]
+    public void JobDaXong_FailSau_KhongLatThanhError()
+    {
+        var job = new BridgeJobStore().Add("ParameterImport", T0);
+        job.Complete(new { summary = "Đã ghi 3000 tham số" }, T0.AddSeconds(2));
+
+        Assert.False(job.Fail("Lỗi thực thi: tháo idle-loop", T0.AddSeconds(3)));
+
+        Assert.Equal(BridgeJobStatus.Done, job.Status);
+        Assert.Null(job.Error);
+        Assert.True(new BridgeJobStore().Add("X", T0).Fail("lỗi", T0));
+    }
+
     [Fact]
     public void Prune_BoJobDaXongQuaHan_GiuJobDangChay()
     {

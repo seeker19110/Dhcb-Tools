@@ -15,8 +15,11 @@ on:
 # Đẩy commit mới lên cùng PR thì huỷ lượt CI cũ: 11 job × ~50 s của lượt cũ không còn giá trị gì
 # mà vẫn chiếm runner, lượt mới phải xếp hàng. Chỉ huỷ trên PR — trên main mỗi commit phải có
 # kết quả CI riêng (release.yml và bằng chứng kiểm thử tra theo commit).
+# Quan sát 2026-09-23: hai merge cách nhau 2 phút thì lượt của commit trước trên main bị HUỶ dù
+# cancel-in-progress đã là false cho push — nhóm trùng tên là đủ để GitHub xếp chồng. Nhóm theo SHA
+# cho push để mỗi commit trên main chắc chắn có kết quả riêng; PR vẫn nhóm theo ref để huỷ lượt cũ.
 concurrency:
-  group: tests-${{ github.workflow }}-${{ github.ref }}
+  group: tests-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:

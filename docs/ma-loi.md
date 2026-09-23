@@ -25,6 +25,7 @@ thêm mã mà quên ghi vào đây (hoặc ngược lại) là test đỏ.
 
 | `E-DOCUMENT-REQUIRED` | Thiếu định danh phiên model cho lệnh Bridge ghi thật | Client cũ hoặc JSON tự gửi chưa có `documentId` | Gọi `POST /query` với `query: document_context`, dùng `documentId` nhận được ở cấp ngoài của `/execute`; cập nhật client cùng Bridge |
 | `E-DOCUMENT-CHANGED` | Model hiện hành khác phiên đã chọn | Chuyển tab, đóng/mở lại model trong khi request đang chờ | Kiểm tra đúng model, đọc lại context và xem trước lại trước khi gửi lệnh ghi |
+| `E-BRIDGE-TOKEN-SHORT` | Bridge từ chối khởi động vì `DHCB_BRIDGE_TOKEN` ngắn hơn 32 ký tự | Đặt biến môi trường bằng tay để test, hoặc còn sót giá trị cũ trước 2026-09-23 | Bỏ biến để Bridge tự sinh token vào `%APPDATA%\DHCB\bridge-token.txt`, hoặc đặt token ≥ 32 ký tự; khởi động lại Revit/AutoCAD |
 
 ## Nguyên tắc đặt mã
 

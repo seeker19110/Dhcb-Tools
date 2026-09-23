@@ -56,8 +56,10 @@ namespace DhcbTools.Shared.Logic.Mep
 
         public string Summary => string.Format(
             CultureInfo.InvariantCulture,
-            "{0}: Dài {1:F2}m, {2} rẽ, Khoảng hở min {3:F0}mm (Điểm: {4:F2})",
-            Title, LengthMm / 1000.0, TurnCount, MinObsDistanceMm, Score);
+            "{0}: Dài {1:F2}m, {2} rẽ, Khoảng hở min {3} (Điểm: {4:F2})",
+            Title, LengthMm / 1000.0, TurnCount,
+            MinObsDistanceMm >= 1e9 ? "không có chướng ngại" : MinObsDistanceMm.ToString("F0", CultureInfo.InvariantCulture) + "mm",
+            Score);
     }
 
     /// <summary>
@@ -81,6 +83,10 @@ namespace DhcbTools.Shared.Logic.Mep
         /// Sinh ra danh sách các phương án tuyến MEP ứng viên với cấu hình phạt khác nhau và chấm điểm tổng hợp.
         /// Hai chiến lược cho ra cùng một đường gấp khúc thì gộp làm một phương án, tiêu đề ghi cả hai.
         /// </summary>
+        /// <param name="start">Điểm đầu (mm).</param>
+        /// <param name="goal">Điểm cuối (mm).</param>
+        /// <param name="obstacles">Hộp chướng ngại (mm); null = không có.</param>
+        /// <param name="baseOptions">Cấu hình A* gốc; mỗi chiến lược nhân hệ số phạt riêng.</param>
         /// <param name="searchMarginMm">Nới hộp tìm kiếm quanh đoạn đầu–cuối theo XY (mm).</param>
         /// <param name="searchMarginZMm">Nới hộp tìm kiếm theo Z (mm).</param>
         public static IReadOnlyList<RouteCandidateOption> GenerateCandidates(

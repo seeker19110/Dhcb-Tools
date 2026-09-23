@@ -164,35 +164,13 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
         {
             return regex is not null
                 ? regex.Replace(value, config.Replace)
-                : ReplaceAll(value, config.Find, config.Replace, config.IgnoreCase);
+                : Shared.Logic.TextReplace.ReplaceAll(value, config.Find, config.Replace, config.IgnoreCase);
         }
         catch (RegexMatchTimeoutException)
         {
             // Một chuỗi quá lâu không được phép làm hỏng cả lệnh: giữ nguyên đối tượng đó.
             return value;
         }
-    }
-
-    /// <summary>Thay mọi lần xuất hiện. Tự viết vì <c>string.Replace(…, StringComparison)</c> không có trên net48 (AutoCAD ≤ 2024).</summary>
-    internal static string ReplaceAll(string value, string find, string replace, bool ignoreCase)
-    {
-        var comparison = ignoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-        var sb = new System.Text.StringBuilder(value.Length);
-        var index = 0;
-        while (index < value.Length)
-        {
-            var hit = value.IndexOf(find, index, comparison);
-            if (hit < 0)
-            {
-                sb.Append(value, index, value.Length - index);
-                break;
-            }
-
-            sb.Append(value, index, hit - index).Append(replace);
-            index = hit + find.Length;
-        }
-
-        return sb.ToString();
     }
 
     private static bool Matches(string value, TextReplaceConfig config, Regex? regex)
