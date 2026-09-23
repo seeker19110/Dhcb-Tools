@@ -2,6 +2,10 @@
 # Vỏ Revit build với UseWPF=false (bỏ thư mục UI) vì runner Linux không có WindowsDesktop SDK — xem scripts/check-build.sh.
 name: tests
 
+# Chạy trên pull_request từ fork lẫn nhánh trong repo: token chỉ cần đọc mã và ghi artifact.
+permissions:
+  contents: read
+
 on:
   workflow_call:
   push:

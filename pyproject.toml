@@ -12,7 +12,7 @@ dependencies = []
 
 [project.optional-dependencies]
 autocad-panel = ["fastmcp==4.0.2"]
-dev = ["pytest>=8,<10", "pyflakes>=3,<4"]
+dev = ["pytest>=8,<10", "pyflakes>=3,<4", "coverage>=7,<8"]
 
 [tool.pytest.ini_options]
 testpaths = ["tools/autocad-mcp-server", "tests/python"]

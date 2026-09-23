@@ -44,11 +44,12 @@ phải bước bắt buộc để bắt đầu dùng.
 | Hermes CLI | — | **Chỉ** cho panel web AutoCAD (`tools/autocad-mcp-server`) |
 | Ollama | — | Tuỳ chọn: tinh chỉnh lớp AI offline (mặc định chạy heuristic, không cần) |
 
-**Chạy test tại chỗ** (không cần cài Revit/AutoCAD — đúng hai việc CI chạy):
+**Chạy test tại chỗ** (không cần cài Revit/AutoCAD — đúng ba việc CI chạy):
 
 ```bash
 dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj -c Release
-python3 -m pytest tools/autocad-mcp-server -q      # cần: pip install -r requirements-dev.txt
+dotnet test tests/DhcbTools.BatchRunner.Tests/DhcbTools.BatchRunner.Tests.csproj -c Release
+python3 -m coverage run -m pytest -q && python3 -m coverage report   # cần: pip install -r requirements-dev.txt
 ```
 
 Cài để dùng thật: [Cài đặt](#cài-đặt) · quy trình kiểm thử tay:
@@ -81,7 +82,7 @@ src/
 │   ├── Updaters/                  # ElevationUpdater (IUpdater, tắt mặc định)
 │   ├── Ai/                        # CadLayerMap, SpecToConfig, DictionaryLearn
 │   └── Batch/                     # BatchJobRunner (mở → chạy step → lưu → đóng)
-├── DhcbTools.Revit/               # Vỏ Revit: Ribbon 6 panel phủ đủ 49 lệnh, Bridge 8765, hook batch
+├── DhcbTools.Revit/               # Vỏ Revit: Ribbon 6 panel phủ đủ 53 lệnh, Bridge 8765, hook batch
 │                                  #   (pending-job.json), ElevationUpdater, WPF AutoNumbering
 ├── DhcbTools.Core.AutoCAD/        # Core AutoCAD: AcadCommandTable, LayerSync, DrawingCleanup, AutoNumbering, Attributes,
 │                                  #   Text (TextReplace), Standards (LayerStandardCheck, GridExtract, XrefAudit, CadLayerMap), Query
@@ -161,7 +162,7 @@ Ngược lại `504` kèm `id` + `progressUrl` và nghĩa là **"có thể đã 
 để biết chắc. `/progress` có thêm trạng thái `abandoned` và cờ `started`; phản hồi `202` kèm `timeoutSeconds`.
 Lỗi `500` không trả nội dung exception ra ngoài nữa (chi tiết nằm trong log).
 
-**Truy vấn đọc (`POST /query`)** — Revit 17 loại, AutoCAD 12. Ngoài các truy vấn đếm/liệt kê cơ bản
+**Truy vấn đọc (`POST /query`)** — Revit 17 loại, AutoCAD 15. Ngoài các truy vấn đếm/liệt kê cơ bản
 (`document_info`, `levels`, `views`, `sheets`, `rooms`, `elements`, `families`, `warnings`, `links`, `stats`)
 còn phần đủ để agent **nhìn, chỉ và kiểm** được kết quả: `parameters_of` (tham số của category, để dựng
 config không phải đoán), `element_geometry` (hộp bao, đường tâm, connector kèm tình trạng nối — toạ độ mm),
@@ -309,7 +310,7 @@ Toàn bộ giai đoạn 0–6 của [`docs/dac-ta-tinh-nang.md`](docs/dac-ta-tin
 pyRevit, DiRoots, Ideate, Colour Splasher, LAYTRANS, Drawing Compare, RevitBatchProcessor) đã có mã nguồn và biên dịch xanh
 với API Revit/AutoCAD 2023–2027 (ma trận CI, gồm cả đường .NET 10); số test thuần xem output CI (`tests.yml` → artifact `test-results`).
 
-**Đã chạy trên phần mềm thật:** 43/43 lệnh Revit *của vòng 2026-09-04* có ít nhất một ca kiểm chạy bên trong Revit 2024.3
+**Đã chạy trên phần mềm thật:** 43/43 lệnh Revit *của vòng 2026-09-04* (nay 53 lệnh; `SuiteCoverageTests` khoá 53/53 có ca kiểm) có ít nhất một ca kiểm chạy bên trong Revit 2024.3
 và 15/15 lệnh AutoCAD có ca kiểm qua `accoreconsole`, cộng một đêm batch trên **dự án thật** — bằng chứng và số liệu từng vòng:
 [`docs/bang-chung-test.md`](docs/bang-chung-test.md), NETLOAD trên AutoCAD thật:
 [`docs/bang-chung-test-autocad-live.md`](docs/bang-chung-test-autocad-live.md). Phần **chưa** khép: `AutoRoute` mới đo chất lượng tuyến trên model mẫu (§55) và một tuyến dự án thật (§57, 7,9 m = 1,00× Manhattan), đối chiếu một điểm của `SetoutExport` bằng máy toàn đạc trên công trường thật,

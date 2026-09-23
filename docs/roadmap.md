@@ -1,5 +1,7 @@
-# Lộ trình phát triển DHCB Tools
+﻿# Lộ trình phát triển DHCB Tools
 
+> Mới nhất: [audit và nâng cấp 2026-09-23](audit-nang-cap-2026-09-23.md) — ba PR đã sửa; mục "Không sửa trong đợt này" là danh sách quyết định còn chờ.
+>
 > Ưu tiên sau audit 2026-09-07: [bản sửa, tiêu chí nghiệm thu và kế hoạch thí điểm](audit-nang-cap-2026-09-07.md).
 
 Tài liệu này mô tả **kế hoạch phía trước**. Hiện trạng thực tế nằm ở [`progress.md`](progress.md). Đặc tả chi tiết ở

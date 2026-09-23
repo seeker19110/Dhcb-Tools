@@ -287,22 +287,22 @@ Mở `test-drawing.dwg`. Mọi lệnh ghi đều hỏi `[Xemtrước/Thật]`, m
 
 | # | Lệnh | Kỳ vọng | Kết quả |
 |---|---|---|---|
-| C1 | `DHCB` | In danh sách 15 lệnh + hướng dẫn | ☐ |
+| C1 | `DHCB_BRIDGE` | Bật/tắt Bridge 8766, in trạng thái; danh sách 15 lệnh xem bằng `python scripts\dhcb_agent.py autocad tools` | ☐ |
 | C2 | `DHCB_LAYER_EXPORT` → sửa CSV → `DHCB_LAYER_IMPORT` | Round-trip tiếng Việt không mất dấu; layer trùng tên cập nhật, không nhân đôi | ☐ |
 | C3 | `DHCB_CLEANUP` (Thật) | Không xoá CLAYER, không xoá linetype của layer, `0`/`Defpoints` giữ; transaction không hỏng | ☐ |
-| C4 | `DHCB_EXEC DrawingCleanup` với `purgeUnusedTextStyles:true, purgeUnusedDimStyles:true` | Text style không dùng bị xoá, `Standard` giữ | ☐ |
+| C4 | Bridge: `dhcb_agent.py autocad exec DrawingCleanup` với `purgeUnusedTextStyles:true, purgeUnusedDimStyles:true` | Text style không dùng bị xoá, `Standard` giữ | ☐ |
 | C5 | `DHCB_AUTONUMBER` block DOOR, tag MARK | Đánh số theo hàng trái→phải | ☐ |
-| C6 | `DHCB_ATTR_INC` block DOOR, MARK, mẫu `P-{n:000}` | `P-001…` theo vị trí | ☐ |
+| C6 | `DHCB_ATTR_INCREMENT` block DOOR, MARK, mẫu `P-{n:000}` | `P-001…` theo vị trí | ☐ |
 | C7 | `DHCB_ATTR_EXPORT` / `DHCB_ATTR_IMPORT` | Round-trip đúng | ☐ |
 | C8 | `DHCB_TEXT_REPLACE` | Đúng số text thay; regex hoạt động | ☐ |
 | C9 | `DHCB_LAYER_CHECK` với layer-rules.json | HTML báo vi phạm đúng | ☐ |
-| C10 | `DHCB_LAYTRANS` với layer-map.csv (Thật) | `WALL`, `TUONG-200` → `A-WALL` kể cả entity trong block; layer nguồn rỗng bị xoá; CLAYER giữ | ☐ |
-| C11 | `DHCB_COMPARE` với `test-drawing-v2.dwg`, output .html | Đúng 2 Moved + 1 LayerChanged; HTML mở được | ☐ |
-| C12 | `DHCB_BLOCKCOUNT` nhóm theo SIZE | CSV đúng số block theo SIZE | ☐ |
+| C10 | `DHCB_LAYER_TRANSLATE` với layer-map.csv (Thật) | `WALL`, `TUONG-200` → `A-WALL` kể cả entity trong block; layer nguồn rỗng bị xoá; CLAYER giữ | ☐ |
+| C11 | `DHCB_DRAWING_COMPARE` với `test-drawing-v2.dwg`, output .html | Đúng 2 Moved + 1 LayerChanged; HTML mở được | ☐ |
+| C12 | `DHCB_BLOCK_QUANTITY` nhóm theo SIZE | CSV đúng số block theo SIZE | ☐ |
 | C13 | `DHCB_XREF_AUDIT` | Xref thiếu file được liệt kê | ☐ |
 | C14 | `DHCB_GRID_EXTRACT` layer AXIS | CSV 6 trục, tên 1,2,3/A,B,C — dùng cho R41 | ☐ |
-| C15 | `DHCB_LAYERMAP` | CSV gợi ý map layer → Revit type | ☐ |
-| C16 | `DHCB_AI` "đổi layer theo chuẩn" | Đề xuất LayerTranslate, không tự chạy | ☐ |
+| C15 | `DHCB_LAYER_MAP` | CSV gợi ý map layer → Revit type | ☐ |
+| C16 | Bridge: `dhcb_agent.py autocad chat "đổi layer theo chuẩn"` (AutoCAD không có lệnh `DHCB_AI`) | Đề xuất LayerTranslate, không tự chạy | ☐ |
 | C17 | Bridge 8766: `python scripts\dhcb_agent.py autocad tools` và `/health` không token | Như R3–R5 | ☐ |
 
 ---

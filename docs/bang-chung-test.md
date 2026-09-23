@@ -122,7 +122,7 @@ Bốn bộ trong số này không kiểm logic mà **đối chiếu mã nguồn 
 |---|---|
 | `RibbonCoverageTests` | Vỏ Revit ↔ `RevitCommandTable` (mọi lệnh có đường vào từ Ribbon) |
 | `CatalogFieldTests` | `CommandCatalog` ↔ property của lớp `*Config` thật, và "lệnh ghi thì phải có `DryRun`" |
-| `SuiteCoverageTests` | 42/42 lệnh Revit **và 15/15 lệnh AutoCAD** có ít nhất một ca kiểm chạy thật |
+| `SuiteCoverageTests` | 42/42 lệnh Revit **và 15/15 lệnh AutoCAD** có ít nhất một ca kiểm chạy thật (tại vòng đó; nay test khoá 53/53 Revit) |
 | `VietnameseMessageTests` | Không còn mẫu thông báo tiếng Anh trong Core |
 
 `RibbonCoverageTests` đã kiểm bằng **mutation**: đổi hỏng một tên lớp trong `App.cs` thì test đỏ ngay,

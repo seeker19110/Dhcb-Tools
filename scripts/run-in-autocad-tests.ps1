@@ -90,12 +90,16 @@ if (-not $SkipBuild) {
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
-# TFM theo bảng map trong Directory.Build.props: AutoCAD 2026.1+ (package 25.1.x) đã ở .NET 10.
-$pluginDir = Join-Path $repo 'src\DhcbTools.AutoCAD.Core\bin\Release'
-$plugin = Get-ChildItem $pluginDir -Recurse -Filter 'DhcbTools.AutoCAD.Core.dll' -ErrorAction SilentlyContinue |
-          Sort-Object LastWriteTime -Descending | Select-Object -First 1
+# TFM hỏi MSBuild theo bảng map trong Directory.Build.props (AutoCAD 2026.1+ là .NET 10). Trước đây lấy
+# DLL MỚI NHẤT trong mọi thư mục TFM: máy vừa build 2024 (net48) rồi -SkipBuild với -AcadVersion 2026 là
+# NETLOAD nhầm DLL sai runtime vào accoreconsole.
+$coreProj = Join-Path $repo 'src\DhcbTools.AutoCAD.Core\DhcbTools.AutoCAD.Core.csproj'
+$acadTfm = (& dotnet build $coreProj -getProperty:TargetFramework -p:AcadVersion=$AcadVersion).Trim()
+if (-not $acadTfm) { Stop-WithMessage "Không hỏi được TargetFramework của vỏ AutoCAD.Core cho AcadVersion=$AcadVersion" }
+$pluginPath = Join-Path $repo "src\DhcbTools.AutoCAD.Core\bin\Release\$acadTfm\DhcbTools.AutoCAD.Core.dll"
+$plugin = Get-Item $pluginPath -ErrorAction SilentlyContinue
 if (-not $plugin) {
-    Stop-WithMessage "Không tìm thấy DhcbTools.AutoCAD.Core.dll trong $pluginDir (bỏ -SkipBuild để build)"
+    Stop-WithMessage "Không tìm thấy $pluginPath (bỏ -SkipBuild hoặc build với -p:AcadVersion=$AcadVersion)"
 }
 
 # ── 4. Dựng file job ─────────────────────────────────────────────────────────

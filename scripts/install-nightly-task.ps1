@@ -25,6 +25,10 @@ $ErrorActionPreference = 'Stop'
 if (-not (Test-Path $Job)) { throw "Không tìm thấy file job: $Job" }
 if (-not (Test-Path $RunnerExe)) { throw "Không tìm thấy runner: $RunnerExe" }
 
+# Đường dẫn có dấu nháy kép sẽ phá chuỗi tham số và chèn được cờ lạ vào task — từ chối sớm.
+foreach ($p in @($Job, $LogDir, $RunnerExe)) {
+    if ($p -match '"') { throw "Đường dẫn không được chứa dấu nháy kép: $p" }
+}
 # Không dùng tên $args: đó là biến tự động của PowerShell (tham số không khai báo), ghi đè nó là lỗi ngầm.
 $runnerArgs = "--job `"$Job`" --log-dir `"$LogDir`" --max-minutes $MaxMinutes"
 if ($Analyze) { $runnerArgs += " --analyze" }
