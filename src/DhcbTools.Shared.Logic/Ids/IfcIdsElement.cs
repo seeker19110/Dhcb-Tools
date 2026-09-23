@@ -693,6 +693,20 @@ namespace DhcbTools.Shared.Logic.Ids
             ["IFCBUILDINGSTOREY"] = -1,
             ["IFCBUILDING"] = -1,
             ["IFCSITE"] = -1,
+            // IfcDoor/IfcWindow: OverallHeight 8, OverallWidth 9, PredefinedType 10 (rồi OperationType/PartitioningType 11).
+            ["IFCDOOR"] = 10,
+            ["IFCDOORSTANDARDCASE"] = 10,
+            ["IFCWINDOW"] = 10,
+            ["IFCWINDOWSTANDARDCASE"] = 10,
+            // IFC2X3 IfcDoorStyle/IfcWindowStyle không có PredefinedType (vị trí 9 là OperationType/ConstructionType).
+            ["IFCDOORSTYLE"] = -1,
+            ["IFCWINDOWSTYLE"] = -1,
+        };
+
+        /// <summary>Lớp không gian: vị trí 7 là LongName, không phải Tag.</summary>
+        private static readonly HashSet<string> SpatialTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "IFCPROJECT", "IFCSITE", "IFCBUILDING", "IFCBUILDINGSTOREY", "IFCSPACE", "IFCSPATIALZONE", "IFCEXTERNALSPATIALELEMENT",
         };
 
         private readonly IfcIdsModel _model;
@@ -767,6 +781,12 @@ namespace DhcbTools.Shared.Logic.Ids
                 case "elementtype":
                     return IsType(_entity) ? _entity.At(ElementTypeIndex).AsText() : null;
                 case "tag":
+                    // Space/Storey/Building/Site không có Tag — vị trí 7 là LongName; trả nó ra là "đạt" một Tag không tồn tại.
+                    if (SpatialTypes.Contains(_entity.Type))
+                    {
+                        return null;
+                    }
+
                     return _entity.At(TagIndex).Kind == IfcValueKind.Text ? _entity.At(TagIndex).Raw : null;
                 case "predefinedtype":
                     var value = EnumAfter(_entity, IsType(_entity) ? ElementTypeIndex : TagIndex);
@@ -823,37 +843,37 @@ namespace DhcbTools.Shared.Logic.Ids
         /// <summary>Tên lớp của tầng/toà nhà/tổ hợp/hệ chứa phần tử.</summary>
         public IEnumerable<(string? Relation, string Entity)> PartOf => _model.PartOfOf(_entity.Id);
 
-        private static bool IsType(IfcEntity entity) => entity.Type.EndsWith("TYPE", StringComparison.OrdinalIgnoreCase);
+        /// <summary>IfcTypeProduct: tên kết thúc "TYPE", cộng hai lớp IFC2X3 đặt tên khác (IfcDoorStyle/IfcWindowStyle).</summary>
+        private static bool IsType(IfcEntity entity) =>
+            entity.Type.EndsWith("TYPE", StringComparison.OrdinalIgnoreCase)
+            || entity.Type.Equals("IFCDOORSTYLE", StringComparison.OrdinalIgnoreCase)
+            || entity.Type.Equals("IFCWINDOWSTYLE", StringComparison.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// PredefinedType ở ĐÚNG vị trí lược đồ (ngay sau Tag/ElementType, hoặc theo bảng override) — không quét
+        /// tới enum đầu tiên: IfcDoor có PredefinedType = <c>$</c> mà OperationType = <c>.DOUBLE_DOOR…</c> thì
+        /// quét sẽ trả OperationType làm PredefinedType, và <c>.NOTDEFINED.</c> của tác giả IDS đạt oan.
+        /// </summary>
         private static string? EnumAfter(IfcEntity entity, int after)
         {
-            var start = after + 1;
-            if (PredefinedTypeIndexOverride.TryGetValue(entity.Type, out var index))
+            var index = after + 1;
+            if (PredefinedTypeIndexOverride.TryGetValue(entity.Type, out var overridden))
             {
-                if (index < 0)
+                if (overridden < 0)
                 {
                     return null;
                 }
 
-                start = index;
+                index = overridden;
             }
 
-            for (var i = start; i < entity.Attributes.Count; i++)
+            var value = entity.At(index);
+            if (value.Kind != IfcValueKind.Enumeration || value.Raw == "T" || value.Raw == "F" || value.Raw == "U")
             {
-                var value = entity.Attributes[i];
-                if (value.Kind == IfcValueKind.Enumeration)
-                {
-                    // .T./.F./.U. là IfcBoolean/IfcLogical, không phải PredefinedType.
-                    if (value.Raw == "T" || value.Raw == "F" || value.Raw == "U")
-                    {
-                        continue;
-                    }
-
-                    return value.Raw;
-                }
+                return null;
             }
 
-            return null;
+            return value.Raw;
         }
     }
 }

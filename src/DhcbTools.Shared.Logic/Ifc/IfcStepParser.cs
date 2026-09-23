@@ -375,7 +375,14 @@ namespace DhcbTools.Shared.Logic.Ifc
                     throw new IfcParseException("Dòng " + Line + ": chờ một số nguyên.");
                 }
 
-                return int.Parse(sb.ToString(), CultureInfo.InvariantCulture);
+                // ISO 10303-21 không giới hạn số hiệu; bộ đọc này dùng int32 — vượt thì phải là lỗi ĐỌC FILE
+                // (mã thoát 2, có thông báo), không phải OverflowException chưa bắt làm sập BatchRunner.
+                if (!int.TryParse(sb.ToString(), NumberStyles.None, CultureInfo.InvariantCulture, out var number))
+                {
+                    throw new IfcParseException("Dòng " + Line + ": số hiệu #" + sb + " vượt giới hạn 2.147.483.647 mà bộ đọc hỗ trợ.");
+                }
+
+                return number;
             }
 
             private string ReadTypeName()
