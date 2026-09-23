@@ -125,7 +125,7 @@ public static partial class Program
         }
 
         var elements = model.Elements();
-        var check = IdsEvaluator.Check(specifications, elements);
+        var check = IdsEvaluator.Check(specifications, elements, model.Model.Schema);
 
         Console.WriteLine(ifcPath);
         Console.WriteLine($"Lược đồ {model.Model.Schema}, {model.Model.Count} thực thể, {elements.Count} phần tử IDS có thể nói tới.");

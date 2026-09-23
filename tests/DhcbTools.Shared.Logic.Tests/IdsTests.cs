@@ -298,8 +298,8 @@ public class IdsSpecTests
     {
         var ex = Assert.Throws<IdsParseException>(() => Parse(
             "<specification name=\"Lạ\"><applicability/><requirements><attribute><name><simpleValue>Tag</simpleValue></name>"
-            + "<value><restriction base=\"xs:string\"><minLength value=\"3\"/></restriction></value></attribute></requirements></specification>"));
-        Assert.Contains("minLength", ex.Message);
+            + "<value><restriction base=\"xs:string\"><totalDigits value=\"3\"/></restriction></value></attribute></requirements></specification>"));
+        Assert.Contains("totalDigits", ex.Message);
     }
 
     [Fact]

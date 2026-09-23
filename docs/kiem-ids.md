@@ -52,19 +52,28 @@ thẳng thực thể (tên lớp so **đúng lớp**, Pset/vật liệu/phân lo
 | Facet IDS | DHCB đọc từ đâu trong Revit |
 |---|---|
 | `entity` (+ `predefinedType`) | `IfcExportAs` (dạng `IfcWall.SOLIDWALL`), rồi bảng category → lớp IFC |
-| `attribute` | `Name`, `Tag` (= Mark, rỗng thì = ElementId — đúng như bộ xuất IFC, §43), `Description`, `ObjectType`, `GlobalId`; tên khác thì thử như một tham số cùng tên |
+| `attribute` | `Name`, `Tag` (= Mark, rỗng thì = ElementId — đúng như bộ xuất IFC, §43), `Description`, `ObjectType`, `GlobalId` (**22 ký tự nén** đúng như bộ xuất IFC sinh từ UniqueId, không phải UniqueId 45 ký tự); tên khác thì thử như một tham số cùng tên |
 | `property` | tham số `"Pset_Tên.Prop"`, rồi tham số cùng tên ở instance, rồi ở type — đúng thứ tự bộ xuất IFC lấy giá trị |
-| `classification` | `Assembly Code`, `Keynote`, `ClassificationCode` |
+| `classification` | theo `system`: OmniClass → `OmniClass Number`; Uniformat/Uniclass → `Assembly Code`; Keynote → `Keynote`; hệ khác → `ClassificationCode` hoặc tham số cùng tên hệ; không khai `system` → cả bốn. Hệ không biết → không trả gì (trước đây mọi hệ đều nhận Assembly Code nên Revit "đạt" mà IFC trượt) |
 | `material` | vật liệu của phần tử, kể cả vật liệu lớp cấu tạo |
 | `partOf` | tầng và `System Name` / `System Classification` — tên thật (`"Tầng 1"`), không phải tên lớp IFC như đường IFC (mục "Còn thiếu"). Khai `relation` thì tầng khớp `IFCRELCONTAINEDINSPATIALSTRUCTURE`, hệ khớp `IFCRELASSIGNSTOGROUP`; không khai vẫn khớp cả hai như trước |
 
 Ràng buộc giá trị: `simpleValue`, `xs:enumeration`, `xs:pattern` (**neo hai đầu** — XSD khớp toàn bộ chuỗi,
-không neo thì `AB-01-rác` cũng đạt quy tắc `AB-\d\d`), `minInclusive` / `maxInclusive` / `minExclusive` /
-`maxExclusive`. `cardinality="prohibited"` (có mới là sai) và `"optional"` đều đọc.
+không neo thì `AB-01-rác` cũng đạt quy tắc `AB-\d\d`; biên dịch ngay lúc đọc file, có timeout 2 s),
+`minInclusive` / `maxInclusive` / `minExclusive` / `maxExclusive`, `length` / `minLength` / `maxLength`.
+Nhiều ràng buộc trong cùng một `xs:restriction` là **hội** — tất cả phải đúng. Hai bên đều là số thì **so
+số** (`0.3` bằng `IFCREAL(0.29999999999999999)`, `3.` bằng `3.0`); boolean so `TRUE`/`true`/`.T.` như nhau.
+`cardinality="prohibited"` (có mới là sai) và `"optional"` (không bắt buộc có, nhưng đã có thì phải đúng) đều đọc.
 
-**Gặp thứ chưa hỗ trợ thì từ chối file, không bỏ qua im lặng** — facet lạ, ràng buộc lạ (`minLength`…), file
-không có `<specification>` nào, specification không có `<requirements>` nào. Lý do: một quy tắc bị lờ đi vẫn
-in ra dấu ✓, và người đọc báo cáo không có cách nào biết là nó chưa từng được kiểm.
+Ở mức **specification** (IDS 1.0): `minOccurs="0" maxOccurs="0"` là specification **cấm** — mọi phần tử lọt
+applicability là một vi phạm ("không có ống nước trên mái"), và specification cấm được phép không có
+`<requirements>`; `minOccurs="0"` là tuỳ chọn. `ifcVersion` được **lọc**: file IFC lược đồ `IFC4` thì
+specification khai `ifcVersion="IFC2X3"` bị bỏ qua và báo cáo ghi rõ (đường Revit không biết lược đồ nên không lọc).
+
+**Gặp thứ chưa hỗ trợ thì từ chối file, không bỏ qua im lặng** — facet lạ, ràng buộc lạ (`totalDigits`,
+`whiteSpace`…), `<simpleValue>` rỗng, file không có `<specification>` nào, specification không cấm mà không có
+`<requirements>` nào. Lý do: một quy tắc bị lờ đi vẫn in ra dấu ✓, và người đọc báo cáo không có cách nào biết
+là nó chưa từng được kiểm.
 
 ## File IDS lệch chuẩn — cảnh báo, không chặn
 
@@ -112,7 +121,12 @@ như fixture cố ý gài. Bằng chứng: [`bang-chung-test.md`](bang-chung-tes
   Solibri không có trên máy.
 - **Tên facet khai bằng `xs:pattern`** (ví dụ "mọi property khớp `Fire.*`") không suy ngược ra tên được, nên
   facet đó **trượt** thay vì âm thầm coi như đạt.
-- Ràng buộc độ dài chuỗi (`minLength`/`maxLength`) chưa hỗ trợ.
+- ✅ Ràng buộc độ dài chuỗi (`length`/`minLength`/`maxLength`), so số theo giá trị, ràng buộc hội, cardinality
+  mức specification và lọc `ifcVersion` — thêm 2026-09-23 (`IdsComplianceTests`). Đường IFC nay đọc đúng
+  `IfcPropertyEnumeratedValue`/`ListValue`/`BoundedValue`/`ComplexProperty` và `RelatingPropertyDefinition`
+  dạng tập (IFC4 ADD2); PredefinedType đọc đúng vị trí lược đồ (IfcDoor/IfcWindow ở 10, không "enum đầu tiên
+  sau Tag"); Space/Storey/Building/Site không có `Tag`. Số thực trên đường Revit đổi theo loại đại lượng
+  (dài → mm, diện tích → m², thể tích → m³, góc → độ; tỉ số giữ nguyên) thay vì nhân 304,8 tất cả.
 - ✅ **`partOf` theo quan hệ IFC** (thuộc tính `relation` của facet, `ids.xsd` 1.0, tài liệu
   `Documentation/UserManual/partof-facet.md` của buildingSMART/IDS): đường IFC nay tính riêng năm chuỗi thuần
   (`IFCRELAGGREGATES`, `IFCRELASSIGNSTOGROUP`, `IFCRELCONTAINEDINSPATIALSTRUCTURE`, `IFCRELNESTS`, cặp gộp

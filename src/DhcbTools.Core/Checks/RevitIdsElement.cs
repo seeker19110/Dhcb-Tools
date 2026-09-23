@@ -133,7 +133,9 @@ internal sealed class RevitIdsElement : IIdsElement
             case "objecttype":
                 return _type?.Name;
             case "globalid":
-                return _element.UniqueId;
+                // Bộ xuất IFC sinh GlobalId 22 ký tự từ UniqueId (XOR 8 hex cuối với ElementId rồi nén) — trả đúng
+                // chuỗi đó để facet GlobalId (pattern/length) cho cùng kết luận với file IFC.
+                return Shared.Logic.Ifc.IfcGuid.FromRevitUniqueId(_element.UniqueId) ?? _element.UniqueId;
             default:
                 // Thuộc tính lạ: thử luôn như một tham số cùng tên, rồi mới chịu thua. Trả rỗng khác
                 // hẳn trả "" ngầm hiểu là đạt — IdsValue.Accepts coi rỗng là KHÔNG đạt.
@@ -160,10 +162,30 @@ internal sealed class RevitIdsElement : IIdsElement
         return TextOf(_element, name) ?? (_type != null ? TextOf(_type, name) : null);
     }
 
-    /// <summary>Mã phân loại: Assembly Code và Keynote — hai chỗ Revit thật sự chở mã phân loại.</summary>
+    /// <summary>
+    /// Mã phân loại theo hệ. Revit chở mã phân loại ở vài tham số cố định; hệ IDS hỏi được ánh xạ về đúng
+    /// tham số (OmniClass → "OmniClass Number", Uniformat/Uniclass → "Assembly Code", Keynote → "Keynote",
+    /// tên khác → "ClassificationCode" hoặc tham số cùng tên hệ). Hệ không biết → không trả gì: trước đây
+    /// mọi hệ đều nhận Assembly Code nên đường Revit "đạt" trong khi file IFC trượt (§39).
+    /// </summary>
     public IEnumerable<string> Classifications(string? system)
     {
-        foreach (var key in new[] { "Assembly Code", "Keynote", "ClassificationCode" })
+        IEnumerable<string> keys;
+        if (string.IsNullOrWhiteSpace(system))
+        {
+            keys = new[] { "Assembly Code", "Keynote", "ClassificationCode", "OmniClass Number" };
+        }
+        else
+        {
+            var s = system!.Trim();
+            var lower = s.ToLowerInvariant();
+            keys = lower.Contains("omniclass") ? new[] { "OmniClass Number" }
+                : lower.Contains("uniformat") || lower.Contains("uniclass") || lower.Contains("assembly") ? new[] { "Assembly Code" }
+                : lower.Contains("keynote") ? new[] { "Keynote" }
+                : new[] { "ClassificationCode", s, "ClassificationCode(" + s + ")" };
+        }
+
+        foreach (var key in keys)
         {
             var value = TextOf(_element, key) ?? (_type != null ? TextOf(_type, key) : null);
             if (!string.IsNullOrWhiteSpace(value))
@@ -228,6 +250,31 @@ internal sealed class RevitIdsElement : IIdsElement
         }
     }
 
+    /// <summary>
+    /// Số thực theo đơn vị bộ xuất IFC ghi: dài → mm, diện tích → m², thể tích → m³, góc → độ; đại lượng
+    /// không đơn vị (tỉ số, hệ số) giữ nguyên. Trước đây MỌI double nhân 304,8 nên "U-value 0,3" thành 91.
+    /// </summary>
+    private static string DoubleText(Parameter parameter)
+    {
+        var raw = parameter.AsDouble();
+        double value;
+        try
+        {
+            var spec = parameter.Definition.GetDataType();
+            value = spec == SpecTypeId.Length ? UnitUtils.ConvertFromInternalUnits(raw, UnitTypeId.Millimeters)
+                : spec == SpecTypeId.Area ? UnitUtils.ConvertFromInternalUnits(raw, UnitTypeId.SquareMeters)
+                : spec == SpecTypeId.Volume ? UnitUtils.ConvertFromInternalUnits(raw, UnitTypeId.CubicMeters)
+                : spec == SpecTypeId.Angle ? UnitUtils.ConvertFromInternalUnits(raw, UnitTypeId.Degrees)
+                : raw;
+        }
+        catch (Exception)
+        {
+            value = raw; // tham số không có kiểu dữ liệu (family cũ) — giữ số nội bộ
+        }
+
+        return value.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
     private static string? TextOf(Element element, string parameterName)
     {
         var parameter = element.LookupParameter(parameterName);
@@ -240,7 +287,7 @@ internal sealed class RevitIdsElement : IIdsElement
         {
             StorageType.String => parameter.AsString(),
             StorageType.Integer => parameter.AsInteger().ToString(System.Globalization.CultureInfo.InvariantCulture),
-            StorageType.Double => RevitCompat.FtToMm(parameter.AsDouble()).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture),
+            StorageType.Double => DoubleText(parameter),
             StorageType.ElementId => parameter.AsValueString(),
             _ => null,
         };

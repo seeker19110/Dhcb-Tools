@@ -68,14 +68,21 @@ namespace DhcbTools.Shared.Logic.Ids
     /// <summary>Kết quả của một specification.</summary>
     public sealed class IdsSpecificationResult
     {
-        internal IdsSpecificationResult(string name, string description, int applicable, int passed, IReadOnlyList<IdsFailure> failures)
+        internal IdsSpecificationResult(string name, string description, int applicable, int passed, IReadOnlyList<IdsFailure> failures, string? skipReason = null)
         {
             Name = name;
             Description = description;
             Applicable = applicable;
             Passed = passed;
             Failures = failures;
+            SkipReason = skipReason;
         }
+
+        /// <summary>Khác null khi specification KHÔNG được chạy (ví dụ <c>ifcVersion</c> không khớp lược đồ file) — báo cáo phải nói rõ, không hiện thành "0 phần tử".</summary>
+        public string? SkipReason { get; }
+
+        /// <summary>Specification bị bỏ qua, không phải "không có phần tử".</summary>
+        public bool Skipped => SkipReason != null;
 
         /// <summary>Tên specification.</summary>
         public string Name { get; }
@@ -106,7 +113,7 @@ namespace DhcbTools.Shared.Logic.Ids
         /// Không phần tử nào lọt applicability. Đây <b>không phải</b> "đạt": nó nói rằng mô hình không có
         /// loại phần tử mà yêu cầu nhắm tới — có thể do lọc sai, có thể do mô hình thiếu hẳn nhóm đó.
         /// </summary>
-        public bool NoApplicableElements => Applicable == 0;
+        public bool NoApplicableElements => Applicable == 0 && !Skipped;
     }
 
     /// <summary>Kết quả kiểm cả file IDS.</summary>
@@ -141,7 +148,15 @@ namespace DhcbTools.Shared.Logic.Ids
         public const int MaxFailuresPerSpecification = 200;
 
         /// <summary>Kiểm danh sách phần tử theo bộ specification.</summary>
-        public static IdsCheckResult Check(IEnumerable<IdsSpecification> specifications, IEnumerable<IIdsElement> elements)
+        public static IdsCheckResult Check(IEnumerable<IdsSpecification> specifications, IEnumerable<IIdsElement> elements) =>
+            Check(specifications, elements, null);
+
+        /// <summary>
+        /// Kiểm danh sách phần tử theo bộ specification. <paramref name="modelSchema"/> (<c>IFC4</c>, <c>IFC2X3</c>…)
+        /// khác rỗng thì specification khai <c>ifcVersion</c> không chứa lược đồ đó được BỎ QUA và ghi lý do —
+        /// IDS 1.0 cho phép một file chứa quy tắc cho nhiều lược đồ, chạy nhầm là báo trượt thứ tác giả không đòi.
+        /// </summary>
+        public static IdsCheckResult Check(IEnumerable<IdsSpecification> specifications, IEnumerable<IIdsElement> elements, string? modelSchema)
         {
             var specs = specifications?.ToList() ?? new List<IdsSpecification>();
             var items = elements?.ToList() ?? new List<IIdsElement>();
@@ -149,6 +164,13 @@ namespace DhcbTools.Shared.Logic.Ids
 
             foreach (var spec in specs)
             {
+                if (!spec.AppliesTo(modelSchema))
+                {
+                    results.Add(new IdsSpecificationResult(spec.Name, spec.Description, 0, 0, Array.Empty<IdsFailure>(),
+                        "bỏ qua: ifcVersion=\"" + string.Join(" ", spec.IfcVersions) + "\" không gồm lược đồ của file (" + modelSchema + ")"));
+                    continue;
+                }
+
                 var applicable = items.Where(e => spec.Applicability.All(f => Satisfies(e, f))).ToList();
                 var failures = new List<IdsFailure>();
                 var passed = 0;
@@ -156,7 +178,13 @@ namespace DhcbTools.Shared.Logic.Ids
                 foreach (var element in applicable)
                 {
                     var reasons = new List<string>();
-                    foreach (var requirement in spec.Requirements)
+                    if (spec.IsProhibited)
+                    {
+                        // minOccurs="0" maxOccurs="0": phần tử lọt applicability là vi phạm — không có gì để kiểm thêm.
+                        reasons.Add("specification cấm (maxOccurs=0): không được có phần tử nào thuộc loại này");
+                    }
+
+                    foreach (var requirement in spec.IsProhibited ? Enumerable.Empty<IdsFacet>() : spec.Requirements)
                     {
                         var holds = Satisfies(element, requirement);
                         if (requirement.IsProhibited)
@@ -203,8 +231,7 @@ namespace DhcbTools.Shared.Logic.Ids
                     return NamesOf(facet.Name).Any(name => !string.IsNullOrWhiteSpace(element.Attribute(name)));
 
                 case IdsFacetKind.Property:
-                    var set = facet.Container != null && !facet.Container.IsAny ? facet.Container.Simple : null;
-                    return NamesOf(facet.Name).Any(name => !string.IsNullOrWhiteSpace(element.Property(set, name)));
+                    return PropertySets(facet).Any(set => NamesOf(facet.Name).Any(name => !string.IsNullOrWhiteSpace(element.Property(set, name))));
 
                 case IdsFacetKind.Classification:
                     var system = facet.Container != null && !facet.Container.IsAny ? facet.Container.Simple : null;
@@ -236,8 +263,7 @@ namespace DhcbTools.Shared.Logic.Ids
                     return NamesOf(facet.Name).Any(name => facet.Value.Accepts(element.Attribute(name)));
 
                 case IdsFacetKind.Property:
-                    var set = facet.Container != null && !facet.Container.IsAny ? facet.Container.Simple : null;
-                    return NamesOf(facet.Name).Any(name => facet.Value.Accepts(element.Property(set, name)));
+                    return PropertySets(facet).Any(set => NamesOf(facet.Name).Any(name => facet.Value.Accepts(element.Property(set, name))));
 
                 case IdsFacetKind.Classification:
                     var system = facet.Container != null && !facet.Container.IsAny ? facet.Container.Simple : null;
@@ -255,6 +281,25 @@ namespace DhcbTools.Shared.Logic.Ids
                         ? element.PartOf.Any(parent => facet.Value.Accepts(parent.Entity))
                         : element.PartOf.Any(parent => string.Equals(parent.Relation, facet.Relation, StringComparison.OrdinalIgnoreCase)
                                                         && facet.Value.Accepts(parent.Entity));
+            }
+        }
+
+        /// <summary>
+        /// Property set cần thử: không khai/không ràng buộc → <c>null</c> (mọi pset, khớp tên property trần);
+        /// <c>simpleValue</c> hoặc <c>enumeration</c> → từng pset một; khai bằng pattern → không suy ngược
+        /// được, trả rỗng và facet trượt — trước đây rơi về "mọi pset", lỏng hơn điều IDS đòi.
+        /// </summary>
+        private static IEnumerable<string?> PropertySets(IdsFacet facet)
+        {
+            if (facet.Container == null || facet.Container.IsAny)
+            {
+                yield return null;
+                yield break;
+            }
+
+            foreach (var set in NamesOf(facet.Container))
+            {
+                yield return set;
             }
         }
 

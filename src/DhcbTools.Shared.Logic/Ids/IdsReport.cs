@@ -47,6 +47,12 @@ namespace DhcbTools.Shared.Logic.Ids
 
             foreach (var spec in check.Specifications)
             {
+                if (spec.Skipped)
+                {
+                    yield return $"{spec.Name}: {spec.SkipReason}";
+                    continue;
+                }
+
                 var head = $"{spec.Name}: {spec.Passed}/{spec.Applicable} đạt";
                 yield return spec.NoApplicableElements
                     ? $"{spec.Name}: KHÔNG phần tử nào lọt bộ lọc — con số này nói về bộ lọc hoặc về mô hình thiếu nhóm đó, không phải \"đạt\"."
@@ -116,9 +122,11 @@ namespace DhcbTools.Shared.Logic.Ids
                 }
 
                 sb.Append("</td><td>");
-                sb.Append(spec.NoApplicableElements
-                    ? "<span class=\"trong\">0 phần tử — không kiểm được gì</span>"
-                    : spec.Applicable.ToString(CultureInfo.InvariantCulture) + " phần tử");
+                sb.Append(spec.Skipped
+                    ? "<span class=\"trong\">" + HtmlText.Escape(spec.SkipReason!) + "</span>"
+                    : spec.NoApplicableElements
+                        ? "<span class=\"trong\">0 phần tử — không kiểm được gì</span>"
+                        : spec.Applicable.ToString(CultureInfo.InvariantCulture) + " phần tử");
                 sb.Append("</td><td class=\"dat\">").Append(spec.Passed.ToString(CultureInfo.InvariantCulture))
                   .Append("</td><td class=\"truot\">").Append(spec.Failed.ToString(CultureInfo.InvariantCulture))
                   .Append("</td></tr>");

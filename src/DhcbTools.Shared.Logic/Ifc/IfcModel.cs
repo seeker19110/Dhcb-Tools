@@ -250,14 +250,7 @@ namespace DhcbTools.Shared.Logic.Ifc
                             continue;
                         }
 
-                        var propName = prop.At(0).Kind == IfcValueKind.Text ? prop.At(0).Raw : null;
-                        if (string.IsNullOrEmpty(propName))
-                        {
-                            continue;
-                        }
-
-                        // IfcPropertySingleValue: (Name, Description, NominalValue, Unit)
-                        map[setName + "." + propName] = prop.At(2).AsText();
+                        AddProperty(map, setName, prop, 0);
                     }
                 }
                 else if (set.Type.Equals("IFCELEMENTQUANTITY", StringComparison.OrdinalIgnoreCase))
@@ -285,6 +278,64 @@ namespace DhcbTools.Shared.Logic.Ifc
                 return map;
             }
 
+            // Mỗi lớp con của IfcProperty xếp giá trị ở vị trí khác nhau — đọc tất cả như SingleValue thì
+            // EnumeratedValue (danh sách ở 2) thành rỗng và BoundedValue (cận trên ở 2) thành "giá trị".
+            void AddProperty(Dictionary<string, string?> map, string setName, IfcEntity prop, int depth)
+            {
+                var propName = prop.At(0).Kind == IfcValueKind.Text ? prop.At(0).Raw : null;
+                if (string.IsNullOrEmpty(propName) || depth > 4)
+                {
+                    return;
+                }
+
+                var key = setName + "." + propName;
+                switch (prop.Type)
+                {
+                    case "IFCPROPERTYSINGLEVALUE":
+                        // (Name, Description, NominalValue, Unit)
+                        map[key] = prop.At(2).AsText();
+                        break;
+                    case "IFCPROPERTYENUMERATEDVALUE":
+                    case "IFCPROPERTYLISTVALUE":
+                        // (Name, Description, EnumerationValues|ListValues, ...) — lấy phần tử đầu (IDS so một giá trị);
+                        // nhiều giá trị thì nối bằng ";" để người đọc thấy đủ.
+                        map[key] = FirstOrJoin(prop.At(2));
+                        break;
+                    case "IFCPROPERTYBOUNDEDVALUE":
+                        // (Name, Description, UpperBoundValue, LowerBoundValue, Unit, SetPointValue)
+                        map[key] = prop.At(5).AsText() ?? prop.At(2).AsText() ?? prop.At(3).AsText();
+                        break;
+                    case "IFCCOMPLEXPROPERTY":
+                        // (Name, Description, UsageName, HasProperties) — trải phẳng "Set.Complex.Sub"
+                        foreach (var subId in References(prop.At(3)))
+                        {
+                            var sub = ById(subId);
+                            if (sub != null)
+                            {
+                                AddProperty(map, setName + "." + propName, sub, depth + 1);
+                            }
+                        }
+
+                        break;
+                    default:
+                        // IfcPropertyReferenceValue / TableValue: không có một giá trị vô hướng để so — ghi "có mặt" (rỗng)
+                        // để facet không ràng buộc giá trị vẫn thấy property tồn tại.
+                        map[key] = null;
+                        break;
+                }
+            }
+
+            string? FirstOrJoin(IfcValue list)
+            {
+                if (list.Kind != IfcValueKind.List)
+                {
+                    return list.AsText();
+                }
+
+                var texts = list.Items.Select(i => i.AsText()).Where(t => !string.IsNullOrEmpty(t)).ToList();
+                return texts.Count == 0 ? null : texts.Count == 1 ? texts[0] : string.Join(";", texts);
+            }
+
             void Merge(int elementId, Dictionary<string, string?> from, bool overwrite)
             {
                 if (from.Count == 0)
@@ -308,18 +359,17 @@ namespace DhcbTools.Shared.Logic.Ifc
             }
 
             // IfcRelDefinesByProperties: (GlobalId, Owner, Name, Desc, RelatedObjects, RelatingPropertyDefinition)
+            // IFC4 ADD2: RelatingPropertyDefinition là IfcPropertySetDefinitionSelect — có thể là MỘT tham chiếu
+            // hoặc một TẬP tham chiếu; đọc AsReference() thì cả tập biến mất.
             foreach (var rel in OfType("IFCRELDEFINESBYPROPERTIES"))
             {
-                var defId = rel.At(5).AsReference();
-                if (defId is null)
+                foreach (var defId in References(rel.At(5)))
                 {
-                    continue;
-                }
-
-                var map = PropertiesOfSet(defId.Value);
-                foreach (var target in References(rel.At(4)))
-                {
-                    Merge(target, map, overwrite: true);
+                    var map = PropertiesOfSet(defId);
+                    foreach (var target in References(rel.At(4)))
+                    {
+                        Merge(target, map, overwrite: true);
+                    }
                 }
             }
 
