@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -172,7 +173,7 @@ namespace DhcbTools.Shared.Logic.Checks
             {
                 sb.Append("<tr><td>").Append(i++).Append("</td><td>").Append(c.IdA).Append("</td><td>").Append(HtmlText.Escape(c.CategoryA))
                   .Append("</td><td>").Append(c.IdB).Append("</td><td>").Append(HtmlText.Escape(c.CategoryB))
-                  .Append("</td><td>").Append(c.XMm.ToString("F0")).Append("</td><td>").Append(c.YMm.ToString("F0")).Append("</td><td>").Append(c.ZMm.ToString("F0"))
+                  .Append("</td><td>").Append(c.XMm.ToString("F0", CultureInfo.InvariantCulture)).Append("</td><td>").Append(c.YMm.ToString("F0", CultureInfo.InvariantCulture)).Append("</td><td>").Append(c.ZMm.ToString("F0", CultureInfo.InvariantCulture))
                   .Append("</td><td><code>").Append(HtmlText.Escape(c.Key)).Append("</code></td></tr>");
             }
 

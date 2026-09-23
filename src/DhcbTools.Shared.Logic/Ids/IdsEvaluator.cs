@@ -170,6 +170,12 @@ namespace DhcbTools.Shared.Logic.Ids
                         {
                             reasons.Add("thiếu/sai: cần " + requirement.Describe());
                         }
+                        else if (!holds && IsPresent(element, requirement))
+                        {
+                            // IDS 1.0: optional = KHÔNG bắt buộc có, nhưng ĐÃ có thì phải đúng giá trị.
+                            // Trước đây optional được tha vô điều kiện — FireRating = "banana" vẫn đạt.
+                            reasons.Add("có nhưng sai giá trị: " + requirement.Describe());
+                        }
                     }
 
                     if (reasons.Count == 0)
@@ -186,6 +192,33 @@ namespace DhcbTools.Shared.Logic.Ids
             }
 
             return new IdsCheckResult(results, items.Count);
+        }
+
+        /// <summary>Đối tượng của facet có mặt trên phần tử không (bất kể giá trị) — dùng cho cardinality optional.</summary>
+        private static bool IsPresent(IIdsElement element, IdsFacet facet)
+        {
+            switch (facet.Kind)
+            {
+                case IdsFacetKind.Attribute:
+                    return NamesOf(facet.Name).Any(name => !string.IsNullOrWhiteSpace(element.Attribute(name)));
+
+                case IdsFacetKind.Property:
+                    var set = facet.Container != null && !facet.Container.IsAny ? facet.Container.Simple : null;
+                    return NamesOf(facet.Name).Any(name => !string.IsNullOrWhiteSpace(element.Property(set, name)));
+
+                case IdsFacetKind.Classification:
+                    var system = facet.Container != null && !facet.Container.IsAny ? facet.Container.Simple : null;
+                    return element.Classifications(system).Any(code => !string.IsNullOrWhiteSpace(code));
+
+                case IdsFacetKind.Material:
+                    return element.Materials.Any(m => !string.IsNullOrWhiteSpace(m));
+
+                case IdsFacetKind.PartOf:
+                    return element.PartOf.Any();
+
+                default:
+                    return false;
+            }
         }
 
         private static bool Satisfies(IIdsElement element, IdsFacet facet)

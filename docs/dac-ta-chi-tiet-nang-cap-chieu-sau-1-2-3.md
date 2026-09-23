@@ -30,30 +30,37 @@ Nhằm chuyển hướng chiến lược từ **mở rộng số lượng lệnh
 
 ## 2. Thiết kế chi tiết — Lát 1: MEP Routing & Né vật cản
 
-### 2.1 Spatial Hash Grid cho PathFinder3D
-- Tránh duyệt $O(N)$ danh sách `Box3` tại mỗi nút mở rộng của thuật toán A*.
-- Định nghĩa `ObstacleSpatialIndex3D`:
-  - Kích thước ô lưới `CellSizeMm = Max(StepMm * 2, 500)`.
-  - Lưu danh sách chỉ số `Box3` chèn vào từng ô lưới 3D `(xIndex, yIndex, zIndex)`.
-  - Truy vấn `GetCollidingObstacles(Point3 pt, double clearance)` trong $O(1)$ trung bình.
+### 2.1 Spatial Hash Grid cho PathFinder3D — **bỏ (audit 2026-09-23)**
+- `PathFinder3D` đã raster hoá chướng ngại vào `OccupancyGrid` **một lần** khi khởi tạo (mỗi hộp chỉ tô các ô
+  nó phủ), nên mỗi nút mở rộng của A* tra chướng ngại trong $O(1)$ sẵn rồi — không có vòng duyệt $O(N)$ nào để
+  tối ưu. Lớp `ObstacleSpatialIndex3D` thêm ở PR #160 không được nơi nào gọi tới, đã xoá để không tạo ấn tượng
+  sai về hiệu năng. Muốn nhanh hơn thật thì việc có ý nghĩa là tăng `StepMm` hoặc thu hẹp hộp tìm kiếm.
 
 ### 2.2 Đa phương án tuyền đường (`RouteOptionCandidate`)
 Cung cấp 3 phương án tuyến đường chuẩn hóa:
 1. **Option A (Shortest):** Ưu tiên chiều dài tuyến ngắn nhất.
-2. **Option B (Least Turns):** Phạt rẽ cao (`TurnPenalty * 3`), giảm tối đa số phụ kiện fitting.
+2. **Option B (Least Turns):** Phạt rẽ cao (`TurnPenalty * 3` — hằng `RouteOptionGenerator.LeastTurnsPenaltyFactor`), giảm tối đa số phụ kiện fitting.
 3. **Option C (Max Clearance):** Giữ khoảng cách xa nhất với các vật cản xung quanh.
 
 Bảng điểm tổng hợp:
 $$\text{Score} = w_1 \cdot \frac{L_{\min}}{L} + w_2 \cdot \frac{T_{\min}}{T} + w_3 \cdot \text{ClearanceScore}$$
+
+với $L_{\min}$ = khoảng Manhattan đầu–cuối, $T_{\min}$ = số rẽ tối thiểu do `PathFinder3D` tính, ClearanceScore =
+$\min(1, d_{\min}/\text{ClearanceMm})$, $w = (0{,}4;\ 0{,}4;\ 0{,}2)$. Thước đo **tuyệt đối**: một phương án duy nhất
+không tự động được 1,00. Hai chiến lược cho cùng đường gấp khúc thì gộp làm một, tiêu đề ghi cả hai.
 
 ---
 
 ## 3. Thiết kế chi tiết — Lát 2: Clash Detection & BCF 2.1
 
 ### 3.1 Clash Classification Engine
-- **Hard Clash:** Va chạm thể tích hình học thực tế ($V_{\text{intersect}} > \text{Tolerance}$).
-- **Soft Clash (Clearance Violation):** Khoảng cách giữa 2 phần tử $< \text{RequiredClearance}$ dù thể tích chưa chạm.
-- **Tolerance Flaw:** Va chạm nhỏ hơn dung sai thi công (cho phép bỏ qua).
+- **Hard Clash:** có giao nhau và độ sâu xuyên $> \text{Tolerance}$ (mm). Độ sâu do bên gọi đo từ hình học;
+  không có thì suy xấp xỉ bằng $\sqrt[3]{V_{\text{intersect}}}$ — so thể tích với $\text{Tolerance}^3$ như bản đầu
+  là sai đơn vị (vết cà 5 mm trên mặt ống 200×200 = 200.000 mm³ ≫ 125 mm³).
+- **Tolerance Flaw:** có giao nhau nhưng độ sâu $\le \text{Tolerance}$ — ghi nhận, không dời tuyến.
+- **Soft Clash (Clearance Violation):** không giao nhau, khoảng cách $< \text{RequiredClearance}$.
+- **None:** không giao nhau và khoảng cách đủ — **không** thành topic BCF (bản đầu xếp cặp này vào Tolerance Flaw
+  nên mọi cặp ứng viên xa nhau đều thành topic rác).
 
 ### 3.2 BCF 2.1 Topic & Viewpoint Schema Expansion
 - Tự động tính toán camera position & target vector dựa trên Bounding Box của điểm va chạm:

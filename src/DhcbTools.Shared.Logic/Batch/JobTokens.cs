@@ -74,7 +74,9 @@ namespace DhcbTools.Shared.Logic.Batch
                 {
                     try
                     {
-                        return context.RunTime.ToString(key, CultureInfo.InvariantCulture);
+                        // Một ký tự đơn ("d", "M") là ĐỊNH DẠNG CHUẨN của .NET ("09/23/2026", "September 23") chứ không
+                        // phải số ngày/tháng; thêm "%" để ép hiểu là định dạng tuỳ biến.
+                        return context.RunTime.ToString(key.Length == 1 ? "%" + key : key, CultureInfo.InvariantCulture);
                     }
                     catch (FormatException)
                     {

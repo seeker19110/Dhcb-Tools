@@ -33,6 +33,9 @@ namespace DhcbTools.Shared.Logic
         /// tiếng Việt). Vì ô CSV đã tách theo dấu phẩy nên một ô không bao giờ chứa dấu phẩy phân nhóm
         /// hàng nghìn trừ khi được bọc nháy — trường hợp đó ta coi dấu phẩy là dấu thập phân.
         /// </summary>
+        /// <summary>netstandard2.0 không có <c>double.IsFinite</c>.</summary>
+        private static bool IsFinite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
+
         public static bool TryParseDouble(string? text, out double value)
         {
             value = 0;
@@ -45,7 +48,8 @@ namespace DhcbTools.Shared.Logic
 
             if (double.TryParse(trimmed, NumberStyles.Float, CultureInfo.InvariantCulture, out value))
             {
-                return true;
+                // "NaN"/"Infinity" parse được nhưng không phải số đo — lọt vào phép tính thì báo cáo in ra NaN.
+                return IsFinite(value);
             }
 
             // Chỉ đổi khi có đúng một dấu phẩy và không có dấu chấm — tránh nuốt nhầm "1,234.5".
@@ -55,7 +59,7 @@ namespace DhcbTools.Shared.Logic
                 if (firstComma >= 0 && trimmed.IndexOf(',', firstComma + 1) < 0)
                 {
                     var normalized = trimmed.Replace(',', '.');
-                    return double.TryParse(normalized, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+                    return double.TryParse(normalized, NumberStyles.Float, CultureInfo.InvariantCulture, out value) && IsFinite(value);
                 }
             }
 

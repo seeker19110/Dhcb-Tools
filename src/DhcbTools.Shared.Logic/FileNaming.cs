@@ -40,8 +40,24 @@ namespace DhcbTools.Shared.Logic
 
             // Windows bỏ dấu cách và dấu chấm ở cuối tên file — cắt luôn để tên trên đĩa đúng như tên đã log.
             var trimmed = sb.ToString().Trim().TrimEnd('.', ' ');
-            return trimmed.Length == 0 ? Fallback : trimmed;
+            if (trimmed.Length == 0)
+            {
+                return Fallback;
+            }
+
+            // Tên thiết bị Windows (CON, NUL, COM1…) kể cả có phần mở rộng ("NUL.pdf") ghi vào thiết bị chứ không
+            // ra file — export báo thành công mà không có file nào. Thêm "_" để thành tên thường.
+            var dot = trimmed.IndexOf('.');
+            var stem = dot < 0 ? trimmed : trimmed.Substring(0, dot);
+            return ReservedNames.Contains(stem) ? "_" + trimmed : trimmed;
         }
+
+        private static readonly HashSet<string> ReservedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "CON", "PRN", "AUX", "NUL",
+            "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+            "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+        };
 
         /// <summary>
         /// Áp mẫu tên file. Token hỗ trợ: {SheetNumber}, {SheetName}, {ProjectNumber}.

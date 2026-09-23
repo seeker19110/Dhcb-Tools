@@ -123,7 +123,7 @@ namespace DhcbTools.Shared.Logic.Cad
             var sb = new StringBuilder("Kind,Handle,Type,Detail\n");
             foreach (var e in entries)
             {
-                sb.Append(CsvText.JoinLine(new[] { e.Kind.ToString(), e.Handle, e.Type, e.Detail })).Append('\n');
+                sb.Append(CsvText.JoinLine(new[] { e.Kind.ToString(), e.Handle, e.Type, e.Detail }, true)).Append('\n');
             }
             return sb.ToString();
         }

@@ -170,13 +170,17 @@ namespace DhcbTools.Shared.Logic.Progress
                     date = parsed;
                 }
 
-                if (seen.TryGetValue(idText, out var firstLine))
+                // Khoá trùng theo GIÁ TRỊ đã đọc: "123", "+123" và "0123" là cùng một ElementId.
+                var dedupeKey = keyKind == ProgressCsvKey.ElementId ? id.ToString(CultureInfo.InvariantCulture) : idText;
+                if (seen.TryGetValue(dedupeKey, out var firstLine))
                 {
                     result.Errors.Add($"Dòng {line}: mã cấu kiện {idText} đã có ở dòng {firstLine} — lấy dòng sau cùng.");
-                    result.Rows.RemoveAll(r => string.Equals(r.Key, idText, StringComparison.OrdinalIgnoreCase));
+                    result.Rows.RemoveAll(r => keyKind == ProgressCsvKey.ElementId
+                        ? r.ElementId == id
+                        : string.Equals(r.Key, idText, StringComparison.OrdinalIgnoreCase));
                 }
 
-                seen[idText] = line;
+                seen[dedupeKey] = line;
                 result.Rows.Add(new ProgressCsvRow
                 {
                     ElementId = id,
@@ -216,7 +220,7 @@ namespace DhcbTools.Shared.Logic.Progress
             header.Add("% đã nghiệm thu");
             header.Add("Tổng chiều dài (m)");
             header.Add("% đã lắp theo chiều dài");
-            sb.Append(CsvText.JoinLine(header)).Append("\r\n");
+            sb.Append(CsvText.JoinLine(header, true)).Append("\r\n");
 
             foreach (var row in rows)
             {
@@ -227,7 +231,7 @@ namespace DhcbTools.Shared.Logic.Progress
                 cells.Add(NumericText.Format(row.PercentAtLeast(ConstructionStage.DaNghiemThu), 1));
                 cells.Add(row.HasLength ? NumericText.Format(row.TotalLengthMm / 1000.0, 1) : string.Empty);
                 cells.Add(row.HasLength ? NumericText.Format(row.PercentByLengthAtLeast(ConstructionStage.DaLap), 1) : string.Empty);
-                sb.Append(CsvText.JoinLine(cells)).Append("\r\n");
+                sb.Append(CsvText.JoinLine(cells, true)).Append("\r\n");
             }
 
             return sb.ToString();

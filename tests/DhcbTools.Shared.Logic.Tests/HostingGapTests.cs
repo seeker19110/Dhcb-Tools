@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using DhcbTools.Shared.Hosting;
 using Newtonsoft.Json.Linq;
 using Xunit;
@@ -287,9 +287,84 @@ public class HostingGapTests : IDisposable
         var truoc = Environment.GetEnvironmentVariable(BridgeTokenStore.EnvironmentVariable);
         try
         {
-            Environment.SetEnvironmentVariable(BridgeTokenStore.EnvironmentVariable, "  token-tu-moi-truong  ");
+            Environment.SetEnvironmentVariable(BridgeTokenStore.EnvironmentVariable, "  token-tu-moi-truong-du-32-ky-tu-tro-len  ");
 
-            Assert.Equal("token-tu-moi-truong", BridgeTokenStore.LoadOrCreate(Path.Combine(_dir, "t.txt")));
+            Assert.Equal("token-tu-moi-truong-du-32-ky-tu-tro-len", BridgeTokenStore.LoadOrCreate(Path.Combine(_dir, "t.txt")));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(BridgeTokenStore.EnvironmentVariable, truoc);
+        }
+    }
+
+    /// <summary>Biến môi trường ngắn hơn 32 ký tự: từ chối khởi động thay vì chạy với token dò được trong vài phút.</summary>
+    [Fact]
+    public void BridgeTokenStore_BienMoiTruongNgan_Nem()
+    {
+        var truoc = Environment.GetEnvironmentVariable(BridgeTokenStore.EnvironmentVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(BridgeTokenStore.EnvironmentVariable, "a");
+
+            var ex = Assert.Throws<InvalidOperationException>(() => BridgeTokenStore.LoadOrCreate(Path.Combine(_dir, "t.txt")));
+            Assert.Contains("32", ex.Message);
+            Assert.False(File.Exists(Path.Combine(_dir, "t.txt")));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(BridgeTokenStore.EnvironmentVariable, truoc);
+        }
+    }
+
+    /// <summary>
+    /// Hai Bridge cùng tạo token lần đầu: bên đến sau thấy file đã có thì DÙNG token của bên thắng,
+    /// không đè — nếu đè thì bên thắng giữ token trong RAM không còn khớp file, client 401 tới khi khởi động lại.
+    /// </summary>
+    [Fact]
+    public void BridgeTokenStore_FileXuatHienGiuaChung_DungTokenBenThang()
+    {
+        var truoc = Environment.GetEnvironmentVariable(BridgeTokenStore.EnvironmentVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(BridgeTokenStore.EnvironmentVariable, null);
+            var file = Path.Combine(_dir, "dua.txt");
+            var winner = new string('w', 40);
+
+            // Mô phỏng bên thắng ghi file đúng lúc bên thua đang thu ACL cho file tạm.
+            var token = BridgeTokenStore.LoadOrCreate(file, null, _ =>
+            {
+                File.WriteAllText(file, winner);
+                return true;
+            });
+
+            Assert.Equal(winner, token);
+            Assert.Equal(winner, File.ReadAllText(file));
+            Assert.Empty(Directory.GetFiles(_dir, "dua.txt.*.tmp"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(BridgeTokenStore.EnvironmentVariable, truoc);
+        }
+    }
+
+    /// <summary>File có sẵn nhưng ngắn (hỏng) xuất hiện giữa chừng: thay như trước, không dùng token yếu.</summary>
+    [Fact]
+    public void BridgeTokenStore_FileNganXuatHienGiuaChung_ThayBangTokenMoi()
+    {
+        var truoc = Environment.GetEnvironmentVariable(BridgeTokenStore.EnvironmentVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(BridgeTokenStore.EnvironmentVariable, null);
+            var file = Path.Combine(_dir, "ngan.txt");
+
+            var token = BridgeTokenStore.LoadOrCreate(file, null, _ =>
+            {
+                File.WriteAllText(file, "ngan");
+                return true;
+            });
+
+            Assert.True(token.Length >= BridgeTokenStore.MinTokenLength);
+            Assert.Equal(token, File.ReadAllText(file));
         }
         finally
         {
