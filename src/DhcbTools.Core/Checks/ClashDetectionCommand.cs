@@ -157,14 +157,17 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
         var skippedAccepted = 0;
         var seen = new HashSet<string>();
 
+        // Pha thô: băm không gian nhóm B một lần, mỗi phần tử A chỉ xem các ô nó phủ. Trước đây duyệt cả
+        // danh sách B cho MỖI A — 50.000 ống × 20.000 dầm/tường = 10⁹ phép so hộp trên luồng UI.
+        var indexB = Shared.Logic.Geometry.BoxSpatialHash<Candidate>.Build(elementsB, c => c.Box);
+
         foreach (var a in elementsA)
         {
             var boxA = a.get_BoundingBox(null);
             if (boxA == null) continue;
 
-            var candidates = elementsB.Where(t => (t.LinkName != null || t.Element.Id != a.Id) && MepLayout.BoundingBoxesIntersect(
-                boxA.Min.X, boxA.Min.Y, boxA.Min.Z, boxA.Max.X, boxA.Max.Y, boxA.Max.Z,
-                t.Box.MinX, t.Box.MinY, t.Box.MinZ, t.Box.MaxX, t.Box.MaxY, t.Box.MaxZ, tol)).ToList();
+            var queryBox = new Box3(boxA.Min.X, boxA.Min.Y, boxA.Min.Z, boxA.Max.X, boxA.Max.Y, boxA.Max.Z);
+            var candidates = indexB.Query(queryBox, tol).Where(t => t.LinkName != null || t.Element.Id != a.Id).ToList();
             if (candidates.Count == 0) continue;
 
             var hits = PreciseHits(document, a, candidates, result);

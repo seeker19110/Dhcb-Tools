@@ -302,16 +302,17 @@ public static class RevitQueryHandler
     private static object GetWarnings(Document doc, QueryParams p)
     {
         var warnings = doc.GetWarnings();
-        var list = warnings.Select(w => new
+        // Cắt TRƯỚC khi gọi GetDescriptionText/GetFailingElements (mỗi cái ~0,1–1 ms): model liên hợp
+        // 100.000 cảnh báo mà xin 50 dòng từng mất hàng phút. `count` = số dòng trả, `total` = tổng thật.
+        var page = p.Limit > 0 ? warnings.Take(p.Limit) : warnings;
+        var list = page.Select(w => new
         {
             description  = w.GetDescriptionText(),
             elementIds   = w.GetFailingElements().Select(id => RevitCompat.IdValue(id)).ToList(),
             severity     = w.GetSeverity().ToString(),
         }).ToList();
 
-        if (p.Limit > 0) list = list.Take(p.Limit).ToList();
-
-        return new { count = warnings.Count, warnings = list };
+        return new { count = list.Count, total = warnings.Count, warnings = list };
     }
 
     // ──────────────────────────────────────────────────────────────

@@ -150,16 +150,33 @@ namespace DhcbTools.Shared.Logic.Mep
 
             // Lặp: điểm chưa phủ xa nhất → chèn thiết bị mới tại đó (kéo vào trong margin nếu cần) cho tới khi phủ hết.
             var guard = 0;
+            // Khoảng cách từ mỗi mẫu tới thiết bị gần nhất — tính MỘT lần mỗi vòng (trước đây tính lại trong
+            // cả bộ lọc lẫn khoá sắp xếp: phòng 40×60 m, 9.600 mẫu × 400 thiết bị × 500 vòng ≈ 2·10⁹ phép đo).
+            // Thiết bị mới thêm chỉ làm khoảng cách GIẢM, nên chỉ cần cập nhật theo thiết bị vừa thêm.
+            var nearest = new double[samples.Count];
+            for (var i = 0; i < samples.Count; i++)
+            {
+                nearest[i] = plan.Points.Count == 0 ? double.PositiveInfinity : plan.Points.Min(d => d.DistanceTo(samples[i]));
+            }
+
             while (guard++ < 500)
             {
-                var uncovered = samples.Where(s => !plan.Points.Any(d => d.DistanceTo(s) <= o.CoverageRadius)).ToList();
+                var uncovered = new List<Point2>();
+                var worstIndex = -1;
+                for (var i = 0; i < samples.Count; i++)
+                {
+                    if (nearest[i] <= o.CoverageRadius) continue;
+                    uncovered.Add(samples[i]);
+                    if (worstIndex < 0 || nearest[i] > nearest[worstIndex]) worstIndex = i;
+                }
+
                 if (uncovered.Count == 0)
                 {
                     break;
                 }
 
                 // Chọn điểm chưa phủ xa thiết bị nhất; đặt thiết bị mới tại vị trí đó nhưng lùi khỏi biên theo margin.
-                var worst = uncovered.OrderByDescending(s => plan.Points.Count == 0 ? 0 : plan.Points.Min(d => d.DistanceTo(s))).First();
+                var worst = samples[worstIndex];
                 var candidate = PullInside(boundary, worst, o.Margin);
                 if (!Contains(boundary, candidate) || InAnyHole(holes, candidate) || plan.Points.Any(d => d.DistanceTo(candidate) < 1))
                 {
@@ -171,6 +188,11 @@ namespace DhcbTools.Shared.Logic.Mep
                 plan.Points.Add(candidate);
                 plan.AddedForCoverage.Add(candidate);
                 plan.Messages.Add("Chèn thêm thiết bị tại " + candidate + " để phủ điểm " + worst + ".");
+                for (var i = 0; i < samples.Count; i++)
+                {
+                    var d = candidate.DistanceTo(samples[i]);
+                    if (d < nearest[i]) nearest[i] = d;
+                }
             }
         }
 

@@ -114,6 +114,19 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         var hostsInDocument = hostCandidatesAll.Count(h => h.Transform == null);
         var hostsInLinks = hostCandidatesAll.Count - hostsInDocument;
 
+        // Pha thô bằng băm không gian: mỗi ống chỉ xem host ở các ô nó phủ (trước: duyệt cả danh sách host
+        // cho MỖI ống — vẫn O(n·m) dù collector đã hoisted). Solid của host cache theo (link, id): một tường
+        // bị 200 ống xuyên qua từng bị dựng lại hình học 200 lần. Điểm trùng cũng băm thay vì quét tuyến tính.
+        var hostIndex = Shared.Logic.Geometry.BoxSpatialHash<HostCandidate>.Build(hostCandidatesAll, h => h.Box);
+        var solidCache = new Dictionary<(string? Link, long Id), Solid?>();
+        // Hai chỉ mục điểm: sleeve ĐÃ CÓ trong mô hình (đếm vào skippedExisting) và điểm ĐÃ LÊN KẾ HOẠCH lượt này.
+        var existingIndex = new Shared.Logic.Geometry.BoxSpatialHash<XYZ>(Math.Max(ToleranceFt, 1e-6));
+        var plannedIndex = new Shared.Logic.Geometry.BoxSpatialHash<XYZ>(Math.Max(ToleranceFt, 1e-6));
+        foreach (var ex in existingSleeveLocations)
+        {
+            existingIndex.InsertPoint(ex.X, ex.Y, ex.Z, ex);
+        }
+
         foreach (var mepElem in mepElements)
         {
             if (!(mepElem.Location is LocationCurve locCurve))
@@ -136,7 +149,9 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
             var outline = new Outline(bb.Min - new XYZ(0.1, 0.1, 0.1), bb.Max + new XYZ(0.1, 0.1, 0.1));
 
             // Host trong link nằm ở toạ độ của link — phải đưa hộp bao về toạ độ file chủ rồi mới so.
-            var candidates = hostCandidatesAll.Where(c => PassesBox(c, outline)).ToList();
+            var candidates = hostIndex.Query(
+                new Box3(outline.MinimumPoint.X, outline.MinimumPoint.Y, outline.MinimumPoint.Z,
+                         outline.MaximumPoint.X, outline.MaximumPoint.Y, outline.MaximumPoint.Z));
 
             // Lọc tinh bằng solid CHỈ áp dụng cho host cùng file: ElementIntersectsSolidFilter so trong
             // một document, đưa element của link vào là sai kết quả. Host từ link giữ nguyên mức lọc hộp bao.
@@ -177,29 +192,25 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
                     continue;
                 }
 
-                var intersectionPt = FindIntersectionPoint(curve, candidate, out var usedMidpoint);
+                var intersectionPt = FindIntersectionPoint(curve, candidate, solidCache, out var usedMidpoint);
                 if (intersectionPt == null) continue;
                 if (usedMidpoint) midpointFallback++;
 
-                // Check duplicate
-                if (IsNearExistingSleeve(intersectionPt, existingSleeveLocations))
+                // Trùng với sleeve đã có hoặc điểm đã lên kế hoạch: tra băm điểm rồi mới đo khoảng cách.
+                if (existingIndex.QueryPoint(intersectionPt.X, intersectionPt.Y, intersectionPt.Z, ToleranceFt)
+                    .Any(q => q.DistanceTo(intersectionPt) < ToleranceFt))
                 {
                     skippedExisting++;
                     continue;
                 }
 
-                // Check already in placements list
-                bool alreadyPlanned = false;
-                foreach (var p in placements)
+                if (plannedIndex.QueryPoint(intersectionPt.X, intersectionPt.Y, intersectionPt.Z, ToleranceFt)
+                    .Any(q => q.DistanceTo(intersectionPt) < ToleranceFt))
                 {
-                    if (p.Point.DistanceTo(intersectionPt) < ToleranceFt)
-                    {
-                        alreadyPlanned = true;
-                        break;
-                    }
+                    continue;
                 }
-                if (alreadyPlanned) continue;
 
+                plannedIndex.InsertPoint(intersectionPt.X, intersectionPt.Y, intersectionPt.Z, intersectionPt);
                 placements.Add((intersectionPt, null!, host as Wall, host as Floor, size.WidthFt, size.HeightFt, mepElem, candidate.LinkName));
             }
         }
@@ -450,16 +461,6 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         return locs;
     }
 
-    private static bool IsNearExistingSleeve(XYZ point, List<XYZ> existing)
-    {
-        foreach (var ex in existing)
-        {
-            if (point.DistanceTo(ex) < ToleranceFt)
-                return true;
-        }
-        return false;
-    }
-
     private static Solid? GetFirstSolid(Element elem)
     {
         try
@@ -498,7 +499,7 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
     /// không có solid; (3) bất đắc dĩ mới dùng trung điểm tuyến MEP và báo qua <paramref name="usedMidpoint"/>.
     /// Bản trước luôn trả trung điểm tuyến, nên ống dài xuyên nhiều tường thì mọi sleeve dồn về một chỗ.
     /// </summary>
-    private static XYZ? FindIntersectionPoint(Curve mepCurve, HostCandidate candidate, out bool usedMidpoint)
+    private static XYZ? FindIntersectionPoint(Curve mepCurve, HostCandidate candidate, Dictionary<(string? Link, long Id), Solid?> solidCache, out bool usedMidpoint)
     {
         usedMidpoint = false;
 
@@ -511,8 +512,13 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
             catch (System.Exception) { localCurve = mepCurve; }
         }
 
-        // 1. Solid × curve
-        var hostSolid = GetFirstSolid(candidate.Host);
+        // 1. Solid × curve — solid của host lấy từ cache (một tường bị nhiều ống xuyên chỉ dựng hình học một lần).
+        var solidKey = (candidate.LinkName, RevitCompat.IdValue(candidate.Host.Id));
+        if (!solidCache.TryGetValue(solidKey, out var hostSolid))
+        {
+            hostSolid = GetFirstSolid(candidate.Host);
+            solidCache[solidKey] = hostSolid;
+        }
         if (hostSolid != null)
         {
             try
