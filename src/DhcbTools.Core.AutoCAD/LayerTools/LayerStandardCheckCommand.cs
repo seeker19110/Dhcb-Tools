@@ -52,7 +52,8 @@ public sealed class LayerStandardCheckCommand : ICoreCommand<LayerStandardCheckC
 
             try
             {
-                compiled.Add((new Regex(rule.Pattern), rule.Description));
+                // Pattern từ file người dùng: "(A+)+$" trên tên layer dài treo luồng UI vô hạn nếu không có timeout.
+                compiled.Add((new Regex(rule.Pattern, RegexOptions.None, TimeSpan.FromSeconds(2)), rule.Description));
             }
             catch (ArgumentException)
             {

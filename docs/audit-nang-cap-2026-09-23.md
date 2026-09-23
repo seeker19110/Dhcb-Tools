@@ -98,3 +98,30 @@ thay vì `C:\Users\Public`, không gửi `Bearer` rỗng (tránh tự khoá 5 ph
 | Bộ `write-asbuilt` trong Revit 2024.3 (PR 2, ghi thật 55 sheet ×2) | 3/3 đạt |
 | Bộ `autoroute` trong Revit 2024.3 (PR 2) | 13/13 đạt |
 | Python: `coverage run -m pytest` (PR 3) | 325 đạt, phủ câu lệnh 100 % |
+
+## Vòng quét thứ hai (cùng ngày, sau khi ba PR đầu vào `main`)
+
+Năm agent đọc-chỉ với góc nhìn khác: review hồi quy chính ba PR #161–#163, IFC/IDS theo chuẩn, AutoCAD,
+vỏ Revit/Bridge, hiệu năng trên model lớn. Kết quả thành năm PR nữa, mỗi PR kiểm bằng bộ ca chạy thật
+trong Revit 2024.3 hoặc accoreconsole 2026.
+
+| PR | Nội dung | Kiểm chứng |
+|---|---|---|
+| #164 | Tách 6 khối quyết định từ Core xuống tầng thuần (`TestReportWriter`, `LayerRuleSet`, `CadImportOptions`, `TextReplace` — find rỗng từng treo vô hạn, `LineWeightText`, `HandleText`); CI nhóm theo SHA (lượt CI của commit trước trên `main` bị huỷ khi hai merge cách nhau 2 phút); 19 sửa từ review hồi quy (đáng kể: `BridgeJob.Fail` không lật job đã Done thành Error) | 1797 ca phủ 100 %; Revit smoke 43/44; AutoCAD smoke 18/18 |
+| #165 | **IDS 1.0**: `minOccurs`/`maxOccurs` mức specification chưa từng được đọc → specification cấm bị kiểm như bắt buộc (đảo kết luận); so số theo giá trị; ràng buộc `xs:restriction` là hội; `length`/`minLength`/`maxLength`; lọc `ifcVersion`; pattern biên dịch lúc đọc + timeout. **IFC**: đọc đúng `IfcPropertyEnumeratedValue`/`ListValue`/`BoundedValue`/`ComplexProperty`; `RelatingPropertyDefinition` dạng tập; `#id` > int32 là lỗi đọc file; PredefinedType đúng vị trí lược đồ; Space/Storey không có `Tag`. **Revit**: GlobalId 22 ký tự nén đúng thuật toán bộ xuất (`IfcGuid`); `Classifications(system)` theo hệ; số thực đổi theo loại đại lượng | 1775 ca phủ 100 % (`IdsComplianceTests` 22 ca); Revit smoke 43/44, hai ca IdsValidate cùng số liệu |
+| #166 | **Hiệu năng**: `BoxSpatialHash<T>` làm pha thô cho ClashDetection (A×B), SleeveAuto (ống×host + cache solid host + băm điểm trùng), ModelLinesFromCad; `warnings` cắt trước khi đọc mô tả; cache type ở ParameterExport; DevicePattern tính khoảng cách một lần/vòng; RunLog cắt Messages ở 500 dòng | 1761 ca phủ 100 %; Revit `mep` 29/29 (445 sleeve, 7 va chạm, 551 thiết bị — trùng §22/§50), `write-mep` 21/21 (435+10 → 0/552; 455 → 0/562) |
+| #167 | **Vỏ Revit**: `TaskDialog` bên trong `IUpdater.Execute` (treo/sập) → log; truy vấn `rooms` dùng `OfClass(SpatialElement)` bị Revit từ chối — chưa từng chạy; `limit` mặc định 2000; bốn nút Ribbon NRE khi chưa mở model; HealthReport mở browser trên .NET; AutoNumbering có chủ + xác nhận ghi; `SuppressedWarnings` xoá trong `finally` | Build 2024/2026; Revit smoke 43/44 |
+| PR 8 | **AutoCAD**: layer "đang dùng" tính cả attribute của block reference (layer chỉ có chữ title block từng bị xoá); block phụ thuộc xref không là ứng viên purge; linetype của dim style là đang dùng; không `Dispose` view sống của phiên khi snapshot; true color xuất số nguyên (xuất → nhập từng cảnh báo mọi layer true color) và query `#RRGGBB`; LayerTranslate xem trước báo đúng layer nguồn sẽ rỗng (từng "xoá 0" rồi xoá 40); `attributes_of` đếm cả insert của block động; regex quy tắc layer có timeout; `AdjustAlignment` sau khi ghi attribute; AutoNumbering không đếm attribute không đổi; DrawingCompare/AcadCommandTable không ném ra Bridge | AutoCAD 2026 accoreconsole smoke + write |
+
+### Để lại sau vòng 2 (thêm vào bảng ở trên)
+
+| Phát hiện | Vì sao để lại |
+|---|---|
+| `CancellationToken`/tiến độ cho lệnh dài (Sleeve, Clash, AutoRoute) | Đổi chữ ký `ICoreCommand` và mọi vỏ; Bridge 504 hiện nói rõ "không huỷ được nữa" |
+| `--handover` đọc và parse cùng file IFC hai lần (50 MB → ~3 GB live) | Cần `IfcChecker` và `IfcIdsModel` dùng chung một lần parse |
+| Batch job chạy trong `ApplicationInitialized`; hàng đợi Bridge không xả item bỏ rơi khi Revit modal; `MaxInFlight` gồm cả request sync; `BridgeCommitGuard` revision tự tăng bởi preview có transaction tạm | Thiết kế vòng đời Bridge — cần bộ ca Bridge riêng trên Revit thật |
+| TextReplace thay chuỗi thường trên `MText.Contents` có thể đụng mã định dạng (`\P`) | Cần ánh xạ offset Text ↔ Contents; hiện chỉ báo khi mã cắt ngang chuỗi |
+| Dung sai "Mm" phía AutoCAD so trong đơn vị bản vẽ, không đọc `INSUNITS` | Đổi nghĩa cấu hình đang dùng trong job; cần thống nhất với người dùng |
+| AttributeExport chỉ quét model space | Thêm cờ `includePaperSpace` là đổi hợp đồng CSV |
+| IDS: so giá trị không phân biệt hoa thường; `xs:pattern` cú pháp XSD (`\i`, `\c`) chưa dịch sang .NET | Cần chạy lại bộ ca buildingSMART |
+| `IfcStepParser` cấp phát 2 chuỗi/thực thể; đọc file `Encoding.UTF8` thay vì ISO-8859-1 | Đo trên file 50 MB thật trước khi đổi |

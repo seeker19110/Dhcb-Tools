@@ -105,7 +105,7 @@ public static class AcadQueryHandler
                 isLocked    = l.IsLocked,
                 isPlottable = l.IsPlottable,
                 colorIndex  = l.Color.IsByAci ? l.Color.ColorIndex : (int?)null,
-                colorRgb    = l.Color.IsByAci ? null : l.Color.ColorValue.ToString(),
+                colorRgb    = l.Color.IsByAci ? null : "#" + (l.Color.ColorValue.ToArgb() & 0xFFFFFF).ToString("X6", System.Globalization.CultureInfo.InvariantCulture),
                 linetype    = GetLinetypeName(tr, db, l.LinetypeObjectId),
                 lineweight  = l.LineWeight.ToString(),
                 description = l.Description,
@@ -522,7 +522,21 @@ public static class AcadQueryHandler
             });
         }
 
-        var referenceIds = btr.GetBlockReferenceIds(true, false);
+        // Block động: insert đã đổi tham số trỏ tới bản anonymous (*U12) — GetBlockReferenceIds của định nghĩa
+        // gốc không thấy chúng, đếm thiếu và mẫu rỗng.
+        var referenceIds = new List<ObjectId>();
+        foreach (ObjectId refId in btr.GetBlockReferenceIds(true, false)) referenceIds.Add(refId);
+        if (btr.IsDynamicBlock)
+        {
+            foreach (ObjectId anonId in btr.GetAnonymousBlockIds())
+            {
+                if (tr.GetObject(anonId, OpenMode.ForRead) is BlockTableRecord anon)
+                {
+                    foreach (ObjectId refId in anon.GetBlockReferenceIds(true, false)) referenceIds.Add(refId);
+                }
+            }
+        }
+
         var samples = new List<object>();
         foreach (ObjectId refId in referenceIds)
         {

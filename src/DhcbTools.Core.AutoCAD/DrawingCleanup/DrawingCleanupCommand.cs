@@ -81,7 +81,8 @@ public sealed class DrawingCleanupCommand : ICoreCommand<CleanupConfig>
             }
             catch (Autodesk.AutoCAD.Runtime.Exception ex)
             {
-                report.Add($"Không xoá được (AutoCAD từ chối): {ex.Message}");
+                var name = transaction.GetObject(id, OpenMode.ForRead) is SymbolTableRecord r ? r.Name : id.ToString();
+                report.Add($"Không xoá được \"{name}\" (AutoCAD từ chối): {ex.Message}");
             }
         }
 
@@ -129,9 +130,10 @@ public sealed class DrawingCleanupCommand : ICoreCommand<CleanupConfig>
         {
             var block = (BlockTableRecord)transaction.GetObject(blockId, OpenMode.ForRead);
 
-            // Bỏ qua *Model_Space, *Paper_Space, anonymous block và mọi block của xref.
-            if (block.IsLayout || block.IsAnonymous || block.Name.StartsWith("*")
-                || block.IsFromExternalReference || block.IsFromOverlayReference)
+            // Bỏ qua *Model_Space, *Paper_Space, anonymous block và mọi block của xref — kể cả block PHỤ THUỘC
+            // xref ("SITE|DETAIL-A", IsDependent): xoá nó là làm hỏng bảng ký hiệu của xref.
+            if (block.IsLayout || block.Name.StartsWith("*") || AcadHelpers.IsProtectedBlock(block)
+                || block.Name.IndexOf('|') >= 0)
             {
                 continue;
             }
@@ -184,6 +186,21 @@ public sealed class DrawingCleanupCommand : ICoreCommand<CleanupConfig>
                 if (entity.LinetypeId.IsValid)
                 {
                     used.Add(entity.LinetypeId);
+                }
+            }
+        }
+
+        // Dim style tham chiếu linetype cho đường kích thước/đường gióng (DIMLTYPE, DIMLTEX1, DIMLTEX2) —
+        // cùng lý do với Dimtxsty ở CollectUsedTextStyleIds; bỏ sót là dim mất nét đứt khi in.
+        var dimStyleTable = (DimStyleTable)transaction.GetObject(database.DimStyleTableId, OpenMode.ForRead);
+        foreach (ObjectId dimStyleId in dimStyleTable)
+        {
+            var dimStyle = (DimStyleTableRecord)transaction.GetObject(dimStyleId, OpenMode.ForRead);
+            foreach (var id in new[] { dimStyle.Dimltype, dimStyle.Dimltex1, dimStyle.Dimltex2 })
+            {
+                if (id.IsValid)
+                {
+                    used.Add(id);
                 }
             }
         }

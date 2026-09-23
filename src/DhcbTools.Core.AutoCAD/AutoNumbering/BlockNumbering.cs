@@ -145,6 +145,7 @@ internal static class BlockNumbering
         }
 
         var updated = 0;
+        var unchanged = 0;
         var missing = 0;
 
         foreach (var (refId, value) in plan)
@@ -169,9 +170,15 @@ internal static class BlockNumbering
                 {
                     attRef.UpgradeOpen();
                     attRef.TextString = value;
+                    attRef.AdjustAlignment(database);
+                    updated++;
+                }
+                else
+                {
+                    // Trước đây đếm cả attribute không đổi → "Đã đánh số 200/200" khi không ghi gì.
+                    unchanged++;
                 }
 
-                updated++;
                 written = true;
                 break;
             }
@@ -184,7 +191,7 @@ internal static class BlockNumbering
 
         transaction.Commit();
 
-        var result = CommandResult.Ok(request.DoneSummary(updated, plan.Count), updated);
+        var result = CommandResult.Ok(request.DoneSummary(updated, plan.Count) + (unchanged > 0 ? $" {unchanged} attribute đã đúng số, không ghi." : string.Empty), updated);
         if (missing > 0)
         {
             result.Messages.Add(string.IsNullOrEmpty(request.AttributeTag)

@@ -101,6 +101,8 @@ public sealed class AttributeImportCommand : ICoreCommand<AttributeImportConfig>
                 {
                     attRef.UpgradeOpen();
                     attRef.TextString = value;
+                    // Attribute canh giữa/Fit/Aligned giữ hình học canh cũ sau khi đổi chữ — tag lệch khỏi bong bóng.
+                    attRef.AdjustAlignment(database);
                 }
 
                 updated++;

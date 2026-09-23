@@ -152,7 +152,11 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
 
         if (config.DeleteEmptySource)
         {
-            var stillUsed = AcadHelpers.CollectUsedLayerNames(database, transaction);
+            // Xem trước chưa đổi layer của entity nên tập "đang dùng" thật vẫn chứa mọi layer nguồn → báo "xoá 0";
+            // chạy thật rồi xoá 40 layer. Tính tập SAU khi đổi (áp bảng map lên entity ngoài block bảo vệ).
+            var stillUsed = config.DryRun
+                ? AcadHelpers.CollectUsedLayerNamesAfterMap(database, transaction, sourceToTarget)
+                : AcadHelpers.CollectUsedLayerNames(database, transaction);
 
             foreach (var source in sourceToTarget.Keys)
             {
@@ -213,7 +217,7 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
     {
         if (row.Color is not null)
         {
-            if (short.TryParse(row.Color, out var aci) && aci >= 1 && aci <= 255)
+            if (short.TryParse(row.Color, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var aci) && aci >= 1 && aci <= 255)
             {
                 layer.Color = Color.FromColorIndex(ColorMethod.ByAci, aci);
             }

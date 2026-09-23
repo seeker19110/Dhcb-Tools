@@ -38,7 +38,16 @@ public sealed class DrawingCompareCommand : ICoreCommand<DrawingCompareConfig>
         List<EntitySnapshot> other;
         using (var otherDb = new Database(false, true))
         {
-            otherDb.ReadDwgFile(config.OtherPath, FileOpenMode.OpenForReadAndAllShare, true, null);
+            try
+            {
+                otherDb.ReadDwgFile(config.OtherPath, FileOpenMode.OpenForReadAndAllShare, true, null);
+            }
+            catch (Autodesk.AutoCAD.Runtime.Exception ex)
+            {
+                // File đang mở ở phiên khác, bản DWG mới hơn, hoặc không phải DWG: eFileSharingViolation…
+                return CommandResult.Fail($"Không đọc được bản vẽ để so \"{config.OtherPath}\": {ex.ErrorStatus} — đóng file ở phiên khác hoặc lưu về định dạng AutoCAD đang chạy.");
+            }
+
             other = Snapshot(otherDb);
         }
 
