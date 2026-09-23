@@ -132,11 +132,26 @@ public sealed class BatchJobRunner
                     }
                 }
 
-                Save(doc, job, file, outputFolder, runLogPath, entries, forceDryRun, anyStepFailed);
+                try
+                {
+                    Save(doc, job, file, outputFolder, runLogPath, entries, forceDryRun, anyStepFailed);
+                }
+                catch (Exception ex)
+                {
+                    // Save tự bắt lỗi của doc.Save/SaveAs, nhưng Path.Combine (ký tự lạ) hay RunLog.Append
+                    // (file log bị khoá) nằm ngoài — ném ra đây thì cả đêm batch chết ở file này.
+                    var failed = new RunLogEntry { File = file.Path, Command = "Save:" + job.SaveMode, Success = false, Summary = "Lỗi khi lưu: " + ex.Message };
+                    entries.Add(failed);
+                    try { RunLog.Append(runLogPath, failed); } catch { /* log không ghi được — đã có trong entries */ }
+                    Log?.Invoke("  ERR Save: " + ex.Message);
+                }
             }
             finally
             {
-                try { doc.Close(false); } catch { /* đã đóng */ }
+                if (doc != null)
+                {
+                    try { doc.Close(false); } catch (Exception ex) { Log?.Invoke("  Không đóng được " + file.Path + ": " + ex.Message); }
+                }
             }
         }
 

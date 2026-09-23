@@ -129,7 +129,7 @@ public static partial class Program
             // bao giờ tới lượt vì ReadToEnd chặn vô hạn.
             var stdoutTask = p.StandardOutput.ReadToEndAsync();
             var stderrTask = p.StandardError.ReadToEndAsync();
-            var timedOut = !p.WaitForExit((int)Math.Max(60_000, (deadline - DateTime.Now).TotalMilliseconds));
+            var timedOut = !p.WaitForExit((int)Math.Min(int.MaxValue, Math.Max(60_000, (deadline - DateTime.Now).TotalMilliseconds)));
             if (timedOut)
             {
                 try { p.Kill(true); } catch { /* ignore */ }

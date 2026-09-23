@@ -106,7 +106,16 @@ public static partial class Program
             if (!process.WaitForExit(60_000))
             {
                 Console.Error.WriteLine("Revit không thoát sau khi xong — kết thúc tiến trình.");
-                try { process.Kill(true); } catch { /* ignore */ }
+                try { process.Kill(true); } catch { /* tiến trình có thể vừa thoát */ }
+                // Không chờ thì Revit.exe zombie giữ .slog của model, đêm sau không mở được file — như đường AutoCAD.
+                try
+                {
+                    if (!process.WaitForExit(10_000))
+                    {
+                        Console.Error.WriteLine("Revit vẫn chưa thoát sau 10 giây kể từ Kill — kiểm tra tiến trình treo trước lượt chạy sau.");
+                    }
+                }
+                catch { /* WaitForExit ném khi tiến trình đã biến mất */ }
             }
         }
 

@@ -130,7 +130,7 @@ public sealed class AsBuiltStampCommand : ICoreCommand<AsBuiltStampConfig>
             sheets,
             anchors,
             layout,
-            includeAllStampElements: config.Overwrite && !config.DryRun);
+            includeAllStampElements: config.Overwrite); // cùng bộ lọc cho xem trước và chạy thật
         var toStamp = new List<(ViewSheet Sheet, XYZ Anchor, List<Element> Existing)>();
         foreach (var sheet in sheets)
         {
@@ -149,9 +149,10 @@ public sealed class AsBuiltStampCommand : ICoreCommand<AsBuiltStampConfig>
 
         if (config.DryRun)
         {
-            foreach (var (sheet, _, _) in toStamp)
+            foreach (var (sheet, _, existing) in toStamp)
             {
-                result.Messages.Add($"[Xem trước] {sheet.SheetNumber} \"{sheet.Name}\": sẽ vẽ dấu Mẫu {config.Mau} ({layout.WidthMm:0} × {layout.HeightMm:0} mm).");
+                result.Messages.Add($"[Xem trước] {sheet.SheetNumber} \"{sheet.Name}\": sẽ vẽ dấu Mẫu {config.Mau} ({layout.WidthMm:0} × {layout.HeightMm:0} mm)"
+                                    + (existing.Count > 0 ? $" — xoá {existing.Count} phần tử của dấu cũ trước (overwrite=true)." : "."));
             }
 
             result.Summary = toStamp.Count == 0

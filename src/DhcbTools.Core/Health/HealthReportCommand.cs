@@ -21,6 +21,7 @@ public sealed class HealthReportCommand : ICoreCommand<HealthReportConfig>
         try
         {
             var metrics = new HealthMetrics();
+            var notes = new List<string>();
 
             // --- a. Warnings ------------------------------------------------
             if (config.CheckWarnings)
@@ -81,7 +82,7 @@ public sealed class HealthReportCommand : ICoreCommand<HealthReportConfig>
 
                 metrics.InPlaceFamilyCount = inPlaceInstances.Count;
                 foreach (var fi in inPlaceInstances.Take(100))
-                    metrics.InPlaceFamilyNames.Add(fi.Name ?? "(unnamed)");
+                    metrics.InPlaceFamilyNames.Add(fi.Name ?? "(không tên)");
             }
 
             // --- e. File size -----------------------------------------------
@@ -93,7 +94,11 @@ public sealed class HealthReportCommand : ICoreCommand<HealthReportConfig>
                     if (fi.Exists)
                         metrics.FileSizeMb = fi.Length / 1048576.0;
                 }
-                catch (System.Exception) { /* ignore */ }
+                catch (System.Exception ex)
+                {
+                    // Báo cáo sức khoẻ mà im lặng ghi 0 MB khi không đọc được file là báo cáo sai — nói ra.
+                    notes.Add($"Không đọc được cỡ file \"{document.PathName}\": {ex.Message} — cột cỡ file để 0.");
+                }
             }
 
             // --- Generate HTML ----------------------------------------------
@@ -113,7 +118,9 @@ public sealed class HealthReportCommand : ICoreCommand<HealthReportConfig>
                              $"{metrics.OpenConnectorCount} connector hở" + HealthReportNotes.ConnectorScanNote(metrics.ConnectorScanSkipped, metrics.ConnectorScanAborted) + ", " +
                              $"{metrics.InPlaceFamilyCount} in-place family. " +
                              $"File: {outputPath}";
-            return CommandResult.Ok(summary, metrics.WarningCount);
+            var result = CommandResult.Ok(summary, metrics.WarningCount);
+            result.Messages.AddRange(notes);
+            return result;
         }
         catch (System.Exception ex)
         {

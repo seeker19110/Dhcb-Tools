@@ -124,7 +124,10 @@ internal sealed class RevitIdsElement : IIdsElement
                 // phần tử đều có Tag. Trước đây đường Revit trả rỗng khi thiếu Mark: dự án A báo 12 cửa "thiếu
                 // Tag" trong khi IfcTester/đường IFC trên chính file xuất ra báo 0 (§43). Muốn bắt "thiếu Mark"
                 // thì khai property/pattern, không phải attribute Tag.
-                return TextOf(_element, "Mark") ?? RevitCompat.IdValue(_element.Id).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                // Tra bằng BuiltInParameter chứ không bằng tên "Mark": trên Revit giao diện tiếng Việt/khác,
+                // LookupParameter("Mark") trả null và mọi phần tử bị coi là thiếu Mark.
+                var mark = _element.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.AsString();
+                return !string.IsNullOrWhiteSpace(mark) ? mark : RevitCompat.IdValue(_element.Id).ToString(System.Globalization.CultureInfo.InvariantCulture);
             case "description":
                 return TextOf(_element, "Description") ?? (_type != null ? TextOf(_type, "Description") : null);
             case "objecttype":

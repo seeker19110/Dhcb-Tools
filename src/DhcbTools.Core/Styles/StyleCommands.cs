@@ -110,19 +110,42 @@ public sealed class StylePurgeCommand : ICoreCommand<StylePurgeConfig>
         if (kinds.Contains("LinePatterns"))
         {
             var used = new HashSet<ElementId>(templateLinePatterns);
-            foreach (Category cat in document.Settings.Categories)
+            // Một category hỏng mà ném thì trước đây cả vòng lặp (kể cả subcategory còn lại) bị bỏ dở
+            // và KHÔNG đánh dấu "không chắc" — pattern đang dùng bị coi là thừa rồi xoá thật. Nay từng
+            // category/subcategory tự bọc, và bất kỳ lỗi nào cũng đưa nhóm LinePattern vào diện giữ lại.
+            void AddLinePatterns(Category c)
             {
                 try
                 {
-                    used.Add(cat.GetLinePatternId(GraphicsStyleType.Projection));
-                    used.Add(cat.GetLinePatternId(GraphicsStyleType.Cut));
-                    foreach (Category sub in cat.SubCategories)
+                    used.Add(c.GetLinePatternId(GraphicsStyleType.Projection));
+                    used.Add(c.GetLinePatternId(GraphicsStyleType.Cut));
+                }
+                catch (Exception ex)
+                {
+                    if (uncertain.Add("LinePattern"))
                     {
-                        used.Add(sub.GetLinePatternId(GraphicsStyleType.Projection));
-                        used.Add(sub.GetLinePatternId(GraphicsStyleType.Cut));
+                        result.Messages.Add($"LinePattern: không đọc được line pattern của category \"{c.Name}\" ({ex.Message})" + (config.KeepIfUncertain ? " — giữ nguyên nhóm này." : "."));
                     }
                 }
-                catch { /* category không có line pattern */ }
+            }
+
+            foreach (Category cat in document.Settings.Categories)
+            {
+                AddLinePatterns(cat);
+                try
+                {
+                    foreach (Category sub in cat.SubCategories)
+                    {
+                        AddLinePatterns(sub);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (uncertain.Add("LinePattern"))
+                    {
+                        result.Messages.Add($"LinePattern: không duyệt được subcategory của \"{cat.Name}\" ({ex.Message})" + (config.KeepIfUncertain ? " — giữ nguyên nhóm này." : "."));
+                    }
+                }
             }
             foreach (var v in views)
             {
@@ -220,7 +243,15 @@ public sealed class StylePurgeCommand : ICoreCommand<StylePurgeConfig>
                     foreach (var mid in e.GetMaterialIds(false)) used.Add(mid);
                     foreach (var mid in e.GetMaterialIds(true)) used.Add(mid);
                 }
-                catch { /* phần tử không có material */ }
+                catch (Exception ex)
+                {
+                    // Không đọc được material của một phần tử (hình học hỏng) ≠ "không dùng material":
+                    // material của nó có thể là cái duy nhất đang dùng — đánh dấu để (mặc định) không xoá.
+                    if (uncertain.Add("Material"))
+                    {
+                        result.Messages.Add($"Material: không đọc được material của phần tử {RevitCompat.IdValue(e.Id)} ({ex.Message})" + (config.KeepIfUncertain ? " — giữ nguyên nhóm này." : "."));
+                    }
+                }
             }
             foreach (var m in new FilteredElementCollector(document).OfClass(typeof(Material)).Cast<Material>())
             {
@@ -360,7 +391,8 @@ public sealed class ColorByParameterCommand : ICoreCommand<ColorByParameterConfi
         var palette = PaletteGenerator.Assign(valueOf.Values.OrderBy(v => v, StringComparer.OrdinalIgnoreCase), config.FixedColors);
         var counts = valueOf.Values.GroupBy(v => v, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
 
-        if (!string.IsNullOrEmpty(config.LegendCsvPath))
+        // Xem trước không được ghi file: legend CSV đè lên file đang có trong khi Bridge chỉ preview.
+        if (!string.IsNullOrEmpty(config.LegendCsvPath) && !config.DryRun)
         {
             var sb = new StringBuilder("Value,Color,Count\n");
             foreach (var kv in palette.OrderBy(k => k.Key, StringComparer.OrdinalIgnoreCase))
@@ -374,6 +406,11 @@ public sealed class ColorByParameterCommand : ICoreCommand<ColorByParameterConfi
         result.Messages.AddRange(palette.OrderByDescending(k => counts.TryGetValue(k.Key, out var c) ? c : 0).Take(50).Select(k => $"{k.Value} {(k.Key.Length == 0 ? "(trống)" : k.Key)}: {(counts.TryGetValue(k.Key, out var c) ? c : 0)}"));
         if (config.DryRun)
         {
+            if (!string.IsNullOrEmpty(config.LegendCsvPath))
+            {
+                result.Messages.Add($"[Xem trước] Sẽ ghi bảng chú giải ({palette.Count} giá trị) ra {config.LegendCsvPath}.");
+            }
+
             result.Summary = $"[Xem trước] Sẽ tô {elements.Count} phần tử theo \"{config.ParameterName}\" ({palette.Count} giá trị) trong \"{view.Name}\".";
             result.AffectedCount = elements.Count;
             return result;

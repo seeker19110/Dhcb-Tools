@@ -122,9 +122,35 @@ public partial class CommandFormWindow : Window
         RunButton.IsEnabled = false;
     }
 
-    private string Snapshot(JObject config) => PreviewSnapshot.Capture(config.ToString(),
-        _editors.Where(e => e.Field.Kind == FieldKind.FilePath)
-            .Select(e => config[e.Field.Name]?.ToString() ?? string.Empty));
+    /// <summary>
+    /// Ảnh chụp để so "đã xem trước đúng cái sắp chạy": file đầu vào VÀ nội dung thư mục đầu vào (thả thêm
+    /// .rfa vào thư mục giữa xem trước và chạy thật thì phải xem trước lại — như BridgeCommitGuard làm).
+    /// </summary>
+    private string Snapshot(JObject config)
+    {
+        var paths = new List<string>();
+        foreach (var editor in _editors)
+        {
+            var value = config[editor.Field.Name]?.ToString() ?? string.Empty;
+            if (editor.Field.Kind == FieldKind.FilePath)
+            {
+                paths.Add(value);
+            }
+            else if (editor.Field.Kind == FieldKind.FolderPath && !string.IsNullOrWhiteSpace(value) && Directory.Exists(value))
+            {
+                try
+                {
+                    paths.AddRange(Directory.EnumerateFiles(value, "*", SearchOption.AllDirectories).Take(4096));
+                }
+                catch (Exception)
+                {
+                    paths.Add(value); // không duyệt được thì ít nhất ghi tên thư mục
+                }
+            }
+        }
+
+        return PreviewSnapshot.Capture(config.ToString(), paths);
+    }
 
     private void OnRun(object sender, RoutedEventArgs e)
     {

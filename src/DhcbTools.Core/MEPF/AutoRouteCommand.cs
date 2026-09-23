@@ -310,6 +310,16 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
             // "tuyến đẹp" tìm trong không gian trống là kết quả vô nghĩa trông y hệt kết quả tốt.
             result.Summary = AutoRoutePlanner.PreviewSummary(segments.Count, path, elements, source);
             result.AffectedCount = segments.Count;
+            if (config.BuildRoute)
+            {
+                // Chạy thật sẽ dựng duct/pipe (và có thể xoá line) ngay sau khi vẽ line — preview phải nói
+                // điều đó, nếu không token xem-trước của Bridge xác nhận một việc nhỏ hơn việc sẽ làm.
+                var rc = config.RouteConfig ?? new RouteFromLinesConfig();
+                result.Summary += $" Sau đó sẽ dựng {rc.ElementType} (\"{rc.TypeName}\", hệ \"{rc.SystemType}\", {rc.SizeMm} mm) từ các line này"
+                                  + (rc.DeleteLines ? " và xoá line." : ".");
+                result.Messages.Add("[Xem trước] buildRoute=true: bước dựng MEP chỉ mô phỏng được sau khi line đã có — chạy thật gồm cả bước này.");
+            }
+
             return result;
         }
 
