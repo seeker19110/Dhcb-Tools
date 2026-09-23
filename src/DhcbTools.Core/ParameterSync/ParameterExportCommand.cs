@@ -36,6 +36,7 @@ public sealed class ParameterExportCommand : ICoreCommand<ParameterExportConfig>
         }
         sb.Append('\n');
 
+        var typeCache = new Dictionary<ElementId, Element?>();
         foreach (var element in collector)
         {
             sb.Append(element.Id.ToString()).Append(',')
@@ -44,7 +45,7 @@ public sealed class ParameterExportCommand : ICoreCommand<ParameterExportConfig>
 
             foreach (var paramName in config.ParameterNames)
             {
-                var value = ReadParameterAsString(element, paramName);
+                var value = ReadParameterAsString(element, paramName, typeCache);
                 sb.Append(',').Append(CsvEscape(value));
             }
             sb.Append('\n');
@@ -95,14 +96,29 @@ public sealed class ParameterExportCommand : ICoreCommand<ParameterExportConfig>
         return ids;
     }
 
-    internal static string ReadParameterAsString(Element element, string parameterName)
+    internal static string ReadParameterAsString(Element element, string parameterName) =>
+        ReadParameterAsString(element, parameterName, null);
+
+    /// <param name="typeCache">Cache ElementId type → Element cho một lượt xuất: 100.000 phần tử × 5 tham số kiểu = 500.000 GetElement nếu không cache.</param>
+    internal static string ReadParameterAsString(Element element, string parameterName, Dictionary<ElementId, Element?>? typeCache)
     {
         // Tra qua từ điển (tên đồng nghĩa tiếng Việt/Anh) trước khi kết luận "không có".
         var parameter = RevitCompat.LookupInstance(element, parameterName, parameterName);
         if (parameter is null)
         {
             // Không tìm thấy ở instance — thử tra ở Type (ví dụ tham số kiểu như "Fire Rating").
-            var typeElement = element.Document.GetElement(element.GetTypeId());
+            var typeId = element.GetTypeId();
+            Element? typeElement;
+            if (typeCache == null)
+            {
+                typeElement = element.Document.GetElement(typeId);
+            }
+            else if (!typeCache.TryGetValue(typeId, out typeElement))
+            {
+                typeElement = element.Document.GetElement(typeId);
+                typeCache[typeId] = typeElement;
+            }
+
             parameter = typeElement?.LookupParameter(parameterName);
         }
 

@@ -161,11 +161,22 @@ public sealed class ModelLinesFromCadCommand : ICoreCommand<ModelLinesFromCadCon
         // ── Đường đã có: chạy lại không đẻ bản sao ──────────────────────────
         var style = FindLineStyle(document, config.LineStyleName);
         var existing = ExistingModelCurves(document, style);
+        var weld = Math.Max(config.WeldToleranceMm, 1e-9);
+        // Chỉ mục đường đã có theo HAI đầu mút: đường mới chỉ so với đường có một đầu cách đầu của nó ≤ weld.
+        // Trước đây mỗi đường mới quét cả danh sách — chạy lại trên bản vẽ 50.000 đường là 2,5·10⁹ phép so.
+        var existingIndex = new Shared.Logic.Geometry.BoxSpatialHash<CadCurve>(Math.Max(weld, 1.0));
+        foreach (var e in existing)
+        {
+            existingIndex.InsertPoint(e.Start.X, e.Start.Y, e.Start.Z, e);
+            existingIndex.InsertPoint(e.End.X, e.End.Y, e.End.Z, e);
+        }
+
         var toCreate = new List<CadCurve>();
         var already = 0;
         foreach (var curve in filtered.Curves)
         {
-            if (existing.Any(e => CadCurveFilter.SameShape(e, curve, Math.Max(config.WeldToleranceMm, 1e-9))))
+            if (existingIndex.QueryPoint(curve.Start.X, curve.Start.Y, curve.Start.Z, weld)
+                .Any(e => CadCurveFilter.SameShape(e, curve, weld)))
             {
                 already++;
                 continue;

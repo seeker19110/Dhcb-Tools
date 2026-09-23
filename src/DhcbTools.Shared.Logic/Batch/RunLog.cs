@@ -93,6 +93,13 @@ namespace DhcbTools.Shared.Logic.Batch
         /// Ghi thêm một dòng, đã gắn sẵn chuỗi băm (mục 11.5). Đây là **điểm ghi duy nhất** của cả batch
         /// Revit lẫn AutoCAD, nên gắn dấu vết ở đây là phủ hết mọi đường ghi mà không sửa chỗ gọi nào.
         /// </summary>
+        /// <summary>
+        /// Số dòng Messages/Errors tối đa ghi vào log cho một entry. Lệnh xem trước Sleeve/Clash sinh một dòng
+        /// mỗi vị trí — không cắt thì một entry vài MB và <see cref="LastHash"/> (đọc cả file mỗi lần ghi) làm
+        /// đêm batch 400 entry đọc lại hàng chục GB. BatchReport cũng chỉ hiện 500 dòng.
+        /// </summary>
+        public const int MaxPersistedLines = 500;
+
         public static void Append(string path, RunLogEntry entry)
         {
             var dir = Path.GetDirectoryName(path);
@@ -100,6 +107,9 @@ namespace DhcbTools.Shared.Logic.Batch
             {
                 Directory.CreateDirectory(dir);
             }
+
+            Truncate(entry.Messages);
+            Truncate(entry.Errors);
 
             entry.PrevHash = LastHash(path) ?? HashChain.Genesis;
             entry.Hash = null;
@@ -119,6 +129,18 @@ namespace DhcbTools.Shared.Logic.Batch
         /// UTF-8 bị cắt đôi — đổi một lỗi không có lấy một lỗi khó thấy.
         /// </para>
         /// </summary>
+        private static void Truncate(List<string> lines)
+        {
+            if (lines == null || lines.Count <= MaxPersistedLines)
+            {
+                return;
+            }
+
+            var dropped = lines.Count - MaxPersistedLines;
+            lines.RemoveRange(MaxPersistedLines, dropped);
+            lines.Add("… và " + dropped.ToString(System.Globalization.CultureInfo.InvariantCulture) + " dòng nữa (đã cắt khi ghi log, xem báo cáo lệnh để đủ).");
+        }
+
         internal static string? LastHash(string path)
         {
             if (!File.Exists(path))
