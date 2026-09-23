@@ -13,7 +13,7 @@ lệnh (batch chạy đêm), hoặc từ trợ lý AI (qua Bridge/MCP).
 
 ## Dùng được ngay hôm nay: 14 lệnh đã kiểm giá trị rõ
 
-Dự án có 64 lệnh, nhưng phần lớn mới chỉ *chạy được* — chưa có bằng chứng người dùng ngoài tác giả thật sự
+Dự án có 68 lệnh (53 Revit + 15 AutoCAD), nhưng phần lớn mới chỉ *chạy được* — chưa có bằng chứng người dùng ngoài tác giả thật sự
 cần đến. 14 lệnh dưới đây là bậc **hỗ trợ**: giá trị đã rõ qua vòng đóng vai kỹ sư, nên dùng trước tiên.
 Nút Ribbon của các lệnh còn lại (bậc **thử nghiệm**) có ghi chú riêng trong tooltip.
 
@@ -55,7 +55,7 @@ Nút Ribbon của các lệnh còn lại (bậc **thử nghiệm**) có ghi chú
 
 | Muốn biết | Đọc |
 |---|---|
-| Toàn bộ 64 lệnh, cấu trúc mã nguồn | [`README.md`](../README.md) |
+| Toàn bộ 68 lệnh, cấu trúc mã nguồn | [`README.md`](../README.md) |
 | Việc đang làm, số liệu chi tiết | [`progress.md`](progress.md) |
 | Kế hoạch phía trước | [`roadmap.md`](roadmap.md) |
 | Đánh giá độc lập, điểm yếu, tầm nhìn 24 tháng | [`danh-gia-va-tam-nhin-2026-09-06.md`](danh-gia-va-tam-nhin-2026-09-06.md) |

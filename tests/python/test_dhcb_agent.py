@@ -105,6 +105,12 @@ class RequestTests(unittest.TestCase):
         self.assertIsNone(sent.data)
         self.assertEqual("Bearer tk", sent.get_header("Authorization"))
 
+    def test_khong_co_token_thi_khong_gui_header_rong(self) -> None:
+        # Header "Bearer " rỗng bị Bridge đếm là một lần sai token; 5 lần là tự khoá mình 5 phút.
+        with mock.patch.dict(dhcb_agent.os.environ, {"DHCB_BRIDGE_TOKEN": ""}),                 mock.patch.object(dhcb_agent, "load_token", return_value=""),                 fake_urlopen({"tools": []}) as urlopen:
+            dhcb_agent.request("revit", "GET", "/tools")
+        self.assertIsNone(urlopen.call_args[0][0].get_header("Authorization"))
+
     def test_post_gui_json(self) -> None:
         with fake_urlopen({"success": True}) as urlopen:
             dhcb_agent.request("revit", "POST", "/execute", {"command": "KiemTra"})
@@ -272,7 +278,8 @@ class BuildConfigTests(unittest.TestCase):
     def test_export_mac_dinh_ghi_ra_public(self) -> None:
         config = dhcb_agent.build_config(self._args(command="ParameterExport"), "revit", True)
 
-        self.assertEqual("C:/Users/Public/dhcb_revit_export.csv", config["outputPath"])
+        self.assertTrue(config["outputPath"].endswith("/DHCB/exports/dhcb_revit_export.csv"), config["outputPath"])
+        self.assertNotIn("Users/Public", config["outputPath"])
 
     def test_export_lay_het_bo_loc_duoc_khai(self) -> None:
         config = dhcb_agent.build_config(

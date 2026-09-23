@@ -65,7 +65,9 @@ def request(app: str, method: str, path: str, payload=None, timeout: int = 35) -
         payload = {**payload, "documentId": context["documentId"]}
     url = base_url(app) + path
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
-    headers = {"Authorization": "Bearer " + load_token()}
+    token = load_token()
+    # Không có token thì không gửi header rỗng: Bridge đếm đó là một lần sai token, 5 lần là khoá 5 phút.
+    headers = {"Authorization": "Bearer " + token} if token else {}
     if data is not None:
         headers["Content-Type"] = "application/json; charset=utf-8"
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
@@ -178,11 +180,17 @@ def print_result(result: dict):
         print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
+def default_export_path(app: str) -> str:
+    """CSV xuất mặc định nằm trong hồ sơ người dùng — C:/Users/Public thì mọi tài khoản trên máy đọc/đè được."""
+    base = os.environ.get("LOCALAPPDATA") or os.path.join(os.path.expanduser("~"), ".local", "share")
+    return os.path.join(base, "DHCB", "exports", f"dhcb_{app}_export.csv").replace("\\", "/")
+
+
 def build_config(args, app: str, dry_run: bool) -> dict:
     cmd_upper = args.command.upper()
     if cmd_upper in ("PARAMETEREXPORT", "LAYEREXPORT"):
         return {
-            "outputPath": args.output or f"C:/Users/Public/dhcb_{app}_export.csv",
+            "outputPath": args.output or default_export_path(app),
             **({"categories": args.categories} if args.categories else {}),
             **({"parameterNames": args.params} if args.params else {}),
             **({"filterNameContains": args.filter} if args.filter else {}),

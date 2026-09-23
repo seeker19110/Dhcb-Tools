@@ -12,10 +12,10 @@ transaction của tool và có kỹ sư duyệt**, cộng thêm ràng buộc **k
 
 | Tính năng | Lệnh / điểm vào | Phần thuần (test) | Đầu ra |
 |---|---|---|---|
-| 5.1 Map layer CAD → Revit type | Revit `CadLayerMap` (nút *Map layer CAD→Type*), AutoCAD `DHCB_LAYERMAP` | `Ai/LayerMappingSuggester` | CSV `Layer,RevitType,Confidence,NeedsReview,Reason` để duyệt trong Excel |
+| 5.1 Map layer CAD → Revit type | Revit `CadLayerMap` (nút *Map layer CAD→Type*), AutoCAD `DHCB_LAYER_MAP` | `Ai/LayerMappingSuggester` | CSV `Layer,RevitType,Confidence,NeedsReview,Reason` để duyệt trong Excel |
 | 5.2 Thuyết minh → config | Revit `SpecToConfig`, `scripts/dhcb_ai.py spec --pdf …` | `Ai/SpecTextExtractor` | JSON đúng schema `LevelSetup` + `ProjectInfo`, `dryRun:true`, kèm dòng gốc để đối chiếu |
 | 5.3 Phân tích cảnh báo chạy đêm | `BatchRunner --analyze`, `dhcb_ai.py warnings` | `Ai/WarningAnalyzer` | `warnings-summary.md`: gom theo nguyên nhân, thứ tự xử lý |
-| 5.4 Ra lệnh tiếng Việt | Revit nút *Ra lệnh tiếng Việt*, AutoCAD `DHCB_AI`, Bridge `POST /chat`, `dhcb_agent.py … chat` | `Ai/CommandIntentParser` + `Ai/CommandCatalog` | Lệnh + config đề xuất (`dryRun:true`), kỹ sư xác nhận mới chạy |
+| 5.4 Ra lệnh tiếng Việt | Revit nút *Ra lệnh tiếng Việt*; AutoCAD chỉ qua Bridge `POST /chat` (không có lệnh `DHCB_AI` trên dòng lệnh), `dhcb_agent.py … chat` | `Ai/CommandIntentParser` + `Ai/CommandCatalog` | Lệnh + config đề xuất (`dryRun:true`), kỹ sư xác nhận mới chạy |
 | 6.2 MCP server | `scripts/dhcb_mcp_server.py revit|autocad` | — | `tools/list` từ `GET /tools`, `tools/call` ép `dryRun` trừ khi `confirm:true` |
 
 ## Whitelist lệnh

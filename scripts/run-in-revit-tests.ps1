@@ -116,8 +116,14 @@ if (-not $SkipBuild) {
 }
 
 # ── 4. Cài add-in vào thư mục của người dùng ─────────────────────────────────
-$tfm = if ($RevitVersion -ge 2025) { 'net8.0-windows' } else { 'net48' }
+# TFM hỏi MSBuild theo đúng bảng map trong Directory.Build.props (2027+ là net10.0-windows) — bảng
+# viết tay ở đây từng thiếu nhánh net10, và Get-ChildItem trên thư mục không có thì im lặng: add-in
+# cũ vẫn nằm trong Addins và bộ ca "đạt" trên DLL cũ.
+$revitProj = Join-Path $repo 'src\DhcbTools.Revit\DhcbTools.Revit.csproj'
+$tfm = (& dotnet build $revitProj -getProperty:TargetFramework -p:RevitVersion=$RevitVersion).Trim()
+if (-not $tfm) { Stop-WithMessage "Không hỏi được TargetFramework của vỏ Revit cho RevitVersion=$RevitVersion" }
 $binDir = Join-Path $repo "src\DhcbTools.Revit\bin\Release\$tfm"
+if (-not (Test-Path $binDir)) { Stop-WithMessage "Chưa có $binDir — bỏ -SkipBuild hoặc build với -p:RevitVersion=$RevitVersion" }
 $addinDir = "$env:APPDATA\Autodesk\Revit\Addins\$RevitVersion"
 
 Write-Host "`n== Cài vào $addinDir"

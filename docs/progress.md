@@ -2,6 +2,11 @@
 
 Ảnh chụp tại thời điểm cập nhật gần nhất. Kế hoạch phía trước xem [`roadmap.md`](roadmap.md).
 
+> Bổ sung 2026-09-23: audit toàn diện lần hai (năm hướng song song, ~90 phát hiện) → ba PR #161/#162/PR 3;
+> đáng chú ý: gói bàn giao từng "ĐẠT" dù thiếu file, `StylePurge` có thể xoá pattern đang dùng, `AutoRoute`
+> xem trước không kể phần dựng MEP. Xem [audit-nang-cap-2026-09-23.md](audit-nang-cap-2026-09-23.md),
+> gồm bảng việc để lại cần quyết định.
+
 > Bổ sung 2026-09-07: triển khai sửa lỗi từ audit (MCP, preview, định danh model Bridge,
 > cổng test trước publish, tương thích AutoCAD 2026 và cố định API package).
 > Xem [báo cáo nâng cấp](audit-nang-cap-2026-09-07.md) để phân biệt kiểm chứng tại máy với
