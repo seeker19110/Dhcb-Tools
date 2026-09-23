@@ -147,7 +147,7 @@ internal static class GeometryQueries
             var body = schedule.GetTableData().GetSectionData(SectionType.Body);
             var rowCount = body.NumberOfRows;
             var columnCount = body.NumberOfColumns;
-            var limit = p.Limit > 0 ? Math.Min(p.Limit, rowCount) : rowCount;
+            var limit = Math.Min(p.EffectiveLimit, rowCount);
 
             var rows = new List<List<string>>();
             for (var r = 0; r < limit; r++)
@@ -211,10 +211,7 @@ internal static class GeometryQueries
             .WherePasses(new ElementMulticategoryFilter(ids.ToList()))
             .AsEnumerable();
 
-        if (p.Limit > 0)
-        {
-            collector = collector.Take(p.Limit);
-        }
+        collector = collector.Take(p.EffectiveLimit);
 
         foreach (var element in collector)
         {

@@ -1,4 +1,5 @@
 using System.IO;
+using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using DhcbTools.Core;
 using DhcbTools.Shared.Hosting;
@@ -22,6 +23,22 @@ internal static class CommandRunner
 
     public static string ConfigPath(string commandName) =>
         Path.Combine(ConfigDirectory, commandName + ".json");
+
+    /// <summary>
+    /// Document đang mở, hoặc null kèm hộp thoại "Chưa mở mô hình nào". Nút Ribbon không gắn
+    /// IExternalCommandAvailability nên vẫn bấm được ở màn hình Home — dereference thẳng
+    /// ActiveUIDocument.Document là NullReferenceException thành hộp "internal error" của Revit.
+    /// </summary>
+    public static Document? RequireDocument(ExternalCommandData commandData, string commandName)
+    {
+        var document = commandData.Application.ActiveUIDocument?.Document;
+        if (document is null)
+        {
+            TaskDialog.Show(commandName, "Chưa mở mô hình nào.");
+        }
+
+        return document;
+    }
 
     public static Result Run(ExternalCommandData commandData, string commandName)
     {

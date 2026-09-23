@@ -15,7 +15,12 @@ public sealed class RemoveUnusedViewsCommand : IExternalCommand
 {
     public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
     {
-        var document = commandData.Application.ActiveUIDocument.Document;
+        var document = CommandRunner.RequireDocument(commandData, "Dọn view thừa");
+        if (document is null)
+        {
+            return Result.Cancelled;
+        }
+
         var command = new Core.ModelCleanup.RemoveUnusedViewsCommand();
 
         var previewConfig = new CleanupConfig { DryRun = true };

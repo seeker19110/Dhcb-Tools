@@ -24,6 +24,7 @@ public sealed class App : IExternalApplication
 
     private DhcbHttpBridge? _bridge;
     private ElevationUpdater? _elevationUpdater;
+    private EventHandler<Autodesk.Revit.DB.Events.ApplicationInitializedEventArgs>? _onInitialized;
 
     public Result OnStartup(UIControlledApplication application)
     {
@@ -175,7 +176,7 @@ public sealed class App : IExternalApplication
             ("DhcbDictionaryLearn", "Học từ điển dự án", "DictionaryLearnRibbonCommand",
                 "Soi tên tham số thật của dự án và ghi vào dictionary.json (AI offline)."));
 
-        application.ControlledApplication.ApplicationInitialized += (sender, _) =>
+        _onInitialized = (sender, _) =>
         {
             // Phiên batch: chạy job rồi để runner đóng Revit — không dựng Bridge/updater cho phiên đó.
             if (sender is Application app && BatchStartupHook.RunIfRequested(app))
@@ -201,6 +202,7 @@ public sealed class App : IExternalApplication
 
             RegisterElevationUpdater(application);
         };
+        application.ControlledApplication.ApplicationInitialized += _onInitialized;
 
         return Result.Succeeded;
     }
@@ -208,6 +210,11 @@ public sealed class App : IExternalApplication
     public Result OnShutdown(UIControlledApplication application)
     {
         application.ControlledApplication.DocumentChanged -= OnDocumentChanged;
+        if (_onInitialized != null)
+        {
+            application.ControlledApplication.ApplicationInitialized -= _onInitialized;
+        }
+
         _elevationUpdater?.Unregister();
         _bridge?.Stop();
         _bridge?.Dispose();
@@ -228,11 +235,16 @@ public sealed class App : IExternalApplication
 
         try
         {
-            _elevationUpdater = new ElevationUpdater(application.ActiveAddInId, config: null, settings.MaxExecuteMs)
+            var updater = new ElevationUpdater(application.ActiveAddInId, config: null, settings.MaxExecuteMs)
             {
-                OnDisabled = reason => TaskDialog.Show("DHCB Tools", reason),
+                // OnDisabled chạy BÊN TRONG IUpdater.Execute — giữa pha regenerate/commit của transaction người
+                // dùng. Hộp thoại modal ở đó là gọi UI tái nhập không được hỗ trợ (treo hoặc sập Revit, mất
+                // việc chưa lưu). Ghi log; kỹ sư thấy trong %APPDATA%\DHCB\logs.
+                OnDisabled = reason => DhcbLog.Write("Revit", reason),
             };
-            _elevationUpdater.Register();
+            // Register() trả false khi phiên trước (reload add-in) đã đăng ký: không giữ instance không sở hữu
+            // đăng ký đó, nếu không OnShutdown sẽ gỡ nhầm updater của instance cũ.
+            _elevationUpdater = updater.Register() ? updater : null;
         }
         catch (Exception ex)
         {
