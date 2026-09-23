@@ -8,11 +8,17 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import sys
 import unittest
 import urllib.error
 from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
+
+# request() từ chối gửi khi KHÔNG có token (tránh tự khoá Bridge 5 phút). Máy dev có file token trong %APPDATA%
+# nên vô tình qua; runner CI thì không — mọi ca giả lập urlopen cần một token có sẵn. Ca nào kiểm chính
+# load_token() tự xoá biến này bằng mock.patch.dict(..., clear=True).
+os.environ.setdefault("DHCB_BRIDGE_TOKEN", "token-test-cho-bo-test-python-du-32-ky-tu")
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
