@@ -35,7 +35,11 @@ public sealed class LayerExportCommand : ICoreCommand<LayerExportConfig>
                 continue;
             }
 
-            var colorIndex = layer.Color.IsByAci ? layer.Color.ColorIndex.ToString(CultureInfo.InvariantCulture) : layer.Color.ColorValue.ToString();
+            // True color ghi số nguyên RGB (0xRRGGBB) — LayerCsvRow.ParseColor chỉ đọc số; ColorValue.ToString()
+            // là "Color [A=255, R=…]" nên xuất → nhập lại từng cảnh báo "màu không đọc được" ở mọi layer true color.
+            var colorIndex = layer.Color.IsByAci
+                ? layer.Color.ColorIndex.ToString(CultureInfo.InvariantCulture)
+                : (layer.Color.ColorValue.ToArgb() & 0xFFFFFF).ToString(CultureInfo.InvariantCulture);
             var linetype = GetLinetypeName(transaction, database, layer.LinetypeObjectId);
             var lineweight = layer.LineWeight.ToString();
             var plottable = layer.IsPlottable ? "true" : "false";

@@ -42,9 +42,61 @@ internal static class AcadHelpers
             var block = (BlockTableRecord)transaction.GetObject(blockId, OpenMode.ForRead);
             foreach (ObjectId entityId in block)
             {
-                if (transaction.GetObject(entityId, OpenMode.ForRead) is Entity entity)
+                if (transaction.GetObject(entityId, OpenMode.ForRead) is not Entity entity)
                 {
-                    used.Add(entity.Layer);
+                    continue;
+                }
+
+                used.Add(entity.Layer);
+
+                // AttributeReference thuộc BlockReference, KHÔNG nằm trong BlockTableRecord — bỏ sót thì layer chỉ chứa
+                // chữ của title block (TEXT-ATT) bị coi là rỗng và DrawingCleanup/LayerTranslate xoá nó.
+                if (entity is BlockReference blockRef)
+                {
+                    foreach (ObjectId attId in blockRef.AttributeCollection)
+                    {
+                        if (transaction.GetObject(attId, OpenMode.ForRead) is AttributeReference attRef)
+                        {
+                            used.Add(attRef.Layer);
+                        }
+                    }
+                }
+            }
+        }
+
+        return used;
+    }
+
+    /// <summary>
+    /// Như <see cref="CollectUsedLayerNames"/> nhưng tên layer của entity (ngoài block được bảo vệ) được thay theo
+    /// <paramref name="map"/> — để xem trước của LayerTranslate biết layer nguồn nào sẽ RỖNG sau khi đổi.
+    /// </summary>
+    public static HashSet<string> CollectUsedLayerNamesAfterMap(Database database, Transaction transaction, IReadOnlyDictionary<string, string> map)
+    {
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var blockTable = (BlockTable)transaction.GetObject(database.BlockTableId, OpenMode.ForRead);
+
+        foreach (ObjectId blockId in blockTable)
+        {
+            var block = (BlockTableRecord)transaction.GetObject(blockId, OpenMode.ForRead);
+            var protectedBlock = IsProtectedBlock(block);
+            foreach (ObjectId entityId in block)
+            {
+                if (transaction.GetObject(entityId, OpenMode.ForRead) is not Entity entity)
+                {
+                    continue;
+                }
+
+                used.Add(!protectedBlock && map.TryGetValue(entity.Layer, out var target) ? target : entity.Layer);
+                if (entity is BlockReference blockRef)
+                {
+                    foreach (ObjectId attId in blockRef.AttributeCollection)
+                    {
+                        if (transaction.GetObject(attId, OpenMode.ForRead) is AttributeReference attRef)
+                        {
+                            used.Add(!protectedBlock && map.TryGetValue(attRef.Layer, out var t2) ? t2 : attRef.Layer);
+                        }
+                    }
                 }
             }
         }

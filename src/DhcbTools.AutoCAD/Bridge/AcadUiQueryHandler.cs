@@ -259,6 +259,9 @@ internal static class AcadUiQueryHandler
             device.Update();
 
             var bitmap = view.GetSnapshot(new System.Drawing.Rectangle(0, 0, width, height));
+            // Gỡ drawable khỏi view TRƯỚC khi model/view bị Dispose theo thứ tự ngược khai báo — không thì view
+            // còn giữ model đã huỷ, gọi snapshot lặp lại trong một phiên là tích trạng thái GS rồi lỗi.
+            view.EraseAll();
             device.Erase(view);
             tr.Abort();
             return bitmap;
@@ -272,7 +275,8 @@ internal static class AcadUiQueryHandler
     /// <summary>Chụp khung nhìn số 0 (model) đúng như đang hiện trên màn hình.</summary>
     private static System.Drawing.Bitmap SnapshotCurrentView(Document document, int width)
     {
-        using var view = document.GraphicsManager.GetCurrentAcGsView(0);
+        // View trả về là view SỐNG của phiên AutoCAD (không phải của mình) — Dispose nó là làm trắng/sập màn hình.
+        var view = document.GraphicsManager.GetCurrentAcGsView(0);
         var height = width * 3 / 4;
         return view.GetSnapshot(new System.Drawing.Rectangle(0, 0, width, height));
     }

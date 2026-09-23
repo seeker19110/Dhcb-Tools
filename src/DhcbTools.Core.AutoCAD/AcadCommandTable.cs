@@ -59,6 +59,16 @@ public static class AcadCommandTable
         {
             result = CommandResult.Fail(ex.Message);
         }
+        catch (Autodesk.AutoCAD.Runtime.Exception ex)
+        {
+            // Trước đây thoát ra Bridge/RunCommand thành thông báo trần "Lỗi khi chạy trong AutoCAD" không tên lệnh,
+            // và LogRun bị bỏ qua nên nhật ký sử dụng đếm thiếu lần thất bại.
+            result = CommandResult.Fail($"{command}: AutoCAD từ chối ({ex.ErrorStatus}): {ex.Message}");
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            result = CommandResult.Fail($"{command}: lỗi không lường trước — {ex.GetType().Name}: {ex.Message}");
+        }
 
         stopwatch.Stop();
         LogRun(descriptor?.Name ?? command, result, configJson, stopwatch.ElapsedMilliseconds);
