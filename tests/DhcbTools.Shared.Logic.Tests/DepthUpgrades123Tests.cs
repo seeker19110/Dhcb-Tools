@@ -297,7 +297,8 @@ namespace DhcbTools.Shared.Logic.Tests
                 var files = new List<HandoverFile>
                 {
                     new HandoverFile(outside, "IFC", 1, HandoverPackage.Sha256Of(outside)),
-                    new HandoverFile("..\\" + Path.GetFileName(outside), "PDF", 1, "x"),
+                    // Dùng dấu phân cách của hệ điều hành: "..\x" trên Linux chỉ là một tên file lạ, không phải đi lên.
+                    new HandoverFile(".." + Path.DirectorySeparatorChar + Path.GetFileName(outside), "PDF", 1, "x"),
                     new HandoverFile("", "CSV", 1, "x"),
                 };
 
