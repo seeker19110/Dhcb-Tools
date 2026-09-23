@@ -8,7 +8,7 @@ thành ba PR theo tầng để mỗi PR kiểm chứng được bằng đúng c�
 |---|---|---|
 | #161 | `Shared.Logic` + `Shared.Hosting` | 1.753 ca xUnit, phủ dòng 100 %; build hai vỏ |
 | #162 | Core Revit/AutoCAD, vỏ WPF, BatchRunner | build Revit 2024/2026 + AutoCAD 2026; ba bộ ca chạy **trong Revit 2024.3** (smoke 43/44, write-asbuilt 3/3, autoroute) |
-| PR 3 (nhánh `fix/audit-2026-09-23-ci-docs`) | CI, script, tài liệu | pytest + coverage 100 %; YAML đọc lại bằng parser; số lệnh đối chiếu bằng `CommandCatalog` |
+| #163 | CI, script, tài liệu | pytest + coverage 100 %; YAML đọc lại bằng parser; số lệnh đối chiếu bằng `CommandCatalog` |
 
 ## Phát hiện đáng chú ý nhất
 

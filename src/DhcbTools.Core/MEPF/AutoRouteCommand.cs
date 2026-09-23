@@ -315,7 +315,10 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
                 // Chạy thật sẽ dựng duct/pipe (và có thể xoá line) ngay sau khi vẽ line — preview phải nói
                 // điều đó, nếu không token xem-trước của Bridge xác nhận một việc nhỏ hơn việc sẽ làm.
                 var rc = config.RouteConfig ?? new RouteFromLinesConfig();
-                result.Summary += $" Sau đó sẽ dựng {rc.ElementType} (\"{rc.TypeName}\", hệ \"{rc.SystemType}\", {rc.SizeMm} mm) từ các line này"
+                var size = rc.SizeMm == null ? "(mặc định)"
+                    : rc.SizeMm.Diameter.HasValue ? Shared.Logic.NumericText.Format(rc.SizeMm.Diameter.Value) + " mm"
+                    : Shared.Logic.NumericText.Format(rc.SizeMm.Width ?? 0) + "×" + Shared.Logic.NumericText.Format(rc.SizeMm.Height ?? 0) + " mm";
+                result.Summary += $" Sau đó sẽ dựng {rc.ElementType} (type \"{(string.IsNullOrWhiteSpace(rc.TypeName) ? "(mặc định)" : rc.TypeName)}\", hệ \"{(string.IsNullOrWhiteSpace(rc.SystemType) ? "(mặc định)" : rc.SystemType)}\", {size}) từ các line này"
                                   + (rc.DeleteLines ? " và xoá line." : ".");
                 result.Messages.Add("[Xem trước] buildRoute=true: bước dựng MEP chỉ mô phỏng được sau khi line đã có — chạy thật gồm cả bước này.");
             }

@@ -11,6 +11,9 @@ namespace DhcbTools.Shared.Hosting
     /// </summary>
     public static class BridgeTokenStore
     {
+        /// <summary>Độ dài token tối thiểu chấp nhận (file lẫn biến môi trường).</summary>
+        public const int MinTokenLength = 32;
+
         public const string EnvironmentVariable = "DHCB_BRIDGE_TOKEN";
 
         public static string DefaultDirectory =>
@@ -34,9 +37,6 @@ namespace DhcbTools.Shared.Hosting
         /// Bước thu ACL, tiêm được để test đường cảnh báo mà không cần một máy Windows có ACL hỏng thật;
         /// null = <see cref="TryRestrictToOwner"/>.
         /// </param>
-        /// <summary>Độ dài token tối thiểu chấp nhận (file lẫn biến môi trường).</summary>
-        public const int MinTokenLength = 32;
-
         public static string LoadOrCreate(string? path = null, Action<string>? log = null, Func<string, bool>? restrictToOwner = null)
         {
             var fromEnv = Environment.GetEnvironmentVariable(EnvironmentVariable);
@@ -48,7 +48,7 @@ namespace DhcbTools.Shared.Hosting
                 if (env.Length < MinTokenLength)
                 {
                     throw new InvalidOperationException(
-                        "Biến môi trường " + EnvironmentVariable + " phải dài ít nhất " + MinTokenLength
+                        "E-BRIDGE-TOKEN-SHORT: biến môi trường " + EnvironmentVariable + " phải dài ít nhất " + MinTokenLength
                         + " ký tự (đang " + env.Length + "). Bỏ biến để Bridge tự sinh token, hoặc đặt token dài hơn.");
                 }
 

@@ -1,5 +1,6 @@
 using Autodesk.AutoCAD.DatabaseServices;
 using DhcbTools.Shared.Logic;
+using DhcbTools.Shared.Logic.Cad;
 
 namespace DhcbTools.Core.AutoCAD.Attributes;
 
@@ -136,24 +137,11 @@ public sealed class AttributeImportCommand : ICoreCommand<AttributeImportConfig>
         return final;
     }
 
+    /// <summary>Handle đọc bằng <see cref="HandleText"/> (nhận cả "0x1A3", "(1A3)"); trước đây Convert.ToInt64 từ chối các dạng đó và nuốt lỗi.</summary>
     private static bool TryParseHandle(string text, out Handle handle)
     {
-        handle = default;
-        text = text.Trim();
-        if (text.Length == 0)
-        {
-            return false;
-        }
-
-        try
-        {
-            var value = Convert.ToInt64(text, 16);
-            handle = new Handle(value);
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
+        var ok = HandleText.TryParse(text, out var value);
+        handle = ok ? new Handle(value) : default;
+        return ok;
     }
 }

@@ -10,16 +10,4 @@ public sealed class LayerStandardCheckConfig
     public required string OutputPath { get; init; }
 }
 
-/// <summary>Một quy tắc đặt tên layer — layer hợp lệ nếu tên khớp ít nhất một pattern.</summary>
-public sealed class LayerNamingRule
-{
-    public string Pattern { get; set; } = string.Empty;
-
-    public string Description { get; set; } = string.Empty;
-}
-
-/// <summary>Dạng file bọc <c>{"rules":[...]}</c> — chính là dạng của configs/layer-rules.sample.json.</summary>
-public sealed class LayerRulesFile
-{
-    public List<LayerNamingRule>? Rules { get; set; }
-}
+// LayerNamingRule / LayerRulesFile nay ở Shared.Logic.Checks (LayerRuleSet) để có test trên CI.

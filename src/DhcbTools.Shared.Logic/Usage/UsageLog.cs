@@ -279,7 +279,7 @@ namespace DhcbTools.Shared.Logic.Usage
                     s.MedianMs.ToString(CultureInfo.InvariantCulture),
                     s.First.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
                     s.Last.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
-                })).Append('\n');
+                }, true)).Append('\n');
             }
 
             return sb.ToString();

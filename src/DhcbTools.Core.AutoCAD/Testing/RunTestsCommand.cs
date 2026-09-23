@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Autodesk.AutoCAD.DatabaseServices;
 using DhcbTools.Shared.Logic.Batch;
+using DhcbTools.Shared.Hosting.Testing;
 using DhcbTools.Shared.Logic.Testing;
 using Newtonsoft.Json.Linq;
 
@@ -63,7 +64,7 @@ public sealed class RunTestsCommand : ICoreCommand<RunTestsConfig>
         var only = new HashSet<string>(config.OnlyCommands, StringComparer.OrdinalIgnoreCase);
         var outcomes = new List<TestOutcome>();
 
-        var outputFolder = ResolveOutputFolder(config);
+        var outputFolder = TestReportWriter.ResolveOutputFolder(config.SuitePath, config.OutputFolder);
         var tokens = new JobTokenContext(
             outputFolder,
             Path.GetFileNameWithoutExtension(database.Filename ?? string.Empty),
@@ -118,7 +119,7 @@ public sealed class RunTestsCommand : ICoreCommand<RunTestsConfig>
             AcadCommandTable.LogUsage = true;
         }
 
-        return WriteReports(suite, config, outcomes);
+        return TestReportWriter.Write(suite, outputFolder, "in-autocad-tests", outcomes);
     }
 
     private static TestObservation Run(Database database, TestCase testCase, bool allowWrites, JobTokenContext tokens)
@@ -159,48 +160,5 @@ public sealed class RunTestsCommand : ICoreCommand<RunTestsConfig>
                 Exception = ex.ToString(),
             };
         }
-    }
-
-    private static string ResolveOutputFolder(RunTestsConfig config) =>
-        string.IsNullOrWhiteSpace(config.OutputFolder)
-            ? Path.GetDirectoryName(Path.GetFullPath(config.SuitePath)) ?? "."
-            : config.OutputFolder!;
-
-    private static CommandResult WriteReports(TestSuite suite, RunTestsConfig config, List<TestOutcome> outcomes)
-    {
-        var folder = ResolveOutputFolder(config);
-
-        var summary = TestReport.Summarise(outcomes);
-        var result = TestReport.FailedCount(outcomes) == 0
-            ? CommandResult.Ok(summary, TestReport.PassedCount(outcomes))
-            : CommandResult.Fail(summary);
-
-        try
-        {
-            Directory.CreateDirectory(folder);
-            var trx = Path.Combine(folder, "in-autocad-tests.trx");
-            var markdown = Path.Combine(folder, "in-autocad-tests.md");
-            File.WriteAllText(trx, TestReport.ToTrx(suite.Name, outcomes));
-            File.WriteAllText(markdown, TestReport.ToMarkdown(suite.Name, suite.Model, outcomes));
-            result.Messages.Add($"Báo cáo: {trx}");
-            result.Messages.Add($"Báo cáo: {markdown}");
-        }
-        catch (Exception ex)
-        {
-            result.Messages.Add("Không ghi được báo cáo: " + ex.Message);
-        }
-
-        foreach (var failed in outcomes.Where(o => !o.Passed && !o.Skipped))
-        {
-            result.Errors.Add($"{failed.Name} ({failed.Command}): {string.Join("; ", failed.Failures)}");
-        }
-
-        foreach (var outcome in outcomes)
-        {
-            var verdict = outcome.Skipped ? "BỎ QUA" : outcome.Passed ? "ĐẠT" : "TRƯỢT";
-            result.Messages.Add($"[{verdict}] {outcome.Name} ({outcome.Command}) — {outcome.ElapsedMs} ms");
-        }
-
-        return result;
     }
 }

@@ -10,6 +10,9 @@ namespace DhcbTools.Shared.Logic
     /// </summary>
     public static class NumericText
     {
+        /// <summary>netstandard2.0 không có <c>double.IsFinite</c>.</summary>
+        private static bool IsFinite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
+
         /// <summary>Ghi Double ra chuỗi round-trip được, không phụ thuộc culture máy.</summary>
         public static string Format(double value)
         {
@@ -33,9 +36,6 @@ namespace DhcbTools.Shared.Logic
         /// tiếng Việt). Vì ô CSV đã tách theo dấu phẩy nên một ô không bao giờ chứa dấu phẩy phân nhóm
         /// hàng nghìn trừ khi được bọc nháy — trường hợp đó ta coi dấu phẩy là dấu thập phân.
         /// </summary>
-        /// <summary>netstandard2.0 không có <c>double.IsFinite</c>.</summary>
-        private static bool IsFinite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
-
         public static bool TryParseDouble(string? text, out double value)
         {
             value = 0;

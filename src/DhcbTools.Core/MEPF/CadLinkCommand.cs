@@ -168,74 +168,19 @@ public sealed class CadLinkCommand : ICoreCommand<CadLinkConfig>
             .ThenBy(v => v.Name, StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault();
 
+    /// <summary>Bảng chữ → tên enum nằm ở <see cref="CadImportOptions"/> (thuần, có test); đây chỉ ép sang enum Revit.</summary>
     internal static bool TryParseUnit(string? text, out ImportUnit unit, out string error)
     {
-        error = string.Empty;
-        unit = ImportUnit.Default;
-        var value = (text ?? string.Empty).Trim().ToLowerInvariant();
-        switch (value)
-        {
-            case "":
-            case "auto":
-            case "default":
-                unit = ImportUnit.Default;
-                return true;
-            case "mm":
-            case "milimet":
-            case "millimeter":
-                unit = ImportUnit.Millimeter;
-                return true;
-            case "cm":
-            case "centimet":
-                unit = ImportUnit.Centimeter;
-                return true;
-            case "m":
-            case "met":
-            case "mét":
-                unit = ImportUnit.Meter;
-                return true;
-            case "inch":
-            case "in":
-                unit = ImportUnit.Inch;
-                return true;
-            case "ft":
-            case "foot":
-            case "feet":
-                unit = ImportUnit.Foot;
-                return true;
-            default:
-                error = $"Đơn vị \"{text}\" không hợp lệ. Hợp lệ: auto (Revit tự đọc từ file), mm, cm, m, inch, ft.";
-                return false;
-        }
+        var ok = CadImportOptions.TryParseUnit(text, out var name, out error);
+        unit = (ImportUnit)Enum.Parse(typeof(ImportUnit), name);
+        return ok;
     }
 
     internal static bool TryParsePlacement(string? text, out ImportPlacement placement, out string error)
     {
-        error = string.Empty;
-        placement = ImportPlacement.Origin;
-        var value = (text ?? string.Empty).Trim().ToLowerInvariant();
-        switch (value)
-        {
-            case "":
-            case "origin":
-            case "goc":
-            case "gốc":
-                placement = ImportPlacement.Origin;
-                return true;
-            case "shared":
-            case "chung":
-                placement = ImportPlacement.Shared;
-                return true;
-            case "centered":
-            case "center":
-            case "giua":
-            case "giữa":
-                placement = ImportPlacement.Centered;
-                return true;
-            default:
-                error = $"Cách đặt \"{text}\" không hợp lệ. Hợp lệ: origin (gốc dự án), shared (toạ độ chung), centered (giữa view).";
-                return false;
-        }
+        var ok = CadImportOptions.TryParsePlacement(text, out var name, out error);
+        placement = (ImportPlacement)Enum.Parse(typeof(ImportPlacement), name);
+        return ok;
     }
 
     private static string DescribeUnit(ImportUnit unit) => unit == ImportUnit.Default ? "tự đọc từ file" : unit.ToString();

@@ -93,11 +93,21 @@ namespace DhcbTools.Shared.Hosting
             Volatile.Write(ref _state, (int)BridgeJobStatus.Done);
         }
 
-        public void Fail(string error, DateTime utcNow)
+        /// <summary>
+        /// Ghi lỗi — chỉ khi job còn đang chạy. Job đã Done (Completion đã trả kết quả) mà vỏ ném sau đó
+        /// (dọn dẹp, tháo idle-loop) thì KHÔNG được lật thành Error: kết quả ghi thật đã có, client đọc
+        /// "Lỗi thực thi" sẽ chạy lại lệnh — ghi hai lần.
+        /// </summary>
+        public bool Fail(string error, DateTime utcNow)
         {
+            if (Interlocked.CompareExchange(ref _state, (int)BridgeJobStatus.Error, (int)BridgeJobStatus.Running) != (int)BridgeJobStatus.Running)
+            {
+                return false;
+            }
+
             Volatile.Write(ref _error, error);
             FinishedUtc = utcNow;
-            Volatile.Write(ref _state, (int)BridgeJobStatus.Error);
+            return true;
         }
 
         /// <summary>

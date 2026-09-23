@@ -140,7 +140,7 @@ public sealed class BatchJobRunner
                 {
                     // Save tự bắt lỗi của doc.Save/SaveAs, nhưng Path.Combine (ký tự lạ) hay RunLog.Append
                     // (file log bị khoá) nằm ngoài — ném ra đây thì cả đêm batch chết ở file này.
-                    var failed = new RunLogEntry { File = file.Path, Command = "Save:" + job.SaveMode, Success = false, Summary = "Lỗi khi lưu: " + ex.Message };
+                    var failed = new RunLogEntry { File = file.Path, Command = "Save:" + job.SaveMode, Success = false, Summary = "Lỗi khi lưu: " + ex.Message, Errors = new List<string> { ex.ToString() } };
                     entries.Add(failed);
                     try { RunLog.Append(runLogPath, failed); } catch { /* log không ghi được — đã có trong entries */ }
                     Log?.Invoke("  ERR Save: " + ex.Message);

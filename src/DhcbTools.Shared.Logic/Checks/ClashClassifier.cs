@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using DhcbTools.Shared.Logic.Bcf;
 
 namespace DhcbTools.Shared.Logic.Checks
@@ -9,16 +10,16 @@ namespace DhcbTools.Shared.Logic.Checks
     public enum ClashType
     {
         /// <summary>Không va chạm: không giao nhau và khoảng hở đủ. Không ghi thành topic BCF.</summary>
-        None,
+        None = 0,
 
         /// <summary>Va chạm cứng: hai phần tử giao nhau sâu hơn dung sai thi công.</summary>
-        HardClash,
+        HardClash = 1,
 
         /// <summary>Va chạm mềm: không giao nhau nhưng khoảng hở cách nhiệt / bảo trì bị vi phạm.</summary>
-        SoftClash,
+        SoftClash = 2,
 
         /// <summary>Có giao nhau nhưng nông hơn dung sai thi công — ghi nhận, không cần dời tuyến.</summary>
-        ToleranceFlaw
+        ToleranceFlaw = 3
     }
 
     /// <summary>
@@ -106,6 +107,13 @@ namespace DhcbTools.Shared.Logic.Checks
         /// <summary>
         /// Phân loại một cặp phần tử.
         /// </summary>
+        /// <param name="idA">ElementId phần tử A.</param>
+        /// <param name="categoryA">Category phần tử A.</param>
+        /// <param name="idB">ElementId phần tử B.</param>
+        /// <param name="categoryB">Category phần tử B.</param>
+        /// <param name="xMm">Tâm va chạm X (mm).</param>
+        /// <param name="yMm">Tâm va chạm Y (mm).</param>
+        /// <param name="zMm">Tâm va chạm Z (mm).</param>
         /// <param name="overlapVolumeMm3">Thể tích giao (mm³); ≤ 0 = không giao.</param>
         /// <param name="distanceMm">Khoảng hở nhỏ nhất giữa hai phần tử (mm); 0 khi giao nhau.</param>
         /// <param name="toleranceMm">Dung sai thi công (mm) — độ sâu xuyên nhỏ hơn ngưỡng này chỉ là sai số.</param>
@@ -138,19 +146,24 @@ namespace DhcbTools.Shared.Logic.Checks
                 if (depth > toleranceMm)
                 {
                     type = ClashType.HardClash;
-                    rec = $"Yêu cầu dời tuyến hoặc đục lỗ mở cho {categoryA} #{idA} giao cắt {categoryB} #{idB}. "
-                          + $"Thể tích giao: {overlapVolumeMm3 / 1e9:F4} m³, xuyên sâu {depth:F0} mm (> dung sai {toleranceMm:F0} mm).";
+                    rec = string.Format(CultureInfo.InvariantCulture,
+                        "Yêu cầu dời tuyến hoặc đục lỗ mở cho {0} #{1} giao cắt {2} #{3}. Thể tích giao: {4:F4} m³, xuyên sâu {5:F0} mm (> dung sai {6:F0} mm).",
+                        categoryA, idA, categoryB, idB, overlapVolumeMm3 / 1e9, depth, toleranceMm);
                 }
                 else
                 {
                     type = ClashType.ToleranceFlaw;
-                    rec = $"Giao nhau {depth:F1} mm giữa {categoryA} #{idA} và {categoryB} #{idB} — nằm trong dung sai thi công {toleranceMm:F0} mm, ghi nhận không cần dời tuyến.";
+                    rec = string.Format(CultureInfo.InvariantCulture,
+                        "Giao nhau {0:F1} mm giữa {1} #{2} và {3} #{4} — nằm trong dung sai thi công {5:F0} mm, ghi nhận không cần dời tuyến.",
+                        depth, categoryA, idA, categoryB, idB, toleranceMm);
                 }
             }
             else if (distanceMm < requiredClearanceMm)
             {
                 type = ClashType.SoftClash;
-                rec = $"Vi phạm khoảng hở an toàn ({distanceMm:F0}mm < {requiredClearanceMm:F0}mm) giữa {categoryA} #{idA} và {categoryB} #{idB}. Cần điều chỉnh khoảng hở cách nhiệt.";
+                rec = string.Format(CultureInfo.InvariantCulture,
+                    "Vi phạm khoảng hở an toàn ({0:F0}mm < {1:F0}mm) giữa {2} #{3} và {4} #{5}. Cần điều chỉnh khoảng hở cách nhiệt.",
+                    distanceMm, requiredClearanceMm, categoryA, idA, categoryB, idB);
             }
             else
             {

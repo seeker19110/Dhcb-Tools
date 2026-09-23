@@ -120,7 +120,7 @@ if (-not $SkipBuild) {
 # viết tay ở đây từng thiếu nhánh net10, và Get-ChildItem trên thư mục không có thì im lặng: add-in
 # cũ vẫn nằm trong Addins và bộ ca "đạt" trên DLL cũ.
 $revitProj = Join-Path $repo 'src\DhcbTools.Revit\DhcbTools.Revit.csproj'
-$tfm = (& dotnet build $revitProj -getProperty:TargetFramework -p:RevitVersion=$RevitVersion).Trim()
+$tfm = (& dotnet build $revitProj --nologo -v q -getProperty:TargetFramework -p:RevitVersion=$RevitVersion | Select-Object -Last 1).Trim()
 if (-not $tfm) { Stop-WithMessage "Không hỏi được TargetFramework của vỏ Revit cho RevitVersion=$RevitVersion" }
 $binDir = Join-Path $repo "src\DhcbTools.Revit\bin\Release\$tfm"
 if (-not (Test-Path $binDir)) { Stop-WithMessage "Chưa có $binDir — bỏ -SkipBuild hoặc build với -p:RevitVersion=$RevitVersion" }

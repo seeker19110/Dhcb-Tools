@@ -1,6 +1,7 @@
 using Autodesk.AutoCAD.Colors;
 using Autodesk.AutoCAD.DatabaseServices;
 using DhcbTools.Shared.Logic;
+using DhcbTools.Shared.Logic.Cad;
 
 namespace DhcbTools.Core.AutoCAD.LayerTools;
 
@@ -305,29 +306,12 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
         return ObjectId.Null;
     }
 
-    /// <summary>Lineweight trong CSV: số nguyên 1/100 mm (25 → 0.25 mm), hoặc tên enum "LineWeight025", hoặc "ByLayer/ByBlock/Default".</summary>
+    /// <summary>Lineweight trong CSV: số nguyên 1/100 mm, mm thập phân, tên enum hoặc ByLayer/ByBlock/Default — bảng đọc ở <see cref="LineWeightText"/> (thuần, có test).</summary>
     internal static bool TryParseLineWeight(string text, out LineWeight lineWeight)
     {
-        lineWeight = LineWeight.ByLineWeightDefault;
-        var t = text.Trim();
-        if (t.Equals("Default", StringComparison.OrdinalIgnoreCase) || t.Equals("ByLineWeightDefault", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        if (int.TryParse(t, out var value))
-        {
-            lineWeight = (LineWeight)value;
-            return Enum.IsDefined(typeof(LineWeight), lineWeight);
-        }
-
-        if (Enum.TryParse(t, true, out LineWeight named) && Enum.IsDefined(typeof(LineWeight), named))
-        {
-            lineWeight = named;
-            return true;
-        }
-
-        return false;
+        var ok = LineWeightText.TryParse(text, out var value);
+        lineWeight = (LineWeight)value;
+        return ok && Enum.IsDefined(typeof(LineWeight), lineWeight);
     }
 
     private static bool TryParseBit(string text, out bool value)

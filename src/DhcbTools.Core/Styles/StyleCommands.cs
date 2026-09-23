@@ -77,8 +77,6 @@ public sealed class StylePurgeCommand : ICoreCommand<StylePurgeConfig>
                     }
                 }, $"override category của view template \"{t.Name}\"");
             }
-            if (uncertain.Contains("LinePattern")) uncertain.Add("FillPattern");
-            if (uncertain.Contains("FillPattern")) uncertain.Add("LinePattern");
         }
 
         if (kinds.Contains("ViewTemplates"))
@@ -269,6 +267,11 @@ public sealed class StylePurgeCommand : ICoreCommand<StylePurgeConfig>
                 toDelete.Add((id, kind, name));
             }
         }
+
+        // Line pattern và fill pattern đi cùng nhau trong override của view template: một bên không chắc thì
+        // bên kia cũng không — lan truyền SAU khi mọi khối gom đã chạy (kể cả khối category ở trên).
+        if (uncertain.Contains("LinePattern")) uncertain.Add("FillPattern");
+        if (uncertain.Contains("FillPattern")) uncertain.Add("LinePattern");
 
         if (config.KeepIfUncertain && uncertain.Count > 0)
         {
