@@ -96,7 +96,15 @@ namespace DhcbTools.Shared.Logic
         }
 
         /// <summary>Ghép một dòng CSV từ các ô, tự escape từng ô.</summary>
-        public static string JoinLine(IEnumerable<string> cells)
+        public static string JoinLine(IEnumerable<string> cells) => JoinLine(cells, false);
+
+        /// <summary>
+        /// Ghép một dòng CSV; <paramref name="guardFormulas"/> = true thì ô bắt đầu bằng <c>= + @</c>, TAB
+        /// (hay <c>-</c> mà không phải số) được thêm dấu nháy đơn đằng trước để Excel KHÔNG chạy như công thức.
+        /// Chỉ dùng cho CSV báo cáo (người mở bằng Excel); CSV để nhập ngược vào mô hình hoặc máy toàn đạc
+        /// phải giữ nguyên byte nên không bật.
+        /// </summary>
+        public static string JoinLine(IEnumerable<string> cells, bool guardFormulas)
         {
             var sb = new StringBuilder();
             var first = true;
@@ -106,10 +114,27 @@ namespace DhcbTools.Shared.Logic
                 {
                     sb.Append(',');
                 }
-                sb.Append(Escape(cell));
+                sb.Append(Escape(guardFormulas ? GuardFormula(cell) : cell));
                 first = false;
             }
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Vô hiệu công thức Excel trong một ô báo cáo: tên view <c>=HYPERLINK(...)</c> mở bằng Excel sẽ chạy
+        /// (CSV injection). Số âm ("-12.5") giữ nguyên vì là dữ liệu hợp lệ.
+        /// </summary>
+        public static string GuardFormula(string? value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return value ?? string.Empty;
+            }
+
+            var c = value![0];
+            var dangerous = c == '=' || c == '+' || c == '@' || c == '\t' || c == '\r'
+                            || (c == '-' && !NumericText.TryParseDouble(value, out _));
+            return dangerous ? "'" + value : value;
         }
 
         /// <summary>

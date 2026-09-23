@@ -101,7 +101,7 @@ namespace DhcbTools.Shared.Logic.Mep
                     NumericText.Format(r.Count),
                     NumericText.Format(r.TotalLengthMm / 1000.0, 2),
                     r.TotalLengthMm > 0 ? NumericText.Format(r.StockPieces(stockLengthMm, wastePercent)) : string.Empty,
-                })).Append('\n');
+                }, true)).Append('\n');
             }
             return sb.ToString();
         }

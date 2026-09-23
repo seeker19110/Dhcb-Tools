@@ -168,14 +168,21 @@ namespace DhcbTools.Shared.Logic.Usage
                     ? day.Add(t.TimeOfDay)
                     : day;
 
+                // Số quá cỡ (log bị sửa tay) thì bỏ dòng, đúng hợp đồng "bỏ qua dòng không hợp lệ" — không ném OverflowException.
+                if (!int.TryParse(m.Groups["aff"].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var affected)
+                    || !long.TryParse(m.Groups["ms"].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ms))
+                {
+                    continue;
+                }
+
                 entries.Add(new UsageEntry(
                     when,
                     app,
                     m.Groups["cmd"].Value,
                     bool.Parse(m.Groups["ok"].Value),
                     bool.Parse(m.Groups["dry"].Value),
-                    int.Parse(m.Groups["aff"].Value, CultureInfo.InvariantCulture),
-                    long.Parse(m.Groups["ms"].Value, CultureInfo.InvariantCulture)));
+                    affected,
+                    ms));
             }
 
             return entries;

@@ -385,8 +385,8 @@ namespace DhcbTools.Shared.Logic.Handover
                 var i = 0;
                 foreach (var f in input.Files)
                 {
-                    sb.Append("<tr><td>").Append(++i).Append("</td><td>").Append(HtmlText.Escape(f.RelativePath)).Append("</td><td>").Append(f.Kind)
-                      .Append("</td><td>").Append(SizeText(f.SizeBytes)).Append("</td><td><code>").Append(f.Sha256).Append("</code></td></tr>");
+                    sb.Append("<tr><td>").Append(++i).Append("</td><td>").Append(HtmlText.Escape(f.RelativePath)).Append("</td><td>").Append(HtmlText.Escape(f.Kind))
+                      .Append("</td><td>").Append(SizeText(f.SizeBytes)).Append("</td><td><code>").Append(HtmlText.Escape(f.Sha256)).Append("</code></td></tr>");
                 }
 
                 sb.Append("</table>");

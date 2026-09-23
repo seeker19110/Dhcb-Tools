@@ -21,6 +21,9 @@ namespace DhcbTools.Shared.Logic.Evidence
         /// <summary><c>prevHash</c> không khớp băm của dòng trước — có dòng bị chèn, xoá hoặc đảo chỗ.</summary>
         ChainBroken,
 
+        /// <summary>Chuỗi nguyên vẹn tới dòng cuối nhưng băm cuối không khớp mốc đã ghi nhận — log bị cắt đuôi.</summary>
+        Truncated,
+
         /// <summary>Dòng không đọc lại được để lấy <c>prevHash</c>.</summary>
         Malformed,
     }
@@ -174,7 +177,16 @@ namespace DhcbTools.Shared.Logic.Evidence
         /// Cách lấy <c>prevHash</c> ra khỏi một dòng — truyền từ ngoài vào để lớp này không phải biết
         /// tới định dạng bản ghi hay thư viện JSON nào. Trả null nghĩa là dòng không đọc được.
         /// </param>
-        public static ChainVerification Verify(IReadOnlyList<string> lines, Func<string, string?> prevHashOf)
+        public static ChainVerification Verify(IReadOnlyList<string> lines, Func<string, string?> prevHashOf) =>
+            Verify(lines, prevHashOf, null);
+
+        /// <summary>
+        /// Như <see cref="Verify(IReadOnlyList{string}, Func{string, string})"/> nhưng còn đối chiếu băm của dòng CUỐI
+        /// với <paramref name="expectedLastHash"/> (mốc ghi ở nơi khác: biên bản, e-mail, sổ tay). Chuỗi băm tự nó
+        /// không phát hiện được việc xoá N dòng cuối — cắt đuôi là cách sửa log rẻ nhất, nên mốc cuối là bắt buộc
+        /// khi log dùng làm bằng chứng.
+        /// </summary>
+        public static ChainVerification Verify(IReadOnlyList<string> lines, Func<string, string?> prevHashOf, string? expectedLastHash)
         {
             if (lines is null)
             {
@@ -238,6 +250,16 @@ namespace DhcbTools.Shared.Logic.Evidence
 
                 expectedPrev = hash;
                 done++;
+            }
+
+            if (!StringGuard.IsBlank(expectedLastHash)
+                && !string.Equals(expectedPrev, expectedLastHash!.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                return new ChainVerification(
+                    ChainStatus.Truncated,
+                    done,
+                    done == 0 ? (int?)null : done,
+                    $"Chuỗi nguyên vẹn tới dòng {done} nhưng băm cuối không khớp mốc đã ghi nhận — log bị cắt đuôi hoặc mốc thuộc log khác.");
             }
 
             return new ChainVerification(

@@ -149,7 +149,9 @@ namespace DhcbTools.Shared.Hosting
                     break;
                 }
 
-                _ = Task.Run(() => HandleRequest(ctx), ct);
+                // Không truyền ct: request đã nhận phải luôn được trả lời (kể cả khi đang Stop), nếu không
+                // client treo tới timeout của chính nó. Vòng lặp đã tự thoát khi ct huỷ.
+                _ = Task.Run(() => HandleRequest(ctx));
             }
         }
 
@@ -393,7 +395,13 @@ namespace DhcbTools.Shared.Hosting
 
             try
             {
-                _ = ExecuteAsync!(item);
+                // Vỏ ném SAU await đầu tiên thì không rơi vào catch bên dưới mà thành Task lỗi; không bắt thì
+                // job đứng "running" mãi (đã claim nên đồng hồ huỷ không đụng tới). Nối tiếp để ghi Fail.
+                ExecuteAsync!(item).ContinueWith(
+                    t => job.Fail("Lỗi thực thi: " + (t.Exception?.GetBaseException().Message ?? "không rõ"), DateTime.UtcNow),
+                    CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnFaulted,
+                    TaskScheduler.Default);
             }
             catch (Exception ex)
             {

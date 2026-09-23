@@ -90,7 +90,9 @@ namespace DhcbTools.Shared.Logic.Ids
               .Append(HtmlText.Escape(idsPath)).Append("<br><b>Số phần tử soi:</b> ")
               .Append(check.ElementCount.ToString(CultureInfo.InvariantCulture)).Append("</p>");
 
-            sb.Append("<p>").Append(scopeNote).Append("</p>");
+            // Chỉ hai câu ranh giới có sẵn mới được chèn thô (chúng chứa thẻ HTML); chuỗi khác từ bên gọi đi qua Escape.
+            var trustedNote = string.Equals(scopeNote, RevitScopeNote, StringComparison.Ordinal) || string.Equals(scopeNote, IfcScopeNote, StringComparison.Ordinal);
+            sb.Append("<p>").Append(trustedNote ? scopeNote : HtmlText.Escape(scopeNote)).Append("</p>");
 
             if (schemaWarnings.Count > 0)
             {

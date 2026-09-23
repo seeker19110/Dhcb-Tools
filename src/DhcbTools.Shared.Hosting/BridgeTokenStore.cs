@@ -34,19 +34,32 @@ namespace DhcbTools.Shared.Hosting
         /// Bước thu ACL, tiêm được để test đường cảnh báo mà không cần một máy Windows có ACL hỏng thật;
         /// null = <see cref="TryRestrictToOwner"/>.
         /// </param>
+        /// <summary>Độ dài token tối thiểu chấp nhận (file lẫn biến môi trường).</summary>
+        public const int MinTokenLength = 32;
+
         public static string LoadOrCreate(string? path = null, Action<string>? log = null, Func<string, bool>? restrictToOwner = null)
         {
             var fromEnv = Environment.GetEnvironmentVariable(EnvironmentVariable);
             if (!string.IsNullOrWhiteSpace(fromEnv))
             {
-                return fromEnv.Trim();
+                // Đường file đòi ≥ 32 ký tự; biến môi trường trước đây nhận cả "a" — token một ký tự thì
+                // khoá 5 lần/60 s của AuthLockout cũng không cứu được. Từ chối khởi động thay vì chạy yếu.
+                var env = fromEnv.Trim();
+                if (env.Length < MinTokenLength)
+                {
+                    throw new InvalidOperationException(
+                        "Biến môi trường " + EnvironmentVariable + " phải dài ít nhất " + MinTokenLength
+                        + " ký tự (đang " + env.Length + "). Bỏ biến để Bridge tự sinh token, hoặc đặt token dài hơn.");
+                }
+
+                return env;
             }
 
             var file = path ?? DefaultPath;
             if (File.Exists(file))
             {
                 var existing = File.ReadAllText(file).Trim();
-                if (existing.Length >= 32)
+                if (existing.Length >= MinTokenLength)
                 {
                     return existing;
                 }
@@ -69,12 +82,21 @@ namespace DhcbTools.Shared.Hosting
                                 + ") — file vẫn dùng được, quyền theo thư mục cha.");
                 }
 
-                if (File.Exists(file))
+                // Hai Bridge (Revit + AutoCAD) khởi động cùng lúc: bên thua không được đè token của bên thắng
+                // (bên thắng giữ token trong RAM không còn khớp file → client 401 tới khi khởi động lại).
+                // Move không đè: thất bại nghĩa là đã có file → đọc lại token của bên thắng.
+                if (!TryMoveNoOverwrite(temp, file))
                 {
-                    File.Delete(file);
-                }
+                    var winner = File.Exists(file) ? File.ReadAllText(file).Trim() : string.Empty;
+                    if (winner.Length >= MinTokenLength)
+                    {
+                        return winner;
+                    }
 
-                File.Move(temp, file);
+                    // File có nhưng ngắn/hỏng (không phải do Bridge khác vừa ghi) — thay như cũ.
+                    File.Delete(file);
+                    File.Move(temp, file);
+                }
             }
             finally
             {
@@ -128,6 +150,21 @@ namespace DhcbTools.Shared.Hosting
                 }
             }
             catch
+            {
+                return false;
+            }
+        }
+    
+
+        /// <summary>Đổi tên file KHÔNG đè: false khi đích đã tồn tại (một Bridge khác vừa ghi xong).</summary>
+        private static bool TryMoveNoOverwrite(string source, string destination)
+        {
+            try
+            {
+                File.Move(source, destination);
+                return true;
+            }
+            catch (IOException) when (File.Exists(destination))
             {
                 return false;
             }
