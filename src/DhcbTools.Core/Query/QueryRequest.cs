@@ -52,8 +52,18 @@ public sealed class QueryParams
     /// <summary>[families] Lọc theo family name (substring, case-insensitive).</summary>
     public string? FamilyNameContains { get; set; }
 
-    /// <summary>Giới hạn số record trả về (0 = không giới hạn).</summary>
+    /// <summary>
+    /// Giới hạn số record trả về. 0 (mặc định) = <see cref="DefaultLimit"/>. Trước đây 0 = không giới hạn:
+    /// một agent gửi {"query":"elements"} không lọc trên model 300.000 phần tử khoá luồng UI Revit vài phút,
+    /// request hết hạn 30 s và kết quả (đã dựng xong) bị vứt. Cần nhiều hơn thì nói rõ số.
+    /// </summary>
     public int Limit { get; set; } = 0;
+
+    /// <summary>Trần mặc định khi không khai <see cref="Limit"/>.</summary>
+    public const int DefaultLimit = 2000;
+
+    /// <summary>Giới hạn thực áp dụng.</summary>
+    public int EffectiveLimit => Limit > 0 ? Limit : DefaultLimit;
 
     // ── Giai đoạn 10.1 ────────────────────────────────────────────────────────
 

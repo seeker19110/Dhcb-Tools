@@ -34,7 +34,9 @@ snapshot  →  ảnh PNG để agent tự nhìn kết quả
 
 ## Truy vấn mới (10.1)
 
-Gọi qua `POST /query` hoặc tool `query` của MCP.
+Gọi qua `POST /query` hoặc tool `query` của MCP. Mọi truy vấn liệt kê nhận `limit`; **không khai thì mặc
+định 2000 dòng** (từ 2026-09-23 — trước đây 0 = không giới hạn, một agent gửi `elements` không lọc trên model
+300.000 phần tử khoá luồng UI Revit vài phút rồi request hết hạn). Cần nhiều hơn thì ghi rõ số.
 
 | Query | Params | Trả về |
 |---|---|---|

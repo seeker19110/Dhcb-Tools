@@ -145,12 +145,20 @@ internal sealed class BridgeEventHandler : IExternalEventHandler
     {
         using var _ = CoreContext.Use(FailurePolicy.SuppressWarnings);
         CoreContext.SuppressedWarnings.Clear();
-        var result = RevitCommandTable.Dispatch(doc, command, configJson);
-        foreach (var warning in CoreContext.SuppressedWarnings)
+        try
         {
-            result.Messages.Add("[Cảnh báo Revit bỏ qua] " + warning);
-        }
+            var result = RevitCommandTable.Dispatch(doc, command, configJson);
+            foreach (var warning in CoreContext.SuppressedWarnings)
+            {
+                result.Messages.Add("[Cảnh báo Revit bỏ qua] " + warning);
+            }
 
-        return result;
+            return result;
+        }
+        finally
+        {
+            // Dispatch ném thì danh sách (thread-static, luồng UI) còn nguyên và dính sang consumer kế tiếp.
+            CoreContext.SuppressedWarnings.Clear();
+        }
     }
 }

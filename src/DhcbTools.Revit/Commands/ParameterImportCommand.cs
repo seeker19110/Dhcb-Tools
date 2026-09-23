@@ -15,7 +15,11 @@ public sealed class ParameterImportCommand : IExternalCommand
 #if DHCB_SKIP_WPF
         return CommandRunner.Run(commandData, "ParameterImport");
 #else
-        var document = commandData.Application.ActiveUIDocument.Document;
+        var document = CommandRunner.RequireDocument(commandData, "Nhập tham số từ CSV");
+        if (document is null)
+        {
+            return Result.Cancelled;
+        }
 
         var dialog = new Microsoft.Win32.OpenFileDialog
         {

@@ -97,7 +97,7 @@ public static class RevitQueryHandler
         }
 
         // Take TRƯỚC khi ToList: limit=50 trên model 300 nghìn phần tử không được dựng 300 nghìn object.
-        if (p.Limit > 0) collector = collector.Take(p.Limit);
+        collector = collector.Take(p.EffectiveLimit);
         var list = collector.ToList();
 
         var rows = list.Select(e =>
@@ -189,7 +189,7 @@ public static class RevitQueryHandler
             };
         }).ToList();
 
-        if (p.Limit > 0) list = list.Take(p.Limit).ToList();
+        list = list.Take(p.EffectiveLimit).ToList();
 
         return new { count = list.Count, views = list };
     }
@@ -226,8 +226,11 @@ public static class RevitQueryHandler
     // ──────────────────────────────────────────────────────────────
     private static object GetRooms(Document doc, QueryParams p)
     {
+        // OfClass(typeof(SpatialElement)) bị Revit từ chối ("exists in the API, but not in Revit's native object
+        // model") — truy vấn rooms chưa từng chạy được. OfCategory là cách mọi lệnh khác trong repo dùng.
         var rooms = new FilteredElementCollector(doc)
-            .OfClass(typeof(SpatialElement))
+            .OfCategory(BuiltInCategory.OST_Rooms)
+            .WhereElementIsNotElementType()
             .OfType<Room>()
             .Where(r => r.Area > 0); // chỉ phòng đã đặt (có area)
 
@@ -250,7 +253,7 @@ public static class RevitQueryHandler
             locationMm   = (r.Location as LocationPoint)?.Point is { } pt ? new { x = Mm(pt.X), y = Mm(pt.Y), z = Mm(pt.Z) } : null,
         }).ToList();
 
-        if (p.Limit > 0) list = list.Take(p.Limit).ToList();
+        list = list.Take(p.EffectiveLimit).ToList();
 
         return new { count = list.Count, rooms = list };
     }
@@ -291,7 +294,7 @@ public static class RevitQueryHandler
         .OrderBy(f => f.name)
         .ToList();
 
-        if (p.Limit > 0) list = list.Take(p.Limit).ToList();
+        list = list.Take(p.EffectiveLimit).ToList();
 
         return new { count = list.Count, families = list };
     }

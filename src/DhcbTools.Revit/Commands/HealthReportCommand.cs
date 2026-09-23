@@ -15,7 +15,11 @@ public sealed class HealthReportCommand : IExternalCommand
 {
     public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
     {
-        var doc = commandData.Application.ActiveUIDocument.Document;
+        var doc = CommandRunner.RequireDocument(commandData, "Health Report");
+        if (doc is null)
+        {
+            return Result.Cancelled;
+        }
 
         string outputPath = System.IO.Path.Combine(
             System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments),
@@ -27,8 +31,14 @@ public sealed class HealthReportCommand : IExternalCommand
 
         if (result.Success)
         {
-            try { System.Diagnostics.Process.Start(outputPath); }
-            catch (System.Exception) { /* ignore if browser fails to open */ }
+            // .NET (Revit 2025+): Process.Start(string) mặc định UseShellExecute=false → mở .html ném Win32Exception
+            // và bị nuốt — báo cáo có nhưng browser không mở, kỹ sư tưởng lệnh không làm gì.
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(outputPath) { UseShellExecute = true }); }
+            catch (System.Exception ex)
+            {
+                DhcbLog.Write("Revit", "Không mở được báo cáo trong browser: " + ex.Message);
+                result.Messages.Add("Không tự mở được browser — mở tay file: " + outputPath);
+            }
         }
 
         Feedback.Show("Health Report", result);
