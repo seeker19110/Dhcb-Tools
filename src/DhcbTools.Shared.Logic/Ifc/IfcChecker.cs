@@ -108,7 +108,6 @@ namespace DhcbTools.Shared.Logic.Ifc
                 throw new ArgumentNullException(nameof(spec));
             }
 
-            var findings = new List<IfcFinding>();
             IfcModel model;
             try
             {
@@ -116,10 +115,33 @@ namespace DhcbTools.Shared.Logic.Ifc
             }
             catch (IfcParseException ex)
             {
-                findings.Add(new IfcFinding(IfcSeverity.Loi, "Không đọc được file: " + ex.Message));
-                return new IfcCheckResult(findings, 0, string.Empty);
+                return Unreadable(ex);
             }
 
+            return Check(model, spec);
+        }
+
+        /// <summary>Kết quả cho file không đọc được — một mục lỗi, 0 thực thể.</summary>
+        public static IfcCheckResult Unreadable(IfcParseException ex) =>
+            new IfcCheckResult(new List<IfcFinding> { new IfcFinding(IfcSeverity.Loi, "Không đọc được file: " + ex.Message) }, 0, string.Empty);
+
+        /// <summary>
+        /// Kiểm một mô hình ĐÃ đọc. Gói bàn giao kiểm IFC rồi kiểm IDS trên cùng file: đọc hai lần là giữ hai bản
+        /// mô hình cùng lúc (file 50 MB → ~3 GB bộ nhớ, audit 2026-09-23) — đọc một lần rồi dùng chung.
+        /// </summary>
+        public static IfcCheckResult Check(IfcModel model, IfcCheckSpec spec)
+        {
+            if (model is null)
+            {
+                throw new ArgumentNullException(nameof(model));
+            }
+
+            if (spec is null)
+            {
+                throw new ArgumentNullException(nameof(spec));
+            }
+
+            var findings = new List<IfcFinding>();
             CheckSchema(model, spec, findings);
             CheckStructure(model, spec, findings);
 
