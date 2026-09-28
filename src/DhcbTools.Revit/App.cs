@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using Autodesk.Revit.ApplicationServices;
 using Autodesk.Revit.UI;
 using DhcbTools.Core.Updaters;
@@ -184,22 +184,7 @@ public sealed class App : IExternalApplication
                 return;
             }
 
-            try
-            {
-                _bridge = new DhcbHttpBridge();
-                _bridge.Start();
-                DhcbLog.Write("Revit", $"HTTP Bridge nghe ở 127.0.0.1:{DhcbHttpBridge.Port}.");
-            }
-            catch (Exception ex)
-            {
-                // Instance Revit thứ hai: cổng 8765 đã bị instance đầu giữ. Không ném ra khỏi event
-                // handler (Revit nuốt hoặc crash) — báo rõ để người dùng biết Bridge đang trỏ instance nào.
-                _bridge?.Dispose();
-                _bridge = null;
-                DhcbLog.Error("Revit", "khởi động HTTP Bridge", ex);
-                TaskDialog.Show("DHCB Tools — HTTP Bridge", ex.Message);
-            }
-
+            StartBridge();
             RegisterElevationUpdater(application);
         };
         application.ControlledApplication.ApplicationInitialized += _onInitialized;
@@ -223,6 +208,38 @@ public sealed class App : IExternalApplication
 
     private static void OnDocumentChanged(object? sender, Autodesk.Revit.DB.Events.DocumentChangedEventArgs e) =>
         BridgeDocumentContext.Touch(e.GetDocument());
+
+    /// <summary>Mở Bridge 8765, trừ khi <c>settings.json</c> tắt nó (<c>{"bridge": {"enabled": false}}</c>).</summary>
+    private void StartBridge()
+    {
+        var settings = BridgeSettings.Load();
+        if (settings.Warning != null)
+        {
+            DhcbLog.Write("Revit", settings.Warning);
+        }
+
+        if (!settings.Enabled)
+        {
+            DhcbLog.Write("Revit", $"HTTP Bridge TẮT theo settings.json (bridge.enabled = false) — không mở cổng {DhcbHttpBridge.Port}.");
+            return;
+        }
+
+        try
+        {
+            _bridge = new DhcbHttpBridge();
+            _bridge.Start();
+            DhcbLog.Write("Revit", $"HTTP Bridge nghe ở 127.0.0.1:{DhcbHttpBridge.Port}.");
+        }
+        catch (Exception ex)
+        {
+            // Instance Revit thứ hai: cổng 8765 đã bị instance đầu giữ. Không ném ra khỏi event
+            // handler (Revit nuốt hoặc crash) — báo rõ để người dùng biết Bridge đang trỏ instance nào.
+            _bridge?.Dispose();
+            _bridge = null;
+            DhcbLog.Error("Revit", "khởi động HTTP Bridge", ex);
+            TaskDialog.Show("DHCB Tools — HTTP Bridge", ex.Message);
+        }
+    }
 
     /// <summary>Mục 4.1: mặc định TẮT, chỉ bật khi settings.json khai báo rõ.</summary>
     private void RegisterElevationUpdater(UIControlledApplication application)

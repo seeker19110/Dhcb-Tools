@@ -68,6 +68,10 @@ namespace DhcbTools.Shared.Hosting
             var config = (JObject?)request.Config?.DeepClone() ?? new JObject();
             if (config.Properties().GroupBy(p => p.Name, StringComparer.OrdinalIgnoreCase).Any(g => g.Count() > 1))
                 return CommandResult.Fail("E-PREVIEW-INVALID: Config có khóa trùng không phân biệt hoa thường.");
+            // Trước cả nhánh lệnh chỉ đọc: HealthReport/ParameterExport ghi outputPath mà không qua preview.
+            var unsafePath = BridgePathPolicy.FirstUnsafe(descriptor, config);
+            if (unsafePath != null)
+                return CommandResult.Fail("E-PATH-UNSAFE: " + unsafePath);
             var dryValue = config.GetValue("dryRun", StringComparison.OrdinalIgnoreCase);
             if (dryValue != null && dryValue.Type != JTokenType.Boolean)
                 return CommandResult.Fail("E-PREVIEW-INVALID: dryRun phải là boolean.");
@@ -174,8 +178,7 @@ namespace DhcbTools.Shared.Hosting
             foreach (var p in config.Properties())
             {
                 // Cả trường chưa lên catalog cũng được xét. Đầu ra không phải đầu vào preview.
-                if (p.Name.StartsWith("output", StringComparison.OrdinalIgnoreCase)
-                    || new[] { "reportPath", "htmlPath", "csvPath", "dxfPath" }.Contains(p.Name, StringComparer.OrdinalIgnoreCase))
+                if (IsOutputField(p.Name))
                     continue;
                 var kind = FieldKindGuess.Of(p.Name);
                 if (kind != FieldKind.FilePath && kind != FieldKind.FolderPath
@@ -195,6 +198,18 @@ namespace DhcbTools.Shared.Hosting
             return Hash(revision.ToString(System.Globalization.CultureInfo.InvariantCulture)
                 + PreviewSnapshot.Capture("", paths));
         }
+
+        /// <summary>
+        /// Trường mà lệnh GHI ra (kể cả khi xem trước) — không được chụp như đầu vào: preview ghi file đó thì
+        /// ảnh chụp trước/sau khác nhau và preview không bao giờ ra token. <c>bcfPath</c> (ClashDetection) và
+        /// <c>legendCsvPath</c> (ColorByParameter) từng thiếu ở đây: ClashDetection kèm bcfPath qua Bridge
+        /// luôn trả E-PREVIEW-CHANGED.
+        /// </summary>
+        internal static bool IsOutputField(string name) =>
+            name.StartsWith("output", StringComparison.OrdinalIgnoreCase)
+            || OutputFields.Contains(name, StringComparer.OrdinalIgnoreCase);
+
+        private static readonly string[] OutputFields = { "reportPath", "htmlPath", "csvPath", "dxfPath", "bcfPath", "legendCsvPath" };
 
         private static void AddDirectory(string directory, List<string> paths)
         {

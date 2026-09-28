@@ -1,5 +1,6 @@
 {
-  "_comment": "Copy thành %APPDATA%\\DHCB\\settings.json. IUpdater cao độ mặc định TẮT (mục 4.1) — bật sau khi đo hiệu năng trên dự án thật.",
+  "_comment": "Copy thành %APPDATA%\\DHCB\\settings.json. IUpdater cao độ mặc định TẮT (mục 4.1) — bật sau khi đo hiệu năng trên dự án thật. bridge.enabled = false: không mở HTTP Bridge 8765/8766 (máy không dùng agent/MCP/panel).",
+  "bridge": { "enabled": true },
   "updaters": { "elevation": false },
   "maxExecuteMs": 200
 }
