@@ -87,7 +87,21 @@ jobs:
           Copy-Item "$out/DhcbTools.Revit.dll", "$out/DhcbTools.Core.dll", "$out/DhcbTools.Shared.Logic.dll", `
                     "$out/DhcbTools.Shared.Hosting.dll", "$out/Newtonsoft.Json.dll" $pkg
           Copy-Item docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md $pkg
-          Compress-Archive -Path "$pkg/*" -DestinationPath "dist/DhcbTools.Revit-${{ matrix.revit }}-${{ needs.version.outputs.version }}.zip"
+
+      # Ký Authenticode khi repo có secret chứng chỉ (DHCB_SIGN_PFX_BASE64/_PASSWORD); không có thì bỏ qua, gói
+      # vẫn phát hành như trước. Bước riêng để secret chỉ vào đúng bước này, không vào bước build/restore.
+      - name: Ký số DLL (nếu có chứng chỉ)
+        shell: pwsh
+        env:
+          DHCB_SIGN_PFX_BASE64: ${{ secrets.DHCB_SIGN_PFX_BASE64 }}
+          DHCB_SIGN_PFX_PASSWORD: ${{ secrets.DHCB_SIGN_PFX_PASSWORD }}
+        run: ./scripts/sign-release.ps1 -Path dist
+
+      - name: Nén
+        shell: pwsh
+        run: |
+          $pkg = "dist/DhcbTools.Revit-${{ matrix.revit }}-${{ needs.version.outputs.version }}"
+          Compress-Archive -Path "$pkg/*" -DestinationPath "$pkg.zip"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -139,7 +153,21 @@ jobs:
           # nó nên chính AutoCAD đã cấp — §25 chạy thật với bundle KHÔNG có file này. Chép thêm bản riêng
           # chỉ tạo nguy cơ lệch phiên bản với bản AutoCAD đang chạy.
           Copy-Item docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md $pkg
-          Compress-Archive -Path "$pkg/*" -DestinationPath "dist/DhcbTools.AutoCAD-${{ matrix.acad }}-${{ needs.version.outputs.version }}.zip"
+
+      # Ký Authenticode khi repo có secret chứng chỉ (DHCB_SIGN_PFX_BASE64/_PASSWORD); không có thì bỏ qua, gói
+      # vẫn phát hành như trước. Bước riêng để secret chỉ vào đúng bước này, không vào bước build/restore.
+      - name: Ký số DLL (nếu có chứng chỉ)
+        shell: pwsh
+        env:
+          DHCB_SIGN_PFX_BASE64: ${{ secrets.DHCB_SIGN_PFX_BASE64 }}
+          DHCB_SIGN_PFX_PASSWORD: ${{ secrets.DHCB_SIGN_PFX_PASSWORD }}
+        run: ./scripts/sign-release.ps1 -Path dist
+
+      - name: Nén
+        shell: pwsh
+        run: |
+          $pkg = "dist/DhcbTools.AutoCAD-${{ matrix.acad }}-${{ needs.version.outputs.version }}"
+          Compress-Archive -Path "$pkg/*" -DestinationPath "$pkg.zip"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -174,7 +202,21 @@ jobs:
           Copy-Item configs/* "$pkg/configs"
           Copy-Item scripts/*.py, scripts/*.ps1 "$pkg/scripts"
           Copy-Item docs/batch-runner.md, docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md $pkg
-          Compress-Archive -Path "$pkg/*" -DestinationPath "dist/DhcbTools.BatchRunner-${{ needs.version.outputs.version }}.zip"
+
+      # Ký Authenticode khi repo có secret chứng chỉ (DHCB_SIGN_PFX_BASE64/_PASSWORD); không có thì bỏ qua, gói
+      # vẫn phát hành như trước. Bước riêng để secret chỉ vào đúng bước này, không vào bước build/restore.
+      - name: Ký số DLL (nếu có chứng chỉ)
+        shell: pwsh
+        env:
+          DHCB_SIGN_PFX_BASE64: ${{ secrets.DHCB_SIGN_PFX_BASE64 }}
+          DHCB_SIGN_PFX_PASSWORD: ${{ secrets.DHCB_SIGN_PFX_PASSWORD }}
+        run: ./scripts/sign-release.ps1 -Path dist
+
+      - name: Nén
+        shell: pwsh
+        run: |
+          $pkg = "dist/DhcbTools.BatchRunner-${{ needs.version.outputs.version }}"
+          Compress-Archive -Path "$pkg/*" -DestinationPath "$pkg.zip"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -230,6 +272,18 @@ jobs:
             "/DStageDir=..\dist\stage" `
             installer/dhcb-tools.iss
           Get-ChildItem dist/*.exe
+
+      - name: Ký số installer (nếu có chứng chỉ)
+        shell: pwsh
+        env:
+          DHCB_SIGN_PFX_BASE64: ${{ secrets.DHCB_SIGN_PFX_BASE64 }}
+          DHCB_SIGN_PFX_PASSWORD: ${{ secrets.DHCB_SIGN_PFX_PASSWORD }}
+        run: |
+          # dist/ lúc này có cả stage (DLL đã ký ở job build) và file Setup vừa dựng; chỉ cần ký file .exe.
+          New-Item -ItemType Directory -Force -Path dist/setup | Out-Null
+          Move-Item dist/*.exe dist/setup
+          ./scripts/sign-release.ps1 -Path dist/setup
+          Move-Item dist/setup/*.exe dist
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
