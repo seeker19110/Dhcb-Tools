@@ -37,6 +37,17 @@ public class NamePatternTests
     }
 
     [Fact]
+    public void TimThay_RegexBacktrackQuaMuc_BaoLoiThayViTreo()
+    {
+        // (a+)+$ trên chuỗi "aaa…!" backtrack theo hàm mũ — không có trần thì treo luồng UI Revit.
+        var p = new NamePattern("{Name}") { Find = "(a+)+$", Replace = "x", FindTimeout = TimeSpan.FromMilliseconds(50) };
+        var ex = Assert.Throws<ArgumentException>(() => p.Apply(0, V(("Name", new string('a', 40) + "!"))));
+        Assert.Contains("(a+)+$", ex.Message);
+        Assert.IsType<System.Text.RegularExpressions.RegexMatchTimeoutException>(ex.InnerException);
+        Assert.Equal(TimeSpan.FromSeconds(2), new NamePattern("{Name}").FindTimeout);
+    }
+
+    [Fact]
     public void TokenLa_GiuNguyen_TienToHauTo()
     {
         var p = new NamePattern("{Khong}") { Prefix = "[", Suffix = "]" };

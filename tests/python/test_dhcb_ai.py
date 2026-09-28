@@ -243,7 +243,7 @@ class CmdOllamaCheckTests(unittest.TestCase):
                 (Path(folder) / "ai.json").write_text(json.dumps(settings), encoding="utf-8")
             patches = [mock.patch.object(dhcb_ai, "appdata_dhcb", return_value=folder)]
             if urlopen is not None:
-                patches.append(mock.patch.object(dhcb_ai.urllib.request, "urlopen", **urlopen))
+                patches.append(mock.patch.object(dhcb_ai.LOOPBACK, "open", **urlopen))
             for patcher in patches:
                 patcher.start()
             try:

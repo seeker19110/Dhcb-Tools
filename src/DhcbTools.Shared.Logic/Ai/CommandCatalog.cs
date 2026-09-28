@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -423,6 +423,7 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Words("đánh số block", "numbering block"),
             new CommandDescriptor("AttributeExport", AutoCad, "Xuất attribute của block ra CSV", false)
                 .Field("blockName", "tên block (rỗng = mọi block có attribute)").Field("outputPath", "file CSV")
+                .Field("includePaperSpace", "true = xuất cả block trong layout (khung tên); mặc định chỉ Model Space", FieldKind.Bool)
                 .Words("xuất attribute", "export attribute", "xuất thuộc tính block"),
             new CommandDescriptor("AttributeImport", AutoCad, "Nhập CSV ghi ngược attribute vào block", true)
                 .Field("inputPath", "file CSV").Field("dryRun", "xem trước")

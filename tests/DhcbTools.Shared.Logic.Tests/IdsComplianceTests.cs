@@ -37,16 +37,18 @@ public class IdsComplianceTests
         Assert.False(v.Accepts("0.31"));
 
         Assert.True(new IdsValue { Simple = "3" }.Accepts("3."));
-        Assert.True(new IdsValue { Simple = "true" }.Accepts("TRUE"));
-        Assert.True(new IdsValue { Simple = "TRUE" }.Accepts(".T."));
-        Assert.False(new IdsValue { Simple = "true" }.Accepts("FALSE"));
+        // Boolean: phía mô hình ghi "true"/"false" chữ thường; IDS viết "TRUE" là sai chuẩn và không khớp.
+        Assert.True(new IdsValue { Simple = "true" }.Accepts("true"));
+        Assert.False(new IdsValue { Simple = "TRUE" }.Accepts("true"));
+        Assert.False(new IdsValue { Simple = "true" }.Accepts("false"));
         Assert.False(new IdsValue { Simple = "1" }.Accepts("NaN"));
 
         var e = new IdsValue();
         e.Enumeration.Add("1.5");
         e.Enumeration.Add("EI60");
         Assert.True(e.Accepts("1.50"));
-        Assert.True(e.Accepts("ei60"));
+        Assert.True(e.Accepts("EI60"));
+        Assert.False(e.Accepts("ei60"));   // IDS 1.0: enumeration so phân biệt hoa thường
         Assert.False(e.Accepts("1.51"));
     }
 

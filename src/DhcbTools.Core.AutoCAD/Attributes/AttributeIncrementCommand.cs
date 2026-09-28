@@ -1,8 +1,9 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text.RegularExpressions;
 using Autodesk.AutoCAD.DatabaseServices;
 using DhcbTools.Core.AutoCAD.AutoNumbering;
 using DhcbTools.Shared.Logic;
+using DhcbTools.Shared.Logic.Cad;
 
 namespace DhcbTools.Core.AutoCAD.Attributes;
 
@@ -35,7 +36,8 @@ public sealed class AttributeIncrementCommand : ICoreCommand<AttributeIncrementC
             BlockName = config.BlockName,
             AttributeTag = config.AttributeTag,
             Direction = ScanDirection.LeftToRightThenTopToBottom,
-            RowTolerance = config.RowToleranceMm,
+            // Config ghi mm; bản vẽ có thể vẽ theo mét/inch — đổi theo INSUNITS (không khai = mm như trước).
+            RowTolerance = DrawingUnits.FromMillimeters(config.RowToleranceMm, (int)database.Insunits),
             StartNumber = config.StartNumber,
             Step = 1,
             Label = n => FormatPattern(config.Pattern, n),

@@ -157,18 +157,18 @@ public class IfcIdsElementTests
     }
 
     [Fact]
-    public void Property_BooleanThanhTRUEFALSE_VaThuaKeTuKieu()
+    public void Property_BooleanThanhTrueFalseChuThuong_VaThuaKeTuKieu()
     {
         var model = Model();
         var wall2 = Element(model, 12);
-        // IFCBOOLEAN(.F.) phải so được với "FALSE" của IDS — không phải "F".
-        Assert.Equal("FALSE", wall2.Property("Pset_WallCommon", "IsExternal"));
+        // IFCBOOLEAN(.F.) → "false" chữ thường, đúng dạng IDS 1.0 viết boolean — không phải "F".
+        Assert.Equal("false", wall2.Property("Pset_WallCommon", "IsExternal"));
         Assert.Equal("2 HR", wall2.Property("Pset_WallCommon", "FireRating"));
         Assert.Equal("2 HR", wall2.Property(null, "FireRating"));
         Assert.Null(wall2.Property("Pset_WallCommon", "KhongCo"));
 
         // Tường 1 không có Pset riêng → thừa kế từ IfcWallType.
-        Assert.Equal("TRUE", Element(model, 11).Property("Pset_WallCommon", "IsExternal"));
+        Assert.Equal("true", Element(model, 11).Property("Pset_WallCommon", "IsExternal"));
     }
 
     [Fact]
@@ -236,14 +236,15 @@ public class IfcIdsElementTests
     }
 
     [Fact]
-    public void Property_IfcLogicalUnknown_GiuChuUNKNOWN_TucKhongDat()
+    public void Property_IfcLogicalUnknown_LaKhongCoGiaTri_TucKhongDat()
     {
+        // IDS 1.0: "a logical unknown is considered false and will not pass" — .U. như thể không có giá trị.
         var space = Element(Model(), 104);
-        Assert.Equal("UNKNOWN", space.Property("Pset_SpaceCommon", "Handicap"));
+        Assert.Null(space.Property("Pset_SpaceCommon", "Handicap"));
         var specs = IdsSpec.Parse(
             "<ids><specifications><specification name=\"t\"><applicability><entity><name><simpleValue>IFCSPACE</simpleValue></name></entity></applicability>"
             + "<requirements><property><propertySet><simpleValue>Pset_SpaceCommon</simpleValue></propertySet><baseName><simpleValue>Handicap</simpleValue></baseName>"
-            + "<value><simpleValue>TRUE</simpleValue></value></property></requirements></specification></specifications></ids>");
+            + "<value><simpleValue>true</simpleValue></value></property></requirements></specification></specifications></ids>");
         Assert.Equal(0, Assert.Single(IdsEvaluator.Check(specs, Model().Elements()).Specifications).Passed);
     }
 
@@ -374,7 +375,7 @@ public class IfcIdsElementTests
         var specs = IdsSpec.Parse(
             "<ids><specifications><specification name=\"Tường trong\"><applicability><entity><name><simpleValue>IFCWALL</simpleValue></name></entity></applicability>"
             + "<requirements><property><propertySet><simpleValue>Pset_WallCommon</simpleValue></propertySet><baseName><simpleValue>IsExternal</simpleValue></baseName>"
-            + "<value><simpleValue>FALSE</simpleValue></value></property></requirements></specification></specifications></ids>");
+            + "<value><simpleValue>false</simpleValue></value></property></requirements></specification></specifications></ids>");
         var spec = Assert.Single(IdsEvaluator.Check(specs, Model().Elements()).Specifications);
         Assert.Equal(3, spec.Applicable);
         Assert.Equal(1, spec.Passed);

@@ -25,6 +25,9 @@ import urllib.request
 
 DEFAULT_MODEL = "qwen3:8b"
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+# Ollama chỉ ở loopback (is_loopback) nên không bao giờ cần proxy; đi qua proxy hệ thống thì request hỏng
+# và lộ endpoint nội bộ ra proxy công ty — cùng lý do với dhcb_agent.LOOPBACK.
+LOOPBACK = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
 def appdata_dhcb() -> str:
@@ -134,7 +137,7 @@ def cmd_ollama_check(_args):
         print("✗ endpoint không phải loopback — add-in sẽ từ chối (offline bắt buộc).")
         sys.exit(1)
     try:
-        with urllib.request.urlopen(settings["endpoint"].rstrip("/") + "/api/tags", timeout=5) as resp:
+        with LOOPBACK.open(settings["endpoint"].rstrip("/") + "/api/tags", timeout=5) as resp:
             tags = json.loads(resp.read().decode("utf-8"))
         names = [m.get("name") for m in tags.get("models", [])]
         print(f"✓ Ollama đang chạy, model có sẵn: {', '.join(names) or '(chưa pull model nào)'}")

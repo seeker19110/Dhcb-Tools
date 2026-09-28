@@ -53,7 +53,21 @@ public static partial class Program
                 continue;
             }
 
-            var ifcResult = IfcChecker.Check(text, spec);
+            // Đọc MỘT lần, dùng chung cho kiểm IFC và kiểm IDS: trước đây mỗi bên tự parse lại cả file.
+            IfcModel? parsed = null;
+            IfcCheckResult ifcResult;
+            string? unreadable = null;
+            try
+            {
+                parsed = IfcModel.Parse(text);
+                ifcResult = IfcChecker.Check(parsed, spec);
+            }
+            catch (IfcParseException ex)
+            {
+                ifcResult = IfcChecker.Unreadable(ex);
+                unreadable = ex.Message;
+            }
+
             input.Checks.Add(new HandoverCheck("Kiểm IFC " + ifc.RelativePath, ifcResult.Ok, Tail(ifcResult.Render(), 3)));
 
             if (!string.IsNullOrEmpty(options.IdsPath))
@@ -69,24 +83,21 @@ public static partial class Program
                 {
                     var specs = IdsSpec.Parse(xml);
                     var warnings = IdsSchemaLint.Check(xml);
-                    // IFC hỏng: IfcChecker ở trên đã báo "không đọc được" thành một mục không đạt; ở đây phải
-                    // bắt riêng, nếu không cả runner sập và đêm đó KHÔNG có gói bàn giao nào (§44).
-                    IfcIdsModel model;
-                    try
+                    // IFC hỏng: kiểm IFC ở trên đã báo "không đọc được" thành một mục không đạt; ở đây phải báo
+                    // riêng, nếu không cả runner sập và đêm đó KHÔNG có gói bàn giao nào (§44).
+                    if (parsed == null)
                     {
-                        model = IfcIdsModel.Parse(text);
-                    }
-                    catch (IfcParseException ex)
-                    {
-                        input.Checks.Add(new HandoverCheck("Kiểm IDS " + ifc.RelativePath, false, "Không đọc được file IFC: " + ex.Message));
+                        input.Checks.Add(new HandoverCheck("Kiểm IDS " + ifc.RelativePath, false, "Không đọc được file IFC: " + unreadable));
                         continue;
                     }
+
+                    var model = IfcIdsModel.From(parsed);
 
                     var check = IdsEvaluator.Check(specs, model.Elements(), model.Model.Schema);
                     var reportName = Path.GetFileNameWithoutExtension(ifc.RelativePath) + "-ids.html";
                     var reportPath = Path.Combine(outputFolder, reportName);
                     File.WriteAllText(reportPath, IdsReport.Html(Path.GetFileName(ifcPath), options.IdsPath!, IdsReport.IfcScopeNote, check, warnings), new UTF8Encoding(true));
-                    input.Checks.Add(new HandoverCheck("Kiểm IDS " + ifc.RelativePath, check.FailureCount == 0, IdsReport.Summary(check, warnings) + " → " + reportName));
+                    input.Checks.Add(new HandoverCheck("Kiểm IDS " + ifc.RelativePath, check.AllPassed, IdsReport.Summary(check, warnings) + " → " + reportName));
                     // Chạy lại (--report-only) thì Collect đã thấy báo cáo của lần trước — không liệt kê hai lần.
                     input.Files.RemoveAll(f => f.RelativePath.Equals(reportName, StringComparison.OrdinalIgnoreCase));
                     input.Files.Add(new HandoverFile(reportName, "HTML", new FileInfo(reportPath).Length, HandoverPackage.Sha256Of(reportPath)));

@@ -5,7 +5,10 @@
     1. cửa phải có Tag (Mark)            -> có phần tử đạt và có phần tử không đạt
     2. tường phải có vật liệu            -> phần lớn đạt
     3. lớp IFC không có trong model mẫu  -> 0 phần tử áp dụng: bộ kiểm phải NÓI RA,
-                                            vì "0 không đạt" ở đây không phải là "đạt"
+                                            vì "0 không đạt" ở đây không phải là "đạt" — và
+                                            specification bắt buộc (mặc định IDS 1.0) nên tính
+                                            là KHÔNG ĐẠT
+  Tên lớp viết HOA (IFCDOOR…) đúng IDS 1.0; bản "lệch chuẩn" giữ IfcDoor để lint cảnh báo.
 -->
 <ids xmlns="http://standards.buildingsmart.org/IDS" xmlns:xs="http://www.w3.org/2001/XMLSchema">
   <info>
@@ -14,7 +17,7 @@
   <specifications>
     <specification name="Cửa phải có mã hiệu (Tag)" ifcVersion="IFC4">
       <applicability>
-        <entity><name><simpleValue>IfcDoor</simpleValue></name></entity>
+        <entity><name><simpleValue>IFCDOOR</simpleValue></name></entity>
       </applicability>
       <requirements>
         <attribute><name><simpleValue>Tag</simpleValue></name></attribute>
@@ -23,7 +26,7 @@
 
     <specification name="Tường phải khai vật liệu" ifcVersion="IFC4">
       <applicability>
-        <entity><name><simpleValue>IfcWall</simpleValue></name></entity>
+        <entity><name><simpleValue>IFCWALL</simpleValue></name></entity>
       </applicability>
       <requirements>
         <material><value><xs:restriction base="xs:string"><xs:pattern value=".+"/></xs:restriction></value></material>
@@ -32,7 +35,7 @@
 
     <specification name="Lớp IFC không có trong model mẫu" ifcVersion="IFC4">
       <applicability>
-        <entity><name><simpleValue>IfcTank</simpleValue></name></entity>
+        <entity><name><simpleValue>IFCTANK</simpleValue></name></entity>
       </applicability>
       <requirements>
         <attribute><name><simpleValue>Name</simpleValue></name></attribute>

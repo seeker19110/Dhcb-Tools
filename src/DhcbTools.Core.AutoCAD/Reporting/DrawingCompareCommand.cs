@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Autodesk.AutoCAD.DatabaseServices;
 using DhcbTools.Shared.Logic;
 using DhcbTools.Shared.Logic.Cad;
@@ -87,7 +87,9 @@ public sealed class DrawingCompareCommand : ICoreCommand<DrawingCompareConfig>
         }
 
         var layerDiff = rows.Count(r => r.Status != "Giống nhau");
-        var entityDiff = CompareByHandle(current, other, config.MoveToleranceMm, out var moved, out var added, out var removed, out var handleNote);
+        // moveToleranceMm là mm; toạ độ snapshot ở đơn vị bản vẽ — đổi theo INSUNITS (không khai = mm như trước).
+        var moveTolerance = DrawingUnits.FromMillimeters(config.MoveToleranceMm, (int)database.Insunits);
+        var entityDiff = CompareByHandle(current, other, moveTolerance, out var moved, out var added, out var removed, out var handleNote);
 
         WriteReport(config, rows, entityDiff);
 

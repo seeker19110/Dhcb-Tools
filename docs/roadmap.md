@@ -1,6 +1,8 @@
 ﻿# Lộ trình phát triển DHCB Tools
 
-> Mới nhất: [audit và nâng cấp 2026-09-23](audit-nang-cap-2026-09-23.md) — tám PR #161–#168 đã sửa; mục "Việc để lại" là danh sách quyết định còn chờ.
+> Mới nhất: [audit bảo mật, quy trình và công cụ 2026-09-28](audit-bao-mat-2026-09-28.md) — tám mục đã sửa; mục "Việc cần chủ repo bật" là phần còn lại ngoài mã nguồn.
+>
+> Trước đó: [audit và nâng cấp 2026-09-23](audit-nang-cap-2026-09-23.md) — tám PR #161–#168 đã sửa; mục "Việc để lại" là danh sách quyết định còn chờ.
 >
 > Ưu tiên sau audit 2026-09-07: [bản sửa, tiêu chí nghiệm thu và kế hoạch thí điểm](audit-nang-cap-2026-09-07.md).
 

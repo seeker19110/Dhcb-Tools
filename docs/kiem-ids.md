@@ -42,10 +42,12 @@ Ribbon: *Kiểm tra & AI → Kiểm theo IDS*. Bridge/MCP/batch đêm: lệnh `I
 DhcbTools.BatchRunner --verify-ifc xuat/toa-a.ifc --verify-ids yeu-cau/chu-dau-tu.ids --ids-report bao-cao/ids-ifc.html
 ```
 
-Mã thoát 0 = không phần tử nào không đạt, 1 = có, 2 = thiếu file / IDS hỏng. Báo cáo cùng dạng với đường Revit,
-phần tử ghi theo `#id` trong file. Đã đối chiếu 10 specification với IfcTester trên Snowdon: khớp từng con số
-([`bang-chung-test.md`](bang-chung-test.md) §41). Cột "DHCB đọc từ đâu" dưới đây là đường Revit; đường IFC đọc
-thẳng thực thể (tên lớp so **đúng lớp**, Pset/vật liệu/phân loại thừa kế từ kiểu, boolean `.T./.F.` → `TRUE/FALSE`).
+Mã thoát 0 = mọi specification đạt, 1 = có specification không đạt (phần tử trượt, **hoặc specification bắt buộc
+mà không phần tử nào lọt bộ lọc**), 2 = thiếu file / IDS hỏng. Báo cáo cùng dạng với đường Revit, phần tử ghi theo
+`#id` trong file. Đã đối chiếu 10 specification với IfcTester trên Snowdon: khớp từng con số
+([`bang-chung-test.md`](bang-chung-test.md) §41), và chạy trên **bộ ca chính thức của buildingSMART** (mục cuối).
+Cột "DHCB đọc từ đâu" dưới đây là đường Revit; đường IFC đọc thẳng thực thể (tên lớp so **đúng lớp**,
+Pset/vật liệu/phân loại thừa kế từ kiểu, boolean `.T./.F.` → `true/false` chữ thường, `.U.` = không có giá trị).
 
 ## Hỗ trợ tới đâu
 
@@ -61,13 +63,20 @@ thẳng thực thể (tên lớp so **đúng lớp**, Pset/vật liệu/phân lo
 Ràng buộc giá trị: `simpleValue`, `xs:enumeration`, `xs:pattern` (**neo hai đầu** — XSD khớp toàn bộ chuỗi,
 không neo thì `AB-01-rác` cũng đạt quy tắc `AB-\d\d`; biên dịch ngay lúc đọc file, có timeout 2 s),
 `minInclusive` / `maxInclusive` / `minExclusive` / `maxExclusive`, `length` / `minLength` / `maxLength`.
-Nhiều ràng buộc trong cùng một `xs:restriction` là **hội** — tất cả phải đúng. Hai bên đều là số thì **so
-số** (`0.3` bằng `IFCREAL(0.29999999999999999)`, `3.` bằng `3.0`); boolean so `TRUE`/`true`/`.T.` như nhau.
+Nhiều ràng buộc khác loại trong cùng một `xs:restriction` là **hội** — tất cả phải đúng; nhiều `xs:pattern` với
+nhau là **hoặc** (quy tắc XSD). Pattern dùng được `\i`, `\c`, `\I`, `\C` của XSD (dịch sang lớp ký tự .NET).
+Chuỗi so **phân biệt hoa thường** (IDS 1.0: `FireRating = "ei60"` không đạt `"EI60"`); boolean phải viết chữ
+thường `true`/`false` — IDS viết `TRUE` là sai chuẩn và không khớp. Hai bên đều là số thì **so số** với dung sai
+IDS 1.0: `|thực − kỳ vọng| ≤ |kỳ vọng|·10⁻⁶ + 10⁻⁶` (`0.3` bằng `IFCREAL(0.29999999999999999)`, `3.` bằng `3.0`);
+biên `min/max…` so chặt. Riêng **tên lớp IFC** không phân biệt hoa thường (`IfcWall` vẫn khớp, lint cảnh báo
+phải viết `IFCWALL`) — không có trường hợp nào khớp sai, và file viết tay không bị hỏng.
 `cardinality="prohibited"` (có mới là sai) và `"optional"` (không bắt buộc có, nhưng đã có thì phải đúng) đều đọc.
 
-Ở mức **specification** (IDS 1.0): `minOccurs="0" maxOccurs="0"` là specification **cấm** — mọi phần tử lọt
-applicability là một vi phạm ("không có ống nước trên mái"), và specification cấm được phép không có
-`<requirements>`; `minOccurs="0"` là tuỳ chọn. `ifcVersion` được **lọc**: file IFC lược đồ `IFC4` thì
+Ở mức **specification** (IDS 1.0, thuộc tính đặt trên `<applicability>`; bản nháp cũ đặt trên `<specification>`
+vẫn đọc): `minOccurs="0" maxOccurs="0"` là specification **cấm** — mọi phần tử lọt applicability là một vi phạm
+("không có ống nước trên mái"); specification cấm không được có `<requirements>` (có là file sai).
+`minOccurs="0"` là tuỳ chọn. Mặc định (`minOccurs="1"`) là **bắt buộc**: không phần tử nào lọt bộ lọc thì
+specification **không đạt**. `ifcVersion` được **lọc**: file IFC lược đồ `IFC4` thì
 specification khai `ifcVersion="IFC2X3"` bị bỏ qua và báo cáo ghi rõ (đường Revit không biết lược đồ nên không lọc).
 
 **Gặp thứ chưa hỗ trợ thì từ chối file, không bỏ qua im lặng** — facet lạ, ràng buộc lạ (`totalDigits`,
@@ -92,9 +101,9 @@ Báo cáo HTML có ba con số cho mỗi specification: **áp dụng cho** bao n
 thuộc {EI60, EI90}`). CSV cùng nội dung để lọc trong Excel.
 
 > **"0 không đạt" không phải lúc nào cũng là đạt.** Specification mà **không phần tử nào lọt bộ lọc** được
-> đánh dấu riêng (`0 phần tử — không kiểm được gì`) và đếm riêng trong summary. Con số 0 ở đó nói về bộ lọc
-> hoặc về việc mô hình thiếu hẳn nhóm phần tử ấy, chứ không nói về chất lượng mô hình — đúng bài học của §16
-> (`ClashDetection` với nhóm category rỗng).
+> đánh dấu riêng và đếm riêng trong summary. Nếu nó bắt buộc (mặc định) thì tính là **KHÔNG ĐẠT** — đúng
+> IDS 1.0 ("required specifications need at least one applicable entity"); trước 2026-09-28 DHCB chỉ cảnh báo
+> và mã thoát vẫn 0. Nhóm phần tử thật sự không bắt buộc thì khai `minOccurs="0"` trên `<applicability>`.
 
 Danh sách phần tử không đạt cắt ở **200 cái mỗi specification**; con số tổng vẫn đếm đủ. Cắt là cắt danh sách,
 không phải cắt kết luận.
@@ -144,3 +153,49 @@ như fixture cố ý gài. Bằng chứng: [`bang-chung-test.md`](bang-chung-tes
   (§72): Revit gán `LevelId` trực tiếp cho mọi phần tử kể cả phần tử lồng trong host khác, nên không có
   bước suy luận qua cha nào để mà sai.
 - Bảng category → lớp IFC là **bảng rút gọn** cho nhóm hay gặp; family lạ thì khai `IfcExportAs` để chắc chắn.
+
+## Đối chiếu bộ ca buildingSMART
+
+buildingSMART công bố 334 ca kiểm (`IDS/Documentation/ImplementersDocumentation/TestCases`, mỗi ca một cặp
+`.ids` + `.ifc`, tên bắt đầu bằng kết quả đúng `pass-`/`fail-`/`invalid-`). CI chạy cả bộ trên đường IFC bằng
+[`scripts/ids-conformance.py`](../scripts/ids-conformance.py) (commit ghim `870f9c4e`) và **đỏ khi có hồi quy** —
+ca lệch ngoài danh sách đã biết [`tests/ids-buildingsmart/known-gaps.txt`](../tests/ids-buildingsmart/known-gaps.txt).
+Chạy tại chỗ:
+
+```bash
+git init /tmp/bsids && git -C /tmp/bsids fetch --depth 1 https://github.com/buildingSMART/IDS.git 870f9c4e6e8f414e737b4d84ca1aa9b46fc6c8f3
+git -C /tmp/bsids checkout FETCH_HEAD -- Documentation/ImplementersDocumentation/TestCases
+dotnet build src/DhcbTools.BatchRunner/DhcbTools.BatchRunner.csproj -c Release
+python3 scripts/ids-conformance.py /tmp/bsids/Documentation/ImplementersDocumentation/TestCases \
+  --runner src/DhcbTools.BatchRunner/bin/Release/net10.0/DhcbTools.BatchRunner.dll
+```
+
+| Nhóm | 2026-09-23 | 2026-09-28 |
+|---|---|---|
+| tolerance | 22/36 | **36/36** |
+| material | 23/29 | **29/29** |
+| partof | 30/34 | **34/34** |
+| entity | 24/33 | 27/33 |
+| restriction | 18/25 | 20/25 |
+| ids | 7/12 | 9/12 |
+| classification | 24/27 | 23/27 |
+| attribute | 38/56 | 36/56 |
+| property | 54/82 | 57/82 |
+| **Tổng** | **240/334** | **271/334** |
+
+Hai nhóm giảm (attribute, classification) là **đạt oan trước đây**: specification bắt buộc không có phần tử nào (vì DHCB chưa liệt kê thực thể
+không có GlobalId như `IfcSurfaceStyleRefraction`, `IfcMaterial`) từng được tính là đạt. Nay tính đúng là không đạt.
+
+63 ca còn lệch, theo nguyên nhân:
+
+- **Chưa có bảng thuộc tính theo lược đồ IFC** (~25 ca attribute/restriction/classification): `Attribute(name)` chỉ
+  biết thuộc tính chung (Name, Tag…) và bảng riêng của vài lớp; `IfcTask.IsMilestone`,
+  `IfcSurfaceStyleRefraction.RefractionIndex`… trả `null`. Cần nhúng bảng thuộc tính của IFC2X3/IFC4/IFC4X3.
+- **Chưa có kiểu dữ liệu của giá trị** (~20 ca property/attribute): `dataType` của facet, đo lường và đổi đơn
+  vị (`unit_conversions…`), pattern không áp cho số, số nguyên không nhận phần thập phân, select/list/logical.
+- **Property khớp nhiều cái** (~8 ca): tên property/pset khai bằng pattern hoặc nhiều property cùng khớp — mọi
+  cái phải đạt; hiện chỉ xét tên cố định.
+- **Bảng ánh xạ lớp IFC2X3** (4 ca `in_ifc2x3_…airterminal…`).
+- **Lọc `ifcVersion`** (3 ca `ids/`): bộ ca kỳ vọng kiểm bất kể lược đồ (IfcTester mặc định không lọc); DHCB
+  **cố ý** bỏ qua specification không nhắm lược đồ của file (mục 11.4) — giữ nguyên.
+- **Tên lớp viết thường** (1 ca): DHCB nhận `IfcWall` và cảnh báo thay vì coi file là sai — xem trên.

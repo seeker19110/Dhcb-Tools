@@ -1,7 +1,7 @@
 """Test cho scripts/dhcb_agent.py — client gửi lệnh vào Bridge của Revit/AutoCAD.
 
-Không mở kết nối thật: mọi lối ra HTTP đều đi qua urllib.request.urlopen, nên chỉ cần thay đúng
-chỗ đó là kiểm được cả đường thành công lẫn mọi mã lỗi mà kỹ sư thật sự gặp (401/429/504/mất kết nối).
+Không mở kết nối thật (trừ LoopbackOpenerTests, tự dựng server trên 127.0.0.1): mọi lối ra HTTP đều đi
+qua dhcb_agent.LOOPBACK.open, nên chỉ cần thay đúng chỗ đó là kiểm được cả đường thành công lẫn mọi mã lỗi mà kỹ sư thật sự gặp (401/429/504/mất kết nối).
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ class FakeResponse:
 class DocumentTargetTests(unittest.TestCase):
     def test_write_is_bound_to_queried_document_without_mutating_payload(self):
         payload = {"command": "AutoNumbering", "config": {"dryRun": False}}
-        with mock.patch.object(dhcb_agent.urllib.request, "urlopen", side_effect=[
+        with mock.patch.object(dhcb_agent.LOOPBACK, "open", side_effect=[
             FakeResponse({"documentId": "session-A"}), FakeResponse({"success": True})
         ]) as send:
             self.assertTrue(dhcb_agent.request("revit", "POST", "/execute", payload)["success"])
@@ -65,19 +65,56 @@ class DocumentTargetTests(unittest.TestCase):
 
 
 def fake_urlopen(payload):
-    return mock.patch.object(dhcb_agent.urllib.request, "urlopen", return_value=FakeResponse(payload))
+    return mock.patch.object(dhcb_agent.LOOPBACK, "open", return_value=FakeResponse(payload))
 
 
 def http_error(code: int, body: str):
     error = urllib.error.HTTPError("http://127.0.0.1", code, "lỗi", None, None)
     error.read = lambda: body.encode("utf-8")  # type: ignore[method-assign]
-    return mock.patch.object(dhcb_agent.urllib.request, "urlopen", side_effect=error)
+    return mock.patch.object(dhcb_agent.LOOPBACK, "open", side_effect=error)
 
 
 class BaseUrlTests(unittest.TestCase):
     def test_cong_theo_ung_dung(self) -> None:
         self.assertEqual("http://127.0.0.1:8765", dhcb_agent.base_url("revit"))
         self.assertEqual("http://127.0.0.1:8766", dhcb_agent.base_url("autocad"))
+
+
+class LoopbackOpenerTests(unittest.TestCase):
+    """Proxy hệ thống/công ty không được thấy request tới Bridge (header Bearer mang token)."""
+
+    def test_bo_qua_proxy_trong_bien_moi_truong(self) -> None:
+        import http.server
+        import threading
+
+        class Ok(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):  # noqa: N802
+                self.send_response(200)
+                self.send_header("Content-Length", "2")
+                self.end_headers()
+                self.wfile.write(b"ok")
+
+            def log_message(self, *args):
+                pass
+
+        server = http.server.HTTPServer(("127.0.0.1", 0), Ok)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        # Proxy trỏ vào cổng đóng: request nào đi qua proxy là hỏng ngay (Connection refused).
+        dead_proxy = "http://127.0.0.1:9"
+        env = {"http_proxy": dead_proxy, "HTTP_PROXY": dead_proxy, "no_proxy": "", "NO_PROXY": ""}
+        try:
+            with mock.patch.dict(os.environ, env):
+                url = f"http://127.0.0.1:{server.server_address[1]}/"
+                with dhcb_agent.LOOPBACK.open(url, timeout=5) as resp:
+                    self.assertEqual(b"ok", resp.read())
+                # Đối chứng: opener mặc định của urllib đi theo proxy nên hỏng — chứng tỏ ca trên có nghĩa.
+                import urllib.request
+                with self.assertRaises(urllib.error.URLError):
+                    urllib.request.build_opener().open(url, timeout=5)
+        finally:
+            server.shutdown()
+            server.server_close()
 
 
 class LoadTokenTests(unittest.TestCase):
@@ -156,7 +193,7 @@ class RequestTests(unittest.TestCase):
         self.assertEqual("<html>bad gateway</html>", result["error"])
 
     def test_khong_ket_noi_duoc_goi_y_mo_phan_mem(self) -> None:
-        with mock.patch.object(dhcb_agent.urllib.request, "urlopen",
+        with mock.patch.object(dhcb_agent.LOOPBACK, "open",
                                side_effect=urllib.error.URLError("connection refused")):
             result = dhcb_agent.request("autocad", "GET", "/tools")
 
@@ -520,7 +557,7 @@ class CliSafetyRegressionTests(unittest.TestCase):
                         args += ["--background"]
                     responses = ([FakeResponse({"id": "job"}), FakeResponse({"status": "done", "result": result})]
                                  if background else [FakeResponse(result)])
-                    with mock.patch.object(dhcb_agent.urllib.request, "urlopen", side_effect=responses) as send:
+                    with mock.patch.object(dhcb_agent.LOOPBACK, "open", side_effect=responses) as send:
                         code, out, _ = self._run(args)
                     self.assertEqual(0, code)
                     self.assertIn("previewToken: token-A", out)
@@ -536,7 +573,7 @@ class CliSafetyRegressionTests(unittest.TestCase):
                     responses = ([FakeResponse({"id": "job1"}),
                                   FakeResponse({"status": "done", "result": {"success": True}})]
                                  if background else [FakeResponse({"success": True})])
-                    with mock.patch.object(dhcb_agent.urllib.request, "urlopen",
+                    with mock.patch.object(dhcb_agent.LOOPBACK, "open",
                                            side_effect=responses) as send:
                         args = [app, "raw", json.dumps(payload), "--no-dry-run"]
                         if background:
@@ -580,7 +617,7 @@ class CliSafetyRegressionTests(unittest.TestCase):
         for value in ([], [1], None, False, 3, "text"):
             with self.subTest(value=value), mock.patch(
                     "builtins.open", mock.mock_open(read_data=json.dumps(value))), \
-                    mock.patch.object(dhcb_agent.urllib.request, "urlopen") as send:
+                    mock.patch.object(dhcb_agent.LOOPBACK, "open") as send:
                 code, _, err = self._run(["revit", "exec", "AutoNumbering",
                                          "--config-file", "bad.json", "--config", "{}"])
             self.assertEqual(2, code)

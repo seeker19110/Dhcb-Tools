@@ -33,26 +33,20 @@ class FetchTests(unittest.TestCase):
         return response
 
     def test_get_khi_khong_co_body(self) -> None:
-        import urllib.request
-
-        with mock.patch.object(urllib.request, "urlopen", return_value=self._response({"status": "ok"})) as urlopen:
+        with mock.patch.object(server.panel_api.LOOPBACK, "open", return_value=self._response({"status": "ok"})) as urlopen:
             self.assertEqual({"status": "ok"}, server._fetch("/health"))
 
         self.assertIsNone(urlopen.call_args[0][0].data)
 
     def test_post_khi_co_body(self) -> None:
-        import urllib.request
-
-        with mock.patch.object(urllib.request, "urlopen", return_value=self._response({"ok": 1})) as urlopen:
+        with mock.patch.object(server.panel_api.LOOPBACK, "open", return_value=self._response({"ok": 1})) as urlopen:
             server._fetch("/query", {"query": "layers"})
 
         self.assertEqual("POST", urlopen.call_args[0][0].method)
 
     def test_bridge_khong_chay_thi_bao_khong_ket_noi(self) -> None:
         import urllib.error
-        import urllib.request
-
-        with mock.patch.object(urllib.request, "urlopen", side_effect=urllib.error.URLError("refused")):
+        with mock.patch.object(server.panel_api.LOOPBACK, "open", side_effect=urllib.error.URLError("refused")):
             self.assertFalse(server._fetch("/health")["connected"])
 
 
@@ -65,30 +59,23 @@ class ProbePanelApiTests(unittest.TestCase):
         return response
 
     def test_gateway_cua_minh_dang_chay(self) -> None:
-        import urllib.request
-
-        with mock.patch.object(urllib.request, "urlopen", return_value=self._response({"panelApi": "ok"})):
+        with mock.patch.object(server.panel_api.LOOPBACK, "open", return_value=self._response({"panelApi": "ok"})):
             self.assertEqual("ours", server._probe_panel_api())
 
     def test_co_server_khac_tra_loi_json_la(self) -> None:
-        import urllib.request
-
-        with mock.patch.object(urllib.request, "urlopen", return_value=self._response({"hello": "world"})):
+        with mock.patch.object(server.panel_api.LOOPBACK, "open", return_value=self._response({"hello": "world"})):
             self.assertEqual("foreign", server._probe_panel_api())
 
     def test_co_server_khac_tra_ma_loi_http(self) -> None:
         import urllib.error
-        import urllib.request
 
         error = urllib.error.HTTPError("http://127.0.0.1", 404, "not found", None, None)
-        with mock.patch.object(urllib.request, "urlopen", side_effect=error):
+        with mock.patch.object(server.panel_api.LOOPBACK, "open", side_effect=error):
             self.assertEqual("foreign", server._probe_panel_api())
 
     def test_khong_ai_nghe_thi_port_trong(self) -> None:
         import urllib.error
-        import urllib.request
-
-        with mock.patch.object(urllib.request, "urlopen", side_effect=urllib.error.URLError("refused")):
+        with mock.patch.object(server.panel_api.LOOPBACK, "open", side_effect=urllib.error.URLError("refused")):
             self.assertEqual("free", server._probe_panel_api())
 
 

@@ -2544,6 +2544,12 @@ Và một **lỗi của IfcTester 0.8.5**: `cast_to_value` chỉ nhận `"true"/
 True). Đổi fixture sang `false` thì IfcTester ra 488 = DHCB. Ghi lại để không ai "sửa" DHCB cho khớp con số
 sai.
 
+> **Đính chính 2026-09-28:** kết luận "`FALSE` viết hoa đúng chuẩn IDS" ở trên **sai**. Bộ ca chính thức của
+> buildingSMART (`attribute/`, `property/…booleans_must_be_specified_as_lowercase_strings…`) coi IDS ghi `FALSE`
+> là **invalid**, chỉ `false` chữ thường mới đạt — IfcTester 0.8.5 làm đúng. DHCB nay đọc `.T./.F.` thành
+> `true/false` và so phân biệt hoa thường; fixture `doi-chieu-ifctester.ids` đã đổi sang `false`
+> (xem [`kiem-ids.md`](kiem-ids.md#đối-chiếu-bộ-ca-buildingsmart), audit 2026-09-28).
+
 ### Quyết định 11.4
 
 Mở sang IFC. Chi phí thấp (một lớp dịch, không lệnh Revit mới), chạy trên CI, và là thứ duy nhất đã bắt được

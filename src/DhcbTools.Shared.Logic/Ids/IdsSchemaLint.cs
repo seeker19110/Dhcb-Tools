@@ -217,6 +217,7 @@ namespace DhcbTools.Shared.Logic.Ids
                         Required(sink, facet, "name");
                         Value(sink, Child(facet, "name"));
                         Value(sink, Child(facet, "predefinedType"));
+                        UpperCaseEntity(sink, Child(facet, "name"));
                         break;
                     case "partof":
                         Required(sink, facet, "entity");
@@ -267,6 +268,21 @@ namespace DhcbTools.Shared.Logic.Ids
         }
 
         /// <summary>Một <c>idsValue</c>: đúng một trong <c>simpleValue</c> hoặc <c>xs:restriction</c>.</summary>
+        /// <summary>
+        /// IDS 1.0 viết tên lớp IFC bằng chữ HOA (<c>IFCWALL</c>) — buildingSMART coi <c>IfcWall</c> là file sai
+        /// (<c>invalid-entities_must_be_specified_as_uppercase_strings</c>). DHCB vẫn khớp được (tên lớp không có
+        /// nghĩa khác theo hoa thường) nhưng IfcTester/Solibri sẽ từ chối, nên cảnh báo.
+        /// </summary>
+        private static void UpperCaseEntity(Sink sink, XElement? name)
+        {
+            var values = name?.Descendants().Where(e => Local(e) == "simpleValue" || Local(e) == "enumeration")
+                .Select(e => ((string?)e.Attribute("value") ?? e.Value).Trim()) ?? Enumerable.Empty<string>();
+            foreach (var value in values.Where(v => v != v.ToUpperInvariant()))
+            {
+                sink.Add(name!, "tên lớp \"" + value + "\" phải viết HOA (" + value.ToUpperInvariant() + ")");
+            }
+        }
+
         private static void Value(Sink sink, XElement? value)
         {
             if (value == null)

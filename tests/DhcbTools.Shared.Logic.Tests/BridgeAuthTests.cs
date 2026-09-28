@@ -80,4 +80,25 @@ public class BridgeAuthTests
     {
         Assert.False(BridgeAuth.IsAuthorized(expectedToken, auth!, contentType!));
     }
+    [Theory]
+    [InlineData("https://trang-la.example", null)]
+    [InlineData("null", null)]                         // Origin của iframe sandbox / file://
+    [InlineData(null, "cross-site")]
+    [InlineData(null, "same-site")]
+    [InlineData(null, "same-origin")]
+    [InlineData("http://127.0.0.1:8767", "same-origin")]
+    public void IsBrowserRequest_TrangWebKhoiXuong_True(string? origin, string? secFetchSite)
+    {
+        Assert.True(BridgeAuth.IsBrowserRequest(origin, secFetchSite));
+    }
+
+    [Theory]
+    [InlineData(null, null)]      // script Python, MCP server, panel gateway, curl
+    [InlineData("", "  ")]
+    [InlineData(null, "none")]    // kỹ sư tự gõ URL /health vào thanh địa chỉ
+    [InlineData(null, " None ")]
+    public void IsBrowserRequest_ClientHopLeHoacTuGoUrl_False(string? origin, string? secFetchSite)
+    {
+        Assert.False(BridgeAuth.IsBrowserRequest(origin, secFetchSite));
+    }
 }

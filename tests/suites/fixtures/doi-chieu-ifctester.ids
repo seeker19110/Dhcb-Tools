@@ -28,12 +28,12 @@
       </requirements>
     </specification>
 
-    <specification name="03 Tường IsExternal = FALSE (boolean)" ifcVersion="IFC4">
+    <specification name="03 Tường IsExternal = false (boolean)" ifcVersion="IFC4">
       <applicability>
         <entity><name><simpleValue>IFCWALL</simpleValue></name></entity>
       </applicability>
       <requirements>
-        <property><propertySet><simpleValue>Pset_WallCommon</simpleValue></propertySet><baseName><simpleValue>IsExternal</simpleValue></baseName><value><simpleValue>FALSE</simpleValue></value></property>
+        <property><propertySet><simpleValue>Pset_WallCommon</simpleValue></propertySet><baseName><simpleValue>IsExternal</simpleValue></baseName><value><simpleValue>false</simpleValue></value></property>
       </requirements>
     </specification>
 

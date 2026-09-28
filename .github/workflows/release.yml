@@ -37,17 +37,21 @@ jobs:
         shell: bash
         # inputs.version đi qua biến môi trường, không nội suy thẳng vào script: giá trị
         # `1.0.0"$(...)"` từ workflow_dispatch sẽ được bash chạy nếu chèn bằng ${{ }}.
+        # Tên tag cũng phải qua cùng bộ lọc: git cho phép `$ ( ) ; |` trong tên ref, và tag
+        # `v1.2.3$(…)` vẫn khớp mẫu 'v*.*.*'. Output này được chèn vào pwsh/ISCC ở các job sau,
+        # nên chỉ để lọt chữ, số, . + -.
         env:
           INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
           else
-            case "$INPUT_VERSION" in
-              *[!A-Za-z0-9.+-]*|"") echo "version không hợp lệ: chỉ nhận chữ, số, . + -" >&2; exit 1 ;;
-            esac
-            echo "version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
+            version="$INPUT_VERSION"
           fi
+          case "$version" in
+            *[!A-Za-z0-9.+-]*|"") echo "version không hợp lệ: chỉ nhận chữ, số, . + -" >&2; exit 1 ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
   build-revit:
     needs: version
@@ -58,8 +62,10 @@ jobs:
         # 2026 (net8.0-windows) thêm 2026-09-06 sau khi ba bộ ca kiểm chạy thật trên Revit 2026 — bang-chung-test.md §51.
         revit: [2023, 2024, 2025, 2026]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: '8.0.x'
 
@@ -81,9 +87,23 @@ jobs:
           Copy-Item "$out/DhcbTools.Revit.dll", "$out/DhcbTools.Core.dll", "$out/DhcbTools.Shared.Logic.dll", `
                     "$out/DhcbTools.Shared.Hosting.dll", "$out/Newtonsoft.Json.dll" $pkg
           Copy-Item docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md $pkg
-          Compress-Archive -Path "$pkg/*" -DestinationPath "dist/DhcbTools.Revit-${{ matrix.revit }}-${{ needs.version.outputs.version }}.zip"
 
-      - uses: actions/upload-artifact@v4
+      # Ký Authenticode khi repo có secret chứng chỉ (DHCB_SIGN_PFX_BASE64/_PASSWORD); không có thì bỏ qua, gói
+      # vẫn phát hành như trước. Bước riêng để secret chỉ vào đúng bước này, không vào bước build/restore.
+      - name: Ký số DLL (nếu có chứng chỉ)
+        shell: pwsh
+        env:
+          DHCB_SIGN_PFX_BASE64: ${{ secrets.DHCB_SIGN_PFX_BASE64 }}
+          DHCB_SIGN_PFX_PASSWORD: ${{ secrets.DHCB_SIGN_PFX_PASSWORD }}
+        run: ./scripts/sign-release.ps1 -Path dist
+
+      - name: Nén
+        shell: pwsh
+        run: |
+          $pkg = "dist/DhcbTools.Revit-${{ matrix.revit }}-${{ needs.version.outputs.version }}"
+          Compress-Archive -Path "$pkg/*" -DestinationPath "$pkg.zip"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: DhcbTools.Revit-${{ matrix.revit }}
           path: dist/*.zip
@@ -97,8 +117,10 @@ jobs:
       matrix:
         acad: [2024, 2025, 2026]   # 2026 = R25.1, .NET 10 — đã chạy thật (bang-chung-test.md §24, §25)
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           # AutoCAD 2026 (net10.0-windows) cần SDK 10; 2024/2025 vẫn dùng SDK 8.
           dotnet-version: |
@@ -131,9 +153,23 @@ jobs:
           # nó nên chính AutoCAD đã cấp — §25 chạy thật với bundle KHÔNG có file này. Chép thêm bản riêng
           # chỉ tạo nguy cơ lệch phiên bản với bản AutoCAD đang chạy.
           Copy-Item docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md $pkg
-          Compress-Archive -Path "$pkg/*" -DestinationPath "dist/DhcbTools.AutoCAD-${{ matrix.acad }}-${{ needs.version.outputs.version }}.zip"
 
-      - uses: actions/upload-artifact@v4
+      # Ký Authenticode khi repo có secret chứng chỉ (DHCB_SIGN_PFX_BASE64/_PASSWORD); không có thì bỏ qua, gói
+      # vẫn phát hành như trước. Bước riêng để secret chỉ vào đúng bước này, không vào bước build/restore.
+      - name: Ký số DLL (nếu có chứng chỉ)
+        shell: pwsh
+        env:
+          DHCB_SIGN_PFX_BASE64: ${{ secrets.DHCB_SIGN_PFX_BASE64 }}
+          DHCB_SIGN_PFX_PASSWORD: ${{ secrets.DHCB_SIGN_PFX_PASSWORD }}
+        run: ./scripts/sign-release.ps1 -Path dist
+
+      - name: Nén
+        shell: pwsh
+        run: |
+          $pkg = "dist/DhcbTools.AutoCAD-${{ matrix.acad }}-${{ needs.version.outputs.version }}"
+          Compress-Archive -Path "$pkg/*" -DestinationPath "$pkg.zip"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: DhcbTools.AutoCAD-${{ matrix.acad }}
           path: dist/*.zip
@@ -143,8 +179,10 @@ jobs:
     needs: version
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: '10.0.x'
 
@@ -164,9 +202,23 @@ jobs:
           Copy-Item configs/* "$pkg/configs"
           Copy-Item scripts/*.py, scripts/*.ps1 "$pkg/scripts"
           Copy-Item docs/batch-runner.md, docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md $pkg
-          Compress-Archive -Path "$pkg/*" -DestinationPath "dist/DhcbTools.BatchRunner-${{ needs.version.outputs.version }}.zip"
 
-      - uses: actions/upload-artifact@v4
+      # Ký Authenticode khi repo có secret chứng chỉ (DHCB_SIGN_PFX_BASE64/_PASSWORD); không có thì bỏ qua, gói
+      # vẫn phát hành như trước. Bước riêng để secret chỉ vào đúng bước này, không vào bước build/restore.
+      - name: Ký số DLL (nếu có chứng chỉ)
+        shell: pwsh
+        env:
+          DHCB_SIGN_PFX_BASE64: ${{ secrets.DHCB_SIGN_PFX_BASE64 }}
+          DHCB_SIGN_PFX_PASSWORD: ${{ secrets.DHCB_SIGN_PFX_PASSWORD }}
+        run: ./scripts/sign-release.ps1 -Path dist
+
+      - name: Nén
+        shell: pwsh
+        run: |
+          $pkg = "dist/DhcbTools.BatchRunner-${{ needs.version.outputs.version }}"
+          Compress-Archive -Path "$pkg/*" -DestinationPath "$pkg.zip"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: DhcbTools.BatchRunner
           path: dist/*.zip
@@ -177,10 +229,12 @@ jobs:
     needs: [verify, version, build-revit, build-autocad, build-batchrunner]
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Tải mọi gói zip đã build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: artifacts
           merge-multiple: true
@@ -219,7 +273,19 @@ jobs:
             installer/dhcb-tools.iss
           Get-ChildItem dist/*.exe
 
-      - uses: actions/upload-artifact@v4
+      - name: Ký số installer (nếu có chứng chỉ)
+        shell: pwsh
+        env:
+          DHCB_SIGN_PFX_BASE64: ${{ secrets.DHCB_SIGN_PFX_BASE64 }}
+          DHCB_SIGN_PFX_PASSWORD: ${{ secrets.DHCB_SIGN_PFX_PASSWORD }}
+        run: |
+          # dist/ lúc này có cả stage (DLL đã ký ở job build) và file Setup vừa dựng; chỉ cần ký file .exe.
+          New-Item -ItemType Directory -Force -Path dist/setup | Out-Null
+          Move-Item dist/*.exe dist/setup
+          ./scripts/sign-release.ps1 -Path dist/setup
+          Move-Item dist/setup/*.exe dist
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: DhcbTools-Setup
           path: dist/*.exe
@@ -232,7 +298,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: dist
           merge-multiple: true

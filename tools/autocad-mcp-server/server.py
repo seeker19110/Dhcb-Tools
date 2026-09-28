@@ -1,6 +1,6 @@
 """
 AutoCAD Tools MCP Server
-Cung cấp tools để điều khiển AutoCAD qua HTTP bridge (localhost:8766).
+Cung cấp tools để điều khiển AutoCAD qua HTTP bridge (127.0.0.1:8766).
 Cài: hermes mcp add autocad-tools --command python --args <repo>/tools/autocad-mcp-server/server.py
 """
 
@@ -18,7 +18,7 @@ from fastmcp import FastMCP
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import panel_api  # noqa: E402  — cùng thư mục; dùng chung whitelist + chuỗi xác nhận với gateway
 
-BRIDGE_URL = "http://localhost:8766"
+BRIDGE_URL = panel_api.AUTOCAD_URL
 PANEL_API_URL = f"http://{panel_api.HOST}:{panel_api.PORT}"
 PANEL_HTML = str(Path(__file__).parent / "panel.html")
 PANEL_API_SCRIPT = str(Path(__file__).parent / "panel_api.py")
@@ -30,10 +30,9 @@ _gateway_process: subprocess.Popen | None = None
 def _probe_panel_api() -> str:
     """'ours' = gateway của mình đang chạy · 'free' = port trống · 'foreign' = port bị thứ khác chiếm."""
     import urllib.error
-    import urllib.request
 
     try:
-        with urllib.request.urlopen(PANEL_API_URL + "/alive", timeout=2) as resp:
+        with panel_api.LOOPBACK.open(PANEL_API_URL + "/alive", timeout=2) as resp:
             data = json.loads(resp.read())
             return "ours" if data.get("panelApi") == "ok" else "foreign"
     except urllib.error.HTTPError:
@@ -124,7 +123,7 @@ def _fetch(path: str, body: dict | None = None) -> dict:
                 headers=panel_api.bridge_headers(True),
                 method="POST",
             )
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with panel_api.LOOPBACK.open(req, timeout=10) as resp:
             return json.loads(resp.read().decode())
     except Exception as e:
         return {"error": str(e), "connected": False}
@@ -135,7 +134,7 @@ def _fetch(path: str, body: dict | None = None) -> dict:
 @mcp.tool()
 def autocad_health() -> str:
     """
-    Kiểm tra AutoCAD Bridge có đang chạy không (localhost:8766).
+    Kiểm tra AutoCAD Bridge có đang chạy không (127.0.0.1:8766).
     Trả về status, app name, port.
     """
     result = _fetch("/health")

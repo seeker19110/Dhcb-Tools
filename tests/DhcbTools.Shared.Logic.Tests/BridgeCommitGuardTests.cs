@@ -269,6 +269,69 @@ public sealed class BridgeCommitGuardTests : IDisposable
         Assert.True(Execute(request).Success);
     }
 
+    [Theory]
+    [InlineData("HealthReport", "outputPath", @"C:\Users\a\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\x.bat")]
+    [InlineData("HealthReport", "outputPath", "report.ps1")]
+    [InlineData("HealthReport", "outputPath", "x.bat.")]          // Windows bỏ dấu chấm cuối → x.bat
+    [InlineData("HealthReport", "outputPath", "x.bat  ")]         // … và khoảng trắng cuối
+    [InlineData("HealthReport", "outputPath", @"C:\t\a.exe:b.csv")] // alternate data stream
+    [InlineData("HealthReport", "outputPath", @"\\?\C:\t\a.csv")] // đường dẫn thiết bị
+    [InlineData("ClashDetection", "bcfPath", "clash.lnk")]          // trường ghi không bắt đầu bằng "output"
+    [InlineData("AutoNumbering", "somethingPath", "x.cmd")]          // trường chưa có trong catalog
+    public void Bridge_rejects_executable_or_stream_paths_before_dispatch(string command, string field, string path)
+    {
+        var dispatched = 0;
+        var request = Request(config: new JObject { [field] = path });
+        request.Command = command;
+        var result = _guard.Execute("revit", request, "A", () => 0, _ => { dispatched++; return CommandResult.Ok("x"); });
+        Assert.False(result.Success);
+        Assert.StartsWith("E-PATH-UNSAFE: " + field, result.Summary);
+        Assert.Equal(0, dispatched);
+    }
+
+    [Theory]
+    [InlineData("outputPath", @"C:\out\bao-cao.HTML")]
+    [InlineData("outputPath", @"\\may-chu\chung\thong-so.csv")]
+    [InlineData("outputPath", "khong-duoi")]
+    [InlineData("outputFolder", @"C:\out\ten.bat")]   // thư mục: lệnh tự đặt tên file bên trong
+    [InlineData("prefix", "x.bat")]                     // không phải trường đường dẫn
+    public void Bridge_allows_known_formats_folders_and_non_path_fields(string field, string path)
+    {
+        var request = Request(config: new JObject { [field] = path });
+        request.Command = "HealthReport";
+        Assert.True(Execute(request).Success);
+    }
+
+    [Fact]
+    public void Path_policy_checks_list_items_and_skips_non_strings()
+    {
+        var descriptor = DhcbTools.Shared.Logic.Ai.CommandCatalog.Find("revit", "HealthReport")!;
+        Assert.Null(BridgePathPolicy.FirstUnsafe(descriptor, new JObject { ["cadPaths"] = new JArray("a.dwg", 3), ["outputPath"] = 5 }));
+        Assert.Contains("cadPaths", BridgePathPolicy.FirstUnsafe(descriptor, new JObject { ["cadPaths"] = new JArray("a.dwg", "b.vbs") }));
+        Assert.Null(BridgePathPolicy.Problem("   "));
+        Assert.Null(BridgePathPolicy.Problem("a"));
+    }
+
+    /// <summary>
+    /// Preview ClashDetection ghi luôn file BCF. Trước đây bcfPath bị chụp như đầu vào: file chưa có → có sau
+    /// preview, nên preview qua Bridge luôn E-PREVIEW-CHANGED và lệnh không bao giờ ghi được.
+    /// </summary>
+    [Theory]
+    [InlineData("bcfPath", "clash.bcf")]
+    [InlineData("legendCsvPath", "legend.csv")]
+    public void Outputs_written_during_preview_do_not_invalidate_it(string field, string fileName)
+    {
+        var target = Path.Combine(_root, fileName);
+        var request = Request(config: new JObject { [field] = target, ["dryRun"] = true });
+        var preview = _guard.Execute("revit", request, "A", () => _revision, r =>
+        {
+            File.WriteAllText(target, "ghi trong lúc xem trước " + Guid.NewGuid());
+            return CommandResult.Ok("Preview");
+        });
+        Assert.True(preview.Success, preview.Summary);
+        Assert.NotNull(preview.PreviewToken);
+    }
+
     [Fact]
     public void Invalid_path_or_linked_directory_fails_closed()
     {

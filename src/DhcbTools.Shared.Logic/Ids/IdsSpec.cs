@@ -17,7 +17,7 @@ namespace DhcbTools.Shared.Logic.Ids
     {
         private Regex? _pattern;
 
-        /// <summary>Chuỗi phải khớp đúng (không phân biệt hoa thường; hai bên đều là số thì so số).</summary>
+        /// <summary>Chuỗi phải khớp đúng (phân biệt hoa thường; hai bên đều là số thì so số có dung sai).</summary>
         public string? Simple { get; set; }
 
         /// <summary>Danh sách giá trị cho phép.</summary>
@@ -47,8 +47,13 @@ namespace DhcbTools.Shared.Logic.Ids
         /// <summary><c>xs:maxLength</c>.</summary>
         public int? MaxLength { get; set; }
 
-        /// <summary>Sai số tương đối khi so hai số (IFC ghi <c>0.29999999999999999</c> cho 0,3).</summary>
-        public const double NumericTolerance = 1e-9;
+        /// <summary>
+        /// Dung sai khi so bằng hai số, đúng IDS 1.0: thực tế nằm trong
+        /// <c>kỳ vọng ± (|kỳ vọng| × 1e-6 + 1e-6)</c>. Chỉ áp cho so bằng (<c>simpleValue</c>/<c>enumeration</c>);
+        /// biên <c>min/maxInclusive/Exclusive</c> so chặt. Bộ ca <c>tolerance/</c> của buildingSMART đặt giá trị
+        /// ngay trên biên này — dung sai cũ 1e-9 trượt cả 14 ca "pass".
+        /// </summary>
+        public const double NumericTolerance = 1e-6;
 
         /// <summary>Thời gian tối đa cho một lần khớp pattern — regex ác ý/vô tình (<c>(a+)+$</c>) không được treo Revit.</summary>
         public static readonly TimeSpan PatternTimeout = TimeSpan.FromSeconds(2);
@@ -75,12 +80,62 @@ namespace DhcbTools.Shared.Logic.Ids
             {
                 // XSD pattern khớp TOÀN BỘ chuỗi, Regex .NET thì khớp một đoạn. Không neo hai đầu thì
                 // "AB-01-rác" cũng đạt quy tắc "AB-\d\d" — quy tắc đặt tên mất hiệu lực mà vẫn xanh.
-                _pattern = new Regex("^(?:" + Pattern + ")$", RegexOptions.CultureInvariant, PatternTimeout);
+                _pattern = new Regex("^(?:" + TranslateXsd(Pattern!) + ")$", RegexOptions.CultureInvariant, PatternTimeout);
             }
             catch (ArgumentException ex)
             {
                 throw new IdsParseException("xs:pattern \"" + Pattern + "\" không phải biểu thức chính quy .NET đọc được: " + ex.Message);
             }
+        }
+
+        /// <summary>Ký tự đầu của tên XML (<c>\i</c> trong XSD): chữ cái, <c>_</c>, <c>:</c>.</summary>
+        private const string XsdInitialNameChars = @"\p{L}_:";
+
+        /// <summary>Ký tự tên XML (<c>\c</c> trong XSD): thêm chữ số, dấu kết hợp, <c>.</c> và <c>-</c>.</summary>
+        private const string XsdNameChars = @"\p{L}\p{Mn}\p{Mc}\p{Nd}_:.\-";
+
+        /// <summary>
+        /// Dịch bốn lớp ký tự XSD mà .NET không có — <c>\i</c>, <c>\c</c> và hai phủ định <c>\I</c>, <c>\C</c>.
+        /// Trước đây file IDS dùng chúng bị từ chối lúc đọc ("không phải biểu thức chính quy .NET"), dù là
+        /// pattern XSD hợp lệ mà IfcTester chạy được. <c>\I</c>/<c>\C</c> nằm trong <c>[…]</c> không có dạng
+        /// .NET tương đương → vẫn báo lỗi đọc file thay vì kiểm sai.
+        /// </summary>
+        internal static string TranslateXsd(string pattern)
+        {
+            var sb = new System.Text.StringBuilder(pattern.Length + 16);
+            var inClass = false;
+            for (var i = 0; i < pattern.Length; i++)
+            {
+                var ch = pattern[i];
+                if (ch == '\\' && i + 1 < pattern.Length)
+                {
+                    var next = pattern[++i];
+                    var set = next == 'i' || next == 'I' ? XsdInitialNameChars : next == 'c' || next == 'C' ? XsdNameChars : null;
+                    if (set == null)
+                    {
+                        sb.Append(ch).Append(next);
+                    }
+                    else if (char.IsLower(next))
+                    {
+                        sb.Append(inClass ? set : "[" + set + "]");
+                    }
+                    else if (!inClass)
+                    {
+                        sb.Append("[^" + set + "]");
+                    }
+                    else
+                    {
+                        throw new ArgumentException("\\" + next + " bên trong [...] chưa hỗ trợ");
+                    }
+
+                    continue;
+                }
+
+                inClass = ch == '[' || (inClass && ch != ']');
+                sb.Append(ch);
+            }
+
+            return sb.ToString();
         }
 
         /// <summary>Giá trị đọc được từ mô hình có thoả không — MỌI ràng buộc đã khai đều phải đúng.</summary>
@@ -162,36 +217,22 @@ namespace DhcbTools.Shared.Logic.Ids
         }
 
         /// <summary>
-        /// Hai giá trị bằng nhau: cả hai là số thì so số (IDS đòi so theo dataType; <c>0.3</c> phải bằng
-        /// <c>IFCREAL(0.29999999999999999)</c>, <c>3.</c> bằng <c>3.0</c>); boolean so không phân biệt
-        /// <c>true</c>/<c>TRUE</c>/<c>.T.</c>; còn lại so chuỗi không phân biệt hoa thường.
+        /// Hai giá trị bằng nhau: cả hai là số thì so số theo <see cref="NumericTolerance"/> (<c>0.3</c> bằng
+        /// <c>IFCREAL(0.29999999999999999)</c>, <c>3.</c> bằng <c>3.0</c>); còn lại so chuỗi <b>phân biệt hoa
+        /// thường</b> như IDS 1.0 quy định (bộ ca <c>…_case_sensitively</c> của buildingSMART). Boolean không có
+        /// luật riêng: phía mô hình ghi <c>true</c>/<c>false</c> chữ thường (dạng chuẩn XSD) nên IDS viết
+        /// <c>TRUE</c> không khớp — đúng chuẩn: "booleans must be specified as lowercase strings".
         /// </summary>
         internal static bool ValuesEqual(string actual, string expected)
         {
             if (TryNumber(actual, out var a) && TryNumber(expected, out var b))
             {
-                var scale = Math.Max(1.0, Math.Max(Math.Abs(a), Math.Abs(b)));
-                return Math.Abs(a - b) <= NumericTolerance * scale;
+                // × (1 + 1e-9): bộ ca đặt giá trị ĐÚNG trên biên, mà trong double |1.000002 − 1| = 2.0000000003e-6
+                // > 2e-6 — thiếu phần đệm này thì 8/14 ca "pass" của buildingSMART trượt vì sai số làm tròn.
+                return Math.Abs(a - b) <= (Math.Abs(b) * NumericTolerance + NumericTolerance) * (1 + 1e-9);
             }
 
-            return string.Equals(NormalizeBoolean(actual), NormalizeBoolean(expected), StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static string NormalizeBoolean(string text)
-        {
-            switch (text.Trim().ToUpperInvariant())
-            {
-                case "TRUE":
-                case ".T.":
-                case "T":
-                    return "TRUE";
-                case "FALSE":
-                case ".F.":
-                case "F":
-                    return "FALSE";
-                default:
-                    return text;
-            }
+            return string.Equals(actual, expected, StringComparison.Ordinal);
         }
 
         private static bool TryNumber(string text, out double number)
@@ -301,7 +342,7 @@ namespace DhcbTools.Shared.Logic.Ids
         /// <summary>Entity: tên lớp IFC. Attribute: tên thuộc tính. Property: tên property.</summary>
         public IdsValue Name { get; set; } = new IdsValue();
 
-        /// <summary>Property: tên property set. Entity: predefinedType. Classification: hệ phân loại.</summary>
+        /// <summary>Property: tên property set. Entity/PartOf: predefinedType. Classification: hệ phân loại.</summary>
         public IdsValue? Container { get; set; }
 
         /// <summary>Giá trị phải thoả (không ràng buộc = chỉ cần tồn tại).</summary>
@@ -348,7 +389,8 @@ namespace DhcbTools.Shared.Logic.Ids
                 case IdsFacetKind.Material:
                     return "vật liệu " + Value.Describe();
                 default:
-                    return "thuộc về " + (Relation != null ? "(qua " + Relation + ") " : string.Empty) + Value.Describe();
+                    return "thuộc về " + (Relation != null ? "(qua " + Relation + ") " : string.Empty) + Value.Describe()
+                           + (Container != null ? ", predefinedType " + Container.Describe() : string.Empty);
             }
         }
     }
@@ -461,10 +503,19 @@ namespace DhcbTools.Shared.Logic.Ids
                     }
                 }
 
-                spec.MinOccurs = ReadOccurs(element, "minOccurs", 1) ?? 0;
-                spec.MaxOccurs = ReadOccurs(element, "maxOccurs", null);
+                // IDS 1.0 đặt minOccurs/maxOccurs trên <applicability>; bản nháp cũ đặt trên <specification>.
+                // Trước đây chỉ đọc chỗ thứ hai: specification CẤM của file IDS 1.0 thật (applicability
+                // maxOccurs="0") bị coi là bắt buộc — thiếu requirements là từ chối cả file, có requirements
+                // thì kiểm ngược. Đọc applicability trước, không khai mới rơi về specification.
+                var applicability = Child(element, "applicability");
+                var occurs = applicability != null
+                             && (applicability.Attribute("minOccurs") != null || applicability.Attribute("maxOccurs") != null)
+                    ? applicability
+                    : element;
+                spec.MinOccurs = ReadOccurs(occurs, spec.Name, "minOccurs", 1) ?? 0;
+                spec.MaxOccurs = ReadOccurs(occurs, spec.Name, "maxOccurs", null);
 
-                foreach (var facet in ReadFacets(Child(element, "applicability")))
+                foreach (var facet in ReadFacets(applicability))
                 {
                     spec.Applicability.Add(facet);
                 }
@@ -483,6 +534,14 @@ namespace DhcbTools.Shared.Logic.Ids
                         "Specification \"" + spec.Name + "\" không có <requirements> nào — nó sẽ luôn đạt, tức là không kiểm gì cả.");
                 }
 
+                // Cấm mà vẫn khai yêu cầu: IDS 1.0 coi là file sai ("prohibited specifications invalid if
+                // requirements are specified") — đọc tiếp thì yêu cầu bị lờ đi mà tác giả không biết.
+                if (spec.Requirements.Count > 0 && spec.IsProhibited)
+                {
+                    throw new IdsParseException(
+                        "Specification \"" + spec.Name + "\" là CẤM (maxOccurs=\"0\") nhưng vẫn có <requirements> — bỏ requirements, hoặc bỏ maxOccurs=\"0\".");
+                }
+
                 result.Add(spec);
             }
 
@@ -490,7 +549,7 @@ namespace DhcbTools.Shared.Logic.Ids
         }
 
         /// <summary><c>minOccurs</c>/<c>maxOccurs</c>: số nguyên ≥ 0 hoặc <c>unbounded</c> (= null). Thiếu = mặc định.</summary>
-        private static int? ReadOccurs(XElement element, string attribute, int? missing)
+        private static int? ReadOccurs(XElement element, string specification, string attribute, int? missing)
         {
             var text = ((string?)element.Attribute(attribute))?.Trim();
             if (string.IsNullOrEmpty(text))
@@ -508,7 +567,7 @@ namespace DhcbTools.Shared.Logic.Ids
                 return value;
             }
 
-            throw new IdsParseException("Specification \"" + ((string?)element.Attribute("name") ?? string.Empty) + "\": " + attribute + "=\"" + text + "\" phải là số nguyên ≥ 0 hoặc \"unbounded\".");
+            throw new IdsParseException("Specification \"" + specification + "\": " + attribute + "=\"" + text + "\" phải là số nguyên ≥ 0 hoặc \"unbounded\".");
         }
 
         private static IEnumerable<IdsFacet> ReadFacets(XElement? parent)
@@ -523,7 +582,16 @@ namespace DhcbTools.Shared.Logic.Ids
                 switch (Local(element).ToLowerInvariant())
                 {
                     case "entity":
-                        yield return Facet(element, IdsFacetKind.Entity, "name", "predefinedType", null);
+                        var entity = Facet(element, IdsFacetKind.Entity, "name", "predefinedType", null);
+                        // Tên lớp IFC không có nghĩa khác theo hoa thường: nhận cả "IfcWall" (file viết tay, lint
+                        // cảnh báo lệch chuẩn) bằng cách nâng lên chữ hoa — phía mô hình cũng được nâng lên trước khi so.
+                        entity.Name.Simple = entity.Name.Simple?.ToUpperInvariant();
+                        for (var i = 0; i < entity.Name.Enumeration.Count; i++)
+                        {
+                            entity.Name.Enumeration[i] = entity.Name.Enumeration[i].ToUpperInvariant();
+                        }
+
+                        yield return entity;
                         break;
                     case "attribute":
                         yield return Facet(element, IdsFacetKind.Attribute, "name", null, "value");
@@ -540,7 +608,7 @@ namespace DhcbTools.Shared.Logic.Ids
                         yield return Facet(element, IdsFacetKind.Material, "value", null, "value");
                         break;
                     case "partof":
-                        var partOf = Facet(element, IdsFacetKind.PartOf, "entity", null, "entity");
+                        var partOf = PartOfFacet(element);
                         var relation = ((string?)element.Attribute("relation"))?.Trim();
                         if (!string.IsNullOrEmpty(relation))
                         {
@@ -565,6 +633,28 @@ namespace DhcbTools.Shared.Logic.Ids
                         throw new IdsParseException("Facet \"" + Local(element) + "\" chưa hỗ trợ.");
                 }
             }
+        }
+
+        /// <summary>
+        /// <c>&lt;partOf&gt;&lt;entity&gt;&lt;name&gt;…&lt;/name&gt;&lt;predefinedType&gt;…&lt;/predefinedType&gt;&lt;/entity&gt;&lt;/partOf&gt;</c>:
+        /// tên lớp của tổ tiên vào <see cref="IdsFacet.Value"/>, predefinedType vào <see cref="IdsFacet.Container"/>.
+        /// Bản cũ đọc cả khối <c>&lt;entity&gt;</c> như một chuỗi: có predefinedType thì ra "IFCINVENTORYBUNNY" và
+        /// không bao giờ khớp; tên khai bằng restriction thì bị gộp chữ. Khối không có <c>&lt;name&gt;</c>
+        /// (bản nháp cũ ghi thẳng giá trị trong <c>&lt;entity&gt;</c>) vẫn đọc như trước.
+        /// </summary>
+        private static IdsFacet PartOfFacet(XElement element)
+        {
+            var entity = Child(element, "entity");
+            var name = entity != null ? Child(entity, "name") : null;
+            var value = name != null ? ReadValue(name) : ReadValue(entity);
+            return new IdsFacet
+            {
+                Kind = IdsFacetKind.PartOf,
+                Name = value ?? new IdsValue(),
+                Value = value ?? new IdsValue(),
+                Container = name != null ? ReadValue(Child(entity!, "predefinedType")) : null,
+                Cardinality = (string?)element.Attribute("cardinality") ?? "required",
+            };
         }
 
         private static IdsFacet Facet(XElement element, IdsFacetKind kind, string nameChild, string? containerChild, string? valueChild)
@@ -633,7 +723,10 @@ namespace DhcbTools.Shared.Logic.Ids
                         value.Enumeration.Add(text);
                         break;
                     case "pattern":
-                        value.Pattern = text;
+                        // Nhiều xs:pattern trong cùng một restriction là phép HOẶC (XSD), không phải "cái sau
+                        // đè cái trước" — bản cũ chỉ giữ pattern cuối nên "[A-Z]{2}\d{2} hoặc [a-z]{2}\d{2}"
+                        // trượt oan mọi tên viết hoa.
+                        value.Pattern = value.Pattern == null ? text : "(?:" + value.Pattern + ")|(?:" + text + ")";
                         break;
                     case "mininclusive":
                         value.MinInclusive = Number(text);

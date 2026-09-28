@@ -16,13 +16,16 @@ hiện tại của dự án này (add-in C#, một người làm). Repo **đã c
 
 ## CI đang chạy những gì
 
-Ba workflow trong [`.github/workflows/`](.github/workflows/):
+Bốn workflow trong [`.github/workflows/`](.github/workflows/) — `tests.yml`, `release.yml` mô tả dưới đây, cộng
+`secret-scan.yml` (gitleaks, mọi PR) và `dependency-audit.yml` (`scripts/check-vulnerable.sh`: package NuGet/pip có
+lỗ hổng đã biết; chạy khi PR đổi dependency, trên `main` và hằng tuần). `.github/dependabot.yml` mở PR cập nhật
+GitHub Actions và pip mỗi tháng. Mô hình an toàn tổng thể: [`SECURITY.md`](SECURITY.md).
 
 **`tests.yml` — chạy mọi push vào `main` và **mọi pull request**.** Ba job:
 
 | Job | Máy | Làm gì |
 |---|---|---|
-| `logic-tests` | ubuntu-latest | `dotnet restore/build/test` bộ `DhcbTools.Shared.Logic.Tests` (Release) **kèm cổng phủ 100% dòng** (`scripts/check-coverage.py`), tải kết quả `.trx` lên artifact `test-results` |
+| `logic-tests` | ubuntu-latest | `dotnet restore/build/test` bộ `DhcbTools.Shared.Logic.Tests` (Release) **kèm cổng phủ 100% dòng** (`scripts/check-coverage.py`), test CLI BatchRunner, **bộ ca IDS chính thức của buildingSMART** (`scripts/ids-conformance.py`, đỏ khi một ca ngoài `tests/ids-buildingsmart/known-gaps.txt` lệch — sửa được ca nào thì xoá dòng đó), tải kết quả `.trx` lên artifact `test-results` |
 | `check-build` | ubuntu-latest, ma trận `2027` / `2026` / `2025` / `2024` / `2023` | Build `BatchRunner` + biên dịch Core và cả bốn vỏ (Revit, AutoCAD, AutoCAD core-only) bằng API package NuGet với `UseWPF=false`. `2026`/`2027` là đường **.NET 10** (AutoCAD ≥ 2026, Revit ≥ 2027), cần cả SDK 8 lẫn 10. Riêng nhánh `2025` còn chạy `py_compile` cho `scripts/*.py` + `tools/autocad-mcp-server/*.py`, `unittest discover` cho gateway panel **và cho `tests/python/`, kèm cổng phủ 100% câu lệnh**, và một bước kiểm cú pháp JavaScript trong `panel.html` |
 | `build-wpf-windows` | windows-latest, ma trận Revit `2027` / `2026` / `2025` / `2024` / `2023` | Build **thật có WPF** vỏ Revit — bật WPF thì SDK bỏ `System.IO` khỏi implicit usings, nên job Linux ở trên không bắt được lỗi đó. `2027` là bản WPF đầu tiên trên net10.0-windows |
 
@@ -90,6 +93,9 @@ python3 -m coverage report                   # đỏ nếu phủ < 100% câu l�
 python3 -m pyflakes scripts/*.py tools/autocad-mcp-server/*.py tests/python/*.py
 ```
 
+Có đổi dependency (`*.csproj`, `Directory.Build.props`, `requirements*.txt`) thì chạy thêm
+`pip install pip-audit && ./scripts/check-vulnerable.sh` — cùng việc `dependency-audit.yml` làm.
+
 **Cả hai tầng đều có ngưỡng phủ 100%**: thêm code mà không thêm test thì CI đỏ. Nhánh thật sự không
 chạy được trên CI (mã chỉ có trên Windows, đua giữa hai luồng) thì đánh dấu `[ExcludeFromCodeCoverage]`
 / `# pragma: no cover` **kèm lý do ngay tại chỗ** — xem `docs/dac-ta-kiem-thu.md` §2.0 để biết danh
@@ -113,6 +119,16 @@ Thêm lệnh Core mới = thêm class + một dòng trong `Shared.Logic/Ai/Comma
   (xem "Nguyên tắc xuyên suốt" trong [`docs/roadmap.md`](docs/roadmap.md)).
 - HTTP Bridge yêu cầu token (`%APPDATA%\DHCB\bridge-token.txt`) và chỉ bind 127.0.0.1 — không sửa để bind
   `0.0.0.0`; agent ở máy khác dùng SSH tunnel.
+- Bridge từ chối request có header `Origin`/`Sec-Fetch-Site` (trang web trong trình duyệt) — đừng thêm CORS để
+  "cho panel gọi thẳng"; panel đi qua gateway `tools/autocad-mcp-server/panel_api.py`.
+- Client Python gọi Bridge/Ollama bằng opener `LOOPBACK` (không proxy) và địa chỉ `127.0.0.1`, không dùng
+  `urllib.request.urlopen` trực tiếp — nó đi theo proxy hệ thống và đem header `Bearer` ra ngoài.
+- Regex do người dùng/agent nhập luôn có `matchTimeout` — chạy trên luồng UI Revit/AutoCAD, treo là treo cả phần mềm.
+- Lệnh mới ghi file ra định dạng mới thì thêm đuôi đó vào `BridgePathPolicy.AllowedExtensions`, và trường đầu ra
+  không bắt đầu bằng `output` thì thêm vào danh sách trong `BridgeCommitGuard.IsOutputField` — thiếu là preview
+  qua Bridge hỏng (`E-PREVIEW-CHANGED`, như `bcfPath` từng bị).
+- Action trong workflow ghim theo commit SHA kèm chú thích phiên bản (`uses: owner/action@<sha> # vX.Y.Z`);
+  `actions/checkout` đặt `persist-credentials: false`. Dependabot cập nhật SHA.
 - Lớp AI phải giữ offline: endpoint model chỉ loopback, không thêm SDK cloud, không commit API key.
 - Thay đổi ở `DhcbTools.Core`/`DhcbTools.Core.AutoCAD` ảnh hưởng cả Ribbon lẫn HTTP Bridge — kiểm
   tra cả hai đường gọi trước khi merge.

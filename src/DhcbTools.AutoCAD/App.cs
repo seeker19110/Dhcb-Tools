@@ -1,4 +1,4 @@
-using Autodesk.AutoCAD.Runtime;
+﻿using Autodesk.AutoCAD.Runtime;
 using DhcbTools.AutoCAD.Bridge;
 using DhcbTools.Shared.Hosting;
 #if !DHCB_NO_WPF
@@ -53,6 +53,30 @@ public sealed class App : IExtensionApplication
         }
 #endif
 
+        StartBridge(pid);
+
+        Flush();
+        if (_pending.Count > 0)
+        {
+            AcApp.Idle += OnIdle;
+        }
+    }
+
+    /// <summary>Mở Bridge 8766, trừ khi <c>settings.json</c> tắt nó (<c>{"bridge": {"enabled": false}}</c>).</summary>
+    private void StartBridge(int pid)
+    {
+        var settings = BridgeSettings.Load();
+        if (settings.Warning != null)
+        {
+            Status("[DHCB Tools] " + settings.Warning);
+        }
+
+        if (!settings.Enabled)
+        {
+            Status($"[DHCB Tools] HTTP Bridge (PID {pid}) TẮT theo settings.json (bridge.enabled = false) — không mở cổng {DhcbHttpBridge.Port}.");
+            return;
+        }
+
         try
         {
             _bridge = new DhcbHttpBridge();
@@ -71,12 +95,6 @@ public sealed class App : IExtensionApplication
             _bridge = null;
             DhcbLog.Error("AutoCAD", "khởi động HTTP Bridge", ex);
             Status($"[DHCB Tools] Lỗi khởi động Bridge (PID {pid}): {ex.Message}");
-        }
-
-        Flush();
-        if (_pending.Count > 0)
-        {
-            AcApp.Idle += OnIdle;
         }
     }
 

@@ -1,11 +1,11 @@
-using System.Text;
+﻿using System.Text;
 using Autodesk.AutoCAD.DatabaseServices;
 using DhcbTools.Shared.Logic;
 
 namespace DhcbTools.Core.AutoCAD.Attributes;
 
 /// <summary>
-/// Xuất mọi attribute của Block Reference trong Model Space ra CSV dạng hàng dài
+/// Xuất mọi attribute của Block Reference trong Model Space (và các layout nếu <c>includePaperSpace</c>) ra CSV dạng hàng dài
 /// (một hàng mỗi attribute) — đơn giản hơn pivot cột động, và khớp trực tiếp với AttributeImport.
 /// Cột: BlockName, Handle, AttributeTag, AttributeValue.
 /// </summary>
@@ -23,10 +23,22 @@ public sealed class AttributeExportCommand : ICoreCommand<AttributeExportConfig>
 
         using var transaction = database.TransactionManager.StartTransaction();
 
-        var modelSpace = (BlockTableRecord)transaction.GetObject(
-            SymbolUtilityServices.GetBlockModelSpaceId(database), OpenMode.ForRead);
+        var spaces = new List<ObjectId> { SymbolUtilityServices.GetBlockModelSpaceId(database) };
+        if (config.IncludePaperSpace)
+        {
+            // Mỗi layout là một BlockTableRecord có IsLayout; khung tên có attribute hầu như luôn nằm ở đây.
+            var blockTable = (BlockTable)transaction.GetObject(database.BlockTableId, OpenMode.ForRead);
+            foreach (ObjectId recordId in blockTable)
+            {
+                var record = (BlockTableRecord)transaction.GetObject(recordId, OpenMode.ForRead);
+                if (record.IsLayout && recordId != spaces[0])
+                {
+                    spaces.Add(recordId);
+                }
+            }
+        }
 
-        foreach (ObjectId entityId in modelSpace)
+        foreach (var entityId in spaces.SelectMany(space => ((BlockTableRecord)transaction.GetObject(space, OpenMode.ForRead)).Cast<ObjectId>()))
         {
             var entity = transaction.GetObject(entityId, OpenMode.ForRead);
             if (entity is not BlockReference blockRef)

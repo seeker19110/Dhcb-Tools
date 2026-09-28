@@ -1,0 +1,52 @@
+# Quét dependency có lỗ hổng đã biết (NuGet + pip) bằng scripts/check-vulnerable.sh.
+# Thay cho dependency-review-action — action đó đòi bật Dependency graph ở Settings → Security, repo chưa
+# bật nên đã phải bỏ ở PR #159. Script này không cần tính năng nào của GitHub, chạy ở máy cũng được.
+#
+# Không chạy trên MỌI PR: advisory mới công bố sẽ làm đỏ cả PR không đụng tới dependency. Chỉ chạy khi PR
+# đổi file khai báo dependency, trên main, và hằng tuần để bắt advisory mới cho dependency đang dùng.
+name: dependency-audit
+
+on:
+  pull_request:
+    paths: ['**/*.csproj', 'Directory.Build.props', '**/requirements*.txt', 'pyproject.toml',
+            'scripts/check-vulnerable.sh', '.github/workflows/dependency-audit.yml']
+  push:
+    branches: [main]
+    paths: ['**/*.csproj', 'Directory.Build.props', '**/requirements*.txt', 'pyproject.toml',
+            'scripts/check-vulnerable.sh', '.github/workflows/dependency-audit.yml']
+  schedule:
+    - cron: '17 1 * * 1'   # thứ Hai 08:17 giờ Việt Nam
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          # net48/net8.0-windows restore bằng SDK 8 cũng được, nhưng TFM net10.0-windows (2027) cần SDK 10.
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      # Python riêng thay vì python3 của image: pip-audit dựng venv tạm để giải dependency, cần module venv đầy đủ.
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+
+      - name: Cài pip-audit
+        run: python3 -m pip install --quiet 'pip-audit>=2.7,<3'
+
+      - name: Quét NuGet + Python
+        run: ./scripts/check-vulnerable.sh

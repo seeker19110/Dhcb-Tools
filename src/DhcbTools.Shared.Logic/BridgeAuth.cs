@@ -89,6 +89,32 @@ namespace DhcbTools.Shared.Logic
         }
 
         /// <summary>
+        /// Request do trình duyệt gửi từ một trang web? Client hợp lệ của Bridge (script Python, MCP server,
+        /// panel gateway, curl) không bao giờ gửi <c>Origin</c> hay <c>Sec-Fetch-Site</c>; trình duyệt gửi
+        /// <c>Origin</c> với mọi POST và <c>Sec-Fetch-Site</c> với mọi request do trang web phát ra.
+        /// <para>
+        /// Vì sao phải chặn TRƯỚC bước kiểm token: trang web bất kỳ kỹ sư đang mở có thể bắn
+        /// <c>fetch("http://127.0.0.1:8765/execute", {mode: "no-cors"})</c> 5 lần — không đọc được phản hồi,
+        /// nhưng mỗi lần là một "sai token" → <see cref="T:DhcbTools.Shared.Hosting.AuthLockout"/> khoá Bridge
+        /// 5 phút, lặp lại mãi chừng nào tab còn mở. Chặn ở đây thì không tính vào bộ đếm khoá.
+        /// </para>
+        /// <para>
+        /// <c>Sec-Fetch-Site: none</c> là kỹ sư tự gõ URL vào thanh địa chỉ (ví dụ mở <c>/health</c> để xem
+        /// Bridge còn sống) — không phải trang web nào khởi xướng, nên vẫn cho qua.
+        /// </para>
+        /// </summary>
+        public static bool IsBrowserRequest(string? originHeader, string? secFetchSiteHeader)
+        {
+            if (!StringGuard.IsBlank(originHeader))
+            {
+                return true;
+            }
+
+            return !StringGuard.IsBlank(secFetchSiteHeader)
+                   && !secFetchSiteHeader.Trim().Equals("none", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
         /// Kiểm tra một request có được phép chạy không: đúng token VÀ Content-Type là JSON.
         /// Ràng buộc Content-Type chặn dạng tấn công CSRF đơn giản từ trình duyệt (form post
         /// không đặt được Content-Type application/json nếu không qua CORS preflight).

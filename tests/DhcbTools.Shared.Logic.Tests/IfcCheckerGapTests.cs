@@ -25,6 +25,21 @@ public class IfcCheckerGapTests
     public void Check_SpecNull_NemArgumentNull()
     {
         Assert.Throws<ArgumentNullException>(() => IfcChecker.Check(HaiTuong, null!));
+        Assert.Throws<ArgumentNullException>(() => IfcChecker.Check(IfcModel.Parse(HaiTuong), null!));
+        Assert.Throws<ArgumentNullException>(() => IfcChecker.Check((IfcModel)null!, IfcCheckSpec.Default()));
+        Assert.Throws<ArgumentNullException>(() => DhcbTools.Shared.Logic.Ids.IfcIdsModel.From(null!));
+    }
+
+    /// <summary>Gói bàn giao đọc IFC một lần rồi dùng chung cho kiểm IFC và kiểm IDS — hai đường phải cùng kết quả.</summary>
+    [Fact]
+    public void Check_TrenMoHinhDaDoc_GiongDocTuChuoi_VaDungChungChoIds()
+    {
+        var model = IfcModel.Parse(HaiTuong);
+        var fromText = IfcChecker.Check(HaiTuong, IfcCheckSpec.Default());
+        var fromModel = IfcChecker.Check(model, IfcCheckSpec.Default());
+        Assert.Equal(fromText.Render(), fromModel.Render());
+        Assert.Equal(2, DhcbTools.Shared.Logic.Ids.IfcIdsModel.From(model).Elements().Count);
+        Assert.Same(model, DhcbTools.Shared.Logic.Ids.IfcIdsModel.From(model).Model);
     }
 
     /// <summary>Vượt trần số lượng: báo lỗi kèm cả số đếm thật lẫn con số quy tắc đòi.</summary>

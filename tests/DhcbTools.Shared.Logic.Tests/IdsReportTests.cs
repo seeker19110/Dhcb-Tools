@@ -15,6 +15,8 @@ public class IdsReportTests
             + "<requirements><attribute><name><simpleValue>Tag</simpleValue></name></attribute></requirements></specification>"
             + "<specification name=\"Bể\"><applicability><entity><name><simpleValue>IfcTank</simpleValue></name></entity></applicability>"
             + "<requirements><attribute><name><simpleValue>Name</simpleValue></name></attribute></requirements></specification>"
+            + "<specification name=\"Ống (tuỳ chọn)\"><applicability minOccurs=\"0\" maxOccurs=\"unbounded\"><entity><name><simpleValue>IFCPIPESEGMENT</simpleValue></name></entity></applicability>"
+            + "<requirements><attribute><name><simpleValue>Name</simpleValue></name></attribute></requirements></specification>"
             + "</specifications></ids>");
         var ok = new FakeIdsElement { Label = "1 — Doors \"D1\"" };
         ok.Attributes["Tag"] = "D-01";
@@ -28,8 +30,9 @@ public class IdsReportTests
     public void Summary_DemDatTruotRongVaCanhBao()
     {
         var text = IdsReport.Summary(Check(), Warnings);
-        Assert.Contains("Kiểm 2 phần tử theo 2 specification: 1 phần tử không đạt ở 1 specification", text);
-        Assert.Contains("1 specification không có phần tử nào để kiểm", text);
+        // "Bể" bắt buộc mà không có phần tử nào → không đạt (IDS 1.0); "Ống" tuỳ chọn nên rỗng không sao.
+        Assert.Contains("Kiểm 2 phần tử theo 3 specification: 1 phần tử không đạt, 2 specification không đạt", text);
+        Assert.Contains("2 specification không có phần tử nào để kiểm", text);
         Assert.Contains("file IDS lệch chuẩn ở 1 chỗ", text);
         Assert.DoesNotContain("lệch chuẩn", IdsReport.Summary(Check(), new string[0]));
     }
@@ -41,9 +44,10 @@ public class IdsReportTests
         Assert.StartsWith("⚠ File IDS lệch chuẩn IDS 1.0 ở 1 chỗ", lines[0]);
         Assert.Equal("   • " + Warnings[0], lines[1]);
         Assert.Equal("Cửa có Tag: 1/2 đạt, 1 phần tử không đạt", lines[2]);
-        Assert.StartsWith("Bể: KHÔNG phần tử nào lọt bộ lọc", lines[3]);
-        Assert.StartsWith("Cửa có Tag — 2 — Doors \"D2\": thiếu/sai", lines[4]);
-        Assert.Equal(5, lines.Count);
+        Assert.StartsWith("Bể: KHÔNG phần tử nào lọt bộ lọc — specification bắt buộc nên tính là KHÔNG ĐẠT", lines[3]);
+        Assert.StartsWith("Ống (tuỳ chọn): KHÔNG phần tử nào lọt bộ lọc — specification tuỳ chọn/cấm", lines[4]);
+        Assert.StartsWith("Cửa có Tag — 2 — Doors \"D2\": thiếu/sai", lines[5]);
+        Assert.Equal(6, lines.Count);
     }
 
     [Fact]
@@ -65,7 +69,8 @@ public class IdsReportTests
         Assert.Contains("&lt;restriction&gt;", html);
         Assert.Contains("<small>theo BEP</small>", html);
         Assert.Contains("trên chính file IFC", html);
-        Assert.Contains("0 phần tử — không kiểm được gì", html);
+        Assert.Contains("0 phần tử — KHÔNG ĐẠT: specification bắt buộc", html);
+        Assert.Contains("0 phần tử — tuỳ chọn/cấm, không tính là lỗi", html);
         Assert.Contains("<h2>Cửa có Tag</h2>", html);
         Assert.DoesNotContain("<h2>Bể</h2>", html);
         Assert.DoesNotContain("Danh sách cắt", html);

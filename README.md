@@ -152,6 +152,11 @@ Revit `http://127.0.0.1:8765`, AutoCAD `http://127.0.0.1:8766`. Token sinh lần
 | Mã | Khi nào |
 |---|---|
 | `401` / `429` | Sai token · khoá 5 phút vì dò token, **hoặc** `/execute` async khi hàng đợi đã đủ 20 job |
+| `403` | Request do trang web trong trình duyệt gửi (có header `Origin` / `Sec-Fetch-Site`) — Bridge chỉ phục vụ script, MCP server và panel gateway; không tính vào khoá dò token |
+
+Máy không dùng agent/MCP/panel thì tắt hẳn Bridge: `%APPDATA%\DHCB\settings.json` → `{"bridge": {"enabled": false}}`.
+Đường dẫn file trong config gửi qua Bridge phải mang đuôi định dạng DHCB dùng (`.csv`, `.html`, `.json`…), không thì
+`E-PATH-UNSAFE` — xem [`SECURITY.md`](SECURITY.md).
 | `413` | Body quá 4 MB |
 | `415` | Sai `Content-Type` — trước đây lẫn vào `401` và bị tính nhầm vào bộ đếm dò token |
 | `503` | Quá 8 request đang xử lý cùng lúc |

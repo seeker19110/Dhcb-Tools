@@ -1,4 +1,4 @@
-# Bảng mã lỗi
+﻿# Bảng mã lỗi
 
 Mã lỗi là tiền tố dạng `E-<NHÓM>-<TÌNH-TRẠNG>` đứng đầu thông báo, để **tra cứu được** và để
 script/agent bắt theo mã thay vì so chuỗi tiếng Việt:
@@ -25,6 +25,7 @@ thêm mã mà quên ghi vào đây (hoặc ngược lại) là test đỏ.
 
 | `E-DOCUMENT-REQUIRED` | Thiếu định danh phiên model cho lệnh Bridge ghi thật | Client cũ hoặc JSON tự gửi chưa có `documentId` | Gọi `POST /query` với `query: document_context`, dùng `documentId` nhận được ở cấp ngoài của `/execute`; cập nhật client cùng Bridge |
 | `E-DOCUMENT-CHANGED` | Model hiện hành khác phiên đã chọn | Chuyển tab, đóng/mở lại model trong khi request đang chờ | Kiểm tra đúng model, đọc lại context và xem trước lại trước khi gửi lệnh ghi |
+| `E-PATH-UNSAFE` | Lệnh gửi qua Bridge có đường dẫn file mang đuôi không phải định dạng DHCB đọc/ghi (`.bat`, `.ps1`, `.exe`, `.lnk`…) hoặc chứa `:` ngoài ký tự ổ đĩa | Agent AI điền nhầm, hoặc bị nội dung bản vẽ/thuyết minh dắt đi (prompt injection) | Dùng đúng định dạng của lệnh (`.csv`, `.html`, `.json`…). Danh sách đầy đủ ở `BridgePathPolicy.AllowedExtensions`; Ribbon và batch đêm không bị chốt này |
 | `E-BRIDGE-TOKEN-SHORT` | Bridge từ chối khởi động vì `DHCB_BRIDGE_TOKEN` ngắn hơn 32 ký tự | Đặt biến môi trường bằng tay để test, hoặc còn sót giá trị cũ trước 2026-09-23 | Bỏ biến để Bridge tự sinh token vào `%APPDATA%\DHCB\bridge-token.txt`, hoặc đặt token ≥ 32 ký tự; khởi động lại Revit/AutoCAD |
 
 ## Nguyên tắc đặt mã

@@ -26,9 +26,11 @@ jobs:
   logic-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: '10.0.x'
 
@@ -58,9 +60,21 @@ jobs:
         run: |
           dotnet test tests/DhcbTools.BatchRunner.Tests/DhcbTools.BatchRunner.Tests.csproj -c Release             --logger "trx;LogFileName=batchrunner-cli-results.trx"
 
+      # Bộ ca IDS chính thức của buildingSMART (334 cặp .ids/.ifc có sẵn kết quả đúng), ghim commit để kết quả
+      # không trôi theo repo của họ. Đỏ khi một ca NGOÀI tests/ids-buildingsmart/known-gaps.txt lệch — tức hồi
+      # quy so với chuẩn; ca trong danh sách mà nay khớp thì chỉ nhắc xoá dòng. Chạy sau bước trên vì cần
+      # BatchRunner đã build (--verify-ifc/--verify-ids). Xem docs/kiem-ids.md.
+      - name: Đối chiếu bộ ca IDS của buildingSMART
+        run: |
+          git init --quiet "$RUNNER_TEMP/bsids"
+          git -C "$RUNNER_TEMP/bsids" fetch --quiet --depth 1 https://github.com/buildingSMART/IDS.git 870f9c4e6e8f414e737b4d84ca1aa9b46fc6c8f3
+          git -C "$RUNNER_TEMP/bsids" checkout --quiet FETCH_HEAD -- Documentation/ImplementersDocumentation/TestCases
+          python3 scripts/ids-conformance.py "$RUNNER_TEMP/bsids/Documentation/ImplementersDocumentation/TestCases" \
+            --runner src/DhcbTools.BatchRunner/bin/Release/net10.0/DhcbTools.BatchRunner.dll
+
       - name: Tải kết quả test
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: test-results
           path: '**/*-results.trx'
@@ -79,9 +93,11 @@ jobs:
         # hỗ trợ .NET 8 ngày 10/11/2026. release.yml chưa đóng gói 2026/2027: chưa chạy thật trên phần mềm đó.
         version: ['2027', '2026', '2025', '2024', '2023']
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           # Cần cả hai: nhánh net48/net8.0-windows (Revit/AutoCAD 2024–2026) build bằng SDK 8;
           # BatchRunner (net10.0) và nhánh net10.0-windows (AutoCAD 2026+, Revit 2027+) cần SDK 10.
@@ -108,9 +124,11 @@ jobs:
           # test_panel_api.py nhập server.py để kiểm cổng xác nhận của MCP, mà server.py cần fastmcp.
           # Không cài thì bộ test không chạy nổi một ca nào (ImportError) — CI đỏ đúng vì lý do đó.
           python3 -m pip install --quiet -r tools/autocad-mcp-server/requirements.txt
-          python3 -m pip install --quiet coverage
+          python3 -m pip install --quiet 'coverage>=7,<8' 'pyflakes>=3,<4'
           python3 -m py_compile scripts/dhcb_agent.py scripts/dhcb_mcp_server.py scripts/dhcb_ai.py \
             scripts/doi-chieu-setout-ifc.py tools/autocad-mcp-server/server.py tools/autocad-mcp-server/panel_api.py
+          # CONTRIBUTING và PR template đã ghi pyflakes là bước kiểm, nhưng trước 2026-09-28 CI không chạy nó.
+          python3 -m pyflakes scripts/*.py tools/autocad-mcp-server/*.py tests/python/*.py
           # Ngưỡng 100% câu lệnh (fail_under trong pyproject.toml) — cùng con số khi chạy ở máy.
           python3 -m coverage run -m unittest discover -s tools/autocad-mcp-server -p 'test_*.py'
           python3 -m coverage run --append -m unittest discover -s tests/python -p 'test_*.py'
@@ -135,9 +153,11 @@ jobs:
         # 2027 là bản WPF đầu tiên trên net10.0-windows — đúng chỗ SDK đổi implicit usings khi bật WPF.
         revit: ['2027', '2026', '2025', '2024', '2023']
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: |
             8.0.x

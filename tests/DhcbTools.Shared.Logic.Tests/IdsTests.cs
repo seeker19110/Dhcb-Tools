@@ -56,11 +56,13 @@ public class IdsValueTests
         Assert.True(value.Accepts("bất kỳ"));
     }
 
+    /// <summary>IDS 1.0 so giá trị PHÂN BIỆT hoa thường (bộ ca buildingSMART "…_case_sensitively").</summary>
     [Fact]
-    public void ChuoiCoDinh_KhongPhanBietHoaThuong()
+    public void ChuoiCoDinh_PhanBietHoaThuong()
     {
         var value = new IdsValue { Simple = "IfcWall" };
-        Assert.True(value.Accepts("ifcwall"));
+        Assert.True(value.Accepts("IfcWall"));
+        Assert.False(value.Accepts("ifcwall"));
         Assert.False(value.Accepts("IfcWallStandardCase"));
         Assert.Equal("= \"IfcWall\"", value.Describe());
     }
@@ -71,7 +73,8 @@ public class IdsValueTests
         var value = new IdsValue();
         value.Enumeration.Add("A");
         value.Enumeration.Add("B");
-        Assert.True(value.Accepts("b"));
+        Assert.True(value.Accepts("B"));
+        Assert.False(value.Accepts("b"));   // enumeration cũng phân biệt hoa thường
         Assert.False(value.Accepts("C"));
         Assert.Equal("thuộc {A, B}", value.Describe());
     }
@@ -173,7 +176,8 @@ public class IdsSpecTests
         var entity = Assert.Single(spec.Applicability);
         Assert.Equal(IdsFacetKind.Entity, entity.Kind);
         Assert.Equal("DOOR", entity.Container!.Simple);
-        Assert.Equal("lớp IFC = \"IfcDoor\", predefinedType = \"DOOR\"", entity.Describe());
+        // Tên lớp nâng lên chữ hoa lúc đọc (IDS 1.0 viết IFCDOOR; "IfcDoor" vẫn nhận, lint cảnh báo).
+        Assert.Equal("lớp IFC = \"IFCDOOR\", predefinedType = \"DOOR\"", entity.Describe());
         Assert.Equal("thuộc tính = \"Tag\" có giá trị (khác rỗng)", Assert.Single(spec.Requirements).Describe());
     }
 
@@ -199,7 +203,7 @@ public class IdsSpecTests
             },
             facets.Select(f => f.Kind).ToArray());
 
-        Assert.Equal("lớp IFC = \"IfcWall\"", facets[0].Describe());
+        Assert.Equal("lớp IFC = \"IFCWALL\"", facets[0].Describe());
         Assert.Equal("property = \"Pset_WallCommon\".= \"FireRating\" có giá trị (khác rỗng)", facets[2].Describe());
         Assert.Equal("phân loại = \"Uniclass\": = \"EF_25_10\"", facets[3].Describe());
         Assert.Equal("vật liệu = \"Bê tông\"", facets[4].Describe());
