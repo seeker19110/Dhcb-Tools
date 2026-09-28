@@ -1,5 +1,6 @@
-using Autodesk.AutoCAD.DatabaseServices;
+﻿using Autodesk.AutoCAD.DatabaseServices;
 using DhcbTools.Shared.Logic;
+using DhcbTools.Shared.Logic.Cad;
 
 namespace DhcbTools.Core.AutoCAD.AutoNumbering;
 
@@ -29,7 +30,8 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
             BlockName = config.BlockName,
             AttributeTag = config.AttributeTag,
             Direction = direction,
-            RowTolerance = config.RowToleranceMm,
+            // Config ghi mm; bản vẽ có thể vẽ theo mét/inch — đổi theo INSUNITS (không khai = mm như trước).
+            RowTolerance = DrawingUnits.FromMillimeters(config.RowToleranceMm, (int)database.Insunits),
             StartNumber = config.StartNumber,
             Step = config.Step,
             Label = n => NumberingPlanner.FormatLabel(config.Prefix, n, config.PadWidth),

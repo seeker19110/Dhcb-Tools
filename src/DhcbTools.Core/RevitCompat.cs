@@ -453,8 +453,17 @@ public static class RevitCompat
             }
         }
 
-        return null;
+        return BuiltInMark(element, key);
     }
+
+    /// <summary>
+    /// "Mark" là tên tiếng Anh của tham số dựng sẵn <c>ALL_MODEL_MARK</c>. Revit giao diện ngôn ngữ khác đặt tên khác
+    /// ("Marque", "Kennzeichen"…) nên <c>LookupParameter("Mark")</c> trả null, và mặc định <c>ParameterName = "Mark"</c>
+    /// của AutoNumbering/FlowNumbering không ghi được phần tử nào. Tên là "Mark" thì tra theo BuiltInParameter — trên
+    /// Revit tiếng Anh tra theo tên đã tìm thấy trước nên hành vi không đổi.
+    /// </summary>
+    private static Parameter? BuiltInMark(Element element, string name) =>
+        string.Equals(name, "Mark", StringComparison.OrdinalIgnoreCase) ? element.get_Parameter(BuiltInParameter.ALL_MODEL_MARK) : null;
 
     /// <summary>Thông báo lỗi chuẩn khi <see cref="Lookup"/> trả null — nêu rõ đã thử tên nào và sửa ở đâu.</summary>
     public static string LookupFailed(string key, string? preferred = null) =>
@@ -467,7 +476,7 @@ public static class RevitCompat
     /// <summary>Ghi tham số chuỗi nếu tồn tại và ghi được; trả lý do khi không ghi được.</summary>
     public static string? TrySetString(Element element, string parameterName, string value)
     {
-        var p = element.LookupParameter(parameterName);
+        var p = element.LookupParameter(parameterName) ?? BuiltInMark(element, parameterName);
         if (p == null)
         {
             return $"không có tham số \"{parameterName}\"";
