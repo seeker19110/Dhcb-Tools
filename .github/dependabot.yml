@@ -1,0 +1,30 @@
+# Dependabot version updates — chỉ cho GitHub Actions và pip.
+#
+# Actions ghim theo SHA (chống action bị chiếm tag rồi chạy mã lạ trên runner có GITHUB_TOKEN); ghim SHA
+# mà không ai cập nhật thì sẽ kẹt ở bản cũ có lỗi — Dependabot đẩy PR đổi SHA + chú thích phiên bản.
+#
+# KHÔNG bật cho NuGet: Newtonsoft.Json / System.Drawing.Common trong add-in phải khớp bản Revit/AutoCAD
+# nạp sẵn (xem release.yml, bang-chung-test.md §25), còn API Revit/AutoCAD theo phiên bản phần mềm —
+# nâng tự động là rủi ro lệch assembly lúc chạy mà CI không bắt được. Lỗ hổng NuGet do
+# dependency-audit.yml báo hằng tuần.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ['*']
+    commit-message:
+      prefix: chore(ci)
+
+  - package-ecosystem: pip
+    directories: [/, /tools/autocad-mcp-server]
+    schedule:
+      interval: monthly
+    groups:
+      python:
+        patterns: ['*']
+    commit-message:
+      prefix: chore(deps)
