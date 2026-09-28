@@ -23,7 +23,8 @@ namespace DhcbTools.Shared.Hosting
     ///   POST /query           — cần token; { "query": "...", "params": {...} }
     ///   POST /chat            — cần token; { "text": "..." } → đề xuất lệnh (KHÔNG thực thi)
     ///
-    /// Bảo mật: chỉ bind 127.0.0.1; sai token → 401 không nêu lý do; ≥5 lần sai/60s → khoá 5 phút.
+    /// Bảo mật: chỉ bind 127.0.0.1; request từ trang web (header Origin/Sec-Fetch-Site) → 403 trước mọi bước
+    /// khác, không tính vào khoá; sai token → 401 không nêu lý do; ≥5 lần sai/60s → khoá 5 phút.
     /// Sai Content-Type (không phải JSON) → 415 nói rõ, KHÔNG tính vào đếm khoá — đó là lỗi client
     /// cấu hình, không phải dò token. Body quá <see cref="MaxBodyBytes"/> → 413. Quá
     /// <see cref="MaxInFlight"/> request cùng lúc → 503.
@@ -160,6 +161,18 @@ namespace DhcbTools.Shared.Hosting
             var req = ctx.Request;
             var res = ctx.Response;
             var path = req.Url?.AbsolutePath ?? string.Empty;
+
+            // Trước cả /health và bước kiểm token: request từ trang web không được tính vào khoá dò token
+            // (một tab lạ bắn 5 request là khoá Bridge 5 phút) — xem BridgeAuth.IsBrowserRequest.
+            if (BridgeAuth.IsBrowserRequest(req.Headers["Origin"], req.Headers["Sec-Fetch-Site"]))
+            {
+                WriteJson(res, 403, new
+                {
+                    error = "Bridge không nhận request từ trang web trong trình duyệt. Gọi từ script, MCP server"
+                            + " hoặc panel gateway (tools/autocad-mcp-server).",
+                });
+                return;
+            }
 
             if (req.HttpMethod == "GET" && path == "/health")
             {

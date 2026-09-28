@@ -81,6 +81,34 @@ public class HttpBridgeServerGapTests : IDisposable
         Assert.Contains("locked", await response.Content.ReadAsStringAsync());
     }
 
+    /// <summary>
+    /// Trang web lạ bắn request sai token từ trình duyệt: 403 và KHÔNG tính vào khoá — client thật
+    /// (không có Origin) vẫn dùng được ngay sau đó. Trước đây 5 lần như vậy khoá Bridge 5 phút.
+    /// </summary>
+    [Fact]
+    public async Task RequestTuTrangWeb_403KhongTinhVaoKhoa()
+    {
+        using var trinhDuyet = new HttpClient { BaseAddress = _client.BaseAddress };
+        trinhDuyet.DefaultRequestHeaders.Add("Origin", "https://trang-la.example");
+
+        for (var i = 0; i < 6; i++)
+        {
+            var bi = await trinhDuyet.PostAsync("/execute", new StringContent("{}", Encoding.UTF8, "text/plain"));
+            Assert.Equal(HttpStatusCode.Forbidden, bi.StatusCode);
+        }
+
+        using var noCorsGet = new HttpRequestMessage(HttpMethod.Get, "/health");
+        noCorsGet.Headers.Add("Sec-Fetch-Site", "cross-site");
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendAsync(noCorsGet)).StatusCode);
+
+        using var tuGoUrl = new HttpRequestMessage(HttpMethod.Get, "/health");
+        tuGoUrl.Headers.Add("Sec-Fetch-Site", "none");
+        Assert.Equal(HttpStatusCode.OK, (await _client.SendAsync(tuGoUrl)).StatusCode);
+
+        var response = await _client.GetAsync("/tools");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
     [Fact]
     public async Task PhuongThucKhongHoTro_405NoiRoEndpointNao()
     {

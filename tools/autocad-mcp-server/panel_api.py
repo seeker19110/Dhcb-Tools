@@ -21,10 +21,18 @@ from typing import Any
 
 HOST = "127.0.0.1"
 PORT = 8767
-AUTOCAD_URL = "http://localhost:8766"
+# 127.0.0.1, không phải "localhost": Bridge chỉ nghe IPv4 loopback. "localhost" có thể phân giải ra ::1 trước,
+# và bất kỳ tiến trình nào (kể cả của tài khoản khác) chiếm được [::1]:8766 sẽ nhận header Bearer chứa token.
+AUTOCAD_URL = "http://127.0.0.1:8766"
 PANEL_HTML = Path(__file__).with_name("panel.html")
 PANEL_TOKEN = secrets.token_urlsafe(32)
 MAX_BODY_BYTES = 64 * 1024
+# Opener KHÔNG dùng proxy cho request tới loopback. urllib mặc định đi theo proxy hệ thống (HTTP_PROXY, hay
+# ProxyServer trong Internet Settings của Windows) và KHÔNG tự bỏ qua 127.0.0.1 — "<local>" trong ProxyOverride
+# chỉ khớp tên không có dấu chấm. Trên máy công ty có proxy cấu hình tĩnh, request tới Bridge vì thế đi ra proxy
+# kèm header "Authorization: Bearer <token>" và cả config lệnh: lộ token cho proxy, còn lệnh thì không tới được Bridge.
+# server.py dùng chung opener này.
+LOOPBACK = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 ALLOWED_QUERIES = {
     "drawing_info", "layers", "blocks", "inserts", "entities",
     "text", "xrefs", "layouts", "stats",
@@ -180,7 +188,7 @@ def fetch_autocad(path: str, body: dict[str, Any] | None = None, timeout: int = 
         method="POST" if data else "GET",
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with LOOPBACK.open(request, timeout=timeout) as response:
             return json.loads(response.read().decode("utf-8"))
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
         return {"connected": False, "error": str(exc)}

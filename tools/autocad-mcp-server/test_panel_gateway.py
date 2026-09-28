@@ -94,21 +94,21 @@ class FetchAutocadTests(unittest.TestCase):
         return response
 
     def test_get_khi_khong_co_body(self) -> None:
-        with mock.patch.object(panel_api.urllib.request, "urlopen",
+        with mock.patch.object(panel_api.LOOPBACK, "open",
                                return_value=self._response({"status": "ok"})) as urlopen:
             self.assertEqual({"status": "ok"}, panel_api.fetch_autocad("/health"))
 
         self.assertEqual("GET", urlopen.call_args[0][0].method)
 
     def test_post_khi_co_body(self) -> None:
-        with mock.patch.object(panel_api.urllib.request, "urlopen",
+        with mock.patch.object(panel_api.LOOPBACK, "open",
                                return_value=self._response({"rows": []})) as urlopen:
             panel_api.fetch_autocad("/query", {"query": "layers"})
 
         self.assertEqual("POST", urlopen.call_args[0][0].method)
 
     def test_bridge_khong_chay_thi_bao_mat_ket_noi(self) -> None:
-        with mock.patch.object(panel_api.urllib.request, "urlopen",
+        with mock.patch.object(panel_api.LOOPBACK, "open",
                                side_effect=urllib.error.URLError("refused")):
             result = panel_api.fetch_autocad("/health")
 
@@ -132,12 +132,12 @@ class DocumentTargetTests(unittest.TestCase):
                     body["documentId"] = target
                 else:
                     responses.insert(0, self.response({"documentId": "active"}))
-                with mock.patch.object(panel_api.urllib.request, "urlopen", side_effect=responses) as send:
+                with mock.patch.object(panel_api.LOOPBACK, "open", side_effect=responses) as send:
                     self.assertTrue(panel_api.fetch_autocad("/execute", body)["success"])
                     self.assertEqual(target or "active", json.loads(send.call_args.args[0].data)["documentId"])
 
     def test_context_failure_blocks_write(self):
-        with mock.patch.object(panel_api.urllib.request, "urlopen", return_value=self.response({"error": "no model"})) as send:
+        with mock.patch.object(panel_api.LOOPBACK, "open", return_value=self.response({"error": "no model"})) as send:
             self.assertFalse(panel_api.fetch_autocad("/execute", {"config": {"dryRun": False}})["success"])
             self.assertEqual(1, send.call_count)
 

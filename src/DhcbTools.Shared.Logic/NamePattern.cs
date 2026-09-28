@@ -39,6 +39,13 @@ namespace DhcbTools.Shared.Logic
 
         public int CounterStep { get; set; } = 1;
 
+        /// <summary>
+        /// Trần thời gian cho một lần tìm/thay. <see cref="Find"/> là regex do người dùng hoặc agent (qua Bridge)
+        /// đưa vào và chạy trên luồng UI Revit: mẫu kiểu <c>(a+)+$</c> gặp tên dài backtrack tới mức treo cả Revit,
+        /// không có nút huỷ nào cứu được. Quá trần thì báo lỗi đầu vào thay vì treo.
+        /// </summary>
+        public TimeSpan FindTimeout { get; set; } = TimeSpan.FromSeconds(2);
+
         /// <summary>Có token nào trong mẫu không (để quyết định đọc giá trị nguồn).</summary>
         public static IEnumerable<string> TokensIn(string pattern)
         {
@@ -73,8 +80,17 @@ namespace DhcbTools.Shared.Logic
             if (!string.IsNullOrEmpty(Find))
             {
                 var options = CaseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase;
-                var regex = new Regex(FindIsRegex ? Find! : Regex.Escape(Find!), options);
-                text = regex.Replace(text, FindIsRegex ? Replace : Replace.Replace("$", "$$"));
+                var regex = new Regex(FindIsRegex ? Find! : Regex.Escape(Find!), options, FindTimeout);
+                try
+                {
+                    text = regex.Replace(text, FindIsRegex ? Replace : Replace.Replace("$", "$$"));
+                }
+                catch (RegexMatchTimeoutException ex)
+                {
+                    // ArgumentException như regex sai cú pháp: cả hai đều là "find không dùng được", người gọi xử lý một đường.
+                    throw new ArgumentException("Regex find \"" + Find + "\" chạy quá " + FindTimeout.TotalSeconds
+                        + " giây trên \"" + text + "\" (mẫu backtrack quá mức, ví dụ (a+)+). Viết lại mẫu cụ thể hơn.", nameof(Find), ex);
+                }
             }
 
             return Prefix + text + Suffix;

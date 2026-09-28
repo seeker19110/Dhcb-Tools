@@ -38,6 +38,12 @@ for _stream in (sys.stdout, sys.stderr):
 
 PORTS = {"revit": 8765, "autocad": 8766}
 
+# Opener KHÔNG dùng proxy cho request tới loopback. urllib mặc định đi theo proxy hệ thống (HTTP_PROXY, hay
+# ProxyServer trong Internet Settings của Windows) và KHÔNG tự bỏ qua 127.0.0.1 — "<local>" trong ProxyOverride
+# chỉ khớp tên không có dấu chấm. Trên máy công ty có proxy cấu hình tĩnh, request tới Bridge vì thế đi ra proxy
+# kèm header "Authorization: Bearer <token>" và cả config lệnh: lộ token cho proxy, còn lệnh thì không tới được Bridge.
+LOOPBACK = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
 
 def base_url(app: str) -> str:
     return f"http://127.0.0.1:{PORTS[app]}"
@@ -77,7 +83,7 @@ def request(app: str, method: str, path: str, payload=None, timeout: int = 35) -
         headers["Content-Type"] = "application/json; charset=utf-8"
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with LOOPBACK.open(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")

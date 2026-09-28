@@ -1,6 +1,6 @@
 # AutoCAD Tools — MCP Server cho Hermes
 
-Cung cấp 5 tools điều khiển AutoCAD từ Hermes Agent, kết nối qua HTTP Bridge `localhost:8766`.
+Cung cấp 5 tools điều khiển AutoCAD từ Hermes Agent, kết nối qua HTTP Bridge `127.0.0.1:8766`.
 
 ## Cài đặt
 
@@ -68,7 +68,7 @@ tools/autocad-mcp-server/
 panel.html (file:// → tự chuyển hướng sang gateway)
     ↓ http://127.0.0.1:8767/panel (same-origin + token phiên)
 panel_api.py
-    ├── /health, /query, /execute → AutoCAD Bridge localhost:8766
+    ├── /health, /query, /execute → AutoCAD Bridge 127.0.0.1:8766
     └── /ai/chat → Hermes CLI/model đang cấu hình → truy vấn AutoCAD có kiểm soát
 ```
 
@@ -91,6 +91,11 @@ thì cũng đọc được endpoint đó, nên tách ra không thêm an toàn. C
 gateway chỉ bind `127.0.0.1`; **header `Host` phải là `127.0.0.1:8767` hoặc `localhost:8767`**, sai thì trả
 `421` (chặn DNS rebinding: trang web ngoài trỏ tên miền của nó về loopback, request điều hướng không có
 `Origin` nên chỉ `Host` chặn được); và mọi XHR còn phải qua whitelist `Origin` + header `X-Panel-Token`.
+
+Phía sau gateway, token **Bridge** (`%APPDATA%\DHCB\bridge-token.txt`) chỉ đi tới `http://127.0.0.1:8766` qua
+opener **không dùng proxy** (`panel_api.LOOPBACK`): urllib mặc định đi theo proxy hệ thống và không tự bỏ qua
+loopback, nên trên máy có proxy công ty header `Bearer` từng có thể lọt ra proxy; còn `localhost` có thể phân
+giải ra `::1` — cổng mà Bridge không nghe và tiến trình khác chiếm được.
 
 ## Dữ liệu đi đâu
 

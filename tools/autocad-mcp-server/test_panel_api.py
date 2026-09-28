@@ -180,6 +180,22 @@ class BridgeHeaderTests(unittest.TestCase):
         self.assertEqual(headers["Authorization"], "Bearer bridge-secret")
 
 
+class BridgeTargetTests(unittest.TestCase):
+    """Token Bridge chỉ được đi tới đúng 127.0.0.1:8766, không qua proxy, không qua ::1."""
+
+    def test_bridge_url_la_ipv4_loopback(self) -> None:
+        self.assertEqual("http://127.0.0.1:8766", panel_api.AUTOCAD_URL)
+        self.assertEqual(panel_api.AUTOCAD_URL, server.BRIDGE_URL)
+
+    def test_opener_khong_co_proxy(self) -> None:
+        import urllib.request
+
+        # ProxyHandler({}) không có *_open nào nên không được gắn, và thay luôn ProxyHandler mặc định
+        # (cái đọc HTTP_PROXY / Internet Settings) — opener không còn đường nào đi qua proxy.
+        proxy_handlers = [h for h in panel_api.LOOPBACK.handlers if isinstance(h, urllib.request.ProxyHandler)]
+        self.assertEqual([], proxy_handlers)
+
+
 class OriginPolicyTests(unittest.TestCase):
     def test_rejects_file_panel_origin(self) -> None:
         self.assertFalse(make_handler(origin="null").origin_allowed())
@@ -515,11 +531,11 @@ class GatewayLifecycleTests(unittest.TestCase):
             def read(self) -> bytes:
                 return self._body
 
-        with mock.patch("urllib.request.urlopen", return_value=FakeResp(json.dumps({"panelApi": "ok"}).encode())):
+        with mock.patch.object(panel_api.LOOPBACK, "open", return_value=FakeResp(json.dumps({"panelApi": "ok"}).encode())):
             self.assertEqual(server._probe_panel_api(), "ours")
-        with mock.patch("urllib.request.urlopen", return_value=FakeResp(b'{"hello":"world"}')):
+        with mock.patch.object(panel_api.LOOPBACK, "open", return_value=FakeResp(b'{"hello":"world"}')):
             self.assertEqual(server._probe_panel_api(), "foreign")
-        with mock.patch("urllib.request.urlopen", side_effect=OSError("refused")):
+        with mock.patch.object(panel_api.LOOPBACK, "open", side_effect=OSError("refused")):
             self.assertEqual(server._probe_panel_api(), "free")
 
 
