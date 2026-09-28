@@ -50,6 +50,50 @@ Tài liệu đi kèm: [`SECURITY.md`](../SECURITY.md) (mô hình an toàn một 
 Không chạy trong Revit/AutoCAD thật: thay đổi phía .NET nằm ở `Shared.Logic`/`Shared.Hosting` (netstandard2.0)
 và đã có test HTTP thật trên loopback (`HttpBridgeServerGapTests.RequestTuTrangWeb_403KhongTinhVaoKhoa`).
 
+## Vòng 2 — xử lý "Việc để lại" của audit 2026-09-23
+
+Chủ repo yêu cầu sửa hết phần để lại. Nguyên tắc: giữ tương thích ngược (mặc định cũ không đổi, trừ chỗ cũ là
+sai chuẩn), và chỉ nhận là "đã sửa" khi kiểm chứng được ở đây — phần phải chạy trong Revit/AutoCAD mới biết
+đúng sai thì ghi rõ là chưa làm và vì sao.
+
+| Mục để lại (09-23) | Xử lý |
+|---|---|
+| Lệnh chỉ đọc nhận `outputPath` tuyệt đối bất kỳ qua Bridge | `BridgePathPolicy`: mọi trường đường dẫn file của lệnh gửi qua Bridge phải mang đuôi thuộc định dạng DHCB đọc/ghi (`.csv .html .json .pdf .dwg .ifc .rvt`…) và không chứa `:` ngoài ổ đĩa → `E-PATH-UNSAFE`. Không chốt thư mục (batch/kỹ sư vẫn xuất ra ổ mạng); chặn đúng thứ nguy hiểm: agent bị prompt injection ghi `.bat`/`.ps1`/`.lnk` vào Startup. Ribbon/batch không bị chốt |
+| Bridge luôn khởi động, không có khoá | `settings.json` → `{"bridge": {"enabled": false}}` tắt cả hai Bridge; mặc định vẫn bật; file hỏng thì bật + ghi cảnh báo vào log |
+| So giá trị IDS không phân biệt hoa thường; `xs:pattern` XSD (`\i`, `\c`) | Sửa theo **bộ ca chính thức của buildingSMART**: 240 → **271/334**, CI chạy cả bộ và đỏ khi hồi quy ([`kiem-ids.md`](kiem-ids.md#đối-chiếu-bộ-ca-buildingsmart)). Kèm theo: dung sai số IDS 1.0, boolean chữ thường, `.U.` = không có giá trị, nhiều `xs:pattern` là HOẶC, `minOccurs/maxOccurs` đọc từ `<applicability>` (trước đây specification CẤM của file IDS 1.0 thật bị đọc sai), specification bắt buộc không có phần tử = không đạt, `partOf` đọc đúng `<name>`/`<predefinedType>` (trước ghép thành "IFCINVENTORYBUNNY"), vật liệu khớp Category/tên bộ lớp, `USERDEFINED` |
+| `--handover` parse cùng file IFC hai lần | Đọc một lần, `IfcChecker.Check(IfcModel, …)` và `IfcIdsModel.From(IfcModel)` dùng chung |
+| Dung sai "Mm" phía AutoCAD so trong đơn vị bản vẽ | `DrawingUnits.FromMillimeters` theo `INSUNITS` cho `rowToleranceMm` (AutoNumbering, AttributeIncrement) và `moveToleranceMm` (DrawingCompare). Bản vẽ mm hoặc không khai đơn vị: không đổi |
+| AttributeExport chỉ quét model space | Cờ `includePaperSpace` (mặc định `false`); CSV cùng bốn cột, AttributeImport ghi ngược theo Handle nên nhận luôn |
+| `AutoNumbering`/`FlowNumbering` mặc định `"Mark"` | Không đổi mặc định; tên `"Mark"` nay tra theo `BuiltInParameter.ALL_MODEL_MARK` khi Revit giao diện ngôn ngữ khác không có tham số tên "Mark" |
+| Release không ký DLL/installer | `scripts/sign-release.ps1` + bước ký trong `release.yml` — chạy khi repo có secret `DHCB_SIGN_PFX_BASE64`/`DHCB_SIGN_PFX_PASSWORD`, không có thì bỏ qua như trước. Chỉ ký file `DhcbTools*` |
+
+Phát hiện thêm trong vòng này:
+
+- **ClashDetection kèm `bcfPath` qua Bridge không bao giờ lấy được preview token**: preview ghi file BCF, mà
+  `BridgeCommitGuard` chụp `bcfPath` như file *đầu vào* → "file đã đổi trong lúc preview" (`E-PREVIEW-CHANGED`)
+  mọi lần. Tái hiện bằng test trên mã cũ, sửa bằng danh sách trường đầu ra chung (`bcfPath`, `legendCsvPath`).
+- **Ghi chú §41 của `bang-chung-test.md` nói ngược chuẩn**: cho rằng IDS viết `FALSE` là đúng và IfcTester sai;
+  bộ ca buildingSMART coi `FALSE` là invalid. Đã đính chính tại chỗ, fixture đổi sang `false`.
+
+**Chưa làm, và vì sao** — tất cả đều cần chạy trong Revit/AutoCAD để biết đúng sai, không kiểm được ở đây:
+
+| Mục | Lý do |
+|---|---|
+| `CancellationToken`/tiến độ cho lệnh dài | Đổi chữ ký `ICoreCommand` và mọi vỏ; Bridge 504 đã nói rõ "không huỷ được nữa" |
+| `RouteOptionGenerator`/`ClashClassifier` dây vào `AutoRoute`/`ClashDetection` | Tính năng mới trên luồng ghi mô hình — cần bộ ca trong Revit |
+| Vòng đời Bridge (batch trong `ApplicationInitialized`, hàng đợi khi Revit modal, revision do transaction tạm) | Hành vi luồng UI Revit, không có giả lập đáng tin |
+| TextReplace với mã định dạng MText (`\P`) | Cần ánh xạ offset Text ↔ Contents; hiện đã báo khi mã cắt ngang chuỗi |
+| `AuthLockout` khoá toàn cục | Loopback không có định danh client; đường tấn công thật (trang web) đã chặn ở vòng 1 |
+| `dhcb_mcp_server` `confirm` boolean | Không phải lỗ: Bridge đòi `previewToken` + `documentId` của lần xem trước; chuỗi xác nhận do cùng model điền không thêm an toàn |
+| `IfcStepParser` cấp phát/encoding; tách `AcadQueryHandler`/`SleeveCommand` | Tối ưu/nợ cấu trúc — cần đo trên file thật trước khi đổi |
+| IDS: bảng thuộc tính theo lược đồ, kiểu dữ liệu, property khớp nhiều cái (63 ca còn lệch) | Việc lớn (nhúng lược đồ IFC); danh sách từng ca ở `tests/ids-buildingsmart/known-gaps.txt` |
+
+Kiểm chứng vòng 2: `Shared.Logic.Tests` **1.884** ca đạt, phủ dòng 100 %; `BatchRunner.Tests` 21 đạt; Python 100 %
+câu lệnh + pyflakes; build Core + bốn vỏ cho Revit/AutoCAD **2024 (net48) và 2026 (net8/net10)** bằng API NuGet;
+`actionlint` + `zizmor` sạch; bộ ca buildingSMART 271/334 không hồi quy; `sign-release.ps1` parse bằng pwsh 7 và
+chạy nhánh "chưa cấu hình". Revit smoke suite (`revit-smoke.json`) giữ nguyên các chuỗi kỳ vọng — chưa chạy lại
+trong Revit.
+
 ## Việc cần chủ repo bật
 
 Không làm được từ mã nguồn — cần quyền admin repo trên GitHub.
@@ -59,4 +103,4 @@ Không làm được từ mã nguồn — cần quyền admin repo trên GitHub.
 | Branch protection cho `main`, required checks = 11 job của `tests.yml` + `gitleaks` | Settings → Branches | CONTRIBUTING đang phải dặn "không dùng `--auto`" vì thiếu rule này (PR #64 từng merge khi CI chưa xong) |
 | Private vulnerability reporting | Settings → Code security | `SECURITY.md` trỏ vào nút này |
 | Dependency graph + Dependabot alerts | Settings → Code security | Bật thì dùng lại được `dependency-review-action` trên PR |
-| Chứng chỉ ký mã (PFX) làm secret cho `release.yml` | Settings → Secrets | Đã ghi ở audit 2026-09-23; DLL/installer hiện không ký |
+| Chứng chỉ ký mã (PFX) làm secret `DHCB_SIGN_PFX_BASE64` + `DHCB_SIGN_PFX_PASSWORD` | Settings → Secrets and variables → Actions | `release.yml` đã sẵn bước ký; thiếu secret thì gói phát hành chưa ký |

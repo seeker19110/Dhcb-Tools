@@ -166,6 +166,10 @@ Cách chạy lại các bộ ca: `kiem-thu-trong-revit.md` (Revit) và `bang-chu
 
 ## Việc để lại (cần quyết định của người dùng)
 
+> **Cập nhật 2026-09-28:** chủ repo yêu cầu sửa hết; phần làm được và kiểm chứng được đã sửa ở PR #170 — xem
+> bảng "Vòng 2" trong [`audit-bao-mat-2026-09-28.md`](audit-bao-mat-2026-09-28.md#vòng-2--xử-lý-việc-để-lại-của-audit-2026-09-23),
+> kèm danh sách mục chưa làm và lý do. Bảng dưới giữ nguyên để đối chiếu.
+
 Gộp cả hai vòng, nhóm theo khu vực. Không mục nào là lỗi âm thầm: mỗi mục hoặc đã có chốt chặn khác, hoặc
 đổi hành vi mặc định / hợp đồng đang dùng nên cần người dùng chốt trước.
 
