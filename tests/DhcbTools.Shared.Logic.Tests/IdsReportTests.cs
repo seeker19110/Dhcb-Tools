@@ -11,9 +11,9 @@ public class IdsReportTests
     {
         var specs = IdsSpec.Parse(
             "<ids><specifications>"
-            + "<specification name=\"Cửa có Tag\" description=\"theo BEP\"><applicability><entity><name><simpleValue>IfcDoor</simpleValue></name></entity></applicability>"
+            + "<specification name=\"Cửa có Tag\" description=\"theo BEP\"><applicability><entity><name><simpleValue>IFCDOOR</simpleValue></name></entity></applicability>"
             + "<requirements><attribute><name><simpleValue>Tag</simpleValue></name></attribute></requirements></specification>"
-            + "<specification name=\"Bể\"><applicability><entity><name><simpleValue>IfcTank</simpleValue></name></entity></applicability>"
+            + "<specification name=\"Bể\"><applicability><entity><name><simpleValue>IFCTANK</simpleValue></name></entity></applicability>"
             + "<requirements><attribute><name><simpleValue>Name</simpleValue></name></attribute></requirements></specification>"
             + "<specification name=\"Ống (tuỳ chọn)\"><applicability minOccurs=\"0\" maxOccurs=\"unbounded\"><entity><name><simpleValue>IFCPIPESEGMENT</simpleValue></name></entity></applicability>"
             + "<requirements><attribute><name><simpleValue>Name</simpleValue></name></attribute></requirements></specification>"

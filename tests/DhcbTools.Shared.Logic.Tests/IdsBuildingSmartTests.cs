@@ -114,17 +114,26 @@ public class IdsBuildingSmartTests
 
     // ── Entity / predefinedType ────────────────────────────────────────────
 
+    /// <summary>
+    /// IDS 1.0 viết tên lớp CHỮ HOA và so phân biệt hoa thường ("entities must be specified as uppercase strings"):
+    /// "IfcWall" trong IDS không khớp gì — cả đường Revit (IfcEntity "IfcWall" được nâng lên IFCWALL) lẫn đường IFC.
+    /// Bản trước nâng tên trong IDS lên chữ hoa cho dễ dãi, nên cùng một file cho kết luận khác IfcTester.
+    /// </summary>
     [Fact]
-    public void Entity_TenLopTrongEnumeration_NangChuHoa()
+    public void Entity_TenLopVietThuong_KhongKhop_VietHoaThiKhop()
     {
-        var spec = Parse("<specification name=\"t\"><applicability><entity><name><xs:restriction base=\"xs:string\">"
+        var lower = Parse("<specification name=\"t\"><applicability><entity><name><xs:restriction base=\"xs:string\">"
             + "<xs:enumeration value=\"IfcWall\"/><xs:enumeration value=\"IfcSlab\"/></xs:restriction></name></entity></applicability>"
             + "<requirements><attribute><name><simpleValue>Name</simpleValue></name></attribute></requirements></specification>").Single();
-        Assert.Equal(new[] { "IFCWALL", "IFCSLAB" }, spec.Applicability.Single().Name.Enumeration);
+        Assert.Equal(new[] { "IfcWall", "IfcSlab" }, lower.Applicability.Single().Name.Enumeration);
+        var upper = Parse("<specification name=\"t\"><applicability>" + Entity("IFCWALL") + "</applicability>"
+            + "<requirements><attribute><name><simpleValue>Name</simpleValue></name></attribute></requirements></specification>").Single();
 
         var wall = new FakeIdsElement { IfcEntity = "IfcWall", Label = "1" };
         wall.Attributes["Name"] = "T";
-        Assert.Equal(1, IdsEvaluator.Check(new[] { spec }, new IIdsElement[] { wall }).Specifications.Single().Passed);
+        Assert.Equal(0, IdsEvaluator.Check(new[] { lower }, new IIdsElement[] { wall }).Specifications.Single().Applicable);
+        Assert.Equal(1, IdsEvaluator.Check(new[] { upper }, new IIdsElement[] { wall }).Specifications.Single().Passed);
+        Assert.Equal(0, IdsEvaluator.Check(new[] { lower }, Model().Elements()).Specifications.Single().Applicable);
     }
 
     [Fact]

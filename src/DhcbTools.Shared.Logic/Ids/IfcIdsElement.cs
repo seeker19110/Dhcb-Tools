@@ -20,24 +20,29 @@ namespace DhcbTools.Shared.Logic.Ids
     /// (qua <c>IfcRelDefinesByType</c>) được thừa kế xuống phần tử.
     /// </para>
     /// </summary>
-    public sealed class IfcIdsModel
+    public sealed partial class IfcIdsModel
     {
         private readonly IfcModel _model;
         private readonly Dictionary<int, int> _typeOf = new Dictionary<int, int>();
         private readonly Dictionary<int, List<string>> _materials = new Dictionary<int, List<string>>();
-        private readonly Dictionary<int, List<KeyValuePair<string, string>>> _classifications = new Dictionary<int, List<KeyValuePair<string, string>>>();
         private readonly Dictionary<int, List<(string? Relation, string Entity)>> _partOf = new Dictionary<int, List<(string?, string)>>();
 
         /// <summary>Như <see cref="_partOf"/> nhưng giữ số hiệu tổ tiên — để đọc PredefinedType của nó.</summary>
         private readonly Dictionary<int, List<(string? Relation, int Parent)>> _partOfIds = new Dictionary<int, List<(string?, int)>>();
 
+        /// <summary>Phân loại gán TRỰC TIẾP: IfcClassificationReference hoặc cả một IfcClassification.</summary>
+        private readonly Dictionary<int, List<int>> _classificationLinks = new Dictionary<int, List<int>>();
+
         private IfcIdsModel(IfcModel model)
         {
             _model = model;
+            Schema = IfcSchema.For(model.Schema);
             BuildTypes();
             BuildMaterials();
             BuildClassifications();
             BuildPartOf();
+            BuildPropertyDefinitions();
+            BuildUnits();
         }
 
         /// <summary>Đọc file IFC (nội dung văn bản) và dựng sẵn các bảng tra.</summary>
@@ -49,31 +54,24 @@ namespace DhcbTools.Shared.Logic.Ids
         /// <summary>Mô hình IFC bên dưới.</summary>
         public IfcModel Model => _model;
 
+        /// <summary>Lược đồ dùng để tra thuộc tính theo tên.</summary>
+        internal IfcSchema Schema { get; }
+
         /// <summary>
-        /// Mọi phần tử IDS có thể nói tới: thực thể mang GlobalId, trừ quan hệ (<c>IfcRel*</c>) và định nghĩa
-        /// thuộc tính (<c>IfcPropertySet</c>, <c>IfcElementQuantity</c>…) — chúng có GlobalId nhưng không phải
-        /// "đối tượng" mà một specification nhắm tới. Kiểu (<c>IfcWallType</c>…) được giữ: IDS cho phép
-        /// specification áp lên kiểu.
+        /// Mọi thực thể trong phần DATA. IDS nói được tới cả thực thể không có GlobalId (<c>IfcMaterial</c>,
+        /// <c>IfcTaskTime</c>, <c>IfcSurfaceStyleRefraction</c>…) — bản trước chỉ lấy thực thể mang GlobalId nên
+        /// specification nhắm tới chúng luôn "không có phần tử nào". Tập ứng viên của từng specification do facet
+        /// applicability đầu tiên quyết (xem <see cref="IIdsTypedElement.InScopeOf"/>), như IfcTester.
         /// </summary>
         public IReadOnlyList<IIdsElement> Elements()
         {
             var list = new List<IIdsElement>();
             foreach (var entity in _model.File.Data)
             {
-                if (entity.Id == 0 || !IfcModel.LooksLikeGlobalId(IfcModel.GlobalIdOf(entity)))
+                if (entity.Id != 0 && ReferenceEquals(_model.ById(entity.Id), entity))
                 {
-                    continue;
+                    list.Add(new IfcIdsElement(this, entity));
                 }
-
-                var type = entity.Type;
-                if (type.StartsWith("IFCREL", StringComparison.OrdinalIgnoreCase)
-                    || type.StartsWith("IFCPROPERTY", StringComparison.OrdinalIgnoreCase)
-                    || type.Equals("IFCELEMENTQUANTITY", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                list.Add(new IfcIdsElement(this, entity));
             }
 
             return list;
@@ -83,9 +81,6 @@ namespace DhcbTools.Shared.Logic.Ids
 
         internal IReadOnlyList<string> MaterialsOf(int id) =>
             _materials.TryGetValue(id, out var list) ? list : (IReadOnlyList<string>)Array.Empty<string>();
-
-        internal IReadOnlyList<KeyValuePair<string, string>> ClassificationsOf(int id) =>
-            _classifications.TryGetValue(id, out var list) ? list : (IReadOnlyList<KeyValuePair<string, string>>)Array.Empty<KeyValuePair<string, string>>();
 
         internal IReadOnlyList<(string? Relation, string Entity)> PartOfOf(int id) =>
             _partOf.TryGetValue(id, out var list) ? list : (IReadOnlyList<(string?, string)>)Array.Empty<(string?, string)>();
@@ -103,6 +98,17 @@ namespace DhcbTools.Shared.Logic.Ids
                 yield return (relation, entity.Type, new IfcIdsElement(this, entity).PredefinedType);
             }
         }
+
+        /// <summary>Tham số theo TÊN thuộc tính (tra lược đồ), hoặc <see cref="IfcValue.Empty"/> khi lớp không có thuộc tính đó.</summary>
+        internal IfcValue Value(IfcEntity entity, string attribute)
+        {
+            var index = Schema.IndexOf(entity.Type, attribute);
+            return index < 0 ? IfcValue.Empty : entity.At(index);
+        }
+
+        internal string? Text(IfcEntity entity, string attribute) => Value(entity, attribute).AsText();
+
+        internal bool IsA(IfcEntity entity, string ancestor) => Schema.IsA(entity.Type, ancestor);
 
         private void BuildTypes()
         {
@@ -245,69 +251,111 @@ namespace DhcbTools.Shared.Logic.Ids
         }
 
         /// <summary>
-        /// Phân loại: mỗi tham chiếu cho (hệ, mã). Hệ = <c>Name</c> của <c>IfcClassification</c> ở gốc chuỗi
-        /// <c>ReferencedSource</c>; mã = <c>Identification</c> (IFC4) / <c>ItemReference</c> (IFC2X3) — cùng vị trí 1.
-        /// Tham chiếu cha trong chuỗi cũng tính (IfcTester gộp "inherited references").
+        /// Phân loại gán trực tiếp: <c>IfcRelAssociatesClassification</c> (thực thể có GlobalId) và
+        /// <c>IfcExternalReferenceRelationship</c> (tài nguyên không có GlobalId như <c>IfcMaterial</c>, IFC4+).
         /// </summary>
         private void BuildClassifications()
         {
-            // IfcRelAssociatesClassification: (…, RelatedObjects=4, RelatingClassification=5)
-            foreach (var rel in _model.OfType("IFCRELASSOCIATESCLASSIFICATION"))
+            void Link(int target, int reference)
             {
-                var refId = rel.At(5).AsReference();
-                if (refId == null)
+                if (!_classificationLinks.TryGetValue(target, out var list))
                 {
-                    continue;
+                    list = new List<int>();
+                    _classificationLinks[target] = list;
                 }
 
-                var pairs = new List<KeyValuePair<string, string>>();
-                var system = string.Empty;
-                var chain = new List<string>();
-                var current = _model.ById(refId.Value);
-                var guard = 0;
-                while (current != null && guard++ < 32)
+                if (!list.Contains(reference))
                 {
-                    if (current.Type.Equals("IFCCLASSIFICATION", StringComparison.OrdinalIgnoreCase))
-                    {
-                        // IfcClassification: (Source, Edition, EditionDate, Name, …)
-                        system = current.At(3).AsText() ?? string.Empty;
-                        break;
-                    }
-
-                    // IfcClassificationReference: (Location, Identification, Name, ReferencedSource, …)
-                    var code = current.At(1).AsText();
-                    if (!string.IsNullOrEmpty(code))
-                    {
-                        chain.Add(code!);
-                    }
-
-                    var next = current.At(3).AsReference();
-                    current = next == null ? null : _model.ById(next.Value);
-                }
-
-                foreach (var code in chain)
-                {
-                    pairs.Add(new KeyValuePair<string, string>(system, code));
-                }
-
-                if (pairs.Count == 0)
-                {
-                    continue;
-                }
-
-                foreach (var target in References(rel.At(4)))
-                {
-                    if (!_classifications.TryGetValue(target, out var list))
-                    {
-                        list = new List<KeyValuePair<string, string>>();
-                        _classifications[target] = list;
-                    }
-
-                    list.AddRange(pairs);
+                    list.Add(reference);
                 }
             }
 
-            InheritFromType(_classifications);
+            // IfcRelAssociatesClassification: (…, RelatedObjects=4, RelatingClassification=5)
+            foreach (var rel in _model.OfType("IFCRELASSOCIATESCLASSIFICATION"))
+            {
+                var reference = rel.At(5).AsReference();
+                foreach (var target in reference == null ? Enumerable.Empty<int>() : References(rel.At(4)))
+                {
+                    Link(target, reference!.Value);
+                }
+            }
+
+            // IfcExternalReferenceRelationship: (Name, Description, RelatingReference=2, RelatedResourceObjects=3)
+            foreach (var rel in _model.OfType("IFCEXTERNALREFERENCERELATIONSHIP"))
+            {
+                var reference = rel.At(2).AsReference();
+                foreach (var target in reference == null ? Enumerable.Empty<int>() : References(rel.At(3)))
+                {
+                    Link(target, reference!.Value);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Các cặp (mã, hệ) của phần tử, đúng cách IfcTester/ifcopenshell gom: tham chiếu gán trực tiếp, cộng tham
+        /// chiếu của KIỂU cho những hệ mà phần tử không tự khai ("occurrences override the type classification per
+        /// system"), cộng mọi tham chiếu cha trong chuỗi <c>ReferencedSource</c>. Hệ = <c>Name</c> của
+        /// <c>IfcClassification</c> ở gốc chuỗi; gán thẳng cả một <c>IfcClassification</c> cho mã <c>null</c>.
+        /// Tài nguyên không có GlobalId chỉ đọc tham chiếu ngoài của chính nó.
+        /// </summary>
+        internal List<(string? Code, string? System)> ClassificationPairs(IfcEntity entity)
+        {
+            var links = Links(entity.Id);
+            var type = IsA(entity, "IFCOBJECT") ? TypeOf(entity.Id) : null;
+            if (type != null && Links(type.Id).Count > 0)
+            {
+                var own = new HashSet<int>(links.Select(RootOf));
+                links = links.Concat(Links(type.Id).Where(r => !own.Contains(RootOf(r)))).ToList();
+            }
+
+            var pairs = new List<(string?, string?)>();
+            foreach (var link in links)
+            {
+                var current = _model.ById(link);
+                var system = SystemOf(link);
+                if (current != null && current.Type.Equals("IFCCLASSIFICATION", StringComparison.OrdinalIgnoreCase))
+                {
+                    pairs.Add((null, system));
+                }
+
+                // IfcClassificationReference: (Location, Identification|ItemReference=1, Name, ReferencedSource=3, …)
+                for (var guard = 0; current != null && current.Type.Equals("IFCCLASSIFICATIONREFERENCE", StringComparison.OrdinalIgnoreCase) && guard < 32; guard++)
+                {
+                    pairs.Add((current.At(1).AsText(), system));
+                    var next = current.At(3).AsReference();
+                    current = next == null ? null : _model.ById(next.Value);
+                }
+            }
+
+            return pairs;
+        }
+
+        private IReadOnlyList<int> Links(int id) =>
+            _classificationLinks.TryGetValue(id, out var list) ? list : (IReadOnlyList<int>)Array.Empty<int>();
+
+        /// <summary>Số hiệu IfcClassification ở gốc chuỗi tham chiếu (-1 khi chuỗi không tới gốc nào).</summary>
+        private int RootOf(int reference)
+        {
+            var current = _model.ById(reference);
+            for (var guard = 0; current != null && guard < 32; guard++)
+            {
+                if (current.Type.Equals("IFCCLASSIFICATION", StringComparison.OrdinalIgnoreCase))
+                {
+                    return current.Id;
+                }
+
+                var next = current.At(3).AsReference();
+                current = next == null ? null : _model.ById(next.Value);
+            }
+
+            return -1;
+        }
+
+        /// <summary>IfcClassification: (Source, Edition, EditionDate, Name=3, …) — cùng vị trí ở IFC2X3 và IFC4.</summary>
+        private string? SystemOf(int reference)
+        {
+            var root = RootOf(reference);
+            return root < 0 ? null : _model.ById(root)!.At(3).AsText();
         }
 
         /// <summary>
@@ -671,73 +719,8 @@ namespace DhcbTools.Shared.Logic.Ids
     }
 
     /// <summary>Một thực thể IFC nhìn dưới con mắt IDS. Toàn bộ chỗ dịch IFC → IDS nằm ở đây.</summary>
-    public sealed class IfcIdsElement : IIdsElement, IIdsElementDetails
+    public sealed class IfcIdsElement : IIdsElement, IIdsElementDetails, IIdsTypedElement
     {
-        // Vị trí tham số theo lược đồ IFC — giống nhau ở mọi lớp con của IfcObject/IfcTypeObject:
-        // IfcRoot: GlobalId 0, OwnerHistory 1, Name 2, Description 3. IfcObject: ObjectType 4.
-        // IfcElement (IfcProduct + Tag): ObjectPlacement 5, Representation 6, Tag 7.
-        // IfcTypeProduct: ApplicableOccurrence 4, HasPropertySets 5, RepresentationMaps 6, Tag 7, ElementType 8.
-        private const int NameIndex = 2;
-        private const int DescriptionIndex = 3;
-        private const int ObjectTypeIndex = 4;
-        private const int TagIndex = 7;
-        private const int ElementTypeIndex = 8;
-
-        /// <summary>
-        /// Thuộc tính riêng của một số lớp hay bị IDS hỏi, theo vị trí trong lược đồ IFC4 (IFC2X3 giống ở
-        /// những lớp này). Không có bảng lược đồ đầy đủ — tên khác các tên này thì trả <c>null</c> (facet trượt,
-        /// không âm thầm đạt); báo cáo đối chiếu §41 nói rõ giới hạn.
-        /// </summary>
-        private static readonly Dictionary<string, Dictionary<string, int>> ClassAttributes = new Dictionary<string, Dictionary<string, int>>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["IFCDOOR"] = Table(("OverallHeight", 8), ("OverallWidth", 9), ("OperationType", 11), ("UserDefinedOperationType", 12)),
-            ["IFCWINDOW"] = Table(("OverallHeight", 8), ("OverallWidth", 9), ("PartitioningType", 11), ("UserDefinedPartitioningType", 12)),
-            ["IFCSPACE"] = Table(("LongName", 7), ("CompositionType", 8), ("ElevationWithFlooring", 10)),
-            ["IFCBUILDINGSTOREY"] = Table(("LongName", 7), ("CompositionType", 8), ("Elevation", 9)),
-            ["IFCBUILDING"] = Table(("LongName", 7), ("CompositionType", 8), ("ElevationOfRefHeight", 9), ("ElevationOfTerrain", 10)),
-            ["IFCSITE"] = Table(("LongName", 7), ("CompositionType", 8), ("RefLatitude", 9), ("RefLongitude", 10), ("RefElevation", 11), ("LandTitleNumber", 12)),
-            ["IFCPROJECT"] = Table(("LongName", 5), ("Phase", 6)),
-        };
-
-        private static Dictionary<string, int> Table(params (string Name, int Index)[] entries)
-        {
-            var table = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            foreach (var entry in entries)
-            {
-                table[entry.Name] = entry.Index;
-            }
-
-            return table;
-        }
-
-        private static readonly Dictionary<string, int> PredefinedTypeIndexOverride = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
-        {
-            // IfcSpatialStructureElement có CompositionType (enum) ở vị trí 8 trước PredefinedType.
-            ["IFCSPACE"] = 9,
-            ["IFCBUILDINGSTOREY"] = -1,
-            ["IFCBUILDING"] = -1,
-            ["IFCSITE"] = -1,
-            // IfcDoor/IfcWindow: OverallHeight 8, OverallWidth 9, PredefinedType 10 (rồi OperationType/PartitioningType 11).
-            ["IFCDOOR"] = 10,
-            ["IFCDOORSTANDARDCASE"] = 10,
-            ["IFCWINDOW"] = 10,
-            ["IFCWINDOWSTANDARDCASE"] = 10,
-            // IFC2X3 IfcDoorStyle/IfcWindowStyle không có PredefinedType (vị trí 9 là OperationType/ConstructionType).
-            ["IFCDOORSTYLE"] = -1,
-            ["IFCWINDOWSTYLE"] = -1,
-            // Nhóm/hệ (IfcGroup → IfcObject: GlobalId…ObjectType 0–4) — không có Tag nên PredefinedType sớm hơn.
-            ["IFCINVENTORY"] = 5,
-            ["IFCBUILDINGSYSTEM"] = 5,
-            ["IFCDISTRIBUTIONSYSTEM"] = 6,
-            ["IFCDISTRIBUTIONCIRCUIT"] = 6,
-        };
-
-        /// <summary>Lớp không gian: vị trí 7 là LongName, không phải Tag.</summary>
-        private static readonly HashSet<string> SpatialTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "IFCPROJECT", "IFCSITE", "IFCBUILDING", "IFCBUILDINGSTOREY", "IFCSPACE", "IFCSPATIALZONE", "IFCEXTERNALSPATIALELEMENT",
-        };
-
         private readonly IfcIdsModel _model;
         private readonly IfcEntity _entity;
         private readonly IfcEntity? _type;
@@ -753,25 +736,24 @@ namespace DhcbTools.Shared.Logic.Ids
         public int Id => _entity.Id;
 
         /// <summary>Nhãn trong báo cáo: <c>#25604 — IFCWALL "Basic Wall:…"</c>.</summary>
-        public string Label => "#" + _entity.Id + " — " + _entity.Type + " \"" + (IfcModel.NameOf(_entity) ?? string.Empty) + "\"";
+        public string Label => "#" + _entity.Id + " — " + _entity.Type + " \"" + (_model.Text(_entity, "Name") ?? string.Empty) + "\"";
 
-        /// <summary>Tên lớp VIẾT HOA đúng như trong file (<c>IFCWALL</c>); IDS so không phân biệt hoa thường.</summary>
+        /// <summary>Tên lớp VIẾT HOA đúng như trong file (<c>IFCWALL</c>).</summary>
         public string IfcEntity => _entity.Type;
 
         /// <summary>
-        /// PredefinedType theo đúng cách IfcTester suy: giá trị ở phần tử; <c>NOTDEFINED</c>/thiếu thì lấy
-        /// của kiểu; <c>USERDEFINED</c> thì lấy <c>ObjectType</c> (phần tử) hoặc <c>ElementType</c> (kiểu).
-        /// Vị trí của PredefinedType khác nhau theo lớp, nhưng ở mọi IfcElement nó là <b>enum đầu tiên sau
-        /// Tag</b> (IfcWall: 8; IfcDoor IFC4: 10 sau OverallHeight/OverallWidth) — không cần bảng lược đồ.
+        /// PredefinedType theo đúng cách IfcTester suy: giá trị ở phần tử; <c>NOTDEFINED</c>/thiếu thì lấy của kiểu;
+        /// <c>USERDEFINED</c> thì lấy <c>ObjectType</c> (phần tử) hoặc <c>ElementType</c> (kiểu). Vị trí tra theo
+        /// lược đồ — không đoán "enum đầu tiên sau Tag" như bản trước (sai ở IfcDoor, IfcSpace, lớp IFC2X3…).
         /// </summary>
         public string PredefinedType
         {
             get
             {
-                var own = EnumAfter(_entity, IsType(_entity) ? ElementTypeIndex : TagIndex);
+                var own = Own(_entity);
                 if (own == "USERDEFINED")
                 {
-                    return (IsType(_entity) ? _entity.At(ElementTypeIndex).AsText() : _entity.At(ObjectTypeIndex).AsText()) ?? string.Empty;
+                    return UserDefined(_entity) ?? string.Empty;
                 }
 
                 if (!string.IsNullOrEmpty(own) && own != "NOTDEFINED")
@@ -779,93 +761,79 @@ namespace DhcbTools.Shared.Logic.Ids
                     return own!;
                 }
 
-                if (_type == null)
-                {
-                    return string.Empty;
-                }
-
-                var fromType = EnumAfter(_type, ElementTypeIndex);
+                var fromType = _type == null ? null : Own(_type);
                 if (fromType == "USERDEFINED")
                 {
-                    return _type.At(ElementTypeIndex).AsText() ?? string.Empty;
+                    return UserDefined(_type!) ?? string.Empty;
                 }
 
                 return string.IsNullOrEmpty(fromType) || fromType == "NOTDEFINED" ? string.Empty : fromType!;
             }
         }
 
-        /// <summary>Thuộc tính trực tiếp của thực thể: GlobalId, Name, Description, ObjectType, Tag, PredefinedType, ElementType.</summary>
-        public string? Attribute(string name)
+        /// <summary>PredefinedType gốc (ở phần tử, hoặc ở kiểu khi phần tử để NOTDEFINED) là <c>USERDEFINED</c>.</summary>
+        public bool PredefinedTypeIsUserDefined
         {
-            switch ((name ?? string.Empty).Trim().ToLowerInvariant())
+            get
             {
-                case "globalid":
-                    return IfcModel.GlobalIdOf(_entity);
-                case "name":
-                    return _entity.At(NameIndex).AsText();
-                case "description":
-                    return _entity.At(DescriptionIndex).AsText();
-                case "objecttype":
-                    return IsType(_entity) ? null : _entity.At(ObjectTypeIndex).AsText();
-                case "elementtype":
-                    return IsType(_entity) ? _entity.At(ElementTypeIndex).AsText() : null;
-                case "tag":
-                    // Space/Storey/Building/Site không có Tag — vị trí 7 là LongName; trả nó ra là "đạt" một Tag không tồn tại.
-                    if (SpatialTypes.Contains(_entity.Type))
-                    {
-                        return null;
-                    }
-
-                    return _entity.At(TagIndex).Kind == IfcValueKind.Text ? _entity.At(TagIndex).Raw : null;
-                case "predefinedtype":
-                    var value = EnumAfter(_entity, IsType(_entity) ? ElementTypeIndex : TagIndex);
-                    return string.IsNullOrEmpty(value) ? null : value;
-                default:
-                    if (ClassAttributes.TryGetValue(_entity.Type, out var byName)
-                        && byName.TryGetValue((name ?? string.Empty).Trim(), out var index))
-                    {
-                        return NormalizeText(_entity.At(index).AsText());
-                    }
-
-                    return null;
+                var own = Own(_entity);
+                return own == "USERDEFINED"
+                       || ((string.IsNullOrEmpty(own) || own == "NOTDEFINED") && _type != null && Own(_type) == "USERDEFINED");
             }
         }
 
-        /// <summary>
-        /// Boolean/logical trong STEP là <c>.T.</c>/<c>.F.</c>/<c>.U.</c>; IDS 1.0 viết boolean bằng chữ thường
-        /// <c>true</c>/<c>false</c> (dạng chuẩn XSD) và so phân biệt hoa thường. Không đổi thì "IsExternal = false"
-        /// trượt cả 1078 tường trong khi IfcTester cho 590 đạt (§41). <c>.U.</c> (logical unknown) coi như KHÔNG
-        /// có giá trị — IDS: "a logical unknown is considered false and will not pass".
-        /// </summary>
-        private static string? NormalizeText(string? text)
+        private string? Own(IfcEntity entity)
         {
-            switch (text)
+            var value = _model.Value(entity, "PredefinedType");
+            return value.Kind == IfcValueKind.Enumeration ? value.Raw : null;
+        }
+
+        /// <summary>
+        /// Nhãn tự khai khi PredefinedType = USERDEFINED: <c>ObjectType</c> ở phần tử; ở kiểu thì <c>ElementType</c>
+        /// (sản phẩm), <c>ProcessType</c> (công việc — IfcTaskType) hoặc <c>ResourceType</c> (tài nguyên). Lớp nào chỉ
+        /// có một trong bốn tên đó, nên lấy cái có mặt.
+        /// </summary>
+        private string? UserDefined(IfcEntity entity) =>
+            _model.Text(entity, "ObjectType") ?? _model.Text(entity, "ElementType")
+            ?? _model.Text(entity, "ProcessType") ?? _model.Text(entity, "ResourceType");
+
+        /// <summary>
+        /// Thuộc tính trực tiếp theo tên (không phân biệt hoa thường — tiện tra cứu; bộ kiểm IDS dùng đường có kiểu và
+        /// so đúng hoa thường). Boolean trả <c>true</c>/<c>false</c>; <c>.U.</c>, tham chiếu, danh sách trả <c>null</c>.
+        /// </summary>
+        public string? Attribute(string name)
+        {
+            var attributes = _model.Schema.AttributesOf(_entity.Type);
+            for (var i = 0; i < attributes.Count; i++)
             {
-                case "T": return "true";
-                case "F": return "false";
-                case "U": return null;
-                default: return text;
+                if (string.Equals(attributes[i], (name ?? string.Empty).Trim(), StringComparison.OrdinalIgnoreCase))
+                {
+                    var datum = IdsDatum.FromStep(_entity.At(i));
+                    return datum == null || datum.Value.Kind == IdsDatumKind.Object ? null : datum.Value.Text;
+                }
             }
+
+            return null;
         }
 
         /// <summary>Property theo Pset — đã gộp thuộc tính thừa kế từ kiểu (xem <see cref="IfcModel.PropertiesOf"/>).</summary>
         public string? Property(string? propertySet, string name)
         {
             var key = string.IsNullOrWhiteSpace(propertySet) ? name : propertySet + "." + name;
-            return _model.Model.TryProperty(_entity.Id, key, out var value) ? NormalizeText(value) : null;
+            if (!_model.Model.TryProperty(_entity.Id, key, out var value))
+            {
+                return null;
+            }
+
+            // .T./.F. → true/false (dạng chuẩn XSD); .U. = không có giá trị.
+            return value == "T" ? "true" : value == "F" ? "false" : value == "U" ? null : value;
         }
 
         /// <summary>Mã phân loại theo hệ (rỗng = mọi hệ).</summary>
-        public IEnumerable<string> Classifications(string? system)
-        {
-            foreach (var pair in _model.ClassificationsOf(_entity.Id))
-            {
-                if (string.IsNullOrWhiteSpace(system) || string.Equals(pair.Key, system, StringComparison.OrdinalIgnoreCase))
-                {
-                    yield return pair.Value;
-                }
-            }
-        }
+        public IEnumerable<string> Classifications(string? system) =>
+            _model.ClassificationPairs(_entity)
+                .Where(p => p.Code != null && (string.IsNullOrWhiteSpace(system) || string.Equals(p.System, system, StringComparison.OrdinalIgnoreCase)))
+                .Select(p => p.Code!);
 
         /// <summary>Tên vật liệu, tên lớp/thành phần và Category của chúng.</summary>
         public IEnumerable<string> Materials => _model.MaterialsOf(_entity.Id);
@@ -877,52 +845,103 @@ namespace DhcbTools.Shared.Logic.Ids
         public IEnumerable<(string? Relation, string Entity, string PredefinedType)> PartOfWithPredefinedType =>
             _model.PartOfWithPredefinedTypeOf(_entity.Id);
 
-        /// <summary>PredefinedType gốc (ở phần tử, hoặc ở kiểu khi phần tử để NOTDEFINED) là <c>USERDEFINED</c>.</summary>
-        public bool PredefinedTypeIsUserDefined
+        bool IIdsTypedElement.InScopeOf(IdsFacet? first)
         {
-            get
+            switch (first?.Kind)
             {
-                var own = EnumAfter(_entity, IsType(_entity) ? ElementTypeIndex : TagIndex);
-                if (own == "USERDEFINED")
-                {
+                case IdsFacetKind.Property:
+                    return _model.IsA(_entity, "IFCOBJECTDEFINITION")
+                           || (_model.Schema.Name != "IFC2X3" && (_model.IsA(_entity, "IFCMATERIALDEFINITION") || _model.IsA(_entity, "IFCPROFILEDEF")));
+                case IdsFacetKind.Classification:
+                case IdsFacetKind.Material:
+                case null:
+                    return _model.IsA(_entity, "IFCOBJECTDEFINITION");
+                default:
                     return true;
-                }
-
-                return (string.IsNullOrEmpty(own) || own == "NOTDEFINED") && _type != null && EnumAfter(_type, ElementTypeIndex) == "USERDEFINED";
             }
         }
 
-        /// <summary>IfcTypeProduct: tên kết thúc "TYPE", cộng hai lớp IFC2X3 đặt tên khác (IfcDoorStyle/IfcWindowStyle).</summary>
-        private static bool IsType(IfcEntity entity) =>
-            entity.Type.EndsWith("TYPE", StringComparison.OrdinalIgnoreCase)
-            || entity.Type.Equals("IFCDOORSTYLE", StringComparison.OrdinalIgnoreCase)
-            || entity.Type.Equals("IFCWINDOWSTYLE", StringComparison.OrdinalIgnoreCase);
+        IdsMatch? IIdsTypedElement.Match(IdsFacet facet)
+        {
+            switch (facet.Kind)
+            {
+                case IdsFacetKind.Entity:
+                    return MatchEntity(facet) ? IdsMatch.Match : IdsMatch.Mismatch;
+                case IdsFacetKind.Attribute:
+                    return MatchAttribute(facet);
+                case IdsFacetKind.Property:
+                    return _model.MatchProperty(_entity, _type, facet);
+                case IdsFacetKind.Classification:
+                    return MatchClassification(facet);
+                default:
+                    return null;
+            }
+        }
 
         /// <summary>
-        /// PredefinedType ở ĐÚNG vị trí lược đồ (ngay sau Tag/ElementType, hoặc theo bảng override) — không quét
-        /// tới enum đầu tiên: IfcDoor có PredefinedType = <c>$</c> mà OperationType = <c>.DOUBLE_DOOR…</c> thì
-        /// quét sẽ trả OperationType làm PredefinedType, và <c>.NOTDEFINED.</c> của tác giả IDS đạt oan.
+        /// Lớp đúng tên (phân biệt hoa thường, không tính lớp con), rồi predefinedType. IFC2X3 thiếu nhiều lớp
+        /// (IfcAirTerminal…) — bảng ánh xạ kiểu của buildingSMART: IFCFLOWTERMINAL có kiểu IFCAIRTERMINALTYPE được
+        /// tính là IFCAIRTERMINAL, như IfcTester.
         /// </summary>
-        private static string? EnumAfter(IfcEntity entity, int after)
+        private bool MatchEntity(IdsFacet facet)
         {
-            var index = after + 1;
-            if (PredefinedTypeIndexOverride.TryGetValue(entity.Type, out var overridden))
+            var name = facet.Name.Simple;
+            // simpleValue: so thẳng — đường này chạy cho MỌI thực thể của file (cả triệu điểm toạ độ), không qua Accepts.
+            var matches = (name != null ? string.Equals(_entity.Type, name, StringComparison.Ordinal) : facet.Name.Accepts(_entity.Type))
+                          || (_model.Schema.Name == "IFC2X3" && _type != null && name != null && !_model.Schema.Knows(name)
+                              && string.Equals(_type.Type, name + "TYPE", StringComparison.OrdinalIgnoreCase));
+            return matches
+                   && (facet.Container == null || facet.Container.IsAny || facet.Container.Accepts(PredefinedType)
+                       || (PredefinedTypeIsUserDefined && facet.Container.Accepts("USERDEFINED")));
+        }
+
+        /// <summary>
+        /// Thuộc tính forward theo lược đồ, tên so đúng hoa thường (tên khai bằng restriction thì mọi thuộc tính khớp).
+        /// Không có thuộc tính đó (tên sai, thuộc tính inverse) hoặc giá trị <c>$</c>/<c>*</c> → vắng. Chuỗi rỗng,
+        /// danh sách rỗng → có mà sai ("an optional attribute fails if empty"). Giá trị so theo kiểu (<see cref="IdsDatum"/>).
+        /// </summary>
+        private IdsMatch MatchAttribute(IdsFacet facet)
+        {
+            var attributes = _model.Schema.AttributesOf(_entity.Type);
+            var values = new List<IfcValue>();
+            for (var i = 0; i < attributes.Count; i++)
             {
-                if (overridden < 0)
+                if (facet.Name.Simple != null ? attributes[i] == facet.Name.Simple : facet.Name.Accepts(attributes[i]))
                 {
-                    return null;
+                    values.Add(_entity.At(i));
                 }
-
-                index = overridden;
             }
 
-            var value = entity.At(index);
-            if (value.Kind != IfcValueKind.Enumeration || value.Raw == "T" || value.Raw == "F" || value.Raw == "U")
+            var data = values.Select(IdsDatum.FromStep).Where(d => d != null).ToList();
+            if (data.Count == 0)
             {
-                return null;
+                return IdsMatch.Absent;
             }
 
-            return value.Raw;
+            var present = values.Where(v => !(v.Kind == IfcValueKind.List && v.Items.Count == 0))
+                .Select(IdsDatum.FromStep).Where(d => d != null && !(d.Value.Kind == IdsDatumKind.Text && d.Value.Text.Length == 0))
+                .Select(d => d!.Value).ToList();
+            if (present.Count == 0)
+            {
+                return IdsMatch.Mismatch;
+            }
+
+            return present.All(d => facet.Value.Accepts(d)) ? IdsMatch.Match : IdsMatch.Mismatch;
+        }
+
+        /// <summary>Có tham chiếu phân loại nào thì "có mặt"; khớp khi MỘT tham chiếu thoả cả mã lẫn hệ.</summary>
+        private IdsMatch MatchClassification(IdsFacet facet)
+        {
+            var pairs = _model.ClassificationPairs(_entity);
+            if (pairs.Count == 0)
+            {
+                return IdsMatch.Absent;
+            }
+
+            return pairs.Any(p => (facet.Value.IsAny || (p.Code != null && facet.Value.Accepts(IdsDatum.OfText(p.Code))))
+                                  && (facet.Container == null || facet.Container.IsAny || (p.System != null && facet.Container.Accepts(IdsDatum.OfText(p.System)))))
+                ? IdsMatch.Match
+                : IdsMatch.Mismatch;
         }
     }
 }

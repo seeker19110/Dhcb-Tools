@@ -86,13 +86,34 @@ Phát hiện thêm trong vòng này:
 | `AuthLockout` khoá toàn cục | Loopback không có định danh client; đường tấn công thật (trang web) đã chặn ở vòng 1 |
 | `dhcb_mcp_server` `confirm` boolean | Không phải lỗ: Bridge đòi `previewToken` + `documentId` của lần xem trước; chuỗi xác nhận do cùng model điền không thêm an toàn |
 | `IfcStepParser` cấp phát/encoding; tách `AcadQueryHandler`/`SleeveCommand` | Tối ưu/nợ cấu trúc — cần đo trên file thật trước khi đổi |
-| IDS: bảng thuộc tính theo lược đồ, kiểu dữ liệu, property khớp nhiều cái (63 ca còn lệch) | Việc lớn (nhúng lược đồ IFC); danh sách từng ca ở `tests/ids-buildingsmart/known-gaps.txt` |
+| ~~IDS: bảng thuộc tính theo lược đồ, kiểu dữ liệu, property khớp nhiều cái (63 ca còn lệch)~~ | ✅ Làm ở vòng 3 (dưới) — 334/334 |
 
 Kiểm chứng vòng 2: `Shared.Logic.Tests` **1.884** ca đạt, phủ dòng 100 %; `BatchRunner.Tests` 21 đạt; Python 100 %
 câu lệnh + pyflakes; build Core + bốn vỏ cho Revit/AutoCAD **2024 (net48) và 2026 (net8/net10)** bằng API NuGet;
 `actionlint` + `zizmor` sạch; bộ ca buildingSMART 271/334 không hồi quy; `sign-release.ps1` parse bằng pwsh 7 và
 chạy nhánh "chưa cấu hình". Revit smoke suite (`revit-smoke.json`) giữ nguyên các chuỗi kỳ vọng — chưa chạy lại
 trong Revit.
+
+### Vòng 3 — 63 ca IDS còn lệch
+
+Đường IFC của bộ kiểm IDS nay so **theo kiểu dữ liệu** thay vì chuỗi: bảng lược đồ IFC2X3/IFC4/IFC4X3 nhúng trong
+Shared.Logic (sinh bằng `tools/ifc-schema/sinh-luoc-do.py` từ ifcopenshell) để tra thuộc tính theo tên; mọi thực
+thể kể cả không có GlobalId là ứng viên (tập ứng viên theo facet applicability đầu tiên, như IfcTester); số
+nguyên/số thực/boolean/chuỗi/tham chiếu so theo luật IDS 1.0; property: `dataType`, đổi đơn vị về đơn vị chuẩn IDS,
+mọi pset/property khớp restriction phải thoả, list/bounded/table/enumerated, pset vật liệu/profile/định sẵn,
+complex/reference → trượt; classification: hệ gán thẳng, tham chiếu ngoài của tài nguyên, đè theo từng hệ; IFC2X3
+ánh xạ kiểu (IfcFlowTerminal + IfcAirTerminalType = IFCAIRTERMINAL). Ba thay đổi hành vi có chủ ý, theo chuẩn:
+`ifcVersion` không còn lọc (chỉ ghi chú), tên lớp phân biệt hoa thường (`IfcWall` trong IDS không khớp — lint cảnh
+báo), specification bắt buộc không có `<requirements>` là hợp lệ ("phải có ít nhất một…"). Property có đơn vị nay
+so theo đơn vị chuẩn IDS (m, m², m³, kg, rad) ở **cả hai đường** — trước đây đường IFC so số ghi trong file (mm),
+đường Revit đổi ra mm; file IDS viết độ dài property bằng mm cần sửa sang m. Chi tiết:
+[`kiem-ids.md`](kiem-ids.md#đường-ifc-so-theo-kiểu).
+
+Kiểm chứng vòng 3: bộ ca buildingSMART **334/334** (`known-gaps.txt` rỗng — CI đỏ khi bất kỳ ca nào lệch; IfcTester
+0.8.5 cùng bộ ca: 312/334); `Shared.Logic.Tests` **1.904** ca đạt, phủ dòng 100 % (`IdsTypedTests` mới);
+`BatchRunner.Tests` 21 đạt; Python 100 % câu lệnh + pyflakes; build Core Revit 2024 (net48)/2025 và Core AutoCAD
+bằng API NuGet. Fixture `yeu-cau-thong-tin-lech-chuan.ids` của Revit smoke đổi tên lớp sang chữ HOA (đường Revit
+cũng so phân biệt hoa thường) — chưa chạy lại trong Revit.
 
 ## Việc cần chủ repo bật
 

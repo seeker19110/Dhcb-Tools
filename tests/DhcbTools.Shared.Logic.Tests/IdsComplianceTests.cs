@@ -160,9 +160,9 @@ public class IdsComplianceTests
     }
 
     [Fact]
-    public void IdsSpec_KhongCoRequirements_ChiChapNhanKhiCam()
+    public void IdsSpec_KhongCoRequirements_TuChoiKhiTuyChon()
     {
-        Assert.Throws<IdsParseException>(() => Parse("<specification name=\"x\" ifcVersion=\"IFC4\"><applicability/><requirements/></specification>"));
+        Assert.Throws<IdsParseException>(() => Parse("<specification name=\"x\" ifcVersion=\"IFC4\" minOccurs=\"0\"><applicability/><requirements/></specification>"));
         var ok = Parse("<specification name=\"x\" ifcVersion=\"IFC4\" minOccurs=\"0\" maxOccurs=\"0\"><applicability><entity><name><simpleValue>IFCWALL</simpleValue></name></entity></applicability></specification>");
         Assert.True(Assert.Single(ok).IsProhibited);
     }
@@ -216,8 +216,12 @@ public class IdsComplianceTests
         Assert.True(clean.Specifications[0].NoApplicableElements);
     }
 
+    /// <summary>
+    /// ifcVersion không gồm lược đồ của file: VẪN kiểm (như IfcTester và ca ids/… của buildingSMART — trước đây bỏ
+    /// qua nên 3 ca "fail" ra "đạt"), chỉ ghi chú để người đọc biết quy tắc có thể viết cho lược đồ khác.
+    /// </summary>
     [Fact]
-    public void IdsEvaluator_IfcVersionKhongKhop_BoQuaVaNoiRo()
+    public void IdsEvaluator_IfcVersionKhongKhop_VanKiemVaGhiChu()
     {
         var specs = Parse(
             "<specification name=\"chỉ 2x3\" ifcVersion=\"IFC2X3\"><applicability><entity><name><simpleValue>IFCWALL</simpleValue></name></entity></applicability><requirements><attribute><name><simpleValue>Tag</simpleValue></name></attribute></requirements></specification>"
@@ -226,20 +230,19 @@ public class IdsComplianceTests
 
         var result = IdsEvaluator.Check(specs, new IIdsElement[] { wall }, "IFC4");
 
-        Assert.True(result.Specifications[0].Skipped);
-        Assert.Contains("IFC2X3", result.Specifications[0].SkipReason);
-        Assert.False(result.Specifications[0].NoApplicableElements);
-        Assert.Equal(0, result.EmptySpecificationCount);
-        Assert.False(result.Specifications[1].Skipped);
+        Assert.Contains("IFC2X3", result.Specifications[0].VersionNote);
+        Assert.Equal(1, result.Specifications[0].Applicable);
+        Assert.Equal(1, result.Specifications[0].Failed);
+        Assert.Null(result.Specifications[1].VersionNote);
         Assert.Equal(1, result.Specifications[1].Applicable);
 
         var messages = IdsReport.Messages(result, Array.Empty<string>()).ToList();
-        Assert.Contains(messages, m => m.StartsWith("chỉ 2x3: bỏ qua"));
+        Assert.Contains(messages, m => m.StartsWith("chỉ 2x3: 0/1 đạt") && m.Contains("vẫn kiểm như IfcTester"));
         var html = IdsReport.Html("m", "a.ids", IdsReport.IfcScopeNote, result, Array.Empty<string>());
-        Assert.Contains("bỏ qua: ifcVersion", html);
+        Assert.Contains("không gồm lược đồ của file (IFC4)", html);
 
-        // Không biết lược đồ (đường Revit) → không lọc.
-        Assert.False(IdsEvaluator.Check(specs, new IIdsElement[] { wall }).Specifications[0].Skipped);
+        // Không biết lược đồ (đường Revit) → không có ghi chú.
+        Assert.Null(IdsEvaluator.Check(specs, new IIdsElement[] { wall }).Specifications[0].VersionNote);
     }
 
     /// <summary>propertySet khai bằng enumeration: thử từng pset; khai bằng pattern: trượt (không rơi về "mọi pset").</summary>
@@ -291,7 +294,7 @@ public class IdsComplianceTests
             + "#13=IFCPROPERTYENUMERATEDVALUE('EnumLe',$,IFCLABEL('X'),$);\n"
             + "#10=IFCPROPERTYSET('0Pset000000000000000000',$,'Pset_A',$,(#2,#3,#4,#5,#6,#8,#9,#12,#13));\n"
             + "#11=IFCRELDEFINESBYPROPERTIES('0Rel0000000000000000000',$,$,$,(#1),#10);");
-        var wall = model.Elements().Single();
+        var wall = model.Elements().Single(e => e.IfcEntity == "IFCWALL");
 
         Assert.Equal("A", wall.Property("Pset_A", "Single"));
         Assert.Equal("New", wall.Property("Pset_A", "Status"));
@@ -315,7 +318,7 @@ public class IdsComplianceTests
             + "#10=IFCPROPERTYSET('0PsetA00000000000000000',$,'Pset_A',$,(#2));\n"
             + "#11=IFCPROPERTYSET('0PsetB00000000000000000',$,'Pset_B',$,(#3));\n"
             + "#12=IFCRELDEFINESBYPROPERTIES('0Rel0000000000000000000',$,$,$,(#1),(#10,#11));");
-        var wall = model.Elements().Single();
+        var wall = model.Elements().Single(e => e.IfcEntity == "IFCWALL");
         Assert.Equal("1", wall.Property("Pset_A", "A"));
         Assert.Equal("2", wall.Property("Pset_B", "B"));
     }

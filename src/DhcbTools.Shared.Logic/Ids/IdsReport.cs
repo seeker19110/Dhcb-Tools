@@ -46,18 +46,13 @@ namespace DhcbTools.Shared.Logic.Ids
 
             foreach (var spec in check.Specifications)
             {
-                if (spec.Skipped)
-                {
-                    yield return $"{spec.Name}: {spec.SkipReason}";
-                    continue;
-                }
-
                 var head = $"{spec.Name}: {spec.Passed}/{spec.Applicable} đạt";
-                yield return spec.MissingRequired
+                var note = spec.VersionNote == null ? string.Empty : " [" + spec.VersionNote + "]";
+                yield return (spec.MissingRequired
                     ? $"{spec.Name}: KHÔNG phần tử nào lọt bộ lọc — specification bắt buộc nên tính là KHÔNG ĐẠT (mô hình thiếu nhóm đó, hoặc bộ lọc sai). Nhóm này không bắt buộc thì khai minOccurs=\"0\" trên <applicability>."
                     : spec.NoApplicableElements
                         ? $"{spec.Name}: KHÔNG phần tử nào lọt bộ lọc — specification tuỳ chọn/cấm nên không tính là lỗi."
-                        : head + (spec.Failed > 0 ? $", {spec.Failed} phần tử không đạt" : string.Empty);
+                        : head + (spec.Failed > 0 ? $", {spec.Failed} phần tử không đạt" : string.Empty)) + note;
             }
 
             foreach (var failure in check.Specifications.SelectMany(s => s.Failures).Take(20))
@@ -123,13 +118,16 @@ namespace DhcbTools.Shared.Logic.Ids
                 }
 
                 sb.Append("</td><td>");
-                sb.Append(spec.Skipped
-                    ? "<span class=\"trong\">" + HtmlText.Escape(spec.SkipReason!) + "</span>"
-                    : spec.MissingRequired
-                        ? "<span class=\"truot\">0 phần tử — KHÔNG ĐẠT: specification bắt buộc phải có ít nhất một phần tử</span>"
-                        : spec.NoApplicableElements
-                            ? "<span class=\"trong\">0 phần tử — tuỳ chọn/cấm, không tính là lỗi</span>"
-                            : spec.Applicable.ToString(CultureInfo.InvariantCulture) + " phần tử");
+                sb.Append(spec.MissingRequired
+                    ? "<span class=\"truot\">0 phần tử — KHÔNG ĐẠT: specification bắt buộc phải có ít nhất một phần tử</span>"
+                    : spec.NoApplicableElements
+                        ? "<span class=\"trong\">0 phần tử — tuỳ chọn/cấm, không tính là lỗi</span>"
+                        : spec.Applicable.ToString(CultureInfo.InvariantCulture) + " phần tử");
+                if (spec.VersionNote != null)
+                {
+                    sb.Append("<br><small class=\"trong\">").Append(HtmlText.Escape(spec.VersionNote)).Append("</small>");
+                }
+
                 sb.Append("</td><td class=\"dat\">").Append(spec.Passed.ToString(CultureInfo.InvariantCulture))
                   .Append("</td><td class=\"truot\">").Append(spec.Failed.ToString(CultureInfo.InvariantCulture))
                   .Append("</td></tr>");

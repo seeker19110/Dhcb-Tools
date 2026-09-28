@@ -98,8 +98,12 @@ public class IfcIdsElementTests
     private static IfcIdsElement Element(IfcIdsModel model, int id) =>
         (IfcIdsElement)model.Elements().Single(e => ((IfcIdsElement)e).Id == id);
 
+    /// <summary>
+    /// Mọi thực thể đều là ứng viên — IDS nói được tới cả thứ không có GlobalId (IfcMaterial, IfcTaskTime…); tập
+    /// ứng viên của từng specification do facet applicability đầu tiên quyết, như IfcTester.
+    /// </summary>
     [Fact]
-    public void PhanTu_GomDoiTuongCoGlobalId_TruQuanHeVaPset()
+    public void PhanTu_GomMoiThucThe_KeCaKhongCoGlobalId()
     {
         var types = Model().Elements().Select(e => e.IfcEntity).ToList();
         Assert.Equal(3, types.Count(t => t == "IFCWALL"));
@@ -107,17 +111,16 @@ public class IfcIdsElementTests
         Assert.Contains("IFCDOOR", types);
         Assert.Contains("IFCBUILDINGSTOREY", types);
         Assert.Contains("IFCSYSTEM", types);
-        Assert.DoesNotContain(types, t => t.StartsWith("IFCREL"));
-        Assert.DoesNotContain("IFCPROPERTYSET", types);
-        // Không có GlobalId thì không phải đối tượng IDS nói tới.
-        Assert.DoesNotContain("IFCMATERIAL", types);
+        Assert.Contains("IFCMATERIAL", types);
+        Assert.Contains("IFCPROPERTYSET", types);
+        Assert.Contains(types, t => t.StartsWith("IFCREL"));
     }
 
     [Fact]
     public void Entity_SoDungLop_KhongTinhLopCon_GiongIfcTester()
     {
         var specs = IdsSpec.Parse(
-            "<ids><specifications><specification name=\"t\"><applicability><entity><name><simpleValue>IfcWall</simpleValue></name></entity></applicability>"
+            "<ids><specifications><specification name=\"t\"><applicability><entity><name><simpleValue>IFCWALL</simpleValue></name></entity></applicability>"
             + "<requirements><attribute><name><simpleValue>Name</simpleValue></name></attribute></requirements></specification></specifications></ids>");
         var result = IdsEvaluator.Check(specs, Model().Elements());
         // IfcWallType không phải IfcWall.

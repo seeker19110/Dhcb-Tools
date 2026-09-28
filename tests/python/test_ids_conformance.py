@@ -64,10 +64,10 @@ class IdsConformanceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d, redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
             self.assertEqual(1, conf.main([d, "--runner", "r.dll"]))
 
-    def test_danh_sach_that_doc_duoc(self):
-        known = conf.load_known(conf.KNOWN_GAPS)
-        self.assertTrue(known)
-        self.assertTrue(all("/" in case and not case.startswith("#") for case in known))
+    def test_danh_sach_that_doc_duoc_va_rong(self):
+        # 334/334 từ 2026-09-28: danh sách thật chỉ còn chú thích — mọi ca lệch là hồi quy.
+        self.assertTrue(conf.KNOWN_GAPS.exists())
+        self.assertEqual(set(), conf.load_known(conf.KNOWN_GAPS))
 
 
 if __name__ == "__main__":

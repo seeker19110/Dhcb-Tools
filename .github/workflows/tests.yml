@@ -62,8 +62,8 @@ jobs:
 
       # Bộ ca IDS chính thức của buildingSMART (334 cặp .ids/.ifc có sẵn kết quả đúng), ghim commit để kết quả
       # không trôi theo repo của họ. Đỏ khi một ca NGOÀI tests/ids-buildingsmart/known-gaps.txt lệch — tức hồi
-      # quy so với chuẩn; ca trong danh sách mà nay khớp thì chỉ nhắc xoá dòng. Chạy sau bước trên vì cần
-      # BatchRunner đã build (--verify-ifc/--verify-ids). Xem docs/kiem-ids.md.
+      # quy so với chuẩn (danh sách rỗng từ 2026-09-28, 334/334); ca trong danh sách mà nay khớp thì chỉ nhắc xoá
+      # dòng. Chạy sau bước trên vì cần BatchRunner đã build (--verify-ifc/--verify-ids). Xem docs/kiem-ids.md.
       - name: Đối chiếu bộ ca IDS của buildingSMART
         run: |
           git init --quiet "$RUNNER_TEMP/bsids"
@@ -128,7 +128,7 @@ jobs:
           python3 -m py_compile scripts/dhcb_agent.py scripts/dhcb_mcp_server.py scripts/dhcb_ai.py \
             scripts/doi-chieu-setout-ifc.py tools/autocad-mcp-server/server.py tools/autocad-mcp-server/panel_api.py
           # CONTRIBUTING và PR template đã ghi pyflakes là bước kiểm, nhưng trước 2026-09-28 CI không chạy nó.
-          python3 -m pyflakes scripts/*.py tools/autocad-mcp-server/*.py tests/python/*.py
+          python3 -m pyflakes scripts/*.py tools/autocad-mcp-server/*.py tools/ifc-schema/*.py tests/python/*.py
           # Ngưỡng 100% câu lệnh (fail_under trong pyproject.toml) — cùng con số khi chạy ở máy.
           python3 -m coverage run -m unittest discover -s tools/autocad-mcp-server -p 'test_*.py'
           python3 -m coverage run --append -m unittest discover -s tests/python -p 'test_*.py'

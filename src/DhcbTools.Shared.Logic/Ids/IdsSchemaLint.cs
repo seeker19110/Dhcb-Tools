@@ -279,7 +279,7 @@ namespace DhcbTools.Shared.Logic.Ids
                 .Select(e => ((string?)e.Attribute("value") ?? e.Value).Trim()) ?? Enumerable.Empty<string>();
             foreach (var value in values.Where(v => v != v.ToUpperInvariant()))
             {
-                sink.Add(name!, "tên lớp \"" + value + "\" phải viết HOA (" + value.ToUpperInvariant() + ")");
+                sink.Add(name!, "tên lớp \"" + value + "\" phải viết HOA (" + value.ToUpperInvariant() + ") — IDS so phân biệt hoa thường, viết thế này không khớp phần tử nào");
             }
         }
 

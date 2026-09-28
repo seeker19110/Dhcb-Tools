@@ -162,58 +162,94 @@ namespace DhcbTools.Shared.Logic.Ids
                 return false;
             }
 
-            if (!string.IsNullOrEmpty(Pattern))
-            {
-                if (_pattern == null)
-                {
-                    CompilePattern();
-                }
-
-                try
-                {
-                    if (!_pattern!.IsMatch(value))
-                    {
-                        return false;
-                    }
-                }
-                catch (RegexMatchTimeoutException)
-                {
-                    return false;
-                }
-            }
-
-            if (Length != null && value.Length != Length.Value)
+            if (!string.IsNullOrEmpty(Pattern) && !MatchesPattern(value))
             {
                 return false;
             }
 
-            if (MinLength != null && value.Length < MinLength.Value)
+            return LengthsAccept(value) && (!HasBounds || (TryNumber(value, out var number) && BoundsAccept(number)));
+        }
+
+        /// <summary>
+        /// Giá trị <b>có kiểu</b> từ file IFC có thoả không — luật so của IDS 1.0 theo từng kiểu, đúng bộ ca của
+        /// buildingSMART: chuỗi so nguyên văn (<c>'42'</c> không bằng <c>42.0</c>); số thực nhận <c>42</c>/<c>42.</c>/
+        /// <c>1.2345e3</c> với dung sai <see cref="NumericTolerance"/>; số nguyên KHÔNG nhận <c>42.0</c>; boolean chỉ
+        /// <c>true</c>/<c>false</c>/<c>1</c>/<c>0</c>; pattern chỉ áp lên chuỗi ("patterns always fail on any number");
+        /// tham chiếu/danh sách/select bọc kiểu thì mọi ràng buộc giá trị đều trượt.
+        /// </summary>
+        internal bool Accepts(IdsDatum datum)
+        {
+            if (IsAny)
+            {
+                return true;
+            }
+
+            if (datum.Kind == IdsDatumKind.Object
+                || (!string.IsNullOrEmpty(Simple) && !TypedEquals(datum, Simple!))
+                || (Enumeration.Count > 0 && !Enumeration.Any(e => TypedEquals(datum, e)))
+                || (!string.IsNullOrEmpty(Pattern) && (datum.Kind != IdsDatumKind.Text || !MatchesPattern(datum.Text)))
+                || !LengthsAccept(datum.Text))
             {
                 return false;
             }
 
-            if (MaxLength != null && value.Length > MaxLength.Value)
+            if (!HasBounds)
+            {
+                return true;
+            }
+
+            var number = datum.Number;
+            return (datum.Kind == IdsDatumKind.Integer || datum.Kind == IdsDatumKind.Real
+                    || (datum.Kind == IdsDatumKind.Text && TryNumber(datum.Text, out number)))
+                   && BoundsAccept(number);
+        }
+
+        private static bool TypedEquals(IdsDatum datum, string expected)
+        {
+            switch (datum.Kind)
+            {
+                case IdsDatumKind.Text:
+                    return string.Equals(datum.Text, expected, StringComparison.Ordinal);
+                case IdsDatumKind.Boolean:
+                    return datum.Number == 1 ? expected == "true" || expected == "1" : expected == "false" || expected == "0";
+                case IdsDatumKind.Integer:
+                    // xs:integer: chỉ chữ số (có thể kèm dấu) — "42." hay "42.0" là IDS viết sai kiểu, không phải bằng 42.
+                    return IntegerLexical.IsMatch(expected) && TryNumber(expected, out var integer) && integer == datum.Number;
+                default:
+                    return TryNumber(expected, out var real) && NumbersEqual(datum.Number, real);
+            }
+        }
+
+        private static readonly Regex IntegerLexical = new Regex(@"^[+-]?\d+$", RegexOptions.CultureInvariant);
+
+        private bool HasBounds => MinInclusive != null || MaxInclusive != null || MinExclusive != null || MaxExclusive != null;
+
+        private bool BoundsAccept(double number) =>
+            (MinInclusive == null || number >= MinInclusive)
+            && (MaxInclusive == null || number <= MaxInclusive)
+            && (MinExclusive == null || number > MinExclusive)
+            && (MaxExclusive == null || number < MaxExclusive);
+
+        private bool LengthsAccept(string value) =>
+            (Length == null || value.Length == Length.Value)
+            && (MinLength == null || value.Length >= MinLength.Value)
+            && (MaxLength == null || value.Length <= MaxLength.Value);
+
+        private bool MatchesPattern(string value)
+        {
+            if (_pattern == null)
+            {
+                CompilePattern();
+            }
+
+            try
+            {
+                return _pattern!.IsMatch(value);
+            }
+            catch (RegexMatchTimeoutException)
             {
                 return false;
             }
-
-            if (MinInclusive != null || MaxInclusive != null || MinExclusive != null || MaxExclusive != null)
-            {
-                if (!TryNumber(value, out var number))
-                {
-                    return false;
-                }
-
-                if (!((MinInclusive == null || number >= MinInclusive)
-                      && (MaxInclusive == null || number <= MaxInclusive)
-                      && (MinExclusive == null || number > MinExclusive)
-                      && (MaxExclusive == null || number < MaxExclusive)))
-                {
-                    return false;
-                }
-            }
-
-            return true;
         }
 
         /// <summary>
@@ -227,13 +263,19 @@ namespace DhcbTools.Shared.Logic.Ids
         {
             if (TryNumber(actual, out var a) && TryNumber(expected, out var b))
             {
-                // × (1 + 1e-9): bộ ca đặt giá trị ĐÚNG trên biên, mà trong double |1.000002 − 1| = 2.0000000003e-6
-                // > 2e-6 — thiếu phần đệm này thì 8/14 ca "pass" của buildingSMART trượt vì sai số làm tròn.
-                return Math.Abs(a - b) <= (Math.Abs(b) * NumericTolerance + NumericTolerance) * (1 + 1e-9);
+                return NumbersEqual(a, b);
             }
 
             return string.Equals(actual, expected, StringComparison.Ordinal);
         }
+
+        /// <summary>
+        /// <paramref name="actual"/> nằm trong <c>expected ± (|expected| × 1e-6 + 1e-6)</c>. × (1 + 1e-9): bộ ca đặt giá
+        /// trị ĐÚNG trên biên, mà trong double |1.000002 − 1| = 2.0000000003e-6 &gt; 2e-6 — thiếu phần đệm này thì 8/14
+        /// ca "pass" của buildingSMART trượt vì sai số làm tròn.
+        /// </summary>
+        private static bool NumbersEqual(double actual, double expected) =>
+            Math.Abs(actual - expected) <= (Math.Abs(expected) * NumericTolerance + NumericTolerance) * (1 + 1e-9);
 
         private static bool TryNumber(string text, out double number)
         {
@@ -525,13 +567,14 @@ namespace DhcbTools.Shared.Logic.Ids
                     spec.Requirements.Add(facet);
                 }
 
-                // Specification không có yêu cầu nào thì luôn đạt. Nhận nó là in ra một dòng "✓" cho một
-                // điều kiện chưa ai viết — đúng loại no-op im lặng mà E-PRECOND sinh ra để chặn.
-                // Ngoại lệ đúng chuẩn: specification CẤM (maxOccurs="0") — applicability chính là điều kiện.
-                if (spec.Requirements.Count == 0 && !spec.IsProhibited)
+                // Specification TUỲ CHỌN không có yêu cầu nào thì luôn đạt. Nhận nó là in ra một dòng "✓" cho một
+                // điều kiện chưa ai viết — đúng loại no-op im lặng mà E-PRECOND sinh ra để chặn. Bắt buộc (mặc định)
+                // hay cấm thì applicability chính là điều kiện: "phải có ít nhất một IfcAirTerminal" / "không được
+                // có…" — IDS 1.0 hợp lệ, bộ ca buildingSMART có (entity/…_airterminal_per_the_type_mapping_table).
+                if (spec.Requirements.Count == 0 && spec.IsOptional)
                 {
                     throw new IdsParseException(
-                        "Specification \"" + spec.Name + "\" không có <requirements> nào — nó sẽ luôn đạt, tức là không kiểm gì cả.");
+                        "Specification \"" + spec.Name + "\" tuỳ chọn (minOccurs=\"0\") mà không có <requirements> nào — nó sẽ luôn đạt, tức là không kiểm gì cả.");
                 }
 
                 // Cấm mà vẫn khai yêu cầu: IDS 1.0 coi là file sai ("prohibited specifications invalid if
@@ -582,16 +625,10 @@ namespace DhcbTools.Shared.Logic.Ids
                 switch (Local(element).ToLowerInvariant())
                 {
                     case "entity":
-                        var entity = Facet(element, IdsFacetKind.Entity, "name", "predefinedType", null);
-                        // Tên lớp IFC không có nghĩa khác theo hoa thường: nhận cả "IfcWall" (file viết tay, lint
-                        // cảnh báo lệch chuẩn) bằng cách nâng lên chữ hoa — phía mô hình cũng được nâng lên trước khi so.
-                        entity.Name.Simple = entity.Name.Simple?.ToUpperInvariant();
-                        for (var i = 0; i < entity.Name.Enumeration.Count; i++)
-                        {
-                            entity.Name.Enumeration[i] = entity.Name.Enumeration[i].ToUpperInvariant();
-                        }
-
-                        yield return entity;
+                        // IDS 1.0 viết tên lớp CHỮ HOA (IFCWALL) và so phân biệt hoa thường: "IfcWall" không khớp gì
+                        // ("entities must be specified as uppercase strings"). Bản trước nâng lên chữ hoa cho dễ dãi —
+                        // IfcTester/Solibri thì không, nên cùng một file IDS cho hai kết luận. Lint vẫn cảnh báo rõ.
+                        yield return Facet(element, IdsFacetKind.Entity, "name", "predefinedType", null);
                         break;
                     case "attribute":
                         yield return Facet(element, IdsFacetKind.Attribute, "name", null, "value");

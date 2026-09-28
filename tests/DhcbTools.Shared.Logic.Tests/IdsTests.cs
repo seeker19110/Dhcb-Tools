@@ -154,12 +154,22 @@ public class IdsSpecTests
         Assert.Contains("không có <specification>", ex.Message);
     }
 
+    /// <summary>
+    /// Tuỳ chọn mà không có yêu cầu = luôn đạt → từ chối. Bắt buộc (mặc định) mà không có yêu cầu là IDS 1.0 hợp lệ:
+    /// "phải có ít nhất một phần tử như vậy" (ca entity/…_airterminal_per_the_type_mapping_table của buildingSMART).
+    /// </summary>
     [Fact]
-    public void SpecificationKhongCoYeuCau_LaLoi()
+    public void SpecificationKhongCoYeuCau_TuyChonLaLoi_BatBuocLaDoiPhaiCo()
     {
         var ex = Assert.Throws<IdsParseException>(() => Parse(
-            "<specification name=\"Rỗng\"><applicability><entity><name><simpleValue>IfcWall</simpleValue></name></entity></applicability></specification>"));
+            "<specification name=\"Rỗng\"><applicability minOccurs=\"0\"><entity><name><simpleValue>IFCWALL</simpleValue></name></entity></applicability></specification>"));
         Assert.Contains("luôn đạt", ex.Message);
+
+        var required = Assert.Single(Parse(
+            "<specification name=\"Phải có tường\"><applicability><entity><name><simpleValue>IFCWALL</simpleValue></name></entity></applicability></specification>"));
+        var wall = new FakeIdsElement { IfcEntity = "IfcWall", Label = "w" };
+        Assert.True(IdsEvaluator.Check(new[] { required }, new IIdsElement[] { wall }).AllPassed);
+        Assert.False(IdsEvaluator.Check(new[] { required }, Array.Empty<IIdsElement>()).AllPassed);
     }
 
     [Fact]
@@ -167,7 +177,7 @@ public class IdsSpecTests
     {
         var specs = Parse(
             "<specification name=\"Cửa có Tag\" description=\"theo BEP\">"
-            + "<applicability><entity><name><simpleValue>IfcDoor</simpleValue></name><predefinedType><simpleValue>DOOR</simpleValue></predefinedType></entity></applicability>"
+            + "<applicability><entity><name><simpleValue>IFCDOOR</simpleValue></name><predefinedType><simpleValue>DOOR</simpleValue></predefinedType></entity></applicability>"
             + "<requirements><attribute><name><simpleValue>Tag</simpleValue></name></attribute></requirements></specification>");
 
         var spec = Assert.Single(specs);
@@ -176,7 +186,6 @@ public class IdsSpecTests
         var entity = Assert.Single(spec.Applicability);
         Assert.Equal(IdsFacetKind.Entity, entity.Kind);
         Assert.Equal("DOOR", entity.Container!.Simple);
-        // Tên lớp nâng lên chữ hoa lúc đọc (IDS 1.0 viết IFCDOOR; "IfcDoor" vẫn nhận, lint cảnh báo).
         Assert.Equal("lớp IFC = \"IFCDOOR\", predefinedType = \"DOOR\"", entity.Describe());
         Assert.Equal("thuộc tính = \"Tag\" có giá trị (khác rỗng)", Assert.Single(spec.Requirements).Describe());
     }
@@ -186,7 +195,7 @@ public class IdsSpecTests
     {
         var specs = Parse(
             "<specification name=\"Đủ loại\"><applicability/><requirements>"
-            + "<entity><name><simpleValue>IfcWall</simpleValue></name></entity>"
+            + "<entity><name><simpleValue>IFCWALL</simpleValue></name></entity>"
             + "<attribute><name><simpleValue>Name</simpleValue></name></attribute>"
             + "<property><propertySet><simpleValue>Pset_WallCommon</simpleValue></propertySet><baseName><simpleValue>FireRating</simpleValue></baseName></property>"
             + "<classification><system><simpleValue>Uniclass</simpleValue></system><value><simpleValue>EF_25_10</simpleValue></value></classification>"
@@ -338,7 +347,7 @@ public class IdsEvaluatorTests
     public void ApDungLocTheoApplicability_TuongKhongBiKiemBangLuatCuaCua()
     {
         var specs = Spec(
-            "<specification name=\"Cửa có Tag\"><applicability><entity><name><simpleValue>IfcDoor</simpleValue></name></entity></applicability>"
+            "<specification name=\"Cửa có Tag\"><applicability><entity><name><simpleValue>IFCDOOR</simpleValue></name></entity></applicability>"
             + "<requirements><attribute><name><simpleValue>Tag</simpleValue></name></attribute></requirements></specification>");
 
         var wall = new FakeIdsElement { IfcEntity = "IfcWall", Label = "9 — Walls" };
@@ -363,7 +372,7 @@ public class IdsEvaluatorTests
     public void TuongKinh_LaIfcCurtainWall_KhongLotSpecificationIfcWall()
     {
         var specs = Spec(
-            "<specification name=\"Tường có vật liệu\"><applicability><entity><name><simpleValue>IfcWall</simpleValue></name></entity></applicability>"
+            "<specification name=\"Tường có vật liệu\"><applicability><entity><name><simpleValue>IFCWALL</simpleValue></name></entity></applicability>"
             + "<requirements><material/></requirements></specification>");
         var wall = new FakeIdsElement { IfcEntity = "IfcWall", Label = "1 — Walls" };
         wall.MaterialNames.Add("Concrete");
@@ -408,7 +417,7 @@ public class IdsEvaluatorTests
     public void KhongPhanTuNaoLotBoLoc_KhongPhaiLaDat()
     {
         var specs = Spec(
-            "<specification name=\"Bể nước\"><applicability><entity><name><simpleValue>IfcTank</simpleValue></name></entity></applicability>"
+            "<specification name=\"Bể nước\"><applicability><entity><name><simpleValue>IFCTANK</simpleValue></name></entity></applicability>"
             + "<requirements><attribute><name><simpleValue>Name</simpleValue></name></attribute></requirements></specification>");
 
         var result = IdsEvaluator.Check(specs, new IIdsElement[] { Door("D-01") });
@@ -551,7 +560,7 @@ public class IdsEvaluatorTests
     public void PredefinedTypeKhongKhai_ThiKhongRangBuoc()
     {
         var specs = Spec(
-            "<specification name=\"Mọi cửa\"><applicability><entity><name><simpleValue>IfcDoor</simpleValue></name></entity></applicability>"
+            "<specification name=\"Mọi cửa\"><applicability><entity><name><simpleValue>IFCDOOR</simpleValue></name></entity></applicability>"
             + "<requirements><attribute><name><simpleValue>Tag</simpleValue></name></attribute></requirements></specification>");
 
         var element = Door("D-01");

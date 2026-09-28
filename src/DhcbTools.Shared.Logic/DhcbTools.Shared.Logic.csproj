@@ -26,6 +26,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Bảng lược đồ IFC cho bộ kiểm IDS đường IFC — sinh bởi tools/ifc-schema/sinh-luoc-do.py. -->
+    <EmbeddedResource Include="Ids\ifc-schemas.txt" LogicalName="DhcbTools.Shared.Logic.Ids.ifc-schemas.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Chỉ để đọc/ghi JSON (job batch, log JSONL, config AI). Không có API Autodesk nào ở đây. -->
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>

@@ -51,11 +51,39 @@ namespace DhcbTools.Shared.Logic.Ids
     /// </summary>
     public interface IIdsElementDetails
     {
-        /// <summary>PredefinedType gốc là <c>USERDEFINED</c> — IDS chấp nhận cả chữ "USERDEFINED" lẫn giá trị tự khai.</summary>
-        bool PredefinedTypeIsUserDefined { get; }
-
         /// <summary>Như <see cref="IIdsElement.PartOf"/>, kèm PredefinedType của từng tổ tiên.</summary>
         IEnumerable<(string? Relation, string Entity, string PredefinedType)> PartOfWithPredefinedType { get; }
+    }
+
+    /// <summary>Một facet soi trên một phần tử: không có gì để soi, có mà sai, hay khớp.</summary>
+    internal enum IdsMatch
+    {
+        /// <summary>Không có đối tượng của facet (thuộc tính <c>$</c>, không có pset/property/phân loại…).</summary>
+        Absent,
+
+        /// <summary>Có, nhưng không thoả (sai giá trị, sai dataType, rỗng…).</summary>
+        Mismatch,
+
+        /// <summary>Thoả.</summary>
+        Match,
+    }
+
+    /// <summary>
+    /// Phần tử tự soi facet trên dữ liệu CÓ KIỂU (đường file IFC). Đường Revit không cài — facet đi luật chuỗi chung.
+    /// </summary>
+    internal interface IIdsTypedElement
+    {
+        /// <summary>
+        /// Phần tử có thuộc tập ứng viên của facet applicability ĐẦU TIÊN không — theo IfcTester: facet property chỉ
+        /// nhìn IfcObjectDefinition (và vật liệu/profile từ IFC4), classification/material chỉ nhìn IfcObjectDefinition,
+        /// entity/attribute/partOf nhìn mọi thực thể. Applicability rỗng (<c>null</c>): mọi IfcObjectDefinition — đúng
+        /// tập "thực thể có GlobalId, trừ quan hệ và định nghĩa property" mà đường IFC dùng trước đây, không phải cả
+        /// triệu điểm toạ độ của file.
+        /// </summary>
+        bool InScopeOf(IdsFacet? first);
+
+        /// <summary>Kết quả soi, hoặc <c>null</c> để evaluator dùng luật chuỗi chung (material, partOf).</summary>
+        IdsMatch? Match(IdsFacet facet);
     }
 
     /// <summary>Một phần tử không đạt, kèm câu nói rõ thiếu gì.</summary>
@@ -81,14 +109,14 @@ namespace DhcbTools.Shared.Logic.Ids
     /// <summary>Kết quả của một specification.</summary>
     public sealed class IdsSpecificationResult
     {
-        internal IdsSpecificationResult(string name, string description, int applicable, int passed, IReadOnlyList<IdsFailure> failures, string? skipReason = null, bool required = false)
+        internal IdsSpecificationResult(string name, string description, int applicable, int passed, IReadOnlyList<IdsFailure> failures, string? versionNote = null, bool required = false)
         {
             Name = name;
             Description = description;
             Applicable = applicable;
             Passed = passed;
             Failures = failures;
-            SkipReason = skipReason;
+            VersionNote = versionNote;
             Required = required;
         }
 
@@ -105,11 +133,13 @@ namespace DhcbTools.Shared.Logic.Ids
         /// <summary>Specification không đạt: có phần tử trượt, hoặc bắt buộc mà không có phần tử nào.</summary>
         public bool IsFailed => Failed > 0 || MissingRequired;
 
-        /// <summary>Khác null khi specification KHÔNG được chạy (ví dụ <c>ifcVersion</c> không khớp lược đồ file) — báo cáo phải nói rõ, không hiện thành "0 phần tử".</summary>
-        public string? SkipReason { get; }
-
-        /// <summary>Specification bị bỏ qua, không phải "không có phần tử".</summary>
-        public bool Skipped => SkipReason != null;
+        /// <summary>
+        /// Khác null khi <c>ifcVersion</c> của specification không gồm lược đồ của file. Specification VẪN được kiểm —
+        /// đúng như IfcTester và bộ ca chính thức của buildingSMART (ca <c>ids/…</c> khai IFC2X3 chạy trên file IFC4
+        /// vẫn phải ra "không đạt"); trước đây bỏ qua hẳn nên 3 ca đó ra "đạt". Báo cáo in ghi chú này để người đọc
+        /// biết quy tắc có thể viết cho lược đồ khác.
+        /// </summary>
+        public string? VersionNote { get; }
 
         /// <summary>Tên specification.</summary>
         public string Name { get; }
@@ -140,7 +170,7 @@ namespace DhcbTools.Shared.Logic.Ids
         /// Không phần tử nào lọt applicability. Đây <b>không phải</b> "đạt": nó nói rằng mô hình không có
         /// loại phần tử mà yêu cầu nhắm tới — có thể do lọc sai, có thể do mô hình thiếu hẳn nhóm đó.
         /// </summary>
-        public bool NoApplicableElements => Applicable == 0 && !Skipped;
+        public bool NoApplicableElements => Applicable == 0;
     }
 
     /// <summary>Kết quả kiểm cả file IDS.</summary>
@@ -186,8 +216,8 @@ namespace DhcbTools.Shared.Logic.Ids
 
         /// <summary>
         /// Kiểm danh sách phần tử theo bộ specification. <paramref name="modelSchema"/> (<c>IFC4</c>, <c>IFC2X3</c>…)
-        /// khác rỗng thì specification khai <c>ifcVersion</c> không chứa lược đồ đó được BỎ QUA và ghi lý do —
-        /// IDS 1.0 cho phép một file chứa quy tắc cho nhiều lược đồ, chạy nhầm là báo trượt thứ tác giả không đòi.
+        /// khác rỗng thì specification khai <c>ifcVersion</c> không chứa lược đồ đó được ghi chú
+        /// (<see cref="IdsSpecificationResult.VersionNote"/>) nhưng VẪN kiểm, như IfcTester.
         /// </summary>
         public static IdsCheckResult Check(IEnumerable<IdsSpecification> specifications, IEnumerable<IIdsElement> elements, string? modelSchema)
         {
@@ -197,14 +227,12 @@ namespace DhcbTools.Shared.Logic.Ids
 
             foreach (var spec in specs)
             {
-                if (!spec.AppliesTo(modelSchema))
-                {
-                    results.Add(new IdsSpecificationResult(spec.Name, spec.Description, 0, 0, Array.Empty<IdsFailure>(),
-                        "bỏ qua: ifcVersion=\"" + string.Join(" ", spec.IfcVersions) + "\" không gồm lược đồ của file (" + modelSchema + ")"));
-                    continue;
-                }
-
-                var applicable = items.Where(e => spec.Applicability.All(f => Satisfies(e, f))).ToList();
+                var note = spec.AppliesTo(modelSchema)
+                    ? null
+                    : "ifcVersion=\"" + string.Join(" ", spec.IfcVersions) + "\" không gồm lược đồ của file (" + modelSchema + ") — vẫn kiểm như IfcTester";
+                var first = spec.Applicability.FirstOrDefault();
+                var applicable = items.Where(e => (!(e is IIdsTypedElement typed) || typed.InScopeOf(first))
+                                                  && spec.Applicability.All(f => Match(e, f) == IdsMatch.Match)).ToList();
                 var failures = new List<IdsFailure>();
                 var passed = 0;
 
@@ -219,19 +247,22 @@ namespace DhcbTools.Shared.Logic.Ids
 
                     foreach (var requirement in spec.IsProhibited ? Enumerable.Empty<IdsFacet>() : spec.Requirements)
                     {
-                        var holds = Satisfies(element, requirement);
+                        var match = Match(element, requirement);
                         if (requirement.IsProhibited)
                         {
-                            if (holds)
+                            if (match == IdsMatch.Match)
                             {
                                 reasons.Add("không được có " + requirement.Describe());
                             }
                         }
-                        else if (!holds && !requirement.IsOptional)
+                        else if (!requirement.IsOptional)
                         {
-                            reasons.Add("thiếu/sai: cần " + requirement.Describe());
+                            if (match != IdsMatch.Match)
+                            {
+                                reasons.Add("thiếu/sai: cần " + requirement.Describe());
+                            }
                         }
-                        else if (!holds && IsPresent(element, requirement))
+                        else if (match == IdsMatch.Mismatch)
                         {
                             // IDS 1.0: optional = KHÔNG bắt buộc có, nhưng ĐÃ có thì phải đúng giá trị.
                             // Trước đây optional được tha vô điều kiện — FireRating = "banana" vẫn đạt.
@@ -249,10 +280,25 @@ namespace DhcbTools.Shared.Logic.Ids
                     }
                 }
 
-                results.Add(new IdsSpecificationResult(spec.Name, spec.Description, applicable.Count, passed, failures, required: spec.MinOccurs >= 1));
+                results.Add(new IdsSpecificationResult(spec.Name, spec.Description, applicable.Count, passed, failures, note, required: spec.MinOccurs >= 1));
             }
 
             return new IdsCheckResult(results, items.Count);
+        }
+
+        /// <summary>
+        /// Soi một facet: phần tử có kiểu (đường IFC) tự soi; còn lại theo luật chuỗi — khớp, hoặc không khớp mà đối
+        /// tượng CÓ mặt (sai), hoặc vắng.
+        /// </summary>
+        private static IdsMatch Match(IIdsElement element, IdsFacet facet)
+        {
+            var typed = (element as IIdsTypedElement)?.Match(facet);
+            if (typed != null)
+            {
+                return typed.Value;
+            }
+
+            return Satisfies(element, facet) ? IdsMatch.Match : IsPresent(element, facet) ? IdsMatch.Mismatch : IdsMatch.Absent;
         }
 
         /// <summary>Đối tượng của facet có mặt trên phần tử không (bất kể giá trị) — dùng cho cardinality optional.</summary>
@@ -289,8 +335,7 @@ namespace DhcbTools.Shared.Logic.Ids
                     // IDS 1.0 viết tên lớp bằng CHỮ HOA (IFCWALL) và so phân biệt hoa thường; đường Revit trả
                     // "IfcWall" nên nâng phía mô hình lên chữ hoa. IDS viết "IfcWall" là file sai chuẩn — không khớp.
                     return facet.Name.Accepts(element.IfcEntity.ToUpperInvariant())
-                           && (facet.Container == null || facet.Container.IsAny || facet.Container.Accepts(element.PredefinedType)
-                               || (element is IIdsElementDetails details && details.PredefinedTypeIsUserDefined && facet.Container.Accepts("USERDEFINED")));
+                           && (facet.Container == null || facet.Container.IsAny || facet.Container.Accepts(element.PredefinedType));
 
                 case IdsFacetKind.Attribute:
                     // Tên thuộc tính trong IDS là một RÀNG BUỘC, không nhất thiết là một tên cụ thể

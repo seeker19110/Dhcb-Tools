@@ -146,20 +146,21 @@ internal sealed class RevitIdsElement : IIdsElement
     /// <summary>
     /// Property theo property set. Revit không giữ Pset như IFC, nên tra theo <b>tên tham số</b>:
     /// trước hết "Pset_Tên.Prop" (cách khai của bộ xuất qua file mapping), sau đó chính tên property ở
-    /// instance rồi ở type — đúng thứ tự bộ xuất IFC lấy giá trị.
+    /// instance rồi ở type — đúng thứ tự bộ xuất IFC lấy giá trị. Số có đơn vị theo <b>đơn vị chuẩn IDS</b>
+    /// (m, m², m³, rad) — đường IFC đổi property về đúng các đơn vị này, nên cùng một IDS cho cùng kết luận.
     /// </summary>
     public string? Property(string? propertySet, string name)
     {
         if (!string.IsNullOrWhiteSpace(propertySet))
         {
-            var qualified = TextOf(_element, propertySet + "." + name) ?? (_type != null ? TextOf(_type, propertySet + "." + name) : null);
+            var qualified = TextOf(_element, propertySet + "." + name, true) ?? (_type != null ? TextOf(_type, propertySet + "." + name, true) : null);
             if (qualified != null)
             {
                 return qualified;
             }
         }
 
-        return TextOf(_element, name) ?? (_type != null ? TextOf(_type, name) : null);
+        return TextOf(_element, name, true) ?? (_type != null ? TextOf(_type, name, true) : null);
     }
 
     /// <summary>
@@ -251,20 +252,22 @@ internal sealed class RevitIdsElement : IIdsElement
     }
 
     /// <summary>
-    /// Số thực theo đơn vị bộ xuất IFC ghi: dài → mm, diện tích → m², thể tích → m³, góc → độ; đại lượng
-    /// không đơn vị (tỉ số, hệ số) giữ nguyên. Trước đây MỌI double nhân 304,8 nên "U-value 0,3" thành 91.
+    /// Số thực có đơn vị. Property (<paramref name="idsUnits"/>): đơn vị chuẩn IDS 1.0 — dài → m, diện tích → m²,
+    /// thể tích → m³, góc → rad — vì đường IFC đổi property về đúng các đơn vị này (như IfcTester). Attribute: đơn
+    /// vị bộ xuất IFC ghi (dài → mm, góc → độ) — đường IFC và IfcTester so attribute theo số ghi trong file, không đổi.
+    /// Đại lượng không đơn vị (tỉ số, hệ số) giữ nguyên. Trước đây MỌI double nhân 304,8 nên "U-value 0,3" thành 91.
     /// </summary>
-    private static string DoubleText(Parameter parameter)
+    private static string DoubleText(Parameter parameter, bool idsUnits)
     {
         var raw = parameter.AsDouble();
         double value;
         try
         {
             var spec = parameter.Definition.GetDataType();
-            value = spec == SpecTypeId.Length ? UnitUtils.ConvertFromInternalUnits(raw, UnitTypeId.Millimeters)
+            value = spec == SpecTypeId.Length ? UnitUtils.ConvertFromInternalUnits(raw, idsUnits ? UnitTypeId.Meters : UnitTypeId.Millimeters)
                 : spec == SpecTypeId.Area ? UnitUtils.ConvertFromInternalUnits(raw, UnitTypeId.SquareMeters)
                 : spec == SpecTypeId.Volume ? UnitUtils.ConvertFromInternalUnits(raw, UnitTypeId.CubicMeters)
-                : spec == SpecTypeId.Angle ? UnitUtils.ConvertFromInternalUnits(raw, UnitTypeId.Degrees)
+                : spec == SpecTypeId.Angle ? UnitUtils.ConvertFromInternalUnits(raw, idsUnits ? UnitTypeId.Radians : UnitTypeId.Degrees)
                 : raw;
         }
         catch (Exception)
@@ -272,10 +275,11 @@ internal sealed class RevitIdsElement : IIdsElement
             value = raw; // tham số không có kiểu dữ liệu (family cũ) — giữ số nội bộ
         }
 
-        return value.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+        // m/rad cần nhiều chữ số hơn mm/độ để không làm tròn mất phần dưới milimét.
+        return value.ToString(idsUnits ? "0.#########" : "0.###", System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    private static string? TextOf(Element element, string parameterName)
+    private static string? TextOf(Element element, string parameterName, bool idsUnits = false)
     {
         var parameter = element.LookupParameter(parameterName);
         if (parameter == null || !parameter.HasValue)
@@ -287,7 +291,7 @@ internal sealed class RevitIdsElement : IIdsElement
         {
             StorageType.String => parameter.AsString(),
             StorageType.Integer => parameter.AsInteger().ToString(System.Globalization.CultureInfo.InvariantCulture),
-            StorageType.Double => DoubleText(parameter),
+            StorageType.Double => DoubleText(parameter, idsUnits),
             StorageType.ElementId => parameter.AsValueString(),
             _ => null,
         };

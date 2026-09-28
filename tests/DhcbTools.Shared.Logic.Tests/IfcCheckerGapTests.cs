@@ -38,7 +38,7 @@ public class IfcCheckerGapTests
         var fromText = IfcChecker.Check(HaiTuong, IfcCheckSpec.Default());
         var fromModel = IfcChecker.Check(model, IfcCheckSpec.Default());
         Assert.Equal(fromText.Render(), fromModel.Render());
-        Assert.Equal(2, DhcbTools.Shared.Logic.Ids.IfcIdsModel.From(model).Elements().Count);
+        Assert.Equal(2, DhcbTools.Shared.Logic.Ids.IfcIdsModel.From(model).Elements().Count(e => e.IfcEntity == "IFCWALL"));
         Assert.Same(model, DhcbTools.Shared.Logic.Ids.IfcIdsModel.From(model).Model);
     }
 

@@ -127,7 +127,9 @@ public static partial class Program
         var check = IdsEvaluator.Check(specifications, elements, model.Model.Schema);
 
         Console.WriteLine(ifcPath);
-        Console.WriteLine($"Lược đồ {model.Model.Schema}, {model.Model.Count} thực thể, {elements.Count} phần tử IDS có thể nói tới.");
+        // Mọi thực thể đều là ứng viên (IfcMaterial, IfcTaskTime… cũng được IDS nói tới) — tập của từng specification do
+        // facet applicability đầu tiên quyết, nên không có một con số "phần tử IDS" chung để in.
+        Console.WriteLine($"Lược đồ {model.Model.Schema}, {model.Model.Count} thực thể.");
         foreach (var line in IdsReport.Messages(check, schemaWarnings))
         {
             Console.WriteLine(line);

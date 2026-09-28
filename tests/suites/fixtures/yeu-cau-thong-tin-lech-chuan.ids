@@ -4,6 +4,8 @@
     - <restriction>/<pattern> không thuộc namespace xs:
     - specification thiếu ifcVersion
   DHCB đọc được (bộ đọc bỏ qua namespace), nên lệnh phải CHẠY và CẢNH BÁO — không chặn.
+  Tên lớp viết HOA (IFCDOOR…) như chuẩn: từ 2026-09-28 IDS so tên lớp phân biệt hoa thường như IfcTester —
+  bản trước §39 viết "IfcDoor", giữ nguyên thì specification không khớp phần tử nào, lệch khỏi mục đích fixture.
   Nội dung specification giống yeu-cau-thong-tin.ids để kết quả kiểm đối chiếu được 1:1.
 -->
 <ids xmlns="http://standards.buildingsmart.org/IDS">
@@ -13,7 +15,7 @@
   <specifications>
     <specification name="Cửa phải có mã hiệu (Tag)">
       <applicability>
-        <entity><name><simpleValue>IfcDoor</simpleValue></name></entity>
+        <entity><name><simpleValue>IFCDOOR</simpleValue></name></entity>
       </applicability>
       <requirements>
         <attribute><name><simpleValue>Tag</simpleValue></name></attribute>
@@ -22,7 +24,7 @@
 
     <specification name="Tường phải khai vật liệu">
       <applicability>
-        <entity><name><simpleValue>IfcWall</simpleValue></name></entity>
+        <entity><name><simpleValue>IFCWALL</simpleValue></name></entity>
       </applicability>
       <requirements>
         <material><value><restriction base="xs:string"><pattern value=".+"/></restriction></value></material>
@@ -31,7 +33,7 @@
 
     <specification name="Lớp IFC không có trong model mẫu">
       <applicability>
-        <entity><name><simpleValue>IfcTank</simpleValue></name></entity>
+        <entity><name><simpleValue>IFCTANK</simpleValue></name></entity>
       </applicability>
       <requirements>
         <attribute><name><simpleValue>Name</simpleValue></name></attribute>
