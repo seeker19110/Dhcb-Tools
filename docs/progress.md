@@ -2,6 +2,11 @@
 
 Ảnh chụp tại thời điểm cập nhật gần nhất. Kế hoạch phía trước xem [`roadmap.md`](roadmap.md).
 
+> Bổ sung 2026-09-28: audit bảo mật/quy trình/công cụ — Bridge không còn bị trang web khoá bằng request sai token,
+> client Python không đưa token Bridge ra proxy hệ thống, regex find/replace có trần thời gian, action ghim SHA,
+> quét lỗ hổng NuGet/pip hằng tuần. Xem [audit-bao-mat-2026-09-28.md](audit-bao-mat-2026-09-28.md) và
+> [`SECURITY.md`](../SECURITY.md).
+
 > Bổ sung 2026-09-23: audit toàn diện lần hai (năm hướng song song, ~90 phát hiện) → tám PR #161–#168 (hai vòng quét, tất cả đã vào `main`);
 > đáng chú ý: gói bàn giao từng "ĐẠT" dù thiếu file, `StylePurge` có thể xoá pattern đang dùng, `AutoRoute`
 > xem trước không kể phần dựng MEP. Xem [audit-nang-cap-2026-09-23.md](audit-nang-cap-2026-09-23.md),
