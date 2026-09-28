@@ -45,6 +45,19 @@ namespace DhcbTools.Shared.Logic.Ids
         IEnumerable<(string? Relation, string Entity)> PartOf { get; }
     }
 
+    /// <summary>
+    /// Chi tiết mà chỉ đường file IFC có. Evaluator dùng khi phần tử cài interface này; đường Revit không cài —
+    /// khi đó facet partOf có khai predefinedType không kiểm được và TRƯỢT (không đạt oan).
+    /// </summary>
+    public interface IIdsElementDetails
+    {
+        /// <summary>PredefinedType gốc là <c>USERDEFINED</c> — IDS chấp nhận cả chữ "USERDEFINED" lẫn giá trị tự khai.</summary>
+        bool PredefinedTypeIsUserDefined { get; }
+
+        /// <summary>Như <see cref="IIdsElement.PartOf"/>, kèm PredefinedType của từng tổ tiên.</summary>
+        IEnumerable<(string? Relation, string Entity, string PredefinedType)> PartOfWithPredefinedType { get; }
+    }
+
     /// <summary>Một phần tử không đạt, kèm câu nói rõ thiếu gì.</summary>
     public sealed class IdsFailure
     {
@@ -68,7 +81,7 @@ namespace DhcbTools.Shared.Logic.Ids
     /// <summary>Kết quả của một specification.</summary>
     public sealed class IdsSpecificationResult
     {
-        internal IdsSpecificationResult(string name, string description, int applicable, int passed, IReadOnlyList<IdsFailure> failures, string? skipReason = null)
+        internal IdsSpecificationResult(string name, string description, int applicable, int passed, IReadOnlyList<IdsFailure> failures, string? skipReason = null, bool required = false)
         {
             Name = name;
             Description = description;
@@ -76,7 +89,21 @@ namespace DhcbTools.Shared.Logic.Ids
             Passed = passed;
             Failures = failures;
             SkipReason = skipReason;
+            Required = required;
         }
+
+        /// <summary>Specification bắt buộc (<c>minOccurs ≥ 1</c>, mặc định của IDS): phải có ít nhất một phần tử lọt applicability.</summary>
+        public bool Required { get; }
+
+        /// <summary>
+        /// Bắt buộc mà không phần tử nào lọt applicability — IDS 1.0 tính là <b>không đạt</b> ("required
+        /// specifications need at least one applicable entity"). Trước đây chỉ in cảnh báo và mã thoát vẫn 0.
+        /// Không muốn thế thì khai <c>minOccurs="0"</c> trên <c>&lt;applicability&gt;</c>.
+        /// </summary>
+        public bool MissingRequired => Required && NoApplicableElements;
+
+        /// <summary>Specification không đạt: có phần tử trượt, hoặc bắt buộc mà không có phần tử nào.</summary>
+        public bool IsFailed => Failed > 0 || MissingRequired;
 
         /// <summary>Khác null khi specification KHÔNG được chạy (ví dụ <c>ifcVersion</c> không khớp lược đồ file) — báo cáo phải nói rõ, không hiện thành "0 phần tử".</summary>
         public string? SkipReason { get; }
@@ -136,6 +163,12 @@ namespace DhcbTools.Shared.Logic.Ids
 
         /// <summary>Số specification không có phần tử nào để kiểm.</summary>
         public int EmptySpecificationCount => Specifications.Count(s => s.NoApplicableElements);
+
+        /// <summary>Số specification không đạt (có phần tử trượt, hoặc bắt buộc mà rỗng).</summary>
+        public int FailedSpecificationCount => Specifications.Count(s => s.IsFailed);
+
+        /// <summary>Cả file IDS đạt — thứ mã thoát và gói bàn giao dựa vào, không chỉ <see cref="FailureCount"/>.</summary>
+        public bool AllPassed => FailedSpecificationCount == 0;
     }
 
     /// <summary>
@@ -216,7 +249,7 @@ namespace DhcbTools.Shared.Logic.Ids
                     }
                 }
 
-                results.Add(new IdsSpecificationResult(spec.Name, spec.Description, applicable.Count, passed, failures));
+                results.Add(new IdsSpecificationResult(spec.Name, spec.Description, applicable.Count, passed, failures, required: spec.MinOccurs >= 1));
             }
 
             return new IdsCheckResult(results, items.Count);
@@ -253,8 +286,11 @@ namespace DhcbTools.Shared.Logic.Ids
             switch (facet.Kind)
             {
                 case IdsFacetKind.Entity:
-                    return facet.Name.Accepts(element.IfcEntity)
-                           && (facet.Container == null || facet.Container.IsAny || facet.Container.Accepts(element.PredefinedType));
+                    // IDS 1.0 viết tên lớp bằng CHỮ HOA (IFCWALL) và so phân biệt hoa thường; đường Revit trả
+                    // "IfcWall" nên nâng phía mô hình lên chữ hoa. IDS viết "IfcWall" là file sai chuẩn — không khớp.
+                    return facet.Name.Accepts(element.IfcEntity.ToUpperInvariant())
+                           && (facet.Container == null || facet.Container.IsAny || facet.Container.Accepts(element.PredefinedType)
+                               || (element is IIdsElementDetails details && details.PredefinedTypeIsUserDefined && facet.Container.Accepts("USERDEFINED")));
 
                 case IdsFacetKind.Attribute:
                     // Tên thuộc tính trong IDS là một RÀNG BUỘC, không nhất thiết là một tên cụ thể
@@ -273,6 +309,15 @@ namespace DhcbTools.Shared.Logic.Ids
                     return element.Materials.Any(material => facet.Value.Accepts(material));
 
                 default:
+                    if (facet.Container != null && !facet.Container.IsAny)
+                    {
+                        // predefinedType của tổ tiên chỉ đường IFC biết; phần tử không có thông tin đó thì trượt.
+                        return element is IIdsElementDetails withTypes
+                               && withTypes.PartOfWithPredefinedType.Any(parent =>
+                                   (facet.Relation == null || string.Equals(parent.Relation, facet.Relation, StringComparison.OrdinalIgnoreCase))
+                                   && facet.Value.Accepts(parent.Entity) && facet.Container.Accepts(parent.PredefinedType));
+                    }
+
                     // facet.Relation null: chấp nhận entry nào cũng được (relation bất kỳ, kể cả entry
                     // "trộn" tự Relation null của IfcIdsElement). Có khai relation: chỉ entry ĐÚNG quan hệ
                     // đó — không rơi về entry "trộn", vì entry trộn không chứng minh được đúng MỘT loại

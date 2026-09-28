@@ -26,9 +26,8 @@ namespace DhcbTools.Shared.Logic.Ids
         /// <summary>Dòng tổng kết dùng chung cho summary lệnh và dòng cuối console.</summary>
         public static string Summary(IdsCheckResult check, IReadOnlyList<string> schemaWarnings)
         {
-            var failedSpecs = check.Specifications.Count(s => s.Failed > 0);
             return $"Kiểm {check.ElementCount} phần tử theo {check.Specifications.Count} specification: "
-                   + $"{check.FailureCount} phần tử không đạt ở {failedSpecs} specification"
+                   + $"{check.FailureCount} phần tử không đạt, {check.FailedSpecificationCount} specification không đạt"
                    + (check.EmptySpecificationCount > 0 ? $", {check.EmptySpecificationCount} specification không có phần tử nào để kiểm" : string.Empty)
                    + (schemaWarnings.Count > 0 ? $"; file IDS lệch chuẩn ở {schemaWarnings.Count} chỗ (xem cảnh báo)" : string.Empty);
         }
@@ -54,9 +53,11 @@ namespace DhcbTools.Shared.Logic.Ids
                 }
 
                 var head = $"{spec.Name}: {spec.Passed}/{spec.Applicable} đạt";
-                yield return spec.NoApplicableElements
-                    ? $"{spec.Name}: KHÔNG phần tử nào lọt bộ lọc — con số này nói về bộ lọc hoặc về mô hình thiếu nhóm đó, không phải \"đạt\"."
-                    : head + (spec.Failed > 0 ? $", {spec.Failed} phần tử không đạt" : string.Empty);
+                yield return spec.MissingRequired
+                    ? $"{spec.Name}: KHÔNG phần tử nào lọt bộ lọc — specification bắt buộc nên tính là KHÔNG ĐẠT (mô hình thiếu nhóm đó, hoặc bộ lọc sai). Nhóm này không bắt buộc thì khai minOccurs=\"0\" trên <applicability>."
+                    : spec.NoApplicableElements
+                        ? $"{spec.Name}: KHÔNG phần tử nào lọt bộ lọc — specification tuỳ chọn/cấm nên không tính là lỗi."
+                        : head + (spec.Failed > 0 ? $", {spec.Failed} phần tử không đạt" : string.Empty);
             }
 
             foreach (var failure in check.Specifications.SelectMany(s => s.Failures).Take(20))
@@ -124,9 +125,11 @@ namespace DhcbTools.Shared.Logic.Ids
                 sb.Append("</td><td>");
                 sb.Append(spec.Skipped
                     ? "<span class=\"trong\">" + HtmlText.Escape(spec.SkipReason!) + "</span>"
-                    : spec.NoApplicableElements
-                        ? "<span class=\"trong\">0 phần tử — không kiểm được gì</span>"
-                        : spec.Applicable.ToString(CultureInfo.InvariantCulture) + " phần tử");
+                    : spec.MissingRequired
+                        ? "<span class=\"truot\">0 phần tử — KHÔNG ĐẠT: specification bắt buộc phải có ít nhất một phần tử</span>"
+                        : spec.NoApplicableElements
+                            ? "<span class=\"trong\">0 phần tử — tuỳ chọn/cấm, không tính là lỗi</span>"
+                            : spec.Applicable.ToString(CultureInfo.InvariantCulture) + " phần tử");
                 sb.Append("</td><td class=\"dat\">").Append(spec.Passed.ToString(CultureInfo.InvariantCulture))
                   .Append("</td><td class=\"truot\">").Append(spec.Failed.ToString(CultureInfo.InvariantCulture))
                   .Append("</td></tr>");

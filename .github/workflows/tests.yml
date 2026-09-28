@@ -60,6 +60,18 @@ jobs:
         run: |
           dotnet test tests/DhcbTools.BatchRunner.Tests/DhcbTools.BatchRunner.Tests.csproj -c Release             --logger "trx;LogFileName=batchrunner-cli-results.trx"
 
+      # Bộ ca IDS chính thức của buildingSMART (334 cặp .ids/.ifc có sẵn kết quả đúng), ghim commit để kết quả
+      # không trôi theo repo của họ. Đỏ khi một ca NGOÀI tests/ids-buildingsmart/known-gaps.txt lệch — tức hồi
+      # quy so với chuẩn; ca trong danh sách mà nay khớp thì chỉ nhắc xoá dòng. Chạy sau bước trên vì cần
+      # BatchRunner đã build (--verify-ifc/--verify-ids). Xem docs/kiem-ids.md.
+      - name: Đối chiếu bộ ca IDS của buildingSMART
+        run: |
+          git init --quiet "$RUNNER_TEMP/bsids"
+          git -C "$RUNNER_TEMP/bsids" fetch --quiet --depth 1 https://github.com/buildingSMART/IDS.git 870f9c4e6e8f414e737b4d84ca1aa9b46fc6c8f3
+          git -C "$RUNNER_TEMP/bsids" checkout --quiet FETCH_HEAD -- Documentation/ImplementersDocumentation/TestCases
+          python3 scripts/ids-conformance.py "$RUNNER_TEMP/bsids/Documentation/ImplementersDocumentation/TestCases" \
+            --runner src/DhcbTools.BatchRunner/bin/Release/net10.0/DhcbTools.BatchRunner.dll
+
       - name: Tải kết quả test
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

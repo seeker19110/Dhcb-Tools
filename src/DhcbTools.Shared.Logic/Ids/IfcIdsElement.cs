@@ -28,6 +28,9 @@ namespace DhcbTools.Shared.Logic.Ids
         private readonly Dictionary<int, List<KeyValuePair<string, string>>> _classifications = new Dictionary<int, List<KeyValuePair<string, string>>>();
         private readonly Dictionary<int, List<(string? Relation, string Entity)>> _partOf = new Dictionary<int, List<(string?, string)>>();
 
+        /// <summary>Như <see cref="_partOf"/> nhưng giữ số hiệu tổ tiên — để đọc PredefinedType của nó.</summary>
+        private readonly Dictionary<int, List<(string? Relation, int Parent)>> _partOfIds = new Dictionary<int, List<(string?, int)>>();
+
         private IfcIdsModel(IfcModel model)
         {
             _model = model;
@@ -39,6 +42,9 @@ namespace DhcbTools.Shared.Logic.Ids
 
         /// <summary>Đọc file IFC (nội dung văn bản) và dựng sẵn các bảng tra.</summary>
         public static IfcIdsModel Parse(string text) => new IfcIdsModel(IfcModel.Parse(text));
+
+        /// <summary>Dựng bảng tra trên một mô hình đã đọc (dùng chung với <see cref="IfcChecker"/>, không đọc lại file).</summary>
+        public static IfcIdsModel From(IfcModel model) => new IfcIdsModel(model ?? throw new ArgumentNullException(nameof(model)));
 
         /// <summary>Mô hình IFC bên dưới.</summary>
         public IfcModel Model => _model;
@@ -83,6 +89,20 @@ namespace DhcbTools.Shared.Logic.Ids
 
         internal IReadOnlyList<(string? Relation, string Entity)> PartOfOf(int id) =>
             _partOf.TryGetValue(id, out var list) ? list : (IReadOnlyList<(string?, string)>)Array.Empty<(string?, string)>();
+
+        internal IEnumerable<(string? Relation, string Entity, string PredefinedType)> PartOfWithPredefinedTypeOf(int id)
+        {
+            if (!_partOfIds.TryGetValue(id, out var list))
+            {
+                yield break;
+            }
+
+            foreach (var (relation, parent) in list)
+            {
+                var entity = _model.ById(parent)!;
+                yield return (relation, entity.Type, new IfcIdsElement(this, entity).PredefinedType);
+            }
+        }
 
         private void BuildTypes()
         {
@@ -145,8 +165,12 @@ namespace DhcbTools.Shared.Logic.Ids
 
                 switch (entity.Type.ToUpperInvariant())
                 {
-                    case "IFCMATERIAL": // (Name, Description, Category)
+                    // IDS: facet material khớp Name hoặc Category của vật liệu, và Name/LayerSetName của bộ
+                    // lớp/thành phần/profile. Bản cũ bỏ sót Category của IfcMaterial và tên các bộ — 6 ca "pass"
+                    // của buildingSMART trượt (a_material_category_may_pass…, a_layer_set_name_will_pass…).
+                    case "IFCMATERIAL": // (Name, Description, Category) — IFC2X3 chỉ có Name
                         Add(entity.At(0).AsText());
+                        Add(entity.At(2).AsText());
                         break;
                     case "IFCMATERIALLAYERSETUSAGE": // (ForLayerSet, …)
                     case "IFCMATERIALPROFILESETUSAGE": // (ForProfileSet, …)
@@ -154,6 +178,7 @@ namespace DhcbTools.Shared.Logic.Ids
                         break;
                     case "IFCMATERIALLAYERSET": // (MaterialLayers, LayerSetName, Description)
                         foreach (var r in References(entity.At(0))) { AddAll(r); }
+                        Add(entity.At(1).AsText());
                         break;
                     case "IFCMATERIALLAYER": // (Material, LayerThickness, IsVentilated, Name, Description, Category, Priority)
                         foreach (var r in References(entity.At(0))) { AddAll(r); }
@@ -163,6 +188,7 @@ namespace DhcbTools.Shared.Logic.Ids
                     case "IFCMATERIALCONSTITUENTSET": // (Name, Description, MaterialConstituents)
                     case "IFCMATERIALPROFILESET": // (Name, Description, MaterialProfiles, CompositeProfile)
                         foreach (var r in References(entity.At(2))) { AddAll(r); }
+                        Add(entity.At(0).AsText());
                         break;
                     case "IFCMATERIALCONSTITUENT": // (Name, Description, Material, Fraction, Category)
                         Add(entity.At(0).AsText());
@@ -456,17 +482,16 @@ namespace DhcbTools.Shared.Logic.Ids
 
             // Chuỗi THUẦN một loại quan hệ: đi tới hết theo đúng một bảng cha-con, dừng khi hết cạnh hoặc
             // gặp lại (chắn vòng lặp — mô hình lỗi có thể tự tham chiếu).
-            List<string> WalkSingle(IReadOnlyDictionary<int, int> parentOf, int start)
+            List<int> WalkSingle(IReadOnlyDictionary<int, int> parentOf, int start)
             {
-                var list = new List<string>();
+                var list = new List<int>();
                 var visited = new HashSet<int> { start };
                 var current = start;
                 while (parentOf.TryGetValue(current, out var next) && visited.Add(next))
                 {
-                    var entity = _model.ById(next);
-                    if (entity != null && !list.Contains(entity.Type))
+                    if (_model.ById(next) != null)
                     {
-                        list.Add(entity.Type);
+                        list.Add(next);
                     }
 
                     current = next;
@@ -476,9 +501,9 @@ namespace DhcbTools.Shared.Logic.Ids
             }
 
             // Chuỗi THUẦN của quan hệ có thể rẽ nhánh (nhóm/hệ): BFS qua đúng một bảng, có thể nhiều cha.
-            List<string> WalkMulti(IReadOnlyDictionary<int, List<int>> parentsOf, int start)
+            List<int> WalkMulti(IReadOnlyDictionary<int, List<int>> parentsOf, int start)
             {
-                var list = new List<string>();
+                var list = new List<int>();
                 var visited = new HashSet<int> { start };
                 var queue = new Queue<int>();
                 queue.Enqueue(start);
@@ -496,10 +521,9 @@ namespace DhcbTools.Shared.Logic.Ids
                             continue;
                         }
 
-                        var entity = _model.ById(parent);
-                        if (entity != null && !list.Contains(entity.Type))
+                        if (_model.ById(parent) != null)
                         {
-                            list.Add(entity.Type);
+                            list.Add(parent);
                         }
 
                         queue.Enqueue(parent);
@@ -525,16 +549,15 @@ namespace DhcbTools.Shared.Logic.Ids
                 }
             }
 
-            void AddMixedAncestors(List<string> list, int start)
+            void AddMixedAncestors(List<int> list, int start)
             {
                 var guard = 0;
                 var current = start;
                 while (guard++ < 64)
                 {
-                    var entity = _model.ById(current);
-                    if (entity != null && !list.Contains(entity.Type))
+                    if (_model.ById(current) != null && !list.Contains(current))
                     {
-                        list.Add(entity.Type);
+                        list.Add(current);
                     }
 
                     if (!singleParent.TryGetValue(current, out var next))
@@ -553,10 +576,10 @@ namespace DhcbTools.Shared.Logic.Ids
                 }
             }
 
-            var mixed = new Dictionary<int, List<string>>();
+            var mixed = new Dictionary<int, List<int>>();
             foreach (var id in contained.Keys.Concat(singleParent.Keys).Distinct())
             {
-                var list = new List<string>();
+                var list = new List<int>();
                 if (singleParent.TryGetValue(id, out var parent))
                 {
                     AddMixedAncestors(list, parent);
@@ -576,16 +599,15 @@ namespace DhcbTools.Shared.Logic.Ids
             {
                 if (!mixed.TryGetValue(pair.Key, out var list))
                 {
-                    list = new List<string>();
+                    list = new List<int>();
                     mixed[pair.Key] = list;
                 }
 
                 foreach (var groupId in pair.Value)
                 {
-                    var group = _model.ById(groupId);
-                    if (group != null && !list.Contains(group.Type))
+                    if (_model.ById(groupId) != null && !list.Contains(groupId))
                     {
-                        list.Add(group.Type);
+                        list.Add(groupId);
                     }
                 }
             }
@@ -595,18 +617,20 @@ namespace DhcbTools.Shared.Logic.Ids
 
             foreach (var id in everyChild)
             {
-                var entries = new List<(string?, string)>();
+                var entries = new List<(string?, int)>();
                 if (mixed.TryGetValue(id, out var mixedList))
                 {
-                    entries.AddRange(mixedList.Select(type => ((string?)null, type)));
+                    entries.AddRange(mixedList.Select(parent => ((string?)null, parent)));
                 }
 
-                entries.AddRange(WalkSingle(aggregates, id).Select(type => ((string?)IdsRelations.Aggregates, type)));
-                entries.AddRange(WalkSingle(nests, id).Select(type => ((string?)IdsRelations.Nests, type)));
-                entries.AddRange(WalkSingle(contained, id).Select(type => ((string?)IdsRelations.ContainedInSpatialStructure, type)));
-                entries.AddRange(WalkMulti(groups, id).Select(type => ((string?)IdsRelations.AssignsToGroup, type)));
-                entries.AddRange(WalkSingle(voidsAndFills, id).Select(type => ((string?)IdsRelations.VoidsAndFills, type)));
-                _partOf[id] = entries;
+                entries.AddRange(WalkSingle(aggregates, id).Select(parent => ((string?)IdsRelations.Aggregates, parent)));
+                entries.AddRange(WalkSingle(nests, id).Select(parent => ((string?)IdsRelations.Nests, parent)));
+                entries.AddRange(WalkSingle(contained, id).Select(parent => ((string?)IdsRelations.ContainedInSpatialStructure, parent)));
+                entries.AddRange(WalkMulti(groups, id).Select(parent => ((string?)IdsRelations.AssignsToGroup, parent)));
+                entries.AddRange(WalkSingle(voidsAndFills, id).Select(parent => ((string?)IdsRelations.VoidsAndFills, parent)));
+                _partOfIds[id] = entries;
+                // Danh sách theo tên lớp: mỗi (quan hệ, lớp) một lần, giữ thứ tự gặp đầu — y như bản trước.
+                _partOf[id] = entries.Select(e => (e.Item1, _model.ById(e.Item2)!.Type)).Distinct().ToList();
             }
         }
 
@@ -647,7 +671,7 @@ namespace DhcbTools.Shared.Logic.Ids
     }
 
     /// <summary>Một thực thể IFC nhìn dưới con mắt IDS. Toàn bộ chỗ dịch IFC → IDS nằm ở đây.</summary>
-    public sealed class IfcIdsElement : IIdsElement
+    public sealed class IfcIdsElement : IIdsElement, IIdsElementDetails
     {
         // Vị trí tham số theo lược đồ IFC — giống nhau ở mọi lớp con của IfcObject/IfcTypeObject:
         // IfcRoot: GlobalId 0, OwnerHistory 1, Name 2, Description 3. IfcObject: ObjectType 4.
@@ -701,6 +725,11 @@ namespace DhcbTools.Shared.Logic.Ids
             // IFC2X3 IfcDoorStyle/IfcWindowStyle không có PredefinedType (vị trí 9 là OperationType/ConstructionType).
             ["IFCDOORSTYLE"] = -1,
             ["IFCWINDOWSTYLE"] = -1,
+            // Nhóm/hệ (IfcGroup → IfcObject: GlobalId…ObjectType 0–4) — không có Tag nên PredefinedType sớm hơn.
+            ["IFCINVENTORY"] = 5,
+            ["IFCBUILDINGSYSTEM"] = 5,
+            ["IFCDISTRIBUTIONSYSTEM"] = 6,
+            ["IFCDISTRIBUTIONCIRCUIT"] = 6,
         };
 
         /// <summary>Lớp không gian: vị trí 7 là LongName, không phải Tag.</summary>
@@ -803,17 +832,18 @@ namespace DhcbTools.Shared.Logic.Ids
         }
 
         /// <summary>
-        /// Boolean/logical trong STEP là <c>.T.</c>/<c>.F.</c>/<c>.U.</c>; IDS (và IfcTester) so với
-        /// <c>TRUE</c>/<c>FALSE</c>. Không đổi thì "IsExternal = FALSE" trượt cả 1078 tường trong khi IfcTester
-        /// cho 590 đạt (§41). <c>UNKNOWN</c> giữ chữ — IfcTester coi nó là rỗng, tức không đạt.
+        /// Boolean/logical trong STEP là <c>.T.</c>/<c>.F.</c>/<c>.U.</c>; IDS 1.0 viết boolean bằng chữ thường
+        /// <c>true</c>/<c>false</c> (dạng chuẩn XSD) và so phân biệt hoa thường. Không đổi thì "IsExternal = false"
+        /// trượt cả 1078 tường trong khi IfcTester cho 590 đạt (§41). <c>.U.</c> (logical unknown) coi như KHÔNG
+        /// có giá trị — IDS: "a logical unknown is considered false and will not pass".
         /// </summary>
         private static string? NormalizeText(string? text)
         {
             switch (text)
             {
-                case "T": return "TRUE";
-                case "F": return "FALSE";
-                case "U": return "UNKNOWN";
+                case "T": return "true";
+                case "F": return "false";
+                case "U": return null;
                 default: return text;
             }
         }
@@ -842,6 +872,25 @@ namespace DhcbTools.Shared.Logic.Ids
 
         /// <summary>Tên lớp của tầng/toà nhà/tổ hợp/hệ chứa phần tử.</summary>
         public IEnumerable<(string? Relation, string Entity)> PartOf => _model.PartOfOf(_entity.Id);
+
+        /// <summary>Như <see cref="PartOf"/>, kèm PredefinedType của từng tổ tiên (facet partOf khai predefinedType).</summary>
+        public IEnumerable<(string? Relation, string Entity, string PredefinedType)> PartOfWithPredefinedType =>
+            _model.PartOfWithPredefinedTypeOf(_entity.Id);
+
+        /// <summary>PredefinedType gốc (ở phần tử, hoặc ở kiểu khi phần tử để NOTDEFINED) là <c>USERDEFINED</c>.</summary>
+        public bool PredefinedTypeIsUserDefined
+        {
+            get
+            {
+                var own = EnumAfter(_entity, IsType(_entity) ? ElementTypeIndex : TagIndex);
+                if (own == "USERDEFINED")
+                {
+                    return true;
+                }
+
+                return (string.IsNullOrEmpty(own) || own == "NOTDEFINED") && _type != null && EnumAfter(_type, ElementTypeIndex) == "USERDEFINED";
+            }
+        }
 
         /// <summary>IfcTypeProduct: tên kết thúc "TYPE", cộng hai lớp IFC2X3 đặt tên khác (IfcDoorStyle/IfcWindowStyle).</summary>
         private static bool IsType(IfcEntity entity) =>

@@ -16,7 +16,7 @@ public class IdsSchemaLintTests
         "<ids " + ns + ">\n<info><title>t</title></info>\n<specifications>\n" + specs + "\n</specifications>\n</ids>";
 
     private const string GoodSpec =
-        "<specification name=\"Cửa có Tag\" ifcVersion=\"IFC4\">\n<applicability><entity><name><simpleValue>IfcDoor</simpleValue></name></entity></applicability>\n"
+        "<specification name=\"Cửa có Tag\" ifcVersion=\"IFC4\">\n<applicability><entity><name><simpleValue>IFCDOOR</simpleValue></name></entity></applicability>\n"
         + "<requirements><attribute><name><simpleValue>Tag</simpleValue></name></attribute>\n"
         + "<material><value><xs:restriction base=\"xs:string\"><xs:pattern value=\".+\"/></xs:restriction></value></material></requirements>\n</specification>";
 
@@ -85,8 +85,8 @@ public class IdsSchemaLintTests
     public void FacetSaiThuTuTrongApplicability_CanhBao_NhungRequirementsThiTuDo()
     {
         var spec = GoodSpec.Replace(
-            "<applicability><entity><name><simpleValue>IfcDoor</simpleValue></name></entity></applicability>",
-            "<applicability><attribute><name><simpleValue>Tag</simpleValue></name></attribute><entity><name><simpleValue>IfcDoor</simpleValue></name></entity></applicability>");
+            "<applicability><entity><name><simpleValue>IFCDOOR</simpleValue></name></entity></applicability>",
+            "<applicability><attribute><name><simpleValue>Tag</simpleValue></name></attribute><entity><name><simpleValue>IFCDOOR</simpleValue></name></entity></applicability>");
         var warnings = IdsSchemaLint.Check(Wrap(spec));
         Assert.Contains(warnings, w => w.Contains("<entity> đứng sai thứ tự trong <applicability>"));
         // GoodSpec bên requirements có attribute rồi material — đúng thứ tự; đảo lại cũng không kêu.
@@ -141,7 +141,7 @@ public class IdsSchemaLintTests
     public void ThieuInfo_ThieuName_SpecKhongNamTrucTiep_RequirementsTruocApplicability()
     {
         var spec = GoodSpec.Replace(" name=\"Cửa có Tag\"", string.Empty);
-        var appl = "<applicability><entity><name><simpleValue>IfcDoor</simpleValue></name></entity></applicability>";
+        var appl = "<applicability><entity><name><simpleValue>IFCDOOR</simpleValue></name></entity></applicability>";
         var i = spec.IndexOf(appl);
         var j = spec.IndexOf("<requirements>");
         var k = spec.IndexOf("</requirements>") + "</requirements>".Length;
@@ -158,8 +158,8 @@ public class IdsSchemaLintTests
     public void ThieuApplicability_FacetLa_HaiEntity_EntityCoCardinality()
     {
         var xml = Wrap(
-            "<specification name=\"a\" ifcVersion=\"IFC4\"><requirements><foo/><entity cardinality=\"required\"><name><simpleValue>IfcWall</simpleValue></name></entity></requirements></specification>"
-            + "<specification name=\"b\" ifcVersion=\"IFC4\"><applicability><entity><name><simpleValue>IfcWall</simpleValue></name></entity>"
+            "<specification name=\"a\" ifcVersion=\"IFC4\"><requirements><foo/><entity cardinality=\"required\"><name><simpleValue>IFCWALL</simpleValue></name></entity></requirements></specification>"
+            + "<specification name=\"b\" ifcVersion=\"IFC4\"><applicability><entity><name><simpleValue>IFCWALL</simpleValue></name></entity>"
             + "<entity><name><simpleValue>IfcSlab</simpleValue></name></entity></applicability>"
             + "<requirements><attribute><name><simpleValue>Tag</simpleValue></name></attribute></requirements></specification>");
         var warnings = IdsSchemaLint.Check(xml);
@@ -230,5 +230,15 @@ public class IdsSchemaLintTests
 
         Assert.NotNull(dir);
         return System.IO.Path.Combine(dir!, "tests", "suites", "fixtures");
+    }
+    [Fact]
+    public void TenLopKhongVietHoa_CanhBao()
+    {
+        var warnings = IdsSchemaLint.Check(Wrap(
+            "<specification name=\"x\" ifcVersion=\"IFC4\"><applicability><entity><name><simpleValue>IfcWall</simpleValue></name></entity></applicability>"
+            + "<requirements><entity><name><xs:restriction base=\"xs:string\"><xs:enumeration value=\"IFCWALL\"/><xs:enumeration value=\"IfcSlab\"/></xs:restriction></name></entity></requirements></specification>"));
+        Assert.Contains(warnings, w => w.Contains("tên lớp \"IfcWall\" phải viết HOA (IFCWALL)"));
+        Assert.Contains(warnings, w => w.Contains("tên lớp \"IfcSlab\" phải viết HOA (IFCSLAB)"));
+        Assert.DoesNotContain(warnings, w => w.Contains("\"IFCWALL\" phải"));
     }
 }

@@ -80,9 +80,8 @@ public static partial class Program
     /// <summary>
     /// <c>--verify-ifc … --verify-ids &lt;file.ids&gt;</c>: kiểm <b>chính file IFC</b> theo IDS (mục 11.4) — cùng đầu
     /// vào mà IfcTester/Solibri đọc, nên đối chiếu được từng dòng với họ; và chạy trên CI không cần Revit.
-    /// Mã thoát: 0 không phần tử nào không đạt · 1 có phần tử không đạt · 2 không có file hay file IDS hỏng.
-    /// Specification không có phần tử nào để kiểm KHÔNG làm mã thoát thành 1 — nhưng được in ra, vì "0 không đạt"
-    /// ở đó nói về bộ lọc chứ không nói về mô hình.
+    /// Mã thoát: 0 mọi specification đạt · 1 có specification không đạt (phần tử trượt, hoặc specification bắt
+    /// buộc mà không phần tử nào lọt bộ lọc — IDS 1.0 tính là trượt) · 2 không có file hay file IDS hỏng.
     /// </summary>
     internal static int VerifyIds(string ifcPath, string idsPath, string? reportPath)
     {
@@ -146,7 +145,7 @@ public static partial class Program
         }
 
         Console.WriteLine(IdsReport.Summary(check, schemaWarnings) + (string.IsNullOrEmpty(reportPath) ? "." : $" → \"{reportPath}\"."));
-        return check.FailureCount > 0 ? 1 : 0;
+        return check.AllPassed ? 0 : 1;
     }
 
     /// <summary>
