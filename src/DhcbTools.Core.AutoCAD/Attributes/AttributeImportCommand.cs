@@ -39,6 +39,8 @@ public sealed class AttributeImportCommand : ICoreCommand<AttributeImportConfig>
         var result = CommandResult.Ok(string.Empty);
 
         using var transaction = database.TransactionManager.StartTransaction();
+        var lockedLayers = AcadHelpers.LockedLayerIds(database, transaction);
+        var lockedSkips = new LockedLayerSkips();
 
         for (var i = 1; i < lines.Count; i++)
         {
@@ -66,6 +68,15 @@ public sealed class AttributeImportCommand : ICoreCommand<AttributeImportConfig>
                 continue;
             }
 
+            // Block đã xoá sau lúc xuất CSV: handle VẪN tra ra ObjectId (đối tượng xoá còn trong database tới khi lưu và
+            // mở lại), và GetObject ném eWasErased — bản cũ vì thế sập cả lệnh thay vì bỏ qua một dòng.
+            if (objectId.IsErased)
+            {
+                result.Messages.Add($"Bỏ qua dòng {i + 1}: Block Handle \"{handleText}\" đã bị xoá khỏi bản vẽ.");
+                skipped++;
+                continue;
+            }
+
             if (transaction.GetObject(objectId, OpenMode.ForRead) is not BlockReference blockRef)
             {
                 result.Messages.Add($"Bỏ qua dòng {i + 1}: Handle \"{handleText}\" không phải Block Reference.");
@@ -73,47 +84,71 @@ public sealed class AttributeImportCommand : ICoreCommand<AttributeImportConfig>
                 continue;
             }
 
-            var found = false;
-
+            var matches = new List<AttributeReference>();
             foreach (ObjectId attId in blockRef.AttributeCollection)
             {
-                var attRef = (AttributeReference)transaction.GetObject(attId, OpenMode.ForRead);
-                if (!string.Equals(attRef.Tag, tag, StringComparison.OrdinalIgnoreCase))
+                var candidate = (AttributeReference)transaction.GetObject(attId, OpenMode.ForRead);
+                if (string.Equals(candidate.Tag, tag, StringComparison.OrdinalIgnoreCase))
                 {
-                    continue;
+                    matches.Add(candidate);
                 }
-
-                found = true;
-
-                // Giá trị trùng thì không đụng vào: mở ForWrite một attribute là làm bẩn drawing và
-                // đẩy một mục vào undo, dù không đổi gì.
-                if (string.Equals(attRef.TextString, value, StringComparison.Ordinal))
-                {
-                    unchanged++;
-                    break;
-                }
-
-                if (config.DryRun)
-                {
-                    result.Messages.Add($"[Xem trước] Handle {handleText} — {tag}: \"{attRef.TextString}\" → \"{value}\"");
-                }
-                else
-                {
-                    attRef.UpgradeOpen();
-                    attRef.TextString = value;
-                    // Attribute canh giữa/Fit/Aligned giữ hình học canh cũ sau khi đổi chữ — tag lệch khỏi bong bóng.
-                    attRef.AdjustAlignment(database);
-                }
-
-                updated++;
-                break;
             }
 
-            if (!found)
+            if (matches.Count == 0)
             {
                 result.Messages.Add($"Bỏ qua dòng {i + 1}: Block Handle \"{handleText}\" không có attribute tag \"{tag}\".");
                 skipped++;
+                continue;
             }
+
+            if (matches.Count > 1)
+            {
+                // AutoCAD cho phép hai attribute cùng tag trong một block, và AttributeExport xuất cả hai dòng cùng
+                // (Handle, Tag). Bản cũ ghi mọi dòng vào attribute ĐẦU TIÊN: nhập lại nguyên file vừa xuất là đủ để
+                // attribute đầu nhận giá trị của attribute sau, im lặng. Không đoán dòng nào ứng với attribute nào.
+                result.Messages.Add(
+                    $"Bỏ qua dòng {i + 1}: Block Handle \"{handleText}\" có {matches.Count} attribute cùng tag \"{tag}\" — "
+                    + "không biết dòng này ứng với attribute nào; sửa trực tiếp trong AutoCAD.");
+                skipped++;
+                continue;
+            }
+
+            var attRef = matches[0];
+
+            // Giá trị trùng thì không đụng vào: mở ForWrite một attribute là làm bẩn drawing và
+            // đẩy một mục vào undo, dù không đổi gì.
+            if (string.Equals(attRef.TextString, value, StringComparison.Ordinal))
+            {
+                unchanged++;
+                continue;
+            }
+
+            if (lockedLayers.Contains(attRef.LayerId))
+            {
+                // UpgradeOpen trên layer khoá ném eOnLockedLayer — sập cả lệnh. Xem trước cũng bỏ qua để hai con số khớp.
+                lockedSkips.Add(attRef.Layer);
+                skipped++;
+                continue;
+            }
+
+            if (config.DryRun)
+            {
+                result.Messages.Add($"[Xem trước] Handle {handleText} — {tag}: \"{attRef.TextString}\" → \"{value}\"");
+            }
+            else
+            {
+                attRef.UpgradeOpen();
+                attRef.TextString = value;
+                // Attribute canh giữa/Fit/Aligned giữ hình học canh cũ sau khi đổi chữ — tag lệch khỏi bong bóng.
+                attRef.AdjustAlignment(database);
+            }
+
+            updated++;
+        }
+
+        if (lockedSkips.Message("attribute") is { } lockedNote)
+        {
+            result.Messages.Insert(0, lockedNote);
         }
 
         if (unchanged > 0)

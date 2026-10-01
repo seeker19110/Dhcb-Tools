@@ -6,7 +6,7 @@ using DhcbTools.Shared.Logic.Cad;
 namespace DhcbTools.Core.AutoCAD.LayerTools;
 
 /// <summary>
-/// Đổi layer của mọi entity từ Source sang Target theo bảng map CSV — tương đương LAYTRANS.
+/// Đổi layer của mọi entity (và attribute của block reference) từ Source sang Target theo bảng map CSV — tương đương LAYTRANS.
 /// Tạo Target nếu chưa tồn tại (copy Color/Linetype/Lineweight/Plottable từ CSV nếu có; linetype chưa có
 /// trong drawing thì nạp từ acad.lin, nạp không được thì BÁO). Sau khi chuyển, tuỳ chọn xoá layer Source
 /// nếu không còn entity nào tham chiếu.
@@ -112,7 +112,33 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
             .ToDictionary(g => g.Key, g => g.First().Target, StringComparer.OrdinalIgnoreCase);
 
         var blockTable = (BlockTable)transaction.GetObject(database.BlockTableId, OpenMode.ForRead);
+        var lockedLayers = AcadHelpers.LockedLayerIds(database, transaction);
+        var lockedSkips = new LockedLayerSkips();
         var skippedBlocks = 0;
+
+        // Đổi layer của một entity hoặc attribute nếu layer của nó có trong bảng map. Layer khoá: bỏ qua + đếm
+        // (UpgradeOpen trên layer khoá ném eOnLockedLayer, cả lệnh sập) — CollectUsedLayerNamesAfterMap xét đúng tập này.
+        void Translate(Entity ent)
+        {
+            if (!sourceToTarget.TryGetValue(ent.Layer, out var target))
+            {
+                return;
+            }
+
+            if (lockedLayers.Contains(ent.LayerId))
+            {
+                lockedSkips.Add(ent.Layer);
+                return;
+            }
+
+            if (!config.DryRun)
+            {
+                ent.UpgradeOpen();
+                ent.Layer = target;
+            }
+
+            changedCount++;
+        }
 
         foreach (ObjectId blockId in blockTable)
         {
@@ -125,27 +151,36 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
 
             foreach (ObjectId entityId in block)
             {
-                var entity = transaction.GetObject(entityId, OpenMode.ForRead);
-                if (entity is not Entity ent || !sourceToTarget.TryGetValue(ent.Layer, out var target))
+                if (transaction.GetObject(entityId, OpenMode.ForRead) is not Entity ent)
                 {
                     continue;
                 }
 
-                if (config.DryRun)
-                {
-                    changedCount++;
-                    continue;
-                }
+                Translate(ent);
 
-                ent.UpgradeOpen();
-                ent.Layer = target;
-                changedCount++;
+                // AttributeReference thuộc BlockReference, KHÔNG nằm trong BlockTableRecord. Bản cũ bỏ sót: chữ khung tên
+                // ở lại layer cũ, và xem trước (vốn tính cả attribute) báo "xoá N layer nguồn" mà chạy thật xoá ít hơn.
+                if (ent is BlockReference blockRef)
+                {
+                    foreach (ObjectId attId in blockRef.AttributeCollection)
+                    {
+                        if (transaction.GetObject(attId, OpenMode.ForRead) is AttributeReference attRef)
+                        {
+                            Translate(attRef);
+                        }
+                    }
+                }
             }
         }
 
         if (skippedBlocks > 0)
         {
             report.Add($"Không đụng {skippedBlocks} block của xref/anonymous.");
+        }
+
+        if (lockedSkips.Message("entity/attribute") is { } lockedNote)
+        {
+            report.Add(lockedNote);
         }
 
         var deletedLayers = new List<string>();
@@ -155,7 +190,7 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
             // Xem trước chưa đổi layer của entity nên tập "đang dùng" thật vẫn chứa mọi layer nguồn → báo "xoá 0";
             // chạy thật rồi xoá 40 layer. Tính tập SAU khi đổi (áp bảng map lên entity ngoài block bảo vệ).
             var stillUsed = config.DryRun
-                ? AcadHelpers.CollectUsedLayerNamesAfterMap(database, transaction, sourceToTarget)
+                ? AcadHelpers.CollectUsedLayerNamesAfterMap(database, transaction, sourceToTarget, lockedLayers)
                 : AcadHelpers.CollectUsedLayerNames(database, transaction);
 
             foreach (var source in sourceToTarget.Keys)
@@ -194,7 +229,7 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
         {
             transaction.Abort();
             var preview = CommandResult.Ok(
-                $"[Xem trước] Sẽ đổi layer của {changedCount} entity, xoá {deletedLayers.Count} layer nguồn rỗng.",
+                $"[Xem trước] Sẽ đổi layer của {changedCount} đối tượng (entity + attribute), xoá {deletedLayers.Count} layer nguồn rỗng.",
                 changedCount);
             preview.Messages.AddRange(report);
             return preview;
@@ -203,7 +238,7 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
         transaction.Commit();
 
         var result = CommandResult.Ok(
-            $"Đã đổi layer của {changedCount} entity theo \"{config.MapCsvPath}\", xoá {deletedLayers.Count} layer nguồn rỗng.",
+            $"Đã đổi layer của {changedCount} đối tượng (entity + attribute) theo \"{config.MapCsvPath}\", xoá {deletedLayers.Count} layer nguồn rỗng.",
             changedCount);
         result.Messages.AddRange(report);
         return result;

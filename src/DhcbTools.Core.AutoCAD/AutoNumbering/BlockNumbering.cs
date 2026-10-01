@@ -106,87 +106,96 @@ internal static class BlockNumbering
             return CommandResult.Fail($"Số thứ tự vượt giới hạn int khi bắt đầu từ {request.StartNumber} bước {request.Step} cho {items.Count} block.");
         }
 
-        if (request.DryRun)
+        // Attribute đích của một block: khớp tag, hoặc attribute đầu tiên khi không khai tag. Xem trước và chạy thật dùng
+        // CÙNG một hàm để hai con số khớp nhau.
+        AttributeReference? Target(BlockReference blockRef)
         {
-            var preview = CommandResult.Ok(request.PreviewSummary(plan.Count), plan.Count);
-            // Xem trước phải nói trước block nào KHÔNG có attribute cần ghi — chạy thật mới lộ thì xem trước vô nghĩa (§57).
-            var missingAttr = 0;
-            var tagsPresent = new List<string>();
-            foreach (var (refId, _) in plan)
+            foreach (ObjectId attId in blockRef.AttributeCollection)
             {
-                var br = (BlockReference)transaction.GetObject(refId, OpenMode.ForRead);
-                var has = false;
-                foreach (ObjectId attId in br.AttributeCollection)
+                var attRef = (AttributeReference)transaction.GetObject(attId, OpenMode.ForRead);
+                if (string.IsNullOrEmpty(request.AttributeTag)
+                    || string.Equals(attRef.Tag, request.AttributeTag, StringComparison.OrdinalIgnoreCase))
                 {
-                    var att = (AttributeReference)transaction.GetObject(attId, OpenMode.ForRead);
-                    tagsPresent.Add(att.Tag);
-                    if (string.IsNullOrEmpty(request.AttributeTag) || string.Equals(att.Tag, request.AttributeTag, StringComparison.OrdinalIgnoreCase))
-                    {
-                        has = true;
-                    }
+                    return attRef;
                 }
-
-                if (!has) missingAttr++;
             }
 
-            var warning = BlockMessages.AttributeMissingWarning(missingAttr, plan.Count, request.AttributeTag, tagsPresent);
+            return null;
+        }
+
+        var lockedLayers = AcadHelpers.LockedLayerIds(database, transaction);
+        var lockedSkips = new LockedLayerSkips();
+        var updated = 0;
+        var unchanged = 0;
+        var missing = 0;
+        var tagsPresent = new List<string>();
+
+        foreach (var (refId, value) in plan)
+        {
+            var blockRef = (BlockReference)transaction.GetObject(refId, OpenMode.ForRead);
+            var attRef = Target(blockRef);
+            if (attRef is null)
+            {
+                // Xem trước phải nói trước block nào KHÔNG có attribute cần ghi — chạy thật mới lộ thì xem trước vô nghĩa (§57).
+                missing++;
+                foreach (ObjectId attId in blockRef.AttributeCollection)
+                {
+                    tagsPresent.Add(((AttributeReference)transaction.GetObject(attId, OpenMode.ForRead)).Tag);
+                }
+
+                continue;
+            }
+
+            if (string.Equals(attRef.TextString, value, StringComparison.Ordinal))
+            {
+                // Trước đây đếm cả attribute không đổi → "Đã đánh số 200/200" khi không ghi gì.
+                unchanged++;
+                continue;
+            }
+
+            if (lockedLayers.Contains(attRef.LayerId))
+            {
+                // UpgradeOpen trên layer khoá ném eOnLockedLayer — bản cũ sập cả lệnh vì một attribute.
+                lockedSkips.Add(attRef.Layer);
+                continue;
+            }
+
+            if (!request.DryRun)
+            {
+                attRef.UpgradeOpen();
+                attRef.TextString = value;
+                attRef.AdjustAlignment(database);
+            }
+
+            updated++;
+        }
+
+        var notes = new List<string>();
+        if (lockedSkips.Message("attribute") is { } lockedNote)
+        {
+            notes.Add(lockedNote);
+        }
+
+        if (request.DryRun)
+        {
+            transaction.Abort();
+            // Đếm đúng số attribute SẼ ghi (bỏ block thiếu attribute, attribute đã đúng số, layer khoá) — như chạy thật.
+            var preview = CommandResult.Ok(
+                request.PreviewSummary(updated) + (unchanged > 0 ? $" {unchanged} attribute đã đúng số, sẽ không ghi." : string.Empty),
+                updated);
+            var warning = BlockMessages.AttributeMissingWarning(missing, plan.Count, request.AttributeTag, tagsPresent);
             if (warning != null)
             {
                 preview.Messages.Add(warning);
             }
 
+            preview.Messages.AddRange(notes);
             foreach (var (refId, value) in plan)
             {
                 preview.Messages.Add($"{AcadHelpers.HandleOf(refId)}: \"{value}\"");
             }
 
-            transaction.Abort();
             return preview;
-        }
-
-        var updated = 0;
-        var unchanged = 0;
-        var missing = 0;
-
-        foreach (var (refId, value) in plan)
-        {
-            var blockRef = (BlockReference)transaction.GetObject(refId, OpenMode.ForRead);
-            var written = false;
-
-            foreach (ObjectId attId in blockRef.AttributeCollection)
-            {
-                var attRef = (AttributeReference)transaction.GetObject(attId, OpenMode.ForRead);
-
-                var matchByTag = !string.IsNullOrEmpty(request.AttributeTag)
-                    && string.Equals(attRef.Tag, request.AttributeTag, StringComparison.OrdinalIgnoreCase);
-                var matchFirst = string.IsNullOrEmpty(request.AttributeTag);
-
-                if (!matchByTag && !matchFirst)
-                {
-                    continue;
-                }
-
-                if (!string.Equals(attRef.TextString, value, StringComparison.Ordinal))
-                {
-                    attRef.UpgradeOpen();
-                    attRef.TextString = value;
-                    attRef.AdjustAlignment(database);
-                    updated++;
-                }
-                else
-                {
-                    // Trước đây đếm cả attribute không đổi → "Đã đánh số 200/200" khi không ghi gì.
-                    unchanged++;
-                }
-
-                written = true;
-                break;
-            }
-
-            if (!written)
-            {
-                missing++;
-            }
         }
 
         transaction.Commit();
@@ -199,6 +208,7 @@ internal static class BlockNumbering
                 : $"{missing} block không có attribute tag \"{request.AttributeTag}\" — bỏ qua.");
         }
 
+        result.Messages.AddRange(notes);
         return result;
     }
 }

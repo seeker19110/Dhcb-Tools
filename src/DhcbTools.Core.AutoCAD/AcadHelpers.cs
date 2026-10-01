@@ -68,13 +68,20 @@ internal static class AcadHelpers
     }
 
     /// <summary>
-    /// Như <see cref="CollectUsedLayerNames"/> nhưng tên layer của entity (ngoài block được bảo vệ) được thay theo
-    /// <paramref name="map"/> — để xem trước của LayerTranslate biết layer nguồn nào sẽ RỖNG sau khi đổi.
+    /// Như <see cref="CollectUsedLayerNames"/> nhưng tên layer của entity/attribute (ngoài block được bảo vệ, không nằm
+    /// trên layer khoá — đúng tập LayerTranslate thật sự đổi) được thay theo <paramref name="map"/> — để xem trước của
+    /// LayerTranslate biết layer nguồn nào sẽ RỖNG sau khi đổi.
     /// </summary>
-    public static HashSet<string> CollectUsedLayerNamesAfterMap(Database database, Transaction transaction, IReadOnlyDictionary<string, string> map)
+    public static HashSet<string> CollectUsedLayerNamesAfterMap(
+        Database database, Transaction transaction, IReadOnlyDictionary<string, string> map, ISet<ObjectId> lockedLayers)
     {
         var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var blockTable = (BlockTable)transaction.GetObject(database.BlockTableId, OpenMode.ForRead);
+
+        string After(bool protectedBlock, Entity entity) =>
+            !protectedBlock && !lockedLayers.Contains(entity.LayerId) && map.TryGetValue(entity.Layer, out var target)
+                ? target
+                : entity.Layer;
 
         foreach (ObjectId blockId in blockTable)
         {
@@ -87,14 +94,14 @@ internal static class AcadHelpers
                     continue;
                 }
 
-                used.Add(!protectedBlock && map.TryGetValue(entity.Layer, out var target) ? target : entity.Layer);
+                used.Add(After(protectedBlock, entity));
                 if (entity is BlockReference blockRef)
                 {
                     foreach (ObjectId attId in blockRef.AttributeCollection)
                     {
                         if (transaction.GetObject(attId, OpenMode.ForRead) is AttributeReference attRef)
                         {
-                            used.Add(!protectedBlock && map.TryGetValue(attRef.Layer, out var t2) ? t2 : attRef.Layer);
+                            used.Add(After(protectedBlock, attRef));
                         }
                     }
                 }
@@ -102,6 +109,25 @@ internal static class AcadHelpers
         }
 
         return used;
+    }
+
+    /// <summary>
+    /// ObjectId của mọi layer đang khoá. Mở để ghi một entity/attribute trên layer khoá thì AutoCAD ném
+    /// <c>eOnLockedLayer</c> và cả lệnh sập — lệnh ghi phải tra tập này rồi bỏ qua + báo (xem <c>LockedLayerSkips</c>).
+    /// </summary>
+    public static HashSet<ObjectId> LockedLayerIds(Database database, Transaction transaction)
+    {
+        var locked = new HashSet<ObjectId>();
+        var layerTable = (LayerTable)transaction.GetObject(database.LayerTableId, OpenMode.ForRead);
+        foreach (ObjectId layerId in layerTable)
+        {
+            if (((LayerTableRecord)transaction.GetObject(layerId, OpenMode.ForRead)).IsLocked)
+            {
+                locked.Add(layerId);
+            }
+        }
+
+        return locked;
     }
 
     /// <summary>
