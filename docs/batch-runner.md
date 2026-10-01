@@ -22,8 +22,13 @@ Xem [`jobs/nightly.sample.json`](../jobs/nightly.sample.json) (Revit) và
 - `saveMode`: `None` (đóng không lưu) · `Save` · `SaveAs` (lưu bản sao vào `outputFolder`, **mặc định**, không đụng bản gốc).
   ⚠️ **Đổi hành vi:** bên AutoCAD, `Save` nay **lưu đè file gốc thật** bằng `SAVEAS`; trước đây nó chỉ ghi một dòng log
   mà không lưu gì. Job cũ đang để `Save` vì tưởng vô hại thì phải đổi sang `None`/`SaveAs` trước khi chạy lại.
-- `saveOnError` (bool, mặc định `false`): batch Revit **không lưu** file có bước lỗi. Đặt `true` nếu muốn giữ lại phần
-  đã làm được của file lỗi.
+- `saveOnError` (bool, mặc định `false`): **không lưu** file có bước lỗi — cả Revit lẫn AutoCAD. Đặt `true` nếu muốn giữ
+  lại phần đã làm được của file lỗi.
+  Bên AutoCAD (từ audit 2026-10-01): script không tự bỏ được dòng `SAVEAS` khi một `DHCB_RUN` lỗi, nên khi
+  `saveOnError: false` script lưu vào file tạm **cạnh** file đích (`<tên>.dhcb-luu-<dấu giờ>.dwg`, cùng thư mục để đường dẫn
+  xref tương đối không đổi nghĩa), runner đọc log của file đó rồi mới thay đích; có bước lỗi, quá giờ hay accoreconsole
+  thoát khác 0 thì bỏ file tạm và ghi `Save:<mode>` *bỏ qua* kèm lý do. `Save` (ghi đè gốc) giữ bản trước ở `<tên>.bak`
+  như `SAVEAS` của AutoCAD vẫn làm. Trước bản sửa này, file AutoCAD có bước lỗi vẫn bị lưu đè.
 - `dwgVersion` (chuỗi, mặc định `"2018"`): phiên bản DWG cho `SAVEAS` bên AutoCAD.
 - `files[]`: `path`, `detachFromCentral`, `worksets` (chỉ mở các workset này), `onlySteps` (lọc step cho riêng file).
 - `steps[]`: `command` = đúng `CommandName` của Core (xem `dhcb_agent.py revit tools`), `config` = config của lệnh,
@@ -61,6 +66,10 @@ không mất giá trị. Bước AutoCAD dựng script trong thư mục làm vi�
 lượt chạy trong cùng một ngày không giẫm lên nhau.
 
 Mã thoát: `0` mọi step thành công · `1` có step lỗi/bỏ qua · `2` lỗi cấu hình (không đọc được job, không tìm thấy Revit).
+Mã cuối là mã **nặng hơn** giữa log và chính lượt chạy: Revit sập/bị kill giữa đêm thì log chỉ có dòng xanh của các file
+đã kịp chạy, nên runner ghi thêm một dòng `Revit` lỗi vào log và trả 1 (trước audit 2026-10-01 lượt đó ra mã 0).
+Cài bằng `scripts/install-nightly-task.ps1` thì runner là action **cuối** của task (bước dọn `don-ket-qua.ps1` chạy
+trước) — Task Scheduler lấy mã của action chạy sau cùng làm *Last Run Result*.
 
 ## Gói bàn giao (`handover`)
 

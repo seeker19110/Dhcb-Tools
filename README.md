@@ -167,7 +167,7 @@ Ngược lại `504` kèm `id` + `progressUrl` và nghĩa là **"có thể đã 
 để biết chắc. `/progress` có thêm trạng thái `abandoned` và cờ `started`; phản hồi `202` kèm `timeoutSeconds`.
 Lỗi `500` không trả nội dung exception ra ngoài nữa (chi tiết nằm trong log).
 
-**Truy vấn đọc (`POST /query`)** — Revit 17 loại, AutoCAD 15. Ngoài các truy vấn đếm/liệt kê cơ bản
+**Truy vấn đọc (`POST /query`)** — Revit 18 loại, AutoCAD 16 (kể cả `document_context`). Ngoài các truy vấn đếm/liệt kê cơ bản
 (`document_info`, `levels`, `views`, `sheets`, `rooms`, `elements`, `families`, `warnings`, `links`, `stats`)
 còn phần đủ để agent **nhìn, chỉ và kiểm** được kết quả: `parameters_of` (tham số của category, để dựng
 config không phải đoán), `element_geometry` (hộp bao, đường tâm, connector kèm tình trạng nối — toạ độ mm),
@@ -201,8 +201,9 @@ DhcbTools.BatchRunner.exe --job jobs\nightly.json --log-dir D:\DHCB\logs --max-m
 ```
 
 Ra `logs/{yyyy-MM-dd}/run-HHmmss.jsonl` (mỗi lượt chạy một file log), `report.html`, `warnings-summary.md`;
-mã thoát 0/1/2 cho Task Scheduler. Job có thêm `saveOnError` (mặc định `false`) và `dwgVersion` (mặc định `"2018"`);
-**bên AutoCAD `saveMode: "Save"` nay lưu đè file gốc thật**. Chi tiết:
+mã thoát 0/1/2 cho Task Scheduler. Job có thêm `saveOnError` (mặc định `false`: file có bước lỗi **không được lưu**, ở
+cả Revit lẫn AutoCAD) và `dwgVersion` (mặc định `"2018"`); **bên AutoCAD `saveMode: "Save"` nay lưu đè file gốc thật**
+(bản trước giữ ở `.bak`). Chi tiết:
 [`docs/batch-runner.md`](docs/batch-runner.md).
 
 ## Thư viện family cho nhiều phiên bản Revit

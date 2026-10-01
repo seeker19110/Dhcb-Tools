@@ -2,6 +2,12 @@
 
 Ảnh chụp tại thời điểm cập nhật gần nhất. Kế hoạch phía trước xem [`roadmap.md`](roadmap.md).
 
+> Bổ sung 2026-10-01: audit toàn diện lần ba — 17 mục đã sửa, đáng chú ý nhất: `RemoveUnusedViews` có thể xoá view
+> phụ thuộc, panel schedule và sheet chỉ có schedule **đang nằm trên sheet**; MCP server sập với câu tiếng Việt có "Đ"
+> trên Windows; batch AutoCAD bỏ qua `saveOnError` (lưu đè file gốc có bước lỗi); Revit sập giữa đêm vẫn ra mã thoát 0;
+> script cài task chạy đêm lỗi cú pháp trên Windows PowerShell 5.1. Xem
+> [audit-toan-dien-2026-10-01.md](audit-toan-dien-2026-10-01.md), gồm phần cần chạy lại trong Revit/AutoCAD.
+
 > Bổ sung 2026-09-28: audit bảo mật/quy trình/công cụ — Bridge không còn bị trang web khoá bằng request sai token,
 > client Python không đưa token Bridge ra proxy hệ thống, regex find/replace có trần thời gian, action ghim SHA,
 > quét lỗ hổng NuGet/pip hằng tuần. Xem [audit-bao-mat-2026-09-28.md](audit-bao-mat-2026-09-28.md) và

@@ -1,6 +1,8 @@
 ﻿# Lộ trình phát triển DHCB Tools
 
-> Mới nhất: [audit bảo mật, quy trình và công cụ 2026-09-28](audit-bao-mat-2026-09-28.md) — tám mục đã sửa; mục "Việc cần chủ repo bật" là phần còn lại ngoài mã nguồn.
+> Mới nhất: [audit toàn diện 2026-10-01](audit-toan-dien-2026-10-01.md) — 17 mục đã sửa; mục "Để lại" và "Cần chạy lại trong Revit/AutoCAD" là phần còn chờ.
+>
+> Trước đó: [audit bảo mật, quy trình và công cụ 2026-09-28](audit-bao-mat-2026-09-28.md) — tám mục đã sửa; mục "Việc cần chủ repo bật" là phần còn lại ngoài mã nguồn.
 >
 > Trước đó: [audit và nâng cấp 2026-09-23](audit-nang-cap-2026-09-23.md) — tám PR #161–#168 đã sửa; mục "Việc để lại" là danh sách quyết định còn chờ.
 >
