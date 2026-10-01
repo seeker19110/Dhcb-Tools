@@ -132,6 +132,13 @@ namespace DhcbTools.Shared.Logic.Ifc
     /// </summary>
     public static class IfcStepParser
     {
+        /// <summary>
+        /// Số tầng ngoặc lồng nhau tối đa trong một thực thể. IFC thật sâu nhất chừng 3–4 tầng (danh sách
+        /// toạ độ của <c>IfcCartesianPointList3D</c>, giá trị có kiểu trong <c>IfcPropertyListValue</c>);
+        /// 64 rộng rãi mà vẫn xa ngưỡng tràn stack 1 MB của luồng chính trên Windows.
+        /// </summary>
+        public const int MaxNesting = 64;
+
         /// <summary>Đọc toàn bộ nội dung một file IFC dạng văn bản.</summary>
         /// <exception cref="IfcParseException">Khi thiếu phần DATA hoặc gặp ký tự không hợp lệ.</exception>
         public static IfcStepFile Parse(string text)
@@ -235,6 +242,7 @@ namespace DhcbTools.Shared.Logic.Ifc
         {
             private readonly string _text;
             private int _pos;
+            private int _depth;
 
             public Cursor(string text)
             {
@@ -401,8 +409,32 @@ namespace DhcbTools.Shared.Logic.Ifc
                 return sb.ToString().ToUpperInvariant();
             }
 
-            /// <summary>Đọc danh sách trong ngoặc tròn thành danh sách giá trị.</summary>
+            /// <summary>
+            /// Đọc danh sách trong ngoặc tròn thành danh sách giá trị, có trần độ lồng
+            /// (<see cref="MaxNesting"/>). Danh sách lồng nhau đọc bằng đệ quy; không có trần thì một file
+            /// chỉ toàn dấu <c>(</c> làm tràn stack — <c>StackOverflowException</c> không bắt được trong .NET,
+            /// cả BatchRunner chết (mã thoát 0xC00000FD) và gói bàn giao của đêm đó không được dựng.
+            /// </summary>
             public IReadOnlyList<IfcValue> ReadArguments()
+            {
+                if (_depth >= MaxNesting)
+                {
+                    throw new IfcParseException("Dòng " + Line + ": danh sách lồng sâu quá " + MaxNesting
+                                                + " tầng — IFC hợp lệ không lồng tới mức này (file hỏng).");
+                }
+
+                _depth++;
+                try
+                {
+                    return ReadArgumentsCore();
+                }
+                finally
+                {
+                    _depth--;
+                }
+            }
+
+            private IReadOnlyList<IfcValue> ReadArgumentsCore()
             {
                 Take(); // (
                 var items = new List<IfcValue>();

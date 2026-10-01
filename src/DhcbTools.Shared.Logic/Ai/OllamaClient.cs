@@ -107,11 +107,7 @@ namespace DhcbTools.Shared.Logic.Ai
         /// <summary>Transport mặc định: <see cref="HttpWebRequest"/> POST, đọc tối đa <see cref="MaxResponseBytes"/>.</summary>
         public static string? HttpTransport(string url, string body, int timeoutSeconds)
         {
-            var request = (HttpWebRequest)WebRequest.Create(url);
-            request.Method = "POST";
-            request.ContentType = "application/json";
-            request.Timeout = Math.Max(5, timeoutSeconds) * 1000;
-            request.ReadWriteTimeout = request.Timeout;
+            var request = CreateRequest(url, timeoutSeconds);
             var bytes = Encoding.UTF8.GetBytes(body);
             request.ContentLength = bytes.Length;
             using (var stream = request.GetRequestStream())
@@ -124,6 +120,29 @@ namespace DhcbTools.Shared.Logic.Ai
             {
                 return ReadCapped(reader, MaxResponseBytes);
             }
+        }
+
+        /// <summary>
+        /// Request POST tới model local: KHÔNG qua proxy, KHÔNG tự theo chuyển hướng.
+        /// <para>
+        /// Mặc định <see cref="HttpWebRequest"/> đi theo proxy hệ thống. Trên .NET 8/10 (Revit 2025+, AutoCAD
+        /// 2025+) proxy cấu hình tay của Windows KHÔNG tự bỏ qua 127.0.0.1 khi thiếu mục <c>&lt;local&gt;</c> —
+        /// prompt (tên layer, thuyết minh, cảnh báo của mô hình) đi ra proxy công ty, trái với lời hứa "không dữ
+        /// liệu nào rời máy". Cùng loại lỗi audit 2026-09-28 đã sửa cho client Python (opener <c>LOOPBACK</c>).
+        /// Chuyển hướng 307/308 thì POST lại nguyên body tới đích mới — tiến trình lạ chiếm cổng 11434 dắt được
+        /// prompt ra ngoài; endpoint đã bị buộc là loopback thì không có lý do gì để đi theo.
+        /// </para>
+        /// </summary>
+        internal static HttpWebRequest CreateRequest(string url, int timeoutSeconds)
+        {
+            var request = (HttpWebRequest)WebRequest.Create(url);
+            request.Method = "POST";
+            request.ContentType = "application/json";
+            request.Proxy = null;
+            request.AllowAutoRedirect = false;
+            request.Timeout = Math.Max(5, timeoutSeconds) * 1000;
+            request.ReadWriteTimeout = request.Timeout;
+            return request;
         }
 
         /// <summary>Đọc tối đa <paramref name="maxChars"/> ký tự; dài hơn thì ném IOException thay vì đọc tiếp.</summary>
