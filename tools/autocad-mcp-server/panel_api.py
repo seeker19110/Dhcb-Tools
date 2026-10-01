@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -26,6 +27,11 @@ PORT = 8767
 AUTOCAD_URL = "http://127.0.0.1:8766"
 PANEL_HTML = Path(__file__).with_name("panel.html")
 PANEL_TOKEN = secrets.token_urlsafe(32)
+# Khoá khởi chạy: GET /panel (route phát PANEL_TOKEN) đòi ?k=<khoá>. Loopback không phân biệt tài khoản Windows —
+# trên máy dùng chung/RDS, tiến trình của tài khoản khác từng đọc được /panel, lấy token rồi điều khiển AutoCAD của
+# bạn qua gateway (gateway gọi Bridge bằng token CỦA BẠN). Khoá chỉ nằm trong file khởi chạy ở %LOCALAPPDATA% — thư
+# mục mà tài khoản khác không đọc được — giống cách Jupyter phát token qua file *-open.html.
+LAUNCH_KEY = secrets.token_urlsafe(32)
 MAX_BODY_BYTES = 64 * 1024
 # Opener KHÔNG dùng proxy cho request tới loopback. urllib mặc định đi theo proxy hệ thống (HTTP_PROXY, hay
 # ProxyServer trong Internet Settings của Windows) và KHÔNG tự bỏ qua 127.0.0.1 — "<local>" trong ProxyOverride
@@ -88,6 +94,45 @@ def _same_secret(provided: str, expected: str) -> bool:
     """
     # surrogatepass: chuỗi JSON "\ud800" (surrogate lẻ) mã hoá được thay vì ném — chỉ đơn giản là không khớp.
     return hmac.compare_digest(provided.encode("utf-8", "surrogatepass"), expected.encode("utf-8", "surrogatepass"))
+
+
+def launch_file_path() -> Path:
+    """File khởi chạy panel: %LOCALAPPDATA%\\DHCB\\autocad-panel.html (ngoài Windows: ~/.cache/DHCB, quyền 600).
+
+    LOCALAPPDATA, không phải APPDATA: khoá chỉ sống theo một tiến trình gateway, không có lý do đi theo roaming profile.
+    """
+    base = os.environ.get("LOCALAPPDATA")
+    root = Path(base) if base else Path.home() / ".cache"
+    return root / "DHCB" / "autocad-panel.html"
+
+
+def panel_url() -> str:
+    return f"http://{HOST}:{PORT}/panel?k={LAUNCH_KEY}"
+
+
+def write_launch_file(path: Path) -> None:
+    """Ghi trang chuyển hướng tới panel_url() — chỉ chủ tài khoản đọc được.
+
+    Ghi vào file tạm tạo mới với quyền 600 rồi thay thế, nên không có lúc nào file mang khoá mà quyền còn rộng
+    (O_EXCL: không ghi đè vào một file tạm sẵn có mà người khác có thể đã tạo với quyền rộng hơn). Trên Windows
+    quyền đến từ ACL thừa kế của %LOCALAPPDATA% — mặc định chỉ chủ tài khoản, SYSTEM và Administrators.
+    """
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    url = panel_url()  # token_urlsafe chỉ gồm [A-Za-z0-9_-]: chèn thẳng vào HTML/JS an toàn.
+    page = (
+        "<!DOCTYPE html>\n<html lang=\"vi\"><head><meta charset=\"UTF-8\">\n"
+        "<meta name=\"referrer\" content=\"no-referrer\">\n"
+        f"<meta http-equiv=\"refresh\" content=\"0; url={url}\">\n"
+        "<title>AutoCAD Control Panel</title>\n"
+        f"<script>location.replace('{url}');</script>\n"
+        f"</head><body><a href=\"{url}\">Mở bảng điều khiển AutoCAD</a></body></html>\n"
+    )
+    temp = path.with_name(path.name + ".tmp")
+    temp.unlink(missing_ok=True)
+    fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(page)
+    os.replace(temp, path)
 
 
 def _require_confirmation(command: str, payload: dict[str, Any]) -> None:
@@ -399,6 +444,11 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(421, {"error": "Host không phải gateway panel (127.0.0.1:8767 / localhost:8767)"})
         return True
 
+    @staticmethod
+    def launch_key_valid(query: str) -> bool:
+        keys = urllib.parse.parse_qs(query).get("k", [])
+        return len(keys) == 1 and _same_secret(keys[0], LAUNCH_KEY)
+
     def token_valid(self) -> bool:
         provided = self.headers.get("X-Panel-Token", "")
         return bool(provided) and _same_secret(provided, PANEL_TOKEN)
@@ -421,6 +471,16 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def send_text(self, status: int, text: str) -> None:
+        """Trả lời dạng chữ cho trang mở bằng trình duyệt (điều hướng, không phải XHR)."""
+        body = text.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
     def send_panel(self) -> None:
         try:
             html = PANEL_HTML.read_text(encoding="utf-8")
@@ -432,6 +492,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Content-Security-Policy", "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'self'; base-uri 'none'")
+        # URL của trang mang khoá khởi chạy: không để nó đi theo Referer ra đâu cả.
+        self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
@@ -461,13 +523,19 @@ class Handler(BaseHTTPRequestHandler):
         if not self.origin_allowed():
             self.send_json(403, {"error": "Origin không được phép"})
             return
-        if self.path == "/panel":
-            # Unauthenticated by necessity: this is the route that hands out the token.
-            # The token stays embedded in the HTML on purpose instead of a separate
-            # same-origin endpoint: anything able to read /panel could read that
-            # endpoint too, so a split buys nothing. What protects the token is
-            # (1) bind on 127.0.0.1, (2) the Host check above (DNS rebinding),
-            # (3) the Origin whitelist on every XHR. See README "Vì sao token nằm trong HTML".
+        route = urllib.parse.urlsplit(self.path)
+        if route.path == "/panel":
+            # Route phát PANEL_TOKEN (nhúng trong HTML). Không cần X-Panel-Token — trình duyệt điều hướng tới đây
+            # không gửi được header — nhưng cần khoá khởi chạy ?k=, thứ chỉ chủ tài khoản đọc được trong file khởi
+            # chạy. Cùng với bind 127.0.0.1 và kiểm Host (DNS rebinding) ở trên. Xem README "Vì sao token nằm trong HTML".
+            if not self.launch_key_valid(route.query):
+                self.send_text(
+                    403,
+                    "Thiếu hoặc sai khoá khởi chạy panel. Mở panel bằng tool autocad_open_panel, hoặc file "
+                    "autocad-panel.html trong %LOCALAPPDATA%\\DHCB (chạy tay panel_api.py thì dùng URL nó in ra). "
+                    "Khoá đổi mỗi lần gateway khởi động lại.",
+                )
+                return
             self.send_panel()
             return
         if self.path == "/alive":
@@ -520,8 +588,25 @@ class Handler(BaseHTTPRequestHandler):
 
 def main() -> None:
     server = ThreadingHTTPServer((HOST, PORT), Handler)
+    # Chỉ ghi file khởi chạy SAU khi bind được: khoá trong file luôn là khoá của gateway đang giữ port. Lần chạy bind
+    # lỗi (port đã có gateway khác) ném ở trên và không đụng tới file của gateway đang chạy.
+    launch_file: Path | None = launch_file_path()
+    try:
+        write_launch_file(launch_file)
+    except OSError as exc:
+        print(f"Không ghi được file khởi chạy {launch_file}: {exc} — dùng URL bên dưới.", flush=True)
+        launch_file = None
     print(f"AutoCAD panel gateway listening at http://{HOST}:{PORT}", flush=True)
-    server.serve_forever()
+    # In URL kèm khoá cho người chạy tay; server.py chạy gateway với stdout=DEVNULL nên khoá không đi đâu khác.
+    print(f"Mở panel: {panel_url()}", flush=True)
+    try:
+        server.serve_forever()
+    finally:
+        # Xoá TRƯỚC khi nhả port: chưa gateway nào khác bind được nên file chắc chắn còn là của mình.
+        # (terminate() từ server.py không chạy tới đây — file cũ ở lại nhưng khoá trong đó đã vô dụng.)
+        if launch_file is not None:
+            launch_file.unlink(missing_ok=True)
+        server.server_close()
 
 
 if __name__ == "__main__":

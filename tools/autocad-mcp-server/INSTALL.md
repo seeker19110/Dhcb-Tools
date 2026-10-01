@@ -15,4 +15,6 @@ Nạp plugin vào AutoCAD: cài bằng [installer](../../installer/dhcb-tools.is
 `<repo>\src\DhcbTools.AutoCAD\bin\<Cấu hình>\<TFM>\DhcbTools.AutoCAD.dll`.
 
 Mở session Hermes mới → gõ: **"mở bảng điều khiển autocad"** (lúc này server mới khởi động gateway panel ở
-`127.0.0.1:8767`; trước đó nó không chiếm port nào).
+`127.0.0.1:8767`; trước đó nó không chiếm port nào). Panel mở qua file khởi chạy
+`%LOCALAPPDATA%\DHCB\autocad-panel.html` mà gateway ghi khi khởi động; mở thẳng `panel.html` sẽ bị `403` vì thiếu
+khoá khởi chạy — xem README, mục "Vì sao token nằm trong HTML".

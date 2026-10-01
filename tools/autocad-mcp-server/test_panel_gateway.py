@@ -306,7 +306,7 @@ class HandlerTests(unittest.TestCase):
         self.assertEqual(421, handler.status)
 
     def test_panel_tra_html_kem_token_va_csp(self) -> None:
-        handler = FakeHandler("/panel")
+        handler = FakeHandler(f"/panel?k={panel_api.LAUNCH_KEY}")
         with mock.patch.object(panel_api, "PANEL_HTML",
                                mock.Mock(read_text=mock.Mock(return_value="<b>__PANEL_TOKEN__</b>"))):
             handler.do_GET()
@@ -314,9 +314,23 @@ class HandlerTests(unittest.TestCase):
         self.assertEqual(200, handler.status)
         self.assertIn(panel_api.PANEL_TOKEN.encode(), handler.wfile.getvalue())
         self.assertTrue(any(k == "Content-Security-Policy" for k, _ in handler.sent_headers))
+        # URL trang mang khoá khởi chạy — không được đi theo Referer.
+        self.assertIn(("Referrer-Policy", "no-referrer"), handler.sent_headers)
+
+    def test_panel_khong_co_khoa_thi_403_dang_chu_khong_lo_token(self) -> None:
+        handler = FakeHandler("/panel", origin=None)
+        with mock.patch.object(panel_api, "PANEL_HTML",
+                               mock.Mock(read_text=mock.Mock(return_value="<b>__PANEL_TOKEN__</b>"))):
+            handler.do_GET()
+
+        self.assertEqual(403, handler.status)
+        self.assertIn(("Content-Type", "text/plain; charset=utf-8"), handler.sent_headers)
+        page = handler.wfile.getvalue()
+        self.assertNotIn(panel_api.PANEL_TOKEN.encode(), page)
+        self.assertIn("khoá khởi chạy", page.decode("utf-8"))
 
     def test_khong_doc_duoc_panel_html_thi_500(self) -> None:
-        handler = FakeHandler("/panel")
+        handler = FakeHandler(f"/panel?k={panel_api.LAUNCH_KEY}")
         with mock.patch.object(panel_api, "PANEL_HTML",
                                mock.Mock(read_text=mock.Mock(side_effect=OSError("mất file")))):
             handler.do_GET()
@@ -428,15 +442,93 @@ class HandlerTests(unittest.TestCase):
         self.assertNotIn("Access-Control-Allow-Origin", [k for k, _ in handler.sent_headers])
 
 
+class LaunchFileTests(unittest.TestCase):
+    """File khởi chạy: nơi DUY NHẤT chứa khoá ?k= ngoài bộ nhớ gateway."""
+
+    def test_duong_dan_theo_localappdata(self) -> None:
+        with mock.patch.dict(panel_api.os.environ, {"LOCALAPPDATA": "/u/AppData/Local"}):
+            self.assertEqual(Path("/u/AppData/Local/DHCB/autocad-panel.html"), panel_api.launch_file_path())
+
+    def test_khong_co_localappdata_thi_dung_cache_trong_home(self) -> None:
+        with mock.patch.dict(panel_api.os.environ, {}, clear=True), \
+                mock.patch.object(panel_api.Path, "home", return_value=Path("/home/kts")):
+            self.assertEqual(Path("/home/kts/.cache/DHCB/autocad-panel.html"), panel_api.launch_file_path())
+
+    def test_ghi_trang_chuyen_huong_mang_khoa(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "DHCB" / "autocad-panel.html"
+            panel_api.write_launch_file(target)
+            page = target.read_text(encoding="utf-8")
+
+            self.assertIn(f'url={panel_api.panel_url()}"', page)
+            self.assertIn(f"location.replace('{panel_api.panel_url()}')", page)
+            self.assertIn('name="referrer" content="no-referrer"', page)
+            self.assertNotIn(panel_api.PANEL_TOKEN, page)  # token phiên chỉ có trong /panel, không nằm trên đĩa
+            self.assertEqual(["autocad-panel.html"], [p.name for p in target.parent.iterdir()])
+
+    @unittest.skipIf(sys.platform == "win32", "quyền POSIX; trên Windows quyền là ACL thừa kế của %LOCALAPPDATA%")
+    def test_file_chi_chu_tai_khoan_doc_duoc(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "autocad-panel.html"
+            target.write_text("cũ", encoding="utf-8")
+            target.chmod(0o644)
+            # File tạm sót lại từ lần trước (có thể quyền rộng) không được dùng lại — tạo mới bằng O_EXCL.
+            stale = target.with_name(target.name + ".tmp")
+            stale.write_text("sót", encoding="utf-8")
+            stale.chmod(0o666)
+
+            panel_api.write_launch_file(target)
+
+            self.assertEqual(0o600, target.stat().st_mode & 0o777)
+            self.assertIn(panel_api.LAUNCH_KEY, target.read_text(encoding="utf-8"))
+            self.assertFalse(stale.exists())
+
+
 class MainTests(unittest.TestCase):
-    def test_main_mo_cong_va_phuc_vu(self) -> None:
+    def test_main_mo_cong_ghi_file_khoi_chay_roi_don_khi_tat(self) -> None:
         server = mock.Mock()
-        with mock.patch.object(panel_api, "ThreadingHTTPServer", return_value=server) as make_server, \
-                mock.patch("builtins.print"):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "DHCB" / "autocad-panel.html"
+
+            def serve() -> None:
+                # Đang phục vụ: file khởi chạy đã có (server.py dựa vào đây sau khi /alive trả lời).
+                self.assertIn(panel_api.LAUNCH_KEY, target.read_text(encoding="utf-8"))
+                server.server_close.assert_not_called()
+
+            server.serve_forever.side_effect = serve
+            with mock.patch.object(panel_api, "ThreadingHTTPServer", return_value=server) as make_server, \
+                    mock.patch.object(panel_api, "launch_file_path", return_value=target), \
+                    mock.patch("builtins.print") as printed:
+                panel_api.main()
+
+            self.assertEqual(((panel_api.HOST, panel_api.PORT), panel_api.Handler), make_server.call_args[0])
+            server.serve_forever.assert_called_once()
+            self.assertFalse(target.exists())
+            server.server_close.assert_called_once()
+            self.assertIn(panel_api.panel_url(), " ".join(str(c) for c in printed.call_args_list))
+
+    def test_bind_loi_thi_khong_dung_toi_file_cua_gateway_dang_chay(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "autocad-panel.html"
+            target.write_text("khoá của gateway đang giữ port", encoding="utf-8")
+            with mock.patch.object(panel_api, "ThreadingHTTPServer", side_effect=OSError("port đã dùng")), \
+                    mock.patch.object(panel_api, "launch_file_path", return_value=target), \
+                    self.assertRaises(OSError):
+                panel_api.main()
+
+            self.assertEqual("khoá của gateway đang giữ port", target.read_text(encoding="utf-8"))
+
+    def test_khong_ghi_duoc_file_thi_van_phuc_vu_va_in_url(self) -> None:
+        server = mock.Mock()
+        with mock.patch.object(panel_api, "ThreadingHTTPServer", return_value=server), \
+                mock.patch.object(panel_api, "write_launch_file", side_effect=PermissionError("cấm")), \
+                mock.patch("builtins.print") as printed:
             panel_api.main()
 
-        self.assertEqual(((panel_api.HOST, panel_api.PORT), panel_api.Handler), make_server.call_args[0])
         server.serve_forever.assert_called_once()
+        output = " ".join(str(c) for c in printed.call_args_list)
+        self.assertIn("Không ghi được file khởi chạy", output)
+        self.assertIn(panel_api.panel_url(), output)
 
 
 if __name__ == "__main__":

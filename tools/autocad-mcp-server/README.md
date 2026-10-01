@@ -65,8 +65,8 @@ tools/autocad-mcp-server/
 ## Luồng kết nối panel
 
 ```text
-panel.html (file:// → tự chuyển hướng sang gateway)
-    ↓ http://127.0.0.1:8767/panel (same-origin + token phiên)
+%LOCALAPPDATA%\DHCB\autocad-panel.html (file khởi chạy do gateway ghi, mang khoá ?k=)
+    ↓ http://127.0.0.1:8767/panel?k=<khoá khởi chạy> → trang panel.html, nhúng token phiên
 panel_api.py
     ├── /health, /query, /execute → AutoCAD Bridge 127.0.0.1:8766
     └── /ai/chat → Hermes CLI/model đang cấu hình → truy vấn AutoCAD có kiểm soát
@@ -78,6 +78,12 @@ server không còn chiếm port 8767. Nếu port đang bị **chương trình kh
 theo. Gateway đọc `DHCB_BRIDGE_TOKEN` hoặc `%APPDATA%\DHCB\bridge-token.txt` để tương thích Bridge có Bearer
 authentication. AI Chat dùng provider/model hiện hành của Hermes.
 
+Tool trả về `::preview{file=…}` của **file khởi chạy** `%LOCALAPPDATA%\DHCB\autocad-panel.html`, không phải
+`panel.html`: gateway ghi file này ngay sau khi bind được port (ngoài Windows: `~/.cache/DHCB`, quyền 600), xoá khi
+tắt bằng Ctrl+C. Chạy tay `python panel_api.py` thì mở URL có `?k=` mà nó in ra. Mở thẳng `panel.html` hay
+`/panel` không có khoá → `403` kèm hướng dẫn. Gateway bản cũ (chưa có khoá) còn chạy thì tool báo thiếu file khởi
+chạy — tắt tiến trình đó rồi gọi lại.
+
 **Lệnh ghi cần xác nhận rõ ràng.** Cả panel lẫn tool `autocad_execute` đi qua cùng một bộ kiểm
 (`panel_api.validate_proxy_payload`): `dryRun=false` chỉ được chấp nhận khi kèm đúng chuỗi xác nhận của lệnh —
 `DrawingCleanup` → `DELETE_UNUSED`, `AutoNumbering` → `WRITE_AUTONUMBER`, `LayerImport` → `IMPORT_LAYERS`.
@@ -87,15 +93,23 @@ Thiếu hoặc sai chuỗi thì lệnh bị từ chối kèm hướng dẫn, kh�
 ## Vì sao token nằm trong HTML
 
 `GET /panel` nhúng token phiên vào trang thay vì phát qua một endpoint riêng: bất kỳ thứ gì đọc được `/panel`
-thì cũng đọc được endpoint đó, nên tách ra không thêm an toàn. Cái thật sự bảo vệ token là ba lớp khác —
+thì cũng đọc được endpoint đó, nên tách ra không thêm an toàn. Cái bảo vệ token là bốn lớp —
 gateway chỉ bind `127.0.0.1`; **header `Host` phải là `127.0.0.1:8767` hoặc `localhost:8767`**, sai thì trả
 `421` (chặn DNS rebinding: trang web ngoài trỏ tên miền của nó về loopback, request điều hướng không có
-`Origin` nên chỉ `Host` chặn được); và mọi XHR còn phải qua whitelist `Origin` + header `X-Panel-Token`.
+`Origin` nên chỉ `Host` chặn được); **`/panel` đòi khoá khởi chạy `?k=`**; và mọi XHR còn phải qua whitelist
+`Origin` + header `X-Panel-Token`.
 
-Giới hạn còn lại (audit 2026-10-01): loopback không phân biệt tài khoản Windows, nên trên máy **nhiều người dùng**
-(máy dùng chung, Remote Desktop Services) tiến trình của tài khoản khác cũng đọc được `/panel`, lấy token phiên, rồi
-điều khiển AutoCAD của bạn qua gateway — gateway gọi Bridge bằng token của bạn, đi vòng ACL của
-`bridge-token.txt`. Chỉ chạy panel trên máy một người dùng; xem [`SECURITY.md`](../../SECURITY.md).
+**Khoá khởi chạy** (audit 2026-10-01 vòng 2) là lớp cho máy **nhiều người dùng** (máy dùng chung, Remote Desktop
+Services). Loopback không phân biệt tài khoản Windows: trước đây tiến trình của tài khoản khác gọi `/panel` là lấy
+được token phiên, rồi điều khiển AutoCAD của bạn qua gateway — gateway gọi Bridge bằng token của bạn, đi vòng ACL
+của `bridge-token.txt`. Giờ khoá (32 byte ngẫu nhiên, đổi mỗi lần gateway khởi động, so hằng thời gian) chỉ có
+trong bộ nhớ gateway và file khởi chạy ở `%LOCALAPPDATA%` — thư mục mà tài khoản thường khác không đọc được. Cách
+này giống Jupyter phát token qua file `*-open.html`. Trang trả về kèm `Referrer-Policy: no-referrer` để URL mang
+khoá không đi theo Referer.
+
+Giới hạn còn lại: tài khoản **admin** trên máy đọc được mọi thứ của bạn (kể cả `bridge-token.txt`), khoá không
+chống được. Và một tiến trình khác chiếm port 8767 **trước** gateway thì giả được panel — lúc đó tool báo port bị
+chiếm hoặc thiếu file khởi chạy; đừng nhập gì vào một panel mở ra theo cách khác.
 
 Phía sau gateway, token **Bridge** (`%APPDATA%\DHCB\bridge-token.txt`) chỉ đi tới `http://127.0.0.1:8766` qua
 opener **không dùng proxy** (`panel_api.LOOPBACK`): urllib mặc định đi theo proxy hệ thống và không tự bỏ qua
