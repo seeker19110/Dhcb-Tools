@@ -73,6 +73,7 @@ public static partial class Program
         // chạy lại lần hai cùng ngày thừa hưởng nguyên dòng lỗi của lần đầu — mã thoát 1 mãi dù đã sửa xong,
         // và report.html trộn hai lần chạy thành một bảng không ai đọc nổi.
         string? runLog;
+        var launched = 0;
         if (opts.ReportOnly)
         {
             runLog = LatestRunLog(logDir);
@@ -87,7 +88,7 @@ public static partial class Program
         else
         {
             runLog = Path.Combine(logDir, "run-" + runTime.ToString("HHmmss") + ".jsonl");
-            var launched = job.App.Equals("autocad", StringComparison.OrdinalIgnoreCase)
+            launched = job.App.Equals("autocad", StringComparison.OrdinalIgnoreCase)
                 ? RunAutoCad(job, opts, runLog, runTime)
                 : RunRevit(job, opts, runLog);
             if (launched != 0 && !File.Exists(runLog))
@@ -110,7 +111,8 @@ public static partial class Program
             Console.WriteLine($"Tóm tắt: {summaryPath}");
         }
 
-        var code = entries.Count == 0 ? 1 : RunLog.ExitCode(entries);
+        // Mã của đường chạy cũng tính: Revit sập giữa đêm thì log chỉ có dòng xanh của các file đã kịp chạy.
+        var code = RunLog.ExitCode(entries, launched);
         Console.WriteLine($"Kết thúc, mã thoát {code}: {entries.Count(e => e.Success && !e.Skipped)} OK, {entries.Count(e => !e.Success && !e.Skipped)} lỗi, {entries.Count(e => e.Skipped)} bỏ qua.");
 
         if (job.Handover != null && job.Handover.Enabled)

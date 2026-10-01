@@ -48,6 +48,7 @@ public static partial class Program
 
         var deadline = runTime.AddMinutes(opts.MaxMinutes);
         var anyFailed = false;
+        var stop = false;
         var index = 0;
         foreach (var file in job.Files)
         {
@@ -58,11 +59,19 @@ public static partial class Program
                 continue;
             }
 
+            if (stop)
+            {
+                // Như batch Revit: file không được chạy vẫn phải có dòng trong log, nếu không report.html chỉ liệt kê
+                // các file đã chạy và người đọc không biết còn file nào bị bỏ lại.
+                RunLog.Append(runLog, new RunLogEntry { File = file.Path, Command = "*", Skipped = true, Summary = "Dừng vì stopOnError sau lỗi ở file trước." });
+                continue;
+            }
+
             if (!File.Exists(file.Path))
             {
                 RunLog.Append(runLog, new RunLogEntry { File = file.Path, Command = "Open", Success = false, Summary = "Không tìm thấy file." });
                 anyFailed = true;
-                if (job.StopOnError) break;
+                stop = job.StopOnError;
                 continue;
             }
 
@@ -85,10 +94,13 @@ public static partial class Program
 
             // Save = SAVEAS về chính file nguồn (QSAVE không có trong core console); SaveAs = bản sao trong
             // outputFolder. Cả hai đều phải trả lời prompt "replace it?" khi file đích đã có — với Save thì luôn có.
-            string? saveAs = opts.DryRun ? null
+            string? saveTarget = opts.DryRun ? null
                 : job.SaveMode == SaveMode.SaveAs ? Path.Combine(outputFolder, Path.GetFileName(file.Path))
                 : job.SaveMode == SaveMode.Save ? Path.GetFullPath(file.Path)
                 : null;
+            // saveOnError=false (mặc định): SAVEAS vào file tạm cạnh đích, chỉ thay đích khi log của file này sạch —
+            // script không tự bỏ được dòng SAVEAS khi một DHCB_RUN lỗi (xem StagedSave).
+            var saveAs = saveTarget is null || job.SaveOnError ? saveTarget : StagedSave.StagingPath(saveTarget, runTime);
             var saveTargetExists = saveAs is not null && File.Exists(saveAs);
 
             // Step đặc biệt "PlotPdf" (mục 7.13): không phải lệnh Core — sinh -PLOT trong script accoreconsole.
@@ -121,6 +133,7 @@ public static partial class Program
             {
                 RunLog.Append(runLog, new RunLogEntry { File = file.Path, Command = "Open", Success = false, Summary = "Không khởi động được accoreconsole." });
                 anyFailed = true;
+                stop = job.StopOnError;
                 continue;
             }
 
@@ -158,8 +171,12 @@ public static partial class Program
             // nào vào run.jsonl, báo cáo "0 OK, 0 lỗi" trông như chưa chạy gì (§57). Bắt bằng hai dấu hiệu:
             // dòng "Unable to load" trong output, hoặc số dòng log của file này không tăng dù có step.
             var netload = AcadScriptGen.NetloadFailure(output + "\n" + errors);
-            var linesAfter = File.Exists(runLog) ? File.ReadAllLines(runLog).Length : 0;
-            if (!timedOut && (netload != null || (stepPaths.Count > 0 && linesAfter == linesBefore)))
+            var logLines = File.Exists(runLog) ? File.ReadAllLines(runLog) : Array.Empty<string>();
+            var linesAfter = logLines.Length;
+            // Dòng DHCB_RUN của RIÊNG file này (ghi trong lúc accoreconsole chạy) — căn cứ để quyết định lưu.
+            var stepEntries = logLines.Skip(linesBefore).Select(RunLog.Deserialize).OfType<RunLogEntry>().ToList();
+            var netloadFailed = netload != null || (stepPaths.Count > 0 && linesAfter == linesBefore);
+            if (!timedOut && netloadFailed)
             {
                 RunLog.Append(runLog, new RunLogEntry
                 {
@@ -179,26 +196,74 @@ public static partial class Program
                 anyFailed = true;
             }
 
-            if (saveAs is not null)
+            if (saveTarget is not null && saveAs is not null)
             {
-                // Không có kênh nào từ accoreconsole báo "đã lưu": kiểm tra file đích có mới hơn lúc bắt đầu.
-                var saved = exitCode == 0 && File.Exists(saveAs) && File.GetLastWriteTime(saveAs) >= startedAt;
-                RunLog.Append(runLog, new RunLogEntry
-                {
-                    File = file.Path,
-                    Command = "Save:" + job.SaveMode,
-                    Success = saved,
-                    Summary = saved
-                        ? (job.SaveMode == SaveMode.Save ? "Đã lưu (SAVEAS " + job.DwgVersion + " về chính file)." : "Đã lưu bản sao: " + saveAs)
-                        : "Không thấy file được lưu: " + saveAs + " (xem " + Path.Combine(work, $"{index:D3}.log") + ").",
-                });
-                if (!saved) anyFailed = true;
+                var saveEntry = SaveEntry(job, file.Path, saveTarget, saveAs, startedAt, exitCode,
+                    StagedSave.Blocker(timedOut, exitCode, netloadFailed, stepPaths.Count, stepEntries),
+                    Path.Combine(work, $"{index:D3}.log"));
+                RunLog.Append(runLog, saveEntry);
+                if (!saveEntry.Success) anyFailed = true;
             }
 
-            if (anyFailed && job.StopOnError) break;
+            if (anyFailed && job.StopOnError) stop = true;
         }
 
         return anyFailed ? 1 : 0;
+    }
+
+    /// <summary>
+    /// Dòng log "Save:&lt;mode&gt;" của một file. <paramref name="saveAs"/> là đường script đã SAVEAS tới: chính
+    /// <paramref name="saveTarget"/> khi <c>saveOnError=true</c> (như bản cũ), file tạm cạnh đích khi không —
+    /// khi đó chỉ thay đích nếu <paramref name="blocker"/> là null, còn lại bỏ file tạm và ghi rõ vì sao không lưu.
+    /// </summary>
+    private static RunLogEntry SaveEntry(BatchJob job, string source, string saveTarget, string saveAs, DateTime startedAt,
+        int exitCode, string? blocker, string consoleLog)
+    {
+        var entry = new RunLogEntry { File = source, Command = "Save:" + job.SaveMode };
+        // Không có kênh nào từ accoreconsole báo "đã lưu": kiểm tra file script vừa SAVEAS có mới hơn lúc bắt đầu.
+        var written = File.Exists(saveAs) && File.GetLastWriteTime(saveAs) >= startedAt;
+        var savedText = job.SaveMode == SaveMode.Save ? "Đã lưu (SAVEAS " + job.DwgVersion + " về chính file)." : "Đã lưu bản sao: " + saveTarget;
+
+        if (job.SaveOnError)
+        {
+            // Người dùng đã chọn giữ cả phần làm được của file lỗi: script SAVEAS thẳng vào đích như bản cũ.
+            entry.Success = exitCode == 0 && written;
+            entry.Summary = entry.Success ? savedText : "Không thấy file được lưu: " + saveAs + " (xem " + consoleLog + ").";
+            return entry;
+        }
+
+        if (blocker != null)
+        {
+            TryDelete(saveAs);
+            entry.Skipped = true;
+            entry.Summary = "Không lưu vì " + blocker + " (đặt saveOnError=true nếu vẫn muốn lưu).";
+            return entry;
+        }
+
+        if (!written)
+        {
+            entry.Summary = "Không thấy file được lưu: " + saveAs + " (xem " + consoleLog + ").";
+            return entry;
+        }
+
+        try
+        {
+            StagedSave.Promote(saveAs, saveTarget, keepBackup: job.SaveMode == SaveMode.Save);
+            entry.Success = true;
+            entry.Summary = savedText + (job.SaveMode == SaveMode.Save ? " Bản trước giữ ở " + Path.ChangeExtension(saveTarget, ".bak") + "." : string.Empty);
+        }
+        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+        {
+            // File đích đang mở ở máy khác, bị khoá quyền… — việc của đêm nay vẫn còn nguyên trong file tạm.
+            entry.Summary = "Không thay được " + saveTarget + " (" + ex.Message + "). Bản đã lưu nằm ở " + saveAs + ".";
+        }
+
+        return entry;
+    }
+
+    private static void TryDelete(string path)
+    {
+        try { File.Delete(path); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { /* file tạm, dọn tay */ }
     }
 
     /// <summary>Vài dòng cuối không rỗng của output — đủ để đọc lý do trong report.</summary>
