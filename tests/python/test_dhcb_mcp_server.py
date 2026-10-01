@@ -332,5 +332,39 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual([], replies)
 
 
+class StdinEncodingTests(unittest.TestCase):
+    """Windows: stdin nối ống mang code page ANSI, MCP client gửi UTF-8 thô (audit 2026-10-01).
+
+    Giả lập đúng tình huống đó bằng TextIOWrapper cp1252 bọc byte UTF-8: bản cũ đọc thẳng sys.stdin nên
+    'Đ' (0x90) ném UnicodeDecodeError — server sập ngay câu tiếng Việt đầu tiên.
+    """
+
+    @staticmethod
+    def _windows_stdin(*messages: str) -> io.TextIOWrapper:
+        raw = b"".join(m.encode("utf-8") + b"\n" for m in messages)
+        return io.TextIOWrapper(io.BytesIO(raw), encoding="cp1252")
+
+    def test_tieng_viet_utf8_toi_tool_nguyen_ven(self) -> None:
+        call = {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                "params": {"name": "chat", "arguments": {"text": "Đánh số cửa tầng 3 — người, giờ"}}}
+        with load() as (module, agent):
+            agent.request.return_value = {"command": "AutoNumbering"}
+            with mock.patch.object(module.sys, "stdin", self._windows_stdin(json.dumps(call, ensure_ascii=False))), \
+                    redirect_stdout(io.StringIO()) as out:
+                module.main()
+
+        self.assertEqual("Đánh số cửa tầng 3 — người, giờ", agent.request.call_args[0][3]["text"])
+        self.assertEqual(1, json.loads(out.getvalue().splitlines()[0])["id"])
+
+    def test_dong_khong_phai_utf8_bi_bo_qua_server_van_song(self) -> None:
+        raw = b"\xff\xfe{hong}\n" + json.dumps({"jsonrpc": "2.0", "id": 2, "method": "ping"}).encode() + b"\n"
+        with load() as (module, _):
+            with mock.patch.object(module.sys, "stdin", io.TextIOWrapper(io.BytesIO(raw), encoding="cp1252")), \
+                    redirect_stdout(io.StringIO()) as out:
+                module.main()
+
+        self.assertEqual([2], [json.loads(line)["id"] for line in out.getvalue().splitlines()])
+
+
 if __name__ == "__main__":
     unittest.main()

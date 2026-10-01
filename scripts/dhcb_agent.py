@@ -146,6 +146,11 @@ def send_background(app: str, command: str, config: dict,
             return state.get("result", state)
         if status == "error":
             return {"success": False, "summary": state.get("error", "Lệnh nền lỗi.")}
+        if status == "abandoned":
+            # Bridge huỷ job vì luồng UI không nhận việc kịp hạn: lệnh KHÔNG chạy và sẽ không bao giờ chạy.
+            # Trước đây không có nhánh này — client hỏi tiếp 30 phút rồi báo "VẪN ĐANG CHẠY", ngược với sự thật.
+            return {"success": False, "abandoned": True,
+                    "summary": state.get("error") or f"{app.capitalize()} không nhận lệnh kịp hạn — lệnh KHÔNG chạy, gửi lại được."}
         if status is None:
             return state  # 404 hoặc lỗi khác
         if on_tick:
