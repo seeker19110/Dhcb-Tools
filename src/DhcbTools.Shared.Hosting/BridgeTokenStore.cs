@@ -126,8 +126,11 @@ namespace DhcbTools.Shared.Hosting
             try
             {
                 // Dùng icacls để không phải tham chiếu System.Security.AccessControl (không có trong netstandard2.0 đầy đủ).
+                // Đường dẫn TUYỆT ĐỐI trong System32: gọi tên trần thì CreateProcess tìm thư mục của Revit.exe/acad.exe
+                // và thư mục hiện hành TRƯỚC System32 — một icacls.exe đặt cạnh file model đang mở chạy với quyền
+                // người dùng ngay lúc Bridge sinh token.
                 var user = Environment.UserDomainName + "\\" + Environment.UserName;
-                var psi = new System.Diagnostics.ProcessStartInfo("icacls",
+                var psi = new System.Diagnostics.ProcessStartInfo(System.IO.Path.Combine(Environment.SystemDirectory, "icacls.exe"),
                     "\"" + file + "\" /inheritance:r /grant:r \"" + user + ":F\"")
                 {
                     CreateNoWindow = true,

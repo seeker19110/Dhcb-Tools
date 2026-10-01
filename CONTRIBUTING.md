@@ -26,7 +26,7 @@ GitHub Actions và pip mỗi tháng. Mô hình an toàn tổng thể: [`SECURITY
 | Job | Máy | Làm gì |
 |---|---|---|
 | `logic-tests` | ubuntu-latest | `dotnet restore/build/test` bộ `DhcbTools.Shared.Logic.Tests` (Release) **kèm cổng phủ 100% dòng** (`scripts/check-coverage.py`), test CLI BatchRunner, **bộ ca IDS chính thức của buildingSMART** (`scripts/ids-conformance.py`, đỏ khi một ca ngoài `tests/ids-buildingsmart/known-gaps.txt` lệch — sửa được ca nào thì xoá dòng đó), tải kết quả `.trx` lên artifact `test-results` |
-| `check-build` | ubuntu-latest, ma trận `2027` / `2026` / `2025` / `2024` / `2023` | Build `BatchRunner` + biên dịch Core và cả bốn vỏ (Revit, AutoCAD, AutoCAD core-only) bằng API package NuGet với `UseWPF=false`. `2026`/`2027` là đường **.NET 10** (AutoCAD ≥ 2026, Revit ≥ 2027), cần cả SDK 8 lẫn 10. Riêng nhánh `2025` còn chạy `py_compile` cho `scripts/*.py` + `tools/autocad-mcp-server/*.py`, `unittest discover` cho gateway panel **và cho `tests/python/`, kèm cổng phủ 100% câu lệnh**, và một bước kiểm cú pháp JavaScript trong `panel.html` |
+| `check-build` | ubuntu-latest, ma trận `2027` / `2026` / `2025` / `2024` / `2023` | Build `BatchRunner` + biên dịch Core và cả bốn vỏ (Revit, AutoCAD, AutoCAD core-only) bằng API package NuGet với `UseWPF=false`. `2026`/`2027` là đường **.NET 10** (AutoCAD ≥ 2026, Revit ≥ 2027), cần cả SDK 8 lẫn 10. Riêng nhánh `2025` còn chạy `py_compile` cho `scripts/*.py` + `tools/autocad-mcp-server/*.py`, `unittest discover` cho gateway panel **và cho `tests/python/`, kèm cổng phủ 100% câu lệnh**, một bước kiểm cú pháp JavaScript trong `panel.html`, và một bước kiểm mọi `scripts/*.ps1` đọc được bằng cú pháp chung của PowerShell 5.1 và 7 |
 | `build-wpf-windows` | windows-latest, ma trận Revit `2027` / `2026` / `2025` / `2024` / `2023` | Build **thật có WPF** vỏ Revit — bật WPF thì SDK bỏ `System.IO` khỏi implicit usings, nên job Linux ở trên không bắt được lỗi đó. `2027` là bản WPF đầu tiên trên net10.0-windows |
 
 Ma trận ba phiên bản là cố ý: lỗi chỉ xảy ra trên net48 (`Dictionary.GetValueOrDefault`) hoặc chỉ trên
@@ -122,7 +122,12 @@ Thêm lệnh Core mới = thêm class + một dòng trong `Shared.Logic/Ai/Comma
 - Bridge từ chối request có header `Origin`/`Sec-Fetch-Site` (trang web trong trình duyệt) — đừng thêm CORS để
   "cho panel gọi thẳng"; panel đi qua gateway `tools/autocad-mcp-server/panel_api.py`.
 - Client Python gọi Bridge/Ollama bằng opener `LOOPBACK` (không proxy) và địa chỉ `127.0.0.1`, không dùng
-  `urllib.request.urlopen` trực tiếp — nó đi theo proxy hệ thống và đem header `Bearer` ra ngoài.
+  `urllib.request.urlopen` trực tiếp — nó đi theo proxy hệ thống và đem header `Bearer` ra ngoài. Phía C# cũng vậy:
+  request tới loopback đặt `Proxy = null` và `AllowAutoRedirect = false` (xem `OllamaClient.CreateRequest`).
+- So chuỗi bí mật (token, chuỗi xác nhận) trong Python bằng `hmac.compare_digest` trên **byte UTF-8**, không trên
+  `str` — `str` có ký tự ngoài ASCII làm nó ném `TypeError` thay vì trả `False`.
+- Script `.ps1` phải chạy được bằng **Windows PowerShell 5.1** (có sẵn trên mọi máy kỹ sư): không dùng `?.`, `??`,
+  `? :`, `&&`, `||` của PowerShell 7. CI kiểm bằng bộ đọc của pwsh (bước *Kiểm script PowerShell* trong `tests.yml`).
 - Regex do người dùng/agent nhập luôn có `matchTimeout` — chạy trên luồng UI Revit/AutoCAD, treo là treo cả phần mềm.
 - Lệnh mới ghi file ra định dạng mới thì thêm đuôi đó vào `BridgePathPolicy.AllowedExtensions`, và trường đầu ra
   không bắt đầu bằng `output` thì thêm vào danh sách trong `BridgeCommitGuard.IsOutputField` — thiếu là preview

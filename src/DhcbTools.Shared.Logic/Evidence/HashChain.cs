@@ -57,11 +57,11 @@ namespace DhcbTools.Shared.Logic.Evidence
     /// Chuỗi băm nối tiếp cho nhật ký dòng-JSON (mục 11.5 của <c>roadmap.md</c>). Mỗi dòng mang
     /// <c>prevHash</c> (băm của dòng ngay trước) và <c>hash</c> = SHA-256 của **chính phần nội dung dòng
     /// đó tính đến trước trường <c>hash</c>**. Sửa một dòng cũ làm gãy chuỗi từ dòng đó trở đi, và
-    /// <see cref="Verify"/> chỉ ra đúng dòng bị sửa.
+    /// <see cref="Verify(IReadOnlyList{string}, Func{string, string})"/> chỉ ra đúng dòng bị sửa.
     /// <para>
     /// Băm tính trên **đúng chuỗi ký tự đã ghi ra file**, không tính trên object đọc lại rồi serialize
     /// lần nữa: vòng JSON → object → JSON không bảo đảm ra byte y hệt (DateTime, thứ tự trường, culture),
-    /// mà kiểm toàn vẹn thì chỉ cần lệch một byte là báo sai. Nhờ vậy <see cref="Verify"/> không phụ
+    /// mà kiểm toàn vẹn thì chỉ cần lệch một byte là báo sai. Nhờ vậy <see cref="Verify(IReadOnlyList{string}, Func{string, string})"/> không phụ
     /// thuộc thư viện JSON nào.
     /// </para>
     /// <para>

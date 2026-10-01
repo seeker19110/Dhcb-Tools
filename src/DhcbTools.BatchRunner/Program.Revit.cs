@@ -53,23 +53,13 @@ public static partial class Program
         var pending = Path.Combine(dhcbDir, "pending-job.json");
         var done = Path.Combine(dhcbDir, "batch-done.json");
         var errorFile = Path.Combine(dhcbDir, "batch-error.txt");
-        File.Delete(done);
-        // batch-error.txt của lần trước mà còn nằm đó thì chẩn đoán bên dưới ("add-in ĐÃ chạy") nói sai.
-        try { File.Delete(errorFile); } catch (Exception ex) { Console.Error.WriteLine("Không xoá được " + errorFile + " cũ: " + ex.Message); }
-        File.WriteAllText(pending, new JObject
-        {
-            ["jobPath"] = Path.GetFullPath(opts.JobPath),
-            ["runLogPath"] = Path.GetFullPath(runLog),
-            ["maxMinutes"] = opts.MaxMinutes,
-            ["dryRun"] = opts.DryRun,
-        }.ToString());
-
-        var journal = Path.Combine(dhcbDir, "dhcb-batch.txt");
-        File.WriteAllText(journal, RevitJournal(), new UTF8Encoding(false));
 
         // Revit chạy bằng journal CHỈ nạp add-in có .addin nằm cùng thư mục với journal (Autodesk cố ý,
         // để chạy kiểm thử hồi quy không bị add-in lạ xen vào). Không có file này thì add-in bị bỏ qua
         // hoàn toàn: không lỗi, không hộp thoại, Revit chỉ ngồi im tới hết giờ.
+        // Kiểm TRƯỚC khi ghi pending-job.json: bản cũ ghi pending rồi mới kiểm, và nhánh "chưa cài add-in"
+        // thoát luôn — file nằm lại, lần sau kỹ sư mở Revit (năm khác, có add-in) thì Revit âm thầm chạy job
+        // của đêm hôm trước rồi tự đóng giữa phiên làm việc.
         var addinDll = FindInstalledAddin(version);
         if (addinDll is null)
         {
@@ -83,14 +73,44 @@ public static partial class Program
             return 2;
         }
 
+        File.Delete(done);
+        // batch-error.txt của lần trước mà còn nằm đó thì chẩn đoán bên dưới ("add-in ĐÃ chạy") nói sai.
+        try { File.Delete(errorFile); } catch (Exception ex) { Console.Error.WriteLine("Không xoá được " + errorFile + " cũ: " + ex.Message); }
+
+        var journal = Path.Combine(dhcbDir, "dhcb-batch.txt");
+        File.WriteAllText(journal, RevitJournal(), new UTF8Encoding(false));
         File.WriteAllText(Path.Combine(dhcbDir, "DhcbTools.Revit.addin"),
             RevitAddinManifest.Build(addinDll), new UTF8Encoding(false));
         Console.WriteLine("Add-in cho batch: " + addinDll);
 
+        // pending-job.json là thứ DUY NHẤT khiến add-in chạy job khi Revit khởi động — ghi ngay trước khi mở
+        // Revit, và mọi nhánh không mở được Revit phải dọn nó (xem TryDeletePending).
+        File.WriteAllText(pending, new JObject
+        {
+            ["jobPath"] = Path.GetFullPath(opts.JobPath),
+            ["runLogPath"] = Path.GetFullPath(runLog),
+            ["maxMinutes"] = opts.MaxMinutes,
+            ["dryRun"] = opts.DryRun,
+        }.ToString());
+
         Console.WriteLine($"Mở Revit: {revitExe}");
-        using var process = Process.Start(new ProcessStartInfo(revitExe, "\"" + journal + "\" /nosplash") { UseShellExecute = false });
+        Process? started;
+        try
+        {
+            started = Process.Start(new ProcessStartInfo(revitExe, "\"" + journal + "\" /nosplash") { UseShellExecute = false });
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException || ex is IOException)
+        {
+            // --revit-exe trỏ vào file không chạy được (sai kiến trúc, bị chặn quyền, không phải .exe).
+            TryDeletePending(pending);
+            Console.Error.WriteLine("Không khởi động được Revit (" + revitExe + "): " + ex.Message);
+            return 2;
+        }
+
+        using var process = started;
         if (process is null)
         {
+            TryDeletePending(pending);
             Console.Error.WriteLine("Không khởi động được Revit.");
             return 2;
         }
@@ -142,6 +162,24 @@ public static partial class Program
             }
 
             TryDeletePending(pending);
+            // Ghi cả vào log của lượt: report.html chỉ đọc log, mà Revit sập sau 3/10 file thì log chỉ có dòng
+            // xanh của 3 file đã chạy — bảng báo cáo trông như một đêm trọn vẹn.
+            try
+            {
+                RunLog.Append(runLog, new RunLogEntry
+                {
+                    File = "*",
+                    Command = "Revit",
+                    Success = false,
+                    Summary = "Revit không báo hoàn thành (thiếu batch-done.json) — các file chưa có dòng nào trong log là CHƯA chạy."
+                              + (addinRan ? " Xem " + errorFile + " và " + addinLog + "." : " Add-in chưa từng chạy (hộp thoại lúc khởi động?)."),
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("Không ghi được dòng lỗi vào " + runLog + ": " + ex.Message);
+            }
+
             return 1;
         }
 

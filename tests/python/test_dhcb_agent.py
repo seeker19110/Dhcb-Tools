@@ -244,6 +244,26 @@ class SendBackgroundTests(unittest.TestCase):
 
         self.assertEqual({"success": False, "summary": "nổ trong Revit"}, result)
 
+    def test_job_bi_huy_vi_qua_han_nhan_viec_tra_ngay_khong_chay(self) -> None:
+        """Bridge trả 'abandoned' (luồng UI không nhận việc kịp hạn): lệnh KHÔNG chạy. Trước audit 2026-10-01
+        client không nhận ra trạng thái này, hỏi tiếp 30 phút rồi báo "VẪN ĐANG CHẠY"."""
+        abandoned = {"status": "abandoned", "error": "Hết hạn chờ 30 giây: Revit không nhận lệnh — lệnh KHÔNG chạy."}
+        with mock.patch.object(dhcb_agent, "request", side_effect=[{"id": "job1"}, abandoned]) as request, \
+                mock.patch.object(dhcb_agent.time, "sleep") as sleep:
+            result = dhcb_agent.send_background("revit", "KiemTra", {})
+
+        self.assertFalse(result["success"])
+        self.assertTrue(result["abandoned"])
+        self.assertIn("KHÔNG chạy", result["summary"])
+        self.assertEqual(2, request.call_count)
+        sleep.assert_not_called()
+
+    def test_job_bi_huy_khong_kem_ly_do_van_noi_ro(self) -> None:
+        with mock.patch.object(dhcb_agent, "request", side_effect=[{"id": "job1"}, {"status": "abandoned"}]):
+            result = dhcb_agent.send_background("autocad", "KiemTra", {})
+
+        self.assertIn("Autocad không nhận lệnh kịp hạn", result["summary"])
+
     def test_progress_404_tra_nguyen_phan_hoi(self) -> None:
         with mock.patch.object(dhcb_agent, "request", side_effect=[{"id": "job1"}, {"error": "404"}]):
             self.assertEqual({"error": "404"}, dhcb_agent.send_background("revit", "KiemTra", {}))

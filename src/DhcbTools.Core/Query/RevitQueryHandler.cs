@@ -33,7 +33,7 @@ public static class RevitQueryHandler
 
             _ => new { error = $"Query không xác định: \"{req.Query}\". " +
                  "Hợp lệ: document_info, elements, levels, views, sheets, rooms, families, warnings, links, stats, " +
-                 "element_geometry, parameters_of, schedule_rows, snapshot, selection, show_elements, active_view." }
+                 "element_geometry, parameters_of, schedule_rows, snapshot, document_context, selection, show_elements, active_view." }
         };
     }
 

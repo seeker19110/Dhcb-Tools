@@ -36,6 +36,24 @@ public class CliVerifyTests
         Assert.Contains("Không đọc được file", output);
     }
 
+    /// <summary>
+    /// Audit 2026-10-01 — 200.000 dấu "(" lồng nhau: bộ đọc cũ đệ quy tới tràn stack, runner chết hẳn (mã 134 trên
+    /// Linux, 0xC00000FD trên Windows) thay vì báo không đọc được file như mọi file IFC hỏng khác.
+    /// </summary>
+    [Fact]
+    public void FileIfcLongNgoacQuaSau_MaThoat1_KhongTranStack()
+    {
+        using var cli = new Cli();
+        var ifc = cli.Write("long-sau.ifc",
+            "ISO-10303-21;\nHEADER;\nFILE_SCHEMA(('IFC4'));\nENDSEC;\nDATA;\n#1=IFCWALL("
+            + new string('(', 200_000) + new string(')', 200_000) + ");\nENDSEC;\nEND-ISO-10303-21;\n");
+
+        var (code, output) = cli.Run("--verify-ifc", ifc);
+
+        Assert.Equal(1, code);
+        Assert.Contains("lồng sâu", output);
+    }
+
     [Fact]
     public void ThieuFile_IfcHoacIds_MaThoat2()
     {

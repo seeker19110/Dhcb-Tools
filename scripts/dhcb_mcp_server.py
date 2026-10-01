@@ -184,8 +184,28 @@ def respond(msg_id, result=None, error=None):
     sys.stdout.flush()
 
 
+def _stdin_lines():
+    """Từng dòng JSON-RPC từ stdin, giải mã UTF-8 theo ĐÚNG đặc tả MCP.
+
+    Trên Windows (Python < 3.15, không bật UTF-8 mode) stdin nối ống mang code page ANSI (cp1252/cp1258),
+    trong khi Claude Desktop gửi UTF-8 thô. "Đ" (0x90) và "ờ" (0x9D) không có trong hai code page đó →
+    UnicodeDecodeError làm sập server ngay câu tiếng Việt đầu tiên; các dấu khác thành mojibake và đi
+    thẳng vào config lệnh (tiền tố "Tầng" ghi vào mô hình thành "Táº§ng"). Đọc byte rồi tự giải mã;
+    dòng không phải UTF-8 thì bỏ như dòng JSON hỏng.
+    """
+    buffer = getattr(sys.stdin, "buffer", None)
+    if buffer is None:  # stdin đã là luồng văn bản thuần (test thay bằng StringIO)
+        yield from sys.stdin
+        return
+    for raw in buffer:
+        try:
+            yield raw.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
+
+
 def main():
-    for line in sys.stdin:
+    for line in _stdin_lines():
         line = line.strip()
         if not line:
             continue

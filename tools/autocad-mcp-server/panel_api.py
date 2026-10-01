@@ -79,10 +79,21 @@ def _require_safe_csv_path(config: dict[str, Any], name: str) -> None:
         raise ValueError(f"{name} phải nằm trong thư mục tạm")
 
 
+def _same_secret(provided: str, expected: str) -> bool:
+    """So hằng thời gian trên BYTE UTF-8.
+
+    hmac.compare_digest với hai chuỗi str ném TypeError khi có ký tự ngoài ASCII — kỹ sư gõ xác nhận
+    "đồng ý" thì tool MCP sập thay vì báo "cần xác nhận", và header X-Panel-Token lạ làm gateway rớt
+    kết nối không trả lời.
+    """
+    # surrogatepass: chuỗi JSON "\ud800" (surrogate lẻ) mã hoá được thay vì ném — chỉ đơn giản là không khớp.
+    return hmac.compare_digest(provided.encode("utf-8", "surrogatepass"), expected.encode("utf-8", "surrogatepass"))
+
+
 def _require_confirmation(command: str, payload: dict[str, Any]) -> None:
     expected = CONFIRMATIONS[command]
     provided = payload.get("confirmation")
-    if not isinstance(provided, str) or not hmac.compare_digest(provided, expected):
+    if not isinstance(provided, str) or not _same_secret(provided, expected):
         raise ValueError(
             f"{command} với dryRun=false cần xác nhận: truyền confirmation=\"{expected}\" "
             "(hoặc chạy dryRun=true để xem trước)"
@@ -390,7 +401,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def token_valid(self) -> bool:
         provided = self.headers.get("X-Panel-Token", "")
-        return bool(provided) and hmac.compare_digest(provided, PANEL_TOKEN)
+        return bool(provided) and _same_secret(provided, PANEL_TOKEN)
 
     def cors_headers(self) -> None:
         origin = self.headers.get("Origin")

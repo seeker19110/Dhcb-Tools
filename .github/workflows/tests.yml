@@ -140,6 +140,31 @@ jobs:
         run: |
           node -e "const fs=require('fs');const s=fs.readFileSync('tools/autocad-mcp-server/panel.html','utf8');const m=s.match(/<script>([\\s\\S]*?)<\\/script>/);if(!m)throw Error('script missing');new Function(m[1]);if(!s.includes('runCleanup(false)'))throw Error('real cleanup path missing');"
 
+      # Script .ps1 phải chạy được bằng Windows PowerShell 5.1 — bản có sẵn trên mọi máy kỹ sư. Toán tử chỉ có ở
+      # PowerShell 7 (?. ?? ?: && ||) làm 5.1 báo lỗi cú pháp cho CẢ file: install-nightly-task.ps1 từng như thế,
+      # nên cài task chạy đêm theo đúng README là hỏng ngay dòng lệnh đầu (audit 2026-10-01). Runner Linux có sẵn
+      # pwsh 7; bộ đọc của nó gắn loại token riêng cho đúng các toán tử này nên kiểm được mà không cần Windows.
+      - name: Kiểm script PowerShell (cú pháp, chạy được trên 5.1)
+        if: matrix.version == '2025'   # không phụ thuộc TFM, chạy một lần là đủ
+        shell: pwsh
+        run: |
+          $ps7Only = 'QuestionDot', 'QuestionQuestion', 'QuestionQuestionEquals', 'QuestionLBracket', 'AndAnd', 'OrOr', 'QuestionMark'
+          $bad = 0
+          foreach ($f in Get-ChildItem scripts/*.ps1) {
+            $tokens = $null; $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+            foreach ($e in $errors) {
+              Write-Host "::error file=scripts/$($f.Name),line=$($e.Extent.StartLineNumber)::$($e.Message)"
+              $bad++
+            }
+            foreach ($t in @($tokens | Where-Object { $ps7Only -contains $_.Kind.ToString() })) {
+              Write-Host "::error file=scripts/$($f.Name),line=$($t.Extent.StartLineNumber)::'$($t.Text)' chỉ có ở PowerShell 7 — Windows PowerShell 5.1 báo lỗi cú pháp cả file."
+              $bad++
+            }
+          }
+          if ($bad -gt 0) { exit 1 }
+          Write-Host "Mọi script .ps1 đọc được bằng cú pháp chung của PowerShell 5.1 và 7."
+
   # Build ĐẦY ĐỦ có WPF trên Windows — đúng thứ release.yml đóng gói.
   # Job check-build ở trên chạy UseWPF=false (Linux không có WindowsDesktop SDK), mà bật WPF
   # thì SDK BỎ System.IO khỏi implicit usings (tránh nhập nhằng System.IO.Path với

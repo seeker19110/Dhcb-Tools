@@ -203,5 +203,20 @@ namespace DhcbTools.Shared.Logic.Batch
             }
             return 0;
         }
+
+        /// <summary>
+        /// Mã thoát cuối của cả lượt chạy: mã nặng hơn giữa log và chính đường chạy (<paramref name="launchCode"/>
+        /// — runner Revit/AutoCAD trả về). Log rỗng là 1.
+        /// <para>
+        /// Vì sao không chỉ nhìn log: Revit sập (hoặc bị kill vì treo) sau 3/10 file thì log chỉ có 3 dòng xanh của
+        /// những file đã chạy — bảy file kia không hề có dòng nào. Bản cũ tính mã thoát từ log và bỏ mã 1 của runner,
+        /// nên Task Scheduler nhận 0 cho một đêm mới làm được một phần ba.
+        /// </para>
+        /// </summary>
+        public static int ExitCode(IReadOnlyCollection<RunLogEntry> entries, int launchCode)
+        {
+            var fromLog = entries.Count == 0 ? 1 : ExitCode(entries);
+            return Math.Max(fromLog, launchCode < 0 ? 1 : launchCode);
+        }
     }
 }

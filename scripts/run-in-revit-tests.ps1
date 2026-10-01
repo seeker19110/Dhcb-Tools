@@ -139,8 +139,12 @@ $stamp = Get-Date -Format 'yyyy-MM-dd_HH-mm-ss'
 # Dọn lượt cũ TRƯỚC khi chạy, không phải sau: chạy xong mới dọn thì lượt vừa chạy cũng nằm trong diện
 # đếm, và nếu Revit treo thì không bao giờ tới bước dọn. Chỉ đụng thư mục của ĐÚNG bộ ca kiểm này.
 if ($KeepRuns -gt 0 -and (Test-Path $OutputRoot)) {
+    # Khớp ĐÚNG "<bộ>-yyyy-MM-dd_HH-mm-ss" (như don-ket-qua.ps1), không phải "<bộ>-*": bộ "write" mà dùng -like
+    # "write-*" thì gom cả write-mep / write-asbuilt / write-plumbing vào, xoá bằng chứng của các bộ đó và đếm
+    # sai số lượt cần giữ của chính nó.
+    $ownRun = '^' + [regex]::Escape($Suite) + '-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$'
     $old = Get-ChildItem $OutputRoot -Directory -ErrorAction SilentlyContinue |
-           Where-Object { $_.Name -like "$Suite-*" } |
+           Where-Object { $_.Name -match $ownRun } |
            Sort-Object Name -Descending |
            Select-Object -Skip ($KeepRuns - 1)
     if ($old) {

@@ -303,7 +303,41 @@ namespace DhcbTools.Shared.Hosting
                     buffer.Write(chunk, 0, read);
                 }
 
-                return (req.ContentEncoding ?? Encoding.UTF8).GetString(buffer.ToArray());
+                return BodyEncoding(req.ContentType).GetString(buffer.ToArray());
+            }
+        }
+
+        /// <summary>
+        /// Bảng mã để giải body: đúng <c>charset</c> nếu client khai, còn lại UTF-8 — JSON trao đổi giữa hai hệ
+        /// thống phải là UTF-8 (RFC 8259 §8.1) và <c>application/json</c> không có tham số charset nào bắt buộc.
+        /// <para>
+        /// Không dùng <c>HttpListenerRequest.ContentEncoding</c>: thiếu charset thì nó trả <c>Encoding.Default</c>,
+        /// mà trên .NET Framework (Revit/AutoCAD ≤ 2024) đó là code page ANSI của Windows. Client gửi
+        /// <c>"Mã hiệu"</c> bằng UTF-8 với <c>Content-Type: application/json</c> trơn (curl, PowerShell, Node) thì
+        /// lệnh nhận <c>"MÃ£ hiá»‡u"</c> và tra tham số sai tên; script Python đi kèm chỉ thoát nạn vì
+        /// <c>json.dumps</c> mặc định escape hết ký tự ngoài ASCII.
+        /// </para>
+        /// </summary>
+        public static Encoding BodyEncoding(string? contentType)
+        {
+            const string Key = "charset=";
+            var at = contentType?.IndexOf(Key, StringComparison.OrdinalIgnoreCase) ?? -1;
+            if (at < 0)
+            {
+                return Encoding.UTF8;
+            }
+
+            var value = contentType!.Substring(at + Key.Length);
+            var end = value.IndexOf(';');
+            var name = (end >= 0 ? value.Substring(0, end) : value).Trim().Trim('"', '\'').Trim();
+            try
+            {
+                return name.Length == 0 ? Encoding.UTF8 : Encoding.GetEncoding(name);
+            }
+            catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException)
+            {
+                // Tên bảng mã lạ (hoặc code page chưa đăng ký trên .NET) — đọc như UTF-8 thay vì từ chối request.
+                return Encoding.UTF8;
             }
         }
 

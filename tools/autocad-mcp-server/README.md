@@ -92,6 +92,11 @@ gateway chỉ bind `127.0.0.1`; **header `Host` phải là `127.0.0.1:8767` ho�
 `421` (chặn DNS rebinding: trang web ngoài trỏ tên miền của nó về loopback, request điều hướng không có
 `Origin` nên chỉ `Host` chặn được); và mọi XHR còn phải qua whitelist `Origin` + header `X-Panel-Token`.
 
+Giới hạn còn lại (audit 2026-10-01): loopback không phân biệt tài khoản Windows, nên trên máy **nhiều người dùng**
+(máy dùng chung, Remote Desktop Services) tiến trình của tài khoản khác cũng đọc được `/panel`, lấy token phiên, rồi
+điều khiển AutoCAD của bạn qua gateway — gateway gọi Bridge bằng token của bạn, đi vòng ACL của
+`bridge-token.txt`. Chỉ chạy panel trên máy một người dùng; xem [`SECURITY.md`](../../SECURITY.md).
+
 Phía sau gateway, token **Bridge** (`%APPDATA%\DHCB\bridge-token.txt`) chỉ đi tới `http://127.0.0.1:8766` qua
 opener **không dùng proxy** (`panel_api.LOOPBACK`): urllib mặc định đi theo proxy hệ thống và không tự bỏ qua
 loopback, nên trên máy có proxy công ty header `Bearer` từng có thể lọt ra proxy; còn `localhost` có thể phân

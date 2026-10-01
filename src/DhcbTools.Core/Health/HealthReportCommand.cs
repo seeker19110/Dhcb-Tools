@@ -207,7 +207,9 @@ public sealed class HealthReportCommand : ICoreCommand<HealthReportConfig>
         sb.AppendLine("<head>");
         sb.AppendLine("<meta charset=\"UTF-8\">");
         sb.AppendLine("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">");
-        sb.AppendLine($"<title>DHCB — Báo cáo sức khoẻ mô hình – {projectName}</title>");
+        // Tên dự án lấy từ Project Information của model (có thể là model nhận từ bên ngoài): phải escape cả ở
+        // <title> — chỗ duy nhất trước đây chèn thẳng, "</title><script>…" là chạy script khi trang tự mở.
+        sb.AppendLine($"<title>DHCB — Báo cáo sức khoẻ mô hình – {HtmlEncode(projectName)}</title>");
         sb.AppendLine("<style>");
         sb.AppendLine("  body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #f5f5f5; color: #222; }");
         sb.AppendLine("  .header { background: #1a1a2e; color: #fff; padding: 24px 32px; }");

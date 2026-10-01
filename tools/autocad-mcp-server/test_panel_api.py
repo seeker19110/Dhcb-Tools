@@ -219,6 +219,32 @@ class OriginPolicyTests(unittest.TestCase):
         self.assertFalse(handler.token_valid())
 
 
+class NonAsciiSecretTests(unittest.TestCase):
+    """hmac.compare_digest trên str ném TypeError khi có ký tự ngoài ASCII (audit 2026-10-01)."""
+
+    def test_xac_nhan_tieng_viet_bi_tu_choi_bang_valueerror(self) -> None:
+        # "\ud800": surrogate lẻ mà json.loads vẫn trả về — mã hoá UTF-8 thường sẽ ném thay vì chỉ "không khớp".
+        for confirmation in ("đồng ý", "\ud800"):
+            payload = {
+                "command": "DrawingCleanup",
+                "config": {"dryRun": False, "purgeUnused": True, "auditErrors": True},
+                "confirmation": confirmation,
+            }
+            with self.subTest(confirmation=confirmation), self.assertRaisesRegex(ValueError, "DELETE_UNUSED"):
+                panel_api.validate_proxy_payload("/execute", payload)
+
+    def test_tool_mcp_xac_nhan_tieng_viet_tra_loi_huong_dan(self) -> None:
+        text = server.autocad_execute("DrawingCleanup", dry_run=False, confirm="đồng ý")
+        self.assertIn("DELETE_UNUSED", text)
+
+    def test_token_ngoai_ascii_la_403_khong_rot_ket_noi(self) -> None:
+        handler = make_handler("/health", token="t\xe9st")
+        with mock.patch.object(panel_api, "fetch_autocad") as fetch:
+            handler.do_GET()
+            fetch.assert_not_called()
+        self.assertEqual(handler.captured[0]["code"], 403)
+
+
 class HostPolicyTests(unittest.TestCase):
     """DNS rebinding: a foreign Host header must be refused on every method, before anything else."""
 
