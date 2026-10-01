@@ -7,6 +7,9 @@
 > trên Windows; batch AutoCAD bỏ qua `saveOnError` (lưu đè file gốc có bước lỗi); Revit sập giữa đêm vẫn ra mã thoát 0;
 > script cài task chạy đêm lỗi cú pháp trên Windows PowerShell 5.1. Xem
 > [audit-toan-dien-2026-10-01.md](audit-toan-dien-2026-10-01.md), gồm phần cần chạy lại trong Revit/AutoCAD.
+> Vòng 2 cùng ngày (8 mục): `ParameterImport` ghi tham số type một lần, báo xung đột thay vì phụ thuộc thứ tự dòng;
+> panel AutoCAD đòi khoá khởi chạy nên tài khoản Windows khác không lấy được token; `AttributeImport` hết ghi nhầm
+> attribute trùng tag; `LayerTranslate` đổi cả attribute; lệnh ghi AutoCAD không sập vì layer khoá.
 
 > Bổ sung 2026-09-28: audit bảo mật/quy trình/công cụ — Bridge không còn bị trang web khoá bằng request sai token,
 > client Python không đưa token Bridge ra proxy hệ thống, regex find/replace có trần thời gian, action ghim SHA,

@@ -137,6 +137,13 @@ Thêm lệnh Core mới = thêm class + một dòng trong `Shared.Logic/Ai/Comma
 - Lớp AI phải giữ offline: endpoint model chỉ loopback, không thêm SDK cloud, không commit API key.
 - Thay đổi ở `DhcbTools.Core`/`DhcbTools.Core.AutoCAD` ảnh hưởng cả Ribbon lẫn HTTP Bridge — kiểm
   tra cả hai đường gọi trước khi merge.
+- Lệnh ghi: xem trước và chạy thật đi **cùng một vòng** quyết định (cái gì ghi, cái gì bỏ qua), chỉ khác chỗ có ghi
+  hay không — để con số xem trước khớp chạy thật. Lệnh AutoCAD mở entity/attribute để ghi thì tra
+  `AcadHelpers.LockedLayerIds` và báo bằng `LockedLayerSkips` (mở trên layer khoá ném `eOnLockedLayer`, sập cả lệnh);
+  tra theo handle thì xét `ObjectId.IsErased` trước `GetObject`. Nhớ `AttributeReference` không nằm trong
+  `BlockTableRecord` — lặp entity thì xét thêm attribute của block reference.
+- Panel AutoCAD: route phát token (`/panel`) chỉ mở bằng khoá khởi chạy trong `%LOCALAPPDATA%` — đừng thêm đường
+  nào khác trả token hay HTML của panel mà không đòi khoá.
 
 ## Tài liệu liên quan
 
