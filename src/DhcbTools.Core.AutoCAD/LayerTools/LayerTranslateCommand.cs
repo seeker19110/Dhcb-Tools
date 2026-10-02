@@ -205,17 +205,19 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
                     continue;
                 }
 
-                if (config.DryRun)
-                {
-                    report.Add($"[Xem trước] Sẽ xoá layer nguồn rỗng: \"{source}\".");
-                    deletedLayers.Add(source);
-                    continue;
-                }
-
+                // Xét layer hiện hành TRƯỚC nhánh xem trước: bản cũ chỉ xét lúc chạy thật, nên xem trước báo "sẽ xoá" cả layer
+                // hiện hành rồi chạy thật giữ lại — con số "xoá N layer" của hai lượt lệch nhau.
                 var layerId = layerTable[source];
                 if (layerId == database.Clayer)
                 {
                     report.Add($"Không xoá layer nguồn \"{source}\" vì đang là layer hiện hành.");
+                    continue;
+                }
+
+                if (config.DryRun)
+                {
+                    report.Add($"[Xem trước] Sẽ xoá layer nguồn rỗng: \"{source}\".");
+                    deletedLayers.Add(source);
                     continue;
                 }
 
@@ -252,7 +254,7 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
     {
         if (row.Color is not null)
         {
-            if (short.TryParse(row.Color, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var aci) && aci >= 1 && aci <= 255)
+            if (TryParseAci(row.Color, out var aci))
             {
                 layer.Color = Color.FromColorIndex(ColorMethod.ByAci, aci);
             }
@@ -285,7 +287,7 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
 
         if (row.Plottable is not null)
         {
-            if (bool.TryParse(row.Plottable, out var plottable) || TryParseBit(row.Plottable, out plottable))
+            if (TryParsePlottable(row.Plottable, out var plottable))
             {
                 layer.IsPlottable = plottable;
             }
@@ -296,9 +298,17 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
         }
     }
 
-    /// <summary>Xem trước: chỉ kiểm giá trị (kể cả linetype có nạp được không) mà không tạo gì.</summary>
+    /// <summary>
+    /// Xem trước: chỉ kiểm giá trị (kể cả linetype có nạp được không) mà không tạo gì. Báo đủ những ô mà
+    /// <see cref="ApplyProperties"/> sẽ bỏ qua — bản cũ quên màu và Plottable, nên lỗi đó chỉ lộ ra lúc chạy thật.
+    /// </summary>
     private static void DescribePlannedProperties(Database database, Transaction transaction, MapRow row, List<string> report)
     {
+        if (row.Color is not null && !TryParseAci(row.Color, out _))
+        {
+            report.Add($"Dòng {row.Line}: màu \"{row.Color}\" không phải chỉ số ACI 1–255, layer \"{row.Target}\" sẽ giữ màu mặc định.");
+        }
+
         if (row.Linetype is not null)
         {
             var linetypeTable = (LinetypeTable)transaction.GetObject(database.LinetypeTableId, OpenMode.ForRead);
@@ -312,7 +322,21 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
         {
             report.Add($"Dòng {row.Line}: lineweight \"{row.Lineweight}\" không có trong bảng chuẩn AutoCAD (đơn vị 1/100 mm).");
         }
+
+        if (row.Plottable is not null && !TryParsePlottable(row.Plottable, out _))
+        {
+            report.Add($"Dòng {row.Line}: Plottable \"{row.Plottable}\" phải là true/false.");
+        }
     }
+
+    /// <summary>Màu trong CSV: chỉ số ACI 1–255.</summary>
+    private static bool TryParseAci(string text, out short aci)
+        => short.TryParse(text, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out aci)
+           && aci >= 1 && aci <= 255;
+
+    /// <summary>Plottable trong CSV: true/false hoặc 1/0.</summary>
+    private static bool TryParsePlottable(string text, out bool plottable)
+        => bool.TryParse(text, out plottable) || TryParseBit(text, out plottable);
 
     /// <summary>ObjectId của linetype theo tên; chưa có thì nạp từ acad.lin; nạp không được → báo, trả Null.</summary>
     private static ObjectId ResolveLinetype(Database database, Transaction transaction, string name, MapRow row, List<string> report)
