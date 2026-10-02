@@ -1,6 +1,6 @@
 ﻿# Lộ trình phát triển DHCB Tools
 
-> Mới nhất: [audit toàn diện 2026-10-01](audit-toan-dien-2026-10-01.md) — 17 mục ở vòng 1 và 8 mục ở vòng 2 đã sửa (gồm hai mục từng để lại: `ParameterImport` tham số type, khoá khởi chạy của panel); mục "Để lại" và "Cần chạy lại trong Revit/AutoCAD" của cả hai vòng là phần còn chờ.
+> Mới nhất: [audit toàn diện 2026-10-01](audit-toan-dien-2026-10-01.md) — 17 mục ở vòng 1 và 9 mục ở vòng 2 đã sửa (gồm hai mục từng để lại: `ParameterImport` tham số type, khoá khởi chạy của panel); mục "Để lại" và "Cần chạy lại trong Revit/AutoCAD" của cả hai vòng là phần còn chờ.
 >
 > Trước đó: [audit bảo mật, quy trình và công cụ 2026-09-28](audit-bao-mat-2026-09-28.md) — tám mục đã sửa; mục "Việc cần chủ repo bật" là phần còn lại ngoài mã nguồn.
 >
