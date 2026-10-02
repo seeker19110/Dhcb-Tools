@@ -144,6 +144,9 @@ Thêm lệnh Core mới = thêm class + một dòng trong `Shared.Logic/Ai/Comma
   `BlockTableRecord` — lặp entity thì xét thêm attribute của block reference.
 - Panel AutoCAD: route phát token (`/panel`) chỉ mở bằng khoá khởi chạy trong `%LOCALAPPDATA%` — đừng thêm đường
   nào khác trả token hay HTML của panel mà không đòi khoá.
+- Thêm script vào `scripts/` thì xếp loại luôn: script người dùng chạy được từ thư mục cài đặt thì thêm vào
+  `installer/batchrunner-scripts.txt` (release chỉ chép đúng danh sách này); script repo/CI/ký số thì thêm vào
+  `NOT_SHIPPED` trong `tests/python/test_package_scripts.py` — chưa xếp loại là test đỏ.
 
 ## Tài liệu liên quan
 
