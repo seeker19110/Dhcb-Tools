@@ -200,7 +200,12 @@ jobs:
           Copy-Item "src/DhcbTools.BatchRunner/bin/Release/$tfm/*" $pkg -Recurse
           Copy-Item jobs/*.json "$pkg/jobs"
           Copy-Item configs/* "$pkg/configs"
-          Copy-Item scripts/*.py, scripts/*.ps1 "$pkg/scripts"
+          # Chỉ script người dùng — installer/batchrunner-scripts.txt. Trước đây scripts/*.py, *.ps1 kéo theo cả script
+          # ký số/CI/ruleset vào máy kỹ sư. Thiếu file nào thì dừng: gói thiếu script là lỗi im lặng tới tay người dùng.
+          Get-Content installer/batchrunner-scripts.txt |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { $_ -and -not $_.StartsWith('#') } |
+            ForEach-Object { Copy-Item (Join-Path scripts $_) "$pkg/scripts" -ErrorAction Stop }
           Copy-Item docs/batch-runner.md, docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md $pkg
 
       # Ký Authenticode khi repo có secret chứng chỉ (DHCB_SIGN_PFX_BASE64/_PASSWORD); không có thì bỏ qua, gói
@@ -261,13 +266,19 @@ jobs:
 
           Get-ChildItem $stage | Format-Table Name, Mode
 
+      # Ghim 6.7.1. Inno Setup 7 đã ra (7.0.0 ngày 2026-05-14, 7.1.0 ngày 2026-08-10 — tag is-7_* của jrsoftware/issrc):
+      # `choco install innosetup` không ghim sẽ kéo 7.x, cài vào thư mục khác "Inno Setup 6" mà bước dưới gọi, và
+      # dhcb-tools.iss chưa thử với trình biên dịch 7. 6.7.1 là bản 6.x cuối cùng từng là bản mới nhất (02→05/2026)
+      # nên chắc chắn có trên Chocolatey; 6.7.2/6.7.3 ra cùng ngày hoặc sau 7.0 nên có thể không được đăng.
       - name: Cài Inno Setup
-        run: choco install innosetup -y --no-progress
+        run: choco install innosetup --version=6.7.1 -y --no-progress
 
       - name: Đóng gói installer
         shell: pwsh
         run: |
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "Không thấy $iscc — bước cài Inno Setup (ghim 6.7.1) không cài được bản 6." }
+          & $iscc `
             "/DVersion=${{ needs.version.outputs.version }}" `
             "/DStageDir=..\dist\stage" `
             installer/dhcb-tools.iss

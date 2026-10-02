@@ -78,7 +78,7 @@ Source: "{#StageDir}\batchrunner\*"; DestDir: "{app}"; \
   Components: batch; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; ── Script Python: dhcb_agent.py / dhcb_mcp_server.py / dhcb_ai.py ──────────
-; release.yml đã chép scripts/*.py và *.ps1 vào gói batchrunner, nhưng người chỉ cài phần "scripts"
+; release.yml chép các script trong installer/batchrunner-scripts.txt vào gói batchrunner, nhưng người chỉ cài phần "scripts"
 ; (không cài batch runner) vẫn cần chúng: MCP server cho Claude Desktop và client dòng lệnh đều nằm ở đây.
 ; Chỉ cần Python 3.9+, không có dependency ngoài.
 Source: "{#StageDir}\batchrunner\scripts\*"; DestDir: "{app}\scripts"; \

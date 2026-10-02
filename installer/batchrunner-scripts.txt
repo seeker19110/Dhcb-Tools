@@ -1,0 +1,17 @@
+# Script đi kèm gói BatchRunner — và thành phần "scripts" của installer, vốn chép từ chính gói này.
+# Mỗi dòng một tên file trong scripts/. release.yml chỉ chép đúng các file này; thiếu file nào thì dừng.
+#
+# Chỉ script NGƯỜI DÙNG chạy được từ thư mục cài đặt, không cần repo. Trước đây release.yml chép mọi
+# scripts/*.py, *.ps1 nên máy kỹ sư nhận cả script ký số, CI và sửa ruleset của repo. Không đi kèm (danh
+# sách và lý do ở tests/python/test_package_scripts.py, bộ test bắt mọi script mới phải được xếp loại):
+#   sign-addin.ps1, sign-release.ps1      ký số — cần chứng chỉ của tổ chức
+#   check-coverage.py, ids-conformance.py, muc-luc-bang-chung.py, apply-rulesets.py, fix-ruleset.py   CI / quản trị repo
+#   pack-mcpb.ps1                         đóng gói .mcpb từ cây thư mục repo
+#   dung-family.ps1                       build add-in từ mã nguồn rồi mới dựng family
+#   run-in-revit-tests.ps1, run-in-autocad-tests.ps1   cần tests/suites của repo
+dhcb_agent.py
+dhcb_mcp_server.py
+dhcb_ai.py
+doi-chieu-setout-ifc.py
+install-nightly-task.ps1
+don-ket-qua.ps1
