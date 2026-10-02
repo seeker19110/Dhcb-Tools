@@ -5,8 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AutoCAD Control Panel</title>
 <script>
-  // Mở từ file:// thì chuyển sang gateway (origin "null" bị gateway từ chối). Luôn chuyển tới 127.0.0.1
-  // cho nhất quán; mở tay bằng http://localhost:8767/panel cũng được vì gateway cho phép cả hai origin.
+  // Mở thẳng file này từ file:// thì chuyển sang gateway (origin "null" bị gateway từ chối). Thiếu khoá khởi
+  // chạy ?k= nên gateway trả 403 kèm hướng dẫn: đường mở đúng là file khởi chạy %LOCALAPPDATA%\DHCB\autocad-panel.html
+  // (tool autocad_open_panel trả về chính file đó) hoặc URL mà panel_api.py in ra khi chạy tay.
   if (location.protocol === 'file:') location.replace('http://127.0.0.1:8767/panel');
 </script>
 <style>

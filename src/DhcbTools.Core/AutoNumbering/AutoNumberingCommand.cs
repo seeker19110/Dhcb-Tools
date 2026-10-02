@@ -59,21 +59,11 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
             .Select(a => (Element: a.Key, Value: a.Value))
             .ToList();
 
-        if (config.DryRun)
-        {
-            var preview = CommandResult.Ok(
-                $"[Xem trước] Sẽ đánh số {plan.Count} phần tử \"{config.Category}\" vào tham số \"{config.ParameterName}\".",
-                plan.Count);
-            preview.Messages.AddRange(plan.Select(p => $"{p.Element.Id}: \"{p.Value}\""));
-            return preview;
-        }
-
-        var updated = 0;
-        using var transaction = new Transaction(document, $"DHCB - Đánh số {config.Category}");
-        transaction.Start();
-        RevitCompat.ApplyFailurePolicy(transaction);
-
+        // Tra tham số đích cho CẢ xem trước lẫn chạy thật. Bản cũ chỉ tra lúc ghi: xem trước báo "sẽ đánh số 120" rồi
+        // chạy thật "40/120" vì 80 phần tử không có tham số / tham số chỉ đọc — xem trước mất tác dụng.
         var result = CommandResult.Ok(string.Empty);
+        var targets = new List<(Element Element, Parameter Parameter, string Value)>();
+        var unchanged = 0;
         foreach (var (element, value) in plan)
         {
             // Chỉ instance (ghi vào type là đổi cả loạt) nhưng qua từ điển để nhận tên đồng nghĩa tiếng Việt.
@@ -84,14 +74,52 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
                 continue;
             }
 
-            parameter.Set(value);
-            updated++;
-            result.WithChanged(RevitCompat.IdValue(element.Id));
+            if (string.Equals(parameter.AsString() ?? string.Empty, value, StringComparison.Ordinal))
+            {
+                // Đã đúng số: không ghi lại (không làm bẩn mô hình, không đếm là "đã đánh số").
+                unchanged++;
+                continue;
+            }
+
+            targets.Add((element, parameter, value));
         }
 
         if (unknown.Count > 0)
         {
             result.Messages.Add($"Bỏ qua category không xác định: {string.Join(", ", unknown)}.");
+        }
+
+        if (unchanged > 0)
+        {
+            result.Messages.Insert(0, $"{unchanged} phần tử đã đúng số, không ghi lại.");
+        }
+
+        if (config.DryRun)
+        {
+            var preview = CommandResult.Ok(
+                $"[Xem trước] Sẽ đánh số {targets.Count}/{plan.Count} phần tử \"{config.Category}\" vào tham số \"{config.ParameterName}\".",
+                targets.Count);
+            preview.Messages.AddRange(result.Messages);
+            preview.Messages.AddRange(targets.Select(t => $"{t.Element.Id}: \"{t.Value}\""));
+            return preview;
+        }
+
+        var updated = 0;
+        using var transaction = new Transaction(document, $"DHCB - Đánh số {config.Category}");
+        transaction.Start();
+        RevitCompat.ApplyFailurePolicy(transaction);
+
+        foreach (var (element, parameter, value) in targets)
+        {
+            // Set trả false khi Revit không nhận giá trị — trước đây kết quả này bị bỏ qua và vẫn đếm là đã đánh số.
+            if (!parameter.Set(value))
+            {
+                result.Messages.Add($"Bỏ qua phần tử {element.Id}: Revit không nhận giá trị \"{value}\" cho \"{config.ParameterName}\".");
+                continue;
+            }
+
+            updated++;
+            result.WithChanged(RevitCompat.IdValue(element.Id));
         }
 
         transaction.Commit();
