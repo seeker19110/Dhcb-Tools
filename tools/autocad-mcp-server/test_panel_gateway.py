@@ -466,6 +466,23 @@ class LaunchFileTests(unittest.TestCase):
             self.assertNotIn(panel_api.PANEL_TOKEN, page)  # token phiên chỉ có trong /panel, không nằm trên đĩa
             self.assertEqual(["autocad-panel.html"], [p.name for p in target.parent.iterdir()])
 
+    def test_mo_file_o_che_do_nhi_phan_khi_he_dieu_hanh_co_co_o_binary(self) -> None:
+        """Windows: thiếu O_BINARY thì CRT đổi "\\n" thêm lần nữa — file ra "\\r\\r\\n". Giả lập cờ trên Linux."""
+        fake_binary = 1 << 30
+        real_open = panel_api.os.open
+        seen: list[int] = []
+
+        def recording_open(path, flags, mode=0o777):
+            seen.append(flags)
+            return real_open(path, flags & ~fake_binary, mode)
+
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.object(panel_api.os, "O_BINARY", fake_binary, create=True), \
+                mock.patch.object(panel_api.os, "open", side_effect=recording_open):
+            panel_api.write_launch_file(Path(tmp) / "autocad-panel.html")
+
+        self.assertTrue(seen and seen[0] & fake_binary)
+
     @unittest.skipIf(sys.platform == "win32", "quyền POSIX; trên Windows quyền là ACL thừa kế của %LOCALAPPDATA%")
     def test_file_chi_chu_tai_khoan_doc_duoc(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -518,21 +535,38 @@ class MainTests(unittest.TestCase):
 
             self.assertEqual("khoá của gateway đang giữ port", target.read_text(encoding="utf-8"))
 
-    def test_khong_ghi_duoc_file_thi_van_phuc_vu_va_in_url(self) -> None:
+    def test_khong_ghi_duoc_file_thi_van_phuc_vu_in_url_va_xoa_file_khoa_cu(self) -> None:
+        """File cũ mang khoá của gateway trước (terminate() không dọn) mà để lại thì tool trỏ tới một trang 403."""
         server = mock.Mock()
-        with mock.patch.object(panel_api, "ThreadingHTTPServer", return_value=server), \
-                mock.patch.object(panel_api, "write_launch_file", side_effect=PermissionError("cấm")), \
-                mock.patch("builtins.print") as printed:
-            panel_api.main()
+        with tempfile.TemporaryDirectory() as tmp:
+            stale = Path(tmp) / "autocad-panel.html"
+            stale.write_text("khoá của gateway trước", encoding="utf-8")
+            with mock.patch.object(panel_api, "ThreadingHTTPServer", return_value=server), \
+                    mock.patch.object(panel_api, "launch_file_path", return_value=stale), \
+                    mock.patch.object(panel_api, "write_launch_file", side_effect=PermissionError("cấm")), \
+                    mock.patch("builtins.print") as printed:
+                panel_api.main()
+
+            self.assertFalse(stale.exists())
 
         server.serve_forever.assert_called_once()
         output = " ".join(str(c) for c in printed.call_args_list)
         self.assertIn("Không ghi được file khởi chạy", output)
         self.assertIn(panel_api.panel_url(), output)
 
+    def test_khong_xoa_duoc_file_khoa_cu_thi_van_phuc_vu(self) -> None:
+        server = mock.Mock()
+        stale = mock.Mock(spec=Path)
+        stale.unlink.side_effect = PermissionError("đang mở ở chương trình khác")
+        with mock.patch.object(panel_api, "ThreadingHTTPServer", return_value=server), \
+                mock.patch.object(panel_api, "launch_file_path", return_value=stale), \
+                mock.patch.object(panel_api, "write_launch_file", side_effect=PermissionError("cấm")), \
+                mock.patch("builtins.print"):
+            panel_api.main()
 
-if __name__ == "__main__":
-    unittest.main()
+        stale.unlink.assert_called_once_with(missing_ok=True)
+        server.serve_forever.assert_called_once()
+
 
 
 class ValidationErrorTests(unittest.TestCase):
@@ -564,3 +598,7 @@ class ValidationErrorTests(unittest.TestCase):
         self._reject("/execute", {"command": "AutoNumbering", "config": {
             "dryRun": True, "blockName": "TITLE", "attributeTag": "MARK", "prefix": "D-",
             "startNumber": "một", "step": 1, "padWidth": 3}}, "startNumber phải là số nguyên")
+
+
+if __name__ == "__main__":
+    unittest.main()

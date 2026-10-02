@@ -6,6 +6,7 @@ AI endpoint. Uses only the Python standard library.
 
 from __future__ import annotations
 
+import contextlib
 import hmac
 import json
 import os
@@ -129,7 +130,10 @@ def write_launch_file(path: Path) -> None:
     )
     temp = path.with_name(path.name + ".tmp")
     temp.unlink(missing_ok=True)
-    fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    # O_BINARY (chỉ có trên Windows): os.open mặc định mở fd ở chế độ văn bản của CRT, nên "\r\n" mà TextIOWrapper ghi
+    # ra bị đổi thêm lần nữa thành "\r\r\n" — cùng lý do module tempfile luôn thêm cờ này.
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
+    fd = os.open(temp, flags, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         handle.write(page)
     os.replace(temp, path)
@@ -595,6 +599,10 @@ def main() -> None:
         write_launch_file(launch_file)
     except OSError as exc:
         print(f"Không ghi được file khởi chạy {launch_file}: {exc} — dùng URL bên dưới.", flush=True)
+        # File còn lại từ lần trước mang khoá của gateway CŨ (terminate() không dọn): để đó thì autocad_open_panel
+        # trỏ người dùng tới một trang 403. Xoá được thì tool báo rõ "không có file khởi chạy".
+        with contextlib.suppress(OSError):
+            launch_file.unlink(missing_ok=True)
         launch_file = None
     print(f"AutoCAD panel gateway listening at http://{HOST}:{PORT}", flush=True)
     # In URL kèm khoá cho người chạy tay; server.py chạy gateway với stdout=DEVNULL nên khoá không đi đâu khác.
