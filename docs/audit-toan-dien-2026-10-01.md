@@ -57,9 +57,9 @@ Tài liệu đi kèm: `docs/batch-runner.md` (ngữ nghĩa `saveOnError` hai bê
 |---|---|
 | ~~`ParameterImport` ghi tham số **Type** theo từng dòng CSV và so với giá trị HIỆN TẠI: sửa một dòng của type, các dòng sau (vẫn mang giá trị cũ của bản xuất) ghi đè lại — kết quả phụ thuộc thứ tự dòng, summary đếm cả hai lần ghi~~ | **Đã sửa ở vòng 2** (mục V2-1), theo đúng đề xuất: so với giá trị trước khi nhập, xung đột thì không ghi |
 | ~~Panel gateway phát token phiên cho mọi tiến trình loopback (tài khoản khác trên máy dùng chung)~~ | **Đã sửa ở vòng 2** (mục V2-2): kênh mang bí mật là chính file mà `::preview{file=…}` mở — gateway ghi nó vào `%LOCALAPPDATA%` |
-| Gói BatchRunner chép **mọi** `scripts/*.py`/`*.ps1`, kể cả script quản trị repo (`apply-rulesets.py`, `fix-ruleset.py`, `check-coverage.py`, `sign-addin.ps1`) | Không gây hại; dọn danh sách đóng gói là việc của lần phát hành sau |
-| `release.yml` cài Inno Setup bằng `choco install innosetup` không ghim phiên bản | Choco kiểm checksum của gói; ghim phiên bản cần chọn bản đã kiểm trên installer hiện tại |
-| `PackageContents.xml` liệt kê cả ba thành phần AutoCAD dù người dùng chỉ chọn một | AutoCAD năm không được cài chỉ báo không nạp được DLL; cần dựng file theo thành phần đã chọn trong `[Code]` của installer |
+| ~~Gói BatchRunner chép **mọi** `scripts/*.py`/`*.ps1`, kể cả script quản trị repo (`apply-rulesets.py`, `fix-ruleset.py`, `check-coverage.py`, `sign-addin.ps1`)~~ | **Đã sửa ở vòng 3** (mục V3-3) |
+| ~~`release.yml` cài Inno Setup bằng `choco install innosetup` không ghim phiên bản~~ | **Đã sửa ở vòng 3** (mục V3-4) — hoá ra không chỉ là vệ sinh: Inno Setup 7 đã ra |
+| `PackageContents.xml` liệt kê cả ba thành phần AutoCAD dù người dùng chỉ chọn một | Vẫn để lại — xem bảng "Để lại" của vòng 3 |
 
 ## Cần chạy lại trong Revit/AutoCAD trước khi phát hành
 
@@ -127,8 +127,8 @@ Riêng phần chạm API AutoCAD thì không có AutoCAD ở máy audit: kết l
 
 | Mục | Vì sao để lại |
 |---|---|
-| Ba mục đóng gói ở bảng "Để lại" vòng 1 (script quản trị trong gói BatchRunner, `choco install innosetup` không ghim, `PackageContents.xml` liệt kê đủ ba năm AutoCAD) | Không có lỗ hổng. Ghim Inno Setup cần biết số phiên bản đang có trên Chocolatey — máy audit không truy cập được (proxy chặn), ghim mò thì hỏng bước phát hành. Thu gọn danh sách script cần đi kèm một bước CI đối chiếu với script mà tài liệu người dùng nhắc tới (`dhcb_agent.py`, `dhcb_mcp_server.py`, `dhcb_ai.py`, `install-nightly-task.ps1`, `don-ket-qua.ps1`, `dung-family.ps1`, …), nếu không sẽ cắt nhầm |
-| `LayerImport` gặp hai dòng cùng tên layer | Dòng sau thắng (kể cả khi xem trước báo "tạo mới" hai lần). CSV xuất ra không có trùng; chỉ xảy ra khi sửa tay — để cùng lần làm lại thông báo của lệnh |
+| Ba mục đóng gói ở bảng "Để lại" vòng 1 | Hai mục đã sửa ở vòng 3 (V3-3, V3-4); `PackageContents.xml` còn để lại |
+| ~~`LayerImport` gặp hai dòng cùng tên layer~~ | **Đã sửa ở vòng 3** (mục V3-1) |
 
 ### Cần chạy lại trong AutoCAD/Revit trước khi phát hành
 
@@ -154,3 +154,48 @@ Riêng phần chạm API AutoCAD thì không có AutoCAD ở máy audit: kết l
 | Test panel đỏ trên mã cũ | Chạy hai ca mới của `GetAuthTests` trên `panel_api.py` cũ (bơm sẵn một `LAUNCH_KEY` giả để ca chạy được): `/panel` trần **được phục vụ kèm token** — ca đỏ đúng câu "panel served without the launch key"; ca có khoá đúng cũng đỏ vì mã cũ so path tuyệt đối. Các biến thể có query (`?k=sai`…) mã cũ vốn trả 403 qua kiểm token — đỏ vì dạng phản hồi khác, không phải lộ token |
 | Gateway chạy thật | `GET /panel` → `403 text/plain`, không có token; `GET /panel?k=<khoá trong file>` → `200`, kèm `Referrer-Policy`; file khởi chạy quyền `600`; gateway thứ hai (bind lỗi) không đổi file; Ctrl+C xoá file |
 | Biên dịch Core + bốn vỏ (API NuGet, `UseWPF=false`) | 2023 / 2024 / 2025 / 2026 / 2027: **0 lỗi, 0 cảnh báo** (25/25 project) |
+
+---
+
+## Vòng 3 — xử lý việc để lại (2026-10-02, nối tiếp PR #175)
+
+Chủ repo yêu cầu làm tiếp các việc còn lại. Gom từ ba báo cáo (09-23, 09-28, 10-01) — phần làm được và kiểm chứng
+được ở máy không có Revit/AutoCAD:
+
+### Đã sửa
+
+| # | Mức | Chỗ | Vấn đề | Sửa |
+|---|---|---|---|---|
+| V3-1 | Trung bình | `LayerImport` (Core AutoCAD) | (a) Hai dòng cùng layer (tên AutoCAD không phân biệt hoa thường) áp theo thứ tự: dòng sau ghi đè dòng trước; layer chưa có thì xem trước báo "tạo mới" hai lần. (b) Có từ trước, lộ ra khi sửa (a): lúc chạy thật layer vừa tạo còn bị đếm thêm "cập nhật"/"giữ nguyên" — "Đã nhập 2 layer (1 cập nhật, 1 tạo mới)" cho **một** layer, gấp đôi con số xem trước | `LayerImportPlanner` (tầng thuần, 14 ca test) gom trước khi áp: dòng giống hệt nhau áp một lần kèm ghi chú; khác nhau ở bất kỳ ô nào — kể cả một dòng để trống ô mà dòng kia có giá trị — là xung đột: không áp dòng nào của layer đó, báo vào `Errors`, `PartialSuccess` (Bridge không cấp preview token). Layer mới đếm một lần là "tạo mới" ở cả hai lượt; xem trước báo luôn linetype chưa có, lineweight sai như chạy thật |
+| V3-2 | Trung bình | `TextReplace` trên MText (Core AutoCAD) — "Chưa làm" của audit 09-28 | Thay thẳng trên `MText.Contents`, chuỗi CÓ mã định dạng: regex `\d+` đổi luôn chữ số trong `\H2.5x;` (chữ đổi cỡ), tìm "PL" trúng `\PLine` và biến mã xuống dòng thành `\X…`, tên font trong `{\fArial;…}` bị thay theo — hỏng định dạng, không báo | `MTextReplace` (tầng thuần, 15 ca test — mỗi ca hỏng chạy kèm cách cũ để thấy cái hỏng): tách `Contents` thành chữ hiển thị (kèm vị trí từng ký tự) và mã định dạng theo bảng mã của AutoCAD; so khớp trên chữ hiển thị (`\P` thành xuống dòng, nên `^`/`$` regex nhiều dòng theo đoạn, `$1` vẫn dùng được). Chỗ khớp nằm gọn trong một đoạn chữ liền thì thay; vắt qua mã, hoặc chứa ký tự do mã sinh ra (xuống dòng, phân số xếp chồng), thì giữ nguyên và báo "cần sửa tay". Chuỗi thay chèn như chữ: `\` `{` `}` được escape, xuống dòng thành `\P` |
+| V3-3 | Thấp | `release.yml` — gói BatchRunner, thành phần "scripts" của installer | Chép mọi `scripts/*.py`, `*.ps1`: máy kỹ sư nhận cả script ký số, CI, sửa ruleset, và `run-in-*-tests.ps1`/`dung-family.ps1` vốn cần cả repo nên chạy từ thư mục cài đặt là hỏng | Chỉ chép `installer/batchrunner-scripts.txt` (6 script — đã chạy thử từ một thư mục gói phẳng: `dhcb_mcp_server`/`dhcb_ai` import được `dhcb_agent` cạnh nó); thiếu file nào thì bước dừng. `tests/python/test_package_scripts.py`: script mà tài liệu đi kèm gói hay installer nhắc tới phải có trong gói, script phụ thuộc nhau (`$PSScriptRoot`, `import`) đi cùng nhau, mọi script trong `scripts/` phải được xếp loại — đỏ trên `release.yml` của `main` |
+| V3-4 | Trung bình | `release.yml` — bước dựng installer | Inno Setup 7 đã ra (tag `is-7_0_0` 2026-05-14, `is-7_1_0` 2026-08-10 của `jrsoftware/issrc`). `choco install innosetup` không ghim kéo 7.x, cài vào thư mục khác `Inno Setup 6` mà bước đóng gói gọi cứng — lần phát hành tới nhiều khả năng hỏng ở bước installer; `.iss` cũng chưa thử với trình biên dịch 7 | Ghim `--version=6.7.1`: bản 6.x cuối cùng từng là bản **mới nhất** (02→05/2026) nên chắc chắn có trên Chocolatey — 6.7.2 ra cùng ngày 7.0, 6.7.3 ra sau 7.0, bộ cập nhật tự động của Chocolatey có thể đã không đăng. Thiếu `ISCC.exe` thì báo rõ. Test ở V3-3 giữ bản ghim khớp đường dẫn |
+
+### Để lại
+
+| Mục | Vì sao |
+|---|---|
+| `PackageContents.xml` liệt kê đủ ba năm AutoCAD dù người dùng chỉ chọn một; nâng cấp mà bỏ chọn một năm thì Inno Setup không gỡ DLL cũ của năm đó | Sửa đúng phải đổi installer: `[InstallDelete]` cho thành phần không chọn (`Components: not acad2024`…) **cùng lúc** lọc `PackageContents.xml` theo thành phần đã chọn trong `[Code]` (`CurStepChanged(ssPostInstall)`) — hoặc tách mỗi năm một bundle. Chỉ làm một nửa thì đổi "AutoCAD nạp bản DLL cũ" thành "AutoCAD báo không nạp được DLL". Máy audit không biên dịch được `.iss` (ISCC chỉ chạy trên Windows) và CI của PR không dựng installer, nên không kiểm được — cần một lượt trên Windows |
+| Các mục "Chưa làm" khác của audit 09-28 (CancellationToken cho lệnh dài, dây `RouteOptionGenerator`/`ClashClassifier`, vòng đời Bridge, `AuthLockout` theo client, tối ưu `IfcStepParser`, 63 ca IDS còn lệch) | Như 09-28: đổi chữ ký `ICoreCommand`, tính năng mới trên luồng ghi mô hình, hành vi luồng UI Revit, hay việc lớn riêng — đều cần Revit/AutoCAD thật hoặc đo trên file thật |
+| Việc cần chủ repo bật (branch protection, private vulnerability reporting, Dependabot, chứng chỉ ký mã) | Cài đặt GitHub của chủ repo — xem audit 09-28 |
+
+### Cần chạy lại trong AutoCAD trước khi phát hành
+
+- **V3-1** — bộ `write` AutoCAD (bốn ca `LayerImport` giữ nguyên kỳ vọng: fixture không có tên trùng). Thêm một lượt
+  tay: CSV có hai dòng `A-WALL` giống hệt nhau → một lần cập nhật kèm ghi chú bản lặp; khác màu → báo xung đột, không
+  đổi layer; một layer mới có màu → xem trước và chạy thật cùng nói "tạo mới 1".
+- **V3-2** — `TextReplace` xem trước trên một MText có `\P`, đổi font giữa từ và chiều cao `\H…;`: regex `\d+` không
+  đổi cỡ chữ; "PL" không phá xuống dòng; chuỗi vắt qua chữ in đậm được báo "cần sửa tay".
+- **V3-3, V3-4** — một lượt `release.yml` (tag hoặc `workflow_dispatch`): bước cài Inno Setup 6.7.1 thành công, gói
+  BatchRunner có đúng 6 script.
+
+### Kiểm chứng tại máy audit
+
+| Kiểm tra | Kết quả |
+|---|---|
+| `DhcbTools.Shared.Logic.Tests` | **1.948** ca đạt (+14 `LayerImportPlannerTests`, +15 `MTextReplaceTests`), phủ dòng 100 % |
+| `DhcbTools.BatchRunner.Tests` | **24** đạt |
+| Python `coverage run -m pytest` | **357** đạt (+6 `test_package_scripts`), phủ câu lệnh 100 %, `pyflakes` sạch; chạy kiểu CI cũng xanh. Test đóng gói đỏ trên `release.yml` của `main` (chép cả thư mục, không ghim Inno Setup) |
+| Đoạn PowerShell chép script (pwsh 7) | Chép đúng 6 file; thêm một tên không có vào danh sách thì bước dừng với "Cannot find path" |
+| Biên dịch Core + bốn vỏ (API NuGet, `UseWPF=false`) | 2023 / 2024 / 2025 / 2026 / 2027: **0 lỗi, 0 cảnh báo** (25/25 project) |
+| `actionlint` / `zizmor` | Sạch / không thêm phát hiện (còn một gợi ý `self-repository` như trên `main`) |

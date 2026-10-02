@@ -10,6 +10,9 @@
 > Vòng 2 cùng ngày (9 mục): `ParameterImport` ghi tham số type một lần, báo xung đột thay vì phụ thuộc thứ tự dòng;
 > panel AutoCAD đòi khoá khởi chạy nên tài khoản Windows khác không lấy được token; `AttributeImport` hết ghi nhầm
 > attribute trùng tag; `LayerTranslate` đổi cả attribute; lệnh ghi AutoCAD không sập vì layer khoá.
+> Vòng 3 (2026-10-02, việc để lại): `TextReplace` không còn sửa vào mã định dạng MText; `LayerImport` gom dòng trùng
+> tên layer; gói phát hành chỉ kèm script người dùng; ghim Inno Setup 6.7.1 (bản 7 đã ra, `release.yml` gọi cứng
+> thư mục "Inno Setup 6").
 
 > Bổ sung 2026-09-28: audit bảo mật/quy trình/công cụ — Bridge không còn bị trang web khoá bằng request sai token,
 > client Python không đưa token Bridge ra proxy hệ thống, regex find/replace có trần thời gian, action ghim SHA,
