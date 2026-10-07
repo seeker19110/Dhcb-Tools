@@ -261,12 +261,27 @@ namespace DhcbTools.Shared.Logic.Ids
             switch (facet.Kind)
             {
                 case IdsFacetKind.Attribute:
+                    if (element is IIdsTypedElement typedAttributes)
+                    {
+                        return typedAttributes.Attributes(facet.Name).Any(a => !a.IsNull);
+                    }
+
                     return NamesOf(facet.Name).Any(name => !string.IsNullOrWhiteSpace(element.Attribute(name)));
 
                 case IdsFacetKind.Property:
+                    if (element is IIdsTypedElement typedProperties)
+                    {
+                        return typedProperties.Properties(facet.Container, facet.Name).Any(set => set.Value.Count > 0);
+                    }
+
                     return PropertySets(facet).Any(set => NamesOf(facet.Name).Any(name => !string.IsNullOrWhiteSpace(element.Property(set, name))));
 
                 case IdsFacetKind.Classification:
+                    if (element is IIdsTypedElement typedClassifications)
+                    {
+                        return typedClassifications.ClassificationReferences().Count > 0;
+                    }
+
                     var system = facet.Container != null && !facet.Container.IsAny ? facet.Container.Simple : null;
                     return element.Classifications(system).Any(code => !string.IsNullOrWhiteSpace(code));
 
@@ -288,20 +303,41 @@ namespace DhcbTools.Shared.Logic.Ids
                 case IdsFacetKind.Entity:
                     // IDS 1.0 viết tên lớp bằng CHỮ HOA (IFCWALL) và so phân biệt hoa thường; đường Revit trả
                     // "IfcWall" nên nâng phía mô hình lên chữ hoa. IDS viết "IfcWall" là file sai chuẩn — không khớp.
-                    return facet.Name.Accepts(element.IfcEntity.ToUpperInvariant())
+                    return (facet.Name.Accepts(element.IfcEntity.ToUpperInvariant())
+                            || (element is IIdsTypedElement mapped && mapped.EntityAlias != null && facet.Name.Accepts(mapped.EntityAlias)))
                            && (facet.Container == null || facet.Container.IsAny || facet.Container.Accepts(element.PredefinedType)
                                || (element is IIdsElementDetails details && details.PredefinedTypeIsUserDefined && facet.Container.Accepts("USERDEFINED")));
 
                 case IdsFacetKind.Attribute:
                     // Tên thuộc tính trong IDS là một RÀNG BUỘC, không nhất thiết là một tên cụ thể
                     // ("mọi thuộc tính khớp mẫu…"). Ở đây chỉ hỗ trợ tên cố định — dạng hay dùng thật —
-                    // và tên khai bằng danh sách/mẫu thì soi từng cái một.
+                    // và tên khai bằng danh sách/mẫu thì soi từng cái một. Đường IFC (giá trị có kiểu) hiểu cả
+                    // tên khai bằng mẫu: mọi thuộc tính khớp và có giá trị đều phải đạt.
+                    if (element is IIdsTypedElement typedAttributes)
+                    {
+                        var values = typedAttributes.Attributes(facet.Name).Where(a => a.Value != null).ToList();
+                        return values.Count > 0 && values.All(a => facet.Value.AcceptsTyped(a.Value!));
+                    }
+
                     return NamesOf(facet.Name).Any(name => facet.Value.Accepts(element.Attribute(name)));
 
                 case IdsFacetKind.Property:
+                    if (element is IIdsTypedElement typedProperties)
+                    {
+                        return PropertyHolds(typedProperties, facet);
+                    }
+
                     return PropertySets(facet).Any(set => NamesOf(facet.Name).Any(name => facet.Value.Accepts(element.Property(set, name))));
 
                 case IdsFacetKind.Classification:
+                    if (element is IIdsTypedElement typedClassifications)
+                    {
+                        // Hệ khai bằng pattern/danh sách được hiểu đúng (bản chuỗi chỉ biết simpleValue, pattern thành "mọi hệ").
+                        return typedClassifications.ClassificationReferences().Any(r =>
+                            (facet.Container == null || facet.Container.IsAny || facet.Container.Accepts(r.Key))
+                            && (facet.Value.IsAny || facet.Value.Accepts(r.Value)));
+                    }
+
                     var system = facet.Container != null && !facet.Container.IsAny ? facet.Container.Simple : null;
                     return element.Classifications(system).Any(code => facet.Value.Accepts(code));
 
@@ -327,6 +363,31 @@ namespace DhcbTools.Shared.Logic.Ids
                         : element.PartOf.Any(parent => string.Equals(parent.Relation, facet.Relation, StringComparison.OrdinalIgnoreCase)
                                                         && facet.Value.Accepts(parent.Entity));
             }
+        }
+
+        /// <summary>
+        /// Facet property trên giá trị có kiểu, theo IDS 1.0 (và IfcTester): phải có ít nhất một pset khớp; MỌI pset khớp
+        /// phải có property khớp tên và có giá trị; MỌI property khớp phải đúng <c>dataType</c> (nếu khai) và có ít nhất
+        /// một giá trị thoả ràng buộc (property danh sách/liệt kê/khoảng/bảng: một giá trị khớp là đủ).
+        /// </summary>
+        private static bool PropertyHolds(IIdsTypedElement element, IdsFacet facet)
+        {
+            var sets = element.Properties(facet.Container, facet.Name);
+            if (facet.Container == null || facet.Container.IsAny)
+            {
+                // Không khai propertySet (lệch IDS 1.0, lint cảnh báo): property nằm ở pset nào cũng được — không
+                // đòi MỌI pset của phần tử đều có nó.
+                sets = sets.Where(set => set.Value.Count > 0).ToList();
+            }
+
+            return sets.Count > 0 && sets.All(set => set.Value.Count > 0 && set.Value.All(property =>
+            {
+                // Property bảng có cột mỗi kiểu một khác: khai dataType thì chỉ xét giá trị đúng kiểu đó; không còn giá trị nào là trượt.
+                var candidates = property.Values
+                    .Where(v => string.IsNullOrEmpty(facet.DataType) || v.Key == null || string.Equals(v.Key, facet.DataType, StringComparison.OrdinalIgnoreCase))
+                    .Select(v => v.Value).ToList();
+                return property.Supported && candidates.Count > 0 && (facet.Value.IsAny || candidates.Any(facet.Value.AcceptsTyped));
+            }));
         }
 
         /// <summary>

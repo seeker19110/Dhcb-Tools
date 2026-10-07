@@ -24,6 +24,7 @@ NOT_SHIPPED = {
     "sign-release.ps1": "ký số trong release.yml",
     "check-coverage.py": "CI",
     "ids-conformance.py": "CI — bộ ca buildingSMART",
+    "gen-ifc-schema.py": "sinh bảng lược đồ IFC từ IfcOpenShell — chỉ khi đổi lược đồ",
     "muc-luc-bang-chung.py": "CI — mục lục tài liệu",
     "apply-rulesets.py": "quản trị repo GitHub",
     "fix-ruleset.py": "quản trị repo GitHub",
