@@ -7,7 +7,7 @@ một task hẹn giờ là đủ để sáng hôm sau có PDF, health report, lo
 
 | Thành phần | Ở đâu | Việc |
 |---|---|---|
-| `DhcbTools.BatchRunner.exe` | `src/DhcbTools.BatchRunner` (net8.0, không tham chiếu Revit/AutoCAD) | Đọc job, mở Revit / accoreconsole, gom log, xuất báo cáo HTML, trả mã thoát |
+| `DhcbTools.BatchRunner.exe` | `src/DhcbTools.BatchRunner` (net10.0, không tham chiếu Revit/AutoCAD) | Đọc job, mở Revit / accoreconsole, gom log, xuất báo cáo HTML, trả mã thoát |
 | `BatchJobRunner` | `src/DhcbTools.Core/Batch` | Bên trong Revit: mở → chạy step qua `RevitCommandTable` → lưu → đóng, ghi log JSONL của lượt chạy |
 | Hook trong `App.cs` | `src/DhcbTools.Revit` | Khi Revit khởi động, thấy `%APPDATA%\DHCB\pending-job.json` thì chạy job rồi thoát |
 | `DHCB_RUN` | `src/DhcbTools.AutoCAD.Core` (vỏ core-only) | Lệnh không hỏi gì, đọc step JSON, ghi log JSONL — dùng trong script accoreconsole |
@@ -43,7 +43,8 @@ Xem [`jobs/nightly.sample.json`](../jobs/nightly.sample.json) (Revit) và
 # Revit: add-in DhcbTools.Revit phải được cài cho đúng phiên bản trong job (revitVersion)
 DhcbTools.BatchRunner.exe --job jobs\nightly.json --log-dir D:\DHCB\logs --max-minutes 480 --analyze
 
-# AutoCAD: dùng accoreconsole.exe (có sẵn trong mọi bản AutoCAD, không UI)
+# AutoCAD: tự tìm cặp host/plugin đã cài phù hợp; có thể chỉ định đường dẫn cho gói portable
+DhcbTools.BatchRunner.exe --job jobs\autocad-nightly.json --dry-run
 DhcbTools.BatchRunner.exe --job jobs\autocad-nightly.json --accoreconsole "C:\Program Files\Autodesk\AutoCAD 2024\accoreconsole.exe" --plugin-dll D:\DHCB\bin\DhcbTools.AutoCAD.dll
 
 # Chỉ dựng lại báo cáo + tóm tắt cảnh báo từ log đã có
@@ -58,6 +59,15 @@ DhcbTools.BatchRunner.exe --verify-log logs\2026-09-04\run-013000.jsonl
 # Đọc lại file IFC vừa xuất và đối chiếu với bộ quy tắc (mục 11.2 — xem docs/kiem-ifc.md)
 DhcbTools.BatchRunner.exe --verify-ifc D:\xuat\toa-a.ifc --ifc-spec configs\ifc-check.json
 ```
+
+AutoCAD tự chọn cặp hoàn chỉnh theo thứ tự 2026 → 2025 → 2024, bỏ qua các phiên bản chưa hỗ trợ như 2022.
+Trong mỗi cặp, runner ưu tiên DLL phù hợp cạnh EXE, rồi tìm trong
+`%APPDATA%\Autodesk\ApplicationPlugins\DhcbTools.bundle\Contents\<năm>`;
+`DhcbTools.AutoCAD.Core.dll` được ưu tiên trước vỏ đầy đủ. Runner đọc metadata DLL để ghép đúng net48/2024,
+net8/2025, net10/2026; AutoCAD 2026 cần Update 1.2 trở lên và runtime `net10.0`.
+`--accoreconsole`/`--plugin-dll` có ưu tiên, đường dẫn tương đối được tuyệt đối hóa; override không khớp runtime
+hoặc thiếu file trả mã 2 trước khi mở bản vẽ, kèm đường dẫn cần kiểm tra. Host đặt trong thư mục tùy chọn chỉ dùng
+DLL portable hoặc được chỉ định; runner kiểm runtime nếu có và báo rõ rằng runtime không chứng minh được năm AutoCAD.
 
 Kết quả trong `logs/{yyyy-MM-dd}/`: **`run-HHmmss.jsonl`** (mỗi dòng một step; **mỗi lần chạy một file riêng**, không
 gộp chung theo ngày như bản `run.jsonl` cũ), `report.html` (bảng file × step, xanh/đỏ, bấm xem chi tiết),
@@ -159,11 +169,13 @@ Cũng có nút **AI offline & Batch → Chạy job batch** trên Ribbon để ch
 - **Tự nhận phiên bản Revit theo file:** runner đọc header `.rvt` (`RvtFileInfo`) và mở đúng `Revit <năm>\Revit.exe`;
   nhiều phiên bản khác nhau trong một job → dùng bản cao nhất và cảnh báo. Tắt bằng `--no-autodetect`.
 - **Step `PlotPdf` cho AutoCAD:** không phải lệnh Core; runner sinh chuỗi `-PLOT` không hộp thoại vào script accoreconsole
-  (`outputPath`, `layout`, `paperSize`, `orientation`, `plotArea`, `plotStyle`). Xem `jobs/autocad-nightly.sample.json`.
+  (`outputPath`, `layout`, `paperSize`, `orientation`, `plotArea`, `plotStyle`). `--dry-run` chỉ ghi kế hoạch vào log,
+  không chạy `-PLOT`. Khi chạy thật, PDF được in vào file tạm cạnh đích và chỉ thay PDF đích sau khi có header PDF
+  và các bước CAD hoàn tất; lỗi in hoặc lỗi xử lý giữ nguyên PDF cũ và trả mã thoát 1. Xem `jobs/autocad-nightly.sample.json`.
 
 - **Vỏ core-only cho accoreconsole (P2):** `DhcbTools.AutoCAD.Core.dll` chỉ tham chiếu AcDbMgd/AcCoreMgd nên NETLOAD được
-  trong Core Console mọi phiên bản (vỏ đầy đủ tham chiếu AcMgd có thể bị từ chối). Runner tự ưu tiên DLL này nếu nằm cạnh
-  `DhcbTools.BatchRunner.exe`; hoặc chỉ định bằng `--plugin-dll`.
+  trong Core Console phiên bản phù hợp (vỏ đầy đủ tham chiếu AcMgd có thể bị từ chối). Runner tự tìm DLL này trong
+  thư mục portable hoặc bundle đúng năm đã cài; có thể chỉ định bằng `--plugin-dll`.
 
 ## Hẹn giờ
 

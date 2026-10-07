@@ -101,7 +101,8 @@ internal static class AcadHelpers
                     {
                         if (transaction.GetObject(attId, OpenMode.ForRead) is AttributeReference attRef)
                         {
-                            used.Add(After(protectedBlock, attRef));
+                            // An unlocked attribute remains used when its original INSERT layer is locked.
+                            used.Add(After(protectedBlock || lockedLayers.Contains(blockRef.LayerId), attRef));
                         }
                     }
                 }

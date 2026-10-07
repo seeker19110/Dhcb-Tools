@@ -1,0 +1,1077 @@
+{
+  "name": "DHCB locked-layer engineering contract",
+  "//": [
+    "Run after engineering-write through scripts/run-autocad-fixture-tests.ps1.",
+    "Five commands must keep locked entities unchanged and report PartialSuccess for their intended blocked writes."
+  ],
+  "cases": [
+    {
+      "name": "TextReplace locked preview stays partial and unchanged",
+      "command": "TextReplace",
+      "config": {
+        "find": "DHCB-QA-OLD",
+        "replace": "DHCB-QA-LOCKED-WRITE"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "messagesContain": [
+          "đang khoá"
+        ]
+      }
+    },
+    {
+      "name": "TextReplace locked real write stays partial and unchanged",
+      "command": "TextReplace",
+      "config": {
+        "find": "DHCB-QA-OLD",
+        "replace": "DHCB-QA-LOCKED-WRITE"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "messagesContain": [
+          "đang khoá"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "AutoNumbering locked preview stays partial and unchanged",
+      "command": "AutoNumbering",
+      "config": {
+        "blockName": "DHCB-QA-ENGINEERING",
+        "attributeTag": "NUM",
+        "prefix": "LOCK-",
+        "padWidth": 2,
+        "rowToleranceMm": 100
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "messagesContain": [
+          "đang khoá"
+        ]
+      }
+    },
+    {
+      "name": "AutoNumbering locked real write stays partial and unchanged",
+      "command": "AutoNumbering",
+      "config": {
+        "blockName": "DHCB-QA-ENGINEERING",
+        "attributeTag": "NUM",
+        "prefix": "LOCK-",
+        "padWidth": 2,
+        "rowToleranceMm": 100
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "messagesContain": [
+          "đang khoá"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "AttributeIncrement locked preview stays partial and unchanged",
+      "command": "AttributeIncrement",
+      "config": {
+        "blockName": "DHCB-QA-ENGINEERING",
+        "attributeTag": "NUM",
+        "pattern": "LOCK-{n:000}",
+        "rowToleranceMm": 100
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "messagesContain": [
+          "đang khoá"
+        ]
+      }
+    },
+    {
+      "name": "AttributeIncrement locked real write stays partial and unchanged",
+      "command": "AttributeIncrement",
+      "config": {
+        "blockName": "DHCB-QA-ENGINEERING",
+        "attributeTag": "NUM",
+        "pattern": "LOCK-{n:000}",
+        "rowToleranceMm": 100
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "messagesContain": [
+          "đang khoá"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "AttributeImport locked preview stays partial and unchanged",
+      "command": "AttributeImport",
+      "config": {
+        "inputPath": "{outputFolder}/../attributes-edit.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "messagesContain": [
+          "đang khoá"
+        ]
+      }
+    },
+    {
+      "name": "AttributeImport locked real write stays partial and unchanged",
+      "command": "AttributeImport",
+      "config": {
+        "inputPath": "{outputFolder}/../attributes-edit.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "messagesContain": [
+          "đang khoá"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "LayerTranslate locked preview stays partial and unchanged",
+      "command": "LayerTranslate",
+      "config": {
+        "mapCsvPath": "{suiteFolder}/fixtures/layers-engineering-lock.csv",
+        "deleteEmptySource": false
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "messagesContain": [
+          "đang khoá"
+        ]
+      }
+    },
+    {
+      "name": "LayerTranslate locked real write stays partial and unchanged",
+      "command": "LayerTranslate",
+      "config": {
+        "mapCsvPath": "{suiteFolder}/fixtures/layers-engineering-lock.csv",
+        "deleteEmptySource": false
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "messagesContain": [
+          "đang khoá"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "AttributeImport unsupported CSV rows preview",
+      "command": "AttributeImport",
+      "config": {
+        "inputPath": "{outputFolder}/../attributes-incomplete.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "AttributeImport unsupported CSV rows real",
+      "command": "AttributeImport",
+      "config": {
+        "inputPath": "{outputFolder}/../attributes-incomplete.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "AutoNumbering missing requested tag preview",
+      "command": "AutoNumbering",
+      "config": {
+        "blockName": "DHCB-QA-ENGINEERING",
+        "attributeTag": "MISSING"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "AutoNumbering missing requested tag real",
+      "command": "AutoNumbering",
+      "config": {
+        "blockName": "DHCB-QA-ENGINEERING",
+        "attributeTag": "MISSING"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "AttributeIncrement missing requested tag preview",
+      "command": "AttributeIncrement",
+      "config": {
+        "blockName": "DHCB-QA-ENGINEERING",
+        "attributeTag": "MISSING",
+        "pattern": "N-{n}"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "AttributeIncrement missing requested tag real",
+      "command": "AttributeIncrement",
+      "config": {
+        "blockName": "DHCB-QA-ENGINEERING",
+        "attributeTag": "MISSING",
+        "pattern": "N-{n}"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "TextReplace match crossing MText formatting preview",
+      "command": "TextReplace",
+      "config": {
+        "find": "DHCB-QA-FORMATTED",
+        "replace": "changed"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "TextReplace match crossing MText formatting real",
+      "command": "TextReplace",
+      "config": {
+        "find": "DHCB-QA-FORMATTED",
+        "replace": "changed"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "TextReplace no matching text preview",
+      "command": "TextReplace",
+      "config": {
+        "find": "DHCB-QA-ABSENT",
+        "replace": "changed"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "TextReplace no matching text real",
+      "command": "TextReplace",
+      "config": {
+        "find": "DHCB-QA-ABSENT",
+        "replace": "changed"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "AttributeImport unchanged locked CSV preview",
+      "command": "AttributeImport",
+      "config": {
+        "inputPath": "{outputFolder}/../attributes-baseline.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "AttributeImport unchanged locked CSV real",
+      "command": "AttributeImport",
+      "config": {
+        "inputPath": "{outputFolder}/../attributes-baseline.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "AutoNumbering already correct locked number preview",
+      "command": "AutoNumbering",
+      "config": {
+        "blockName": "DHCB-QA-NOOP",
+        "attributeTag": "NUM",
+        "prefix": "EQ-",
+        "padWidth": 2
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "AutoNumbering already correct locked number real",
+      "command": "AutoNumbering",
+      "config": {
+        "blockName": "DHCB-QA-NOOP",
+        "attributeTag": "NUM",
+        "prefix": "EQ-",
+        "padWidth": 2
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "AttributeIncrement already correct locked pattern preview",
+      "command": "AttributeIncrement",
+      "config": {
+        "blockName": "DHCB-QA-NOOP",
+        "attributeTag": "NUM",
+        "pattern": "EQ-{n:00}"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "AttributeIncrement already correct locked pattern real",
+      "command": "AttributeIncrement",
+      "config": {
+        "blockName": "DHCB-QA-NOOP",
+        "attributeTag": "NUM",
+        "pattern": "EQ-{n:00}"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "LayerTranslate same layer map preview",
+      "command": "LayerTranslate",
+      "config": {
+        "mapCsvPath": "{suiteFolder}/fixtures/layers-engineering-noop.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "LayerTranslate same layer map real",
+      "command": "LayerTranslate",
+      "config": {
+        "mapCsvPath": "{suiteFolder}/fixtures/layers-engineering-noop.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "LayerTranslate same layer map case insensitive preview",
+      "command": "LayerTranslate",
+      "config": {
+        "mapCsvPath": "{suiteFolder}/fixtures/layers-engineering-noop-case.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "LayerTranslate same layer map case insensitive real",
+      "command": "LayerTranslate",
+      "config": {
+        "mapCsvPath": "{suiteFolder}/fixtures/layers-engineering-noop-case.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "LayerTranslate mixed invalid rules with valid noop preview",
+      "command": "LayerTranslate",
+      "config": {
+        "mapCsvPath": "{suiteFolder}/fixtures/layers-engineering-incomplete.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "messagesContain": [
+          "Bỏ qua dòng"
+        ],
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "LayerTranslate mixed invalid rules with valid noop real",
+      "command": "LayerTranslate",
+      "config": {
+        "mapCsvPath": "{suiteFolder}/fixtures/layers-engineering-incomplete.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "messagesContain": [
+          "Bỏ qua dòng"
+        ],
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "TextReplace respects locked parent INSERT with layer0 attribute preview",
+      "command": "TextReplace",
+      "config": {
+        "find": "DHCB-QA-PARENT-LOCK",
+        "replace": "parent-write"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "messagesContain": [
+          "đang khoá"
+        ],
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "TextReplace respects locked parent INSERT with layer0 attribute real",
+      "command": "TextReplace",
+      "config": {
+        "find": "DHCB-QA-PARENT-LOCK",
+        "replace": "parent-write"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "messagesContain": [
+          "đang khoá"
+        ],
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "AutoNumbering respects locked parent INSERT with layer0 attribute preview",
+      "command": "AutoNumbering",
+      "config": {
+        "blockName": "DHCB-QA-PARENT-LOCK",
+        "attributeTag": "NUM",
+        "prefix": "PARENT-",
+        "padWidth": 2
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "messagesContain": [
+          "đang khoá"
+        ],
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "AutoNumbering respects locked parent INSERT with layer0 attribute real",
+      "command": "AutoNumbering",
+      "config": {
+        "blockName": "DHCB-QA-PARENT-LOCK",
+        "attributeTag": "NUM",
+        "prefix": "PARENT-",
+        "padWidth": 2
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "messagesContain": [
+          "đang khoá"
+        ],
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "AttributeIncrement respects locked parent INSERT with layer0 attribute preview",
+      "command": "AttributeIncrement",
+      "config": {
+        "blockName": "DHCB-QA-PARENT-LOCK",
+        "attributeTag": "NUM",
+        "pattern": "PARENT-{n:00}"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "messagesContain": [
+          "đang khoá"
+        ],
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "AttributeIncrement respects locked parent INSERT with layer0 attribute real",
+      "command": "AttributeIncrement",
+      "config": {
+        "blockName": "DHCB-QA-PARENT-LOCK",
+        "attributeTag": "NUM",
+        "pattern": "PARENT-{n:00}"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "messagesContain": [
+          "đang khoá"
+        ],
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "AttributeImport respects locked parent INSERT with layer0 attribute preview",
+      "command": "AttributeImport",
+      "config": {
+        "inputPath": "{outputFolder}/../attributes-parent-lock.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "messagesContain": [
+          "đang khoá"
+        ],
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "AttributeImport respects locked parent INSERT with layer0 attribute real",
+      "command": "AttributeImport",
+      "config": {
+        "inputPath": "{outputFolder}/../attributes-parent-lock.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "messagesContain": [
+          "đang khoá"
+        ],
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "LayerTranslate moves unlocked layer0 entities and preserves locked-parent attributes preview",
+      "command": "LayerTranslate",
+      "config": {
+        "mapCsvPath": "{suiteFolder}/fixtures/layers-engineering-parent-lock.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 1,
+        "noErrors": true,
+        "messagesContain": [
+          "đang khoá"
+        ],
+        "maxMs": 30000,
+        "maxChangeEvents": 0
+      }
+    },
+    {
+      "name": "LayerTranslate moves unlocked layer0 entities and preserves locked-parent attributes real",
+      "command": "LayerTranslate",
+      "config": {
+        "mapCsvPath": "{suiteFolder}/fixtures/layers-engineering-parent-lock.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 1,
+        "noErrors": true,
+        "messagesContain": [
+          "đang khoá"
+        ],
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "LayerTranslate attribute-only source stays used behind locked parent preview",
+      "command": "LayerTranslate",
+      "config": {
+        "mapCsvPath": "{suiteFolder}/fixtures/layers-engineering-attribute-only.csv",
+        "deleteEmptySource": true
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "messagesContain": [
+          "đang khoá"
+        ],
+        "summaryContains": [
+          "xoá 0 layer nguồn rỗng"
+        ],
+        "maxChangeEvents": 0
+      }
+    },
+    {
+      "name": "LayerTranslate bad properties remain incomplete preview",
+      "command": "LayerTranslate",
+      "config": {
+        "mapCsvPath": "{suiteFolder}/fixtures/layers-engineering-bad-properties.csv",
+        "deleteEmptySource": true
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "messagesContain": [
+          "màu",
+          "lineweight",
+          "Plottable"
+        ],
+        "maxChangeEvents": 0
+      }
+    },
+    {
+      "name": "LayerTranslate attribute-only source stays used behind locked parent real",
+      "command": "LayerTranslate",
+      "config": {
+        "mapCsvPath": "{suiteFolder}/fixtures/layers-engineering-attribute-only.csv",
+        "deleteEmptySource": true
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "messagesContain": [
+          "đang khoá"
+        ],
+        "summaryContains": [
+          "xoá 0 layer nguồn rỗng"
+        ],
+        "maxChangeEvents": 0,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "LayerTranslate bad properties remain incomplete real",
+      "command": "LayerTranslate",
+      "config": {
+        "mapCsvPath": "{suiteFolder}/fixtures/layers-engineering-bad-properties.csv",
+        "deleteEmptySource": true
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "messagesContain": [
+          "màu",
+          "lineweight",
+          "Plottable"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "LayerTranslate unavailable linetype fallback is incomplete",
+      "command": "LayerTranslate",
+      "allowWrite": true,
+      "config": {
+        "mapCsvPath": "{suiteFolder}/fixtures/layers-engineering-missing-linetype.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "noErrors": true,
+        "messagesContain": [
+          "linetype"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "TextReplace formatted-span identity remains a true noop preview",
+      "command": "TextReplace",
+      "config": {
+        "find": "DHCB-QA-FORMATTED",
+        "replace": "DHCB-QA-FORMATTED"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "neverContains": [
+          "mã định dạng"
+        ],
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "TextReplace formatted-span identity remains a true noop real",
+      "command": "TextReplace",
+      "config": {
+        "find": "DHCB-QA-FORMATTED",
+        "replace": "DHCB-QA-FORMATTED"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "neverContains": [
+          "mã định dạng"
+        ],
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "Export locked fixture for independent unchanged-value check",
+      "command": "AttributeExport",
+      "config": {
+        "blockName": "DHCB-QA-ENGINEERING",
+        "outputPath": "{outputFolder}/attributes-locked.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 6,
+        "maxAffected": 6,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "filesExist": [
+          "{outputFolder}/attributes-locked.csv"
+        ]
+      }
+    },
+    {
+      "name": "Export new-layer property fallbacks for independent verification",
+      "command": "LayerExport",
+      "config": {
+        "outputPath": "{outputFolder}/layers-final.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 1,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "filesExist": [
+          "{outputFolder}/layers-final.csv"
+        ]
+      }
+    }
+  ]
+}

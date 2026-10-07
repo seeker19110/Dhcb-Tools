@@ -123,10 +123,10 @@ public sealed class AttributeImportCommand : ICoreCommand<AttributeImportConfig>
                 continue;
             }
 
-            if (lockedLayers.Contains(attRef.LayerId))
+            if (lockedLayers.Contains(attRef.LayerId) || lockedLayers.Contains(blockRef.LayerId))
             {
                 // UpgradeOpen trên layer khoá ném eOnLockedLayer — sập cả lệnh. Xem trước cũng bỏ qua để hai con số khớp.
-                lockedSkips.Add(attRef.Layer);
+                lockedSkips.Add(lockedLayers.Contains(blockRef.LayerId) ? blockRef.Layer : attRef.Layer);
                 skipped++;
                 continue;
             }
@@ -164,14 +164,14 @@ public sealed class AttributeImportCommand : ICoreCommand<AttributeImportConfig>
                 $"[Xem trước] Sẽ cập nhật {updated} attribute, bỏ qua {skipped} dòng (chưa ghi vào drawing).",
                 updated);
             preview.Messages.AddRange(result.Messages);
-            return preview;
+            return preview.WithIncompleteWork(skipped > 0);
         }
 
         transaction.Commit();
 
         var final = CommandResult.Ok($"Đã cập nhật {updated} attribute từ \"{config.InputPath}\", bỏ qua {skipped} dòng.", updated);
         final.Messages.AddRange(result.Messages);
-        return final;
+        return final.WithIncompleteWork(skipped > 0);
     }
 
     /// <summary>Handle đọc bằng <see cref="HandleText"/> (nhận cả "0x1A3", "(1A3)"); trước đây Convert.ToInt64 từ chối các dạng đó và nuốt lỗi.</summary>

@@ -51,6 +51,7 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
         var plan = new List<(ObjectId Id, string Kind, string OldValue, string NewValue)>();
         var formattingNotes = new List<string>();
         var timeouts = 0;
+        var formattingSkips = 0;
 
         using var transaction = database.TransactionManager.StartTransaction();
         var lockedLayers = AcadHelpers.LockedLayerIds(database, transaction);
@@ -58,11 +59,11 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
 
         // Đưa một đối tượng vào kế hoạch — trừ khi nó nằm trên layer khoá: mở ForWrite sẽ ném eOnLockedLayer và sập
         // cả lệnh (bản cũ). Bỏ qua ngay lúc lập kế hoạch nên xem trước và chạy thật cùng một con số, như FIND của AutoCAD.
-        void AddToPlan(Entity entity, ObjectId id, string kind, string oldValue, string newValue)
+        void AddToPlan(Entity entity, ObjectId id, string kind, string oldValue, string newValue, string? lockedParentLayer = null)
         {
-            if (lockedLayers.Contains(entity.LayerId))
+            if (lockedParentLayer != null || lockedLayers.Contains(entity.LayerId))
             {
-                lockedSkips.Add(entity.Layer);
+                lockedSkips.Add(lockedParentLayer ?? entity.Layer);
                 return;
             }
 
@@ -131,6 +132,7 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
 
                             if (outcome.Skipped > 0)
                             {
+                                formattingSkips += outcome.Skipped;
                                 // Khớp trên chữ hiển thị nhưng vắt qua mã định dạng: gộp lại sẽ xoá định dạng của một
                                 // phần chuỗi, nên chỉ báo, không tự sửa.
                                 formattingNotes.Add(
@@ -146,7 +148,8 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
                                 var replaced = Substitute(attRef.TextString);
                                 if (replaced != attRef.TextString)
                                 {
-                                    AddToPlan(attRef, attId, "Attribute", attRef.TextString, replaced);
+                                    AddToPlan(attRef, attId, "Attribute", attRef.TextString, replaced,
+                                        lockedLayers.Contains(blockRef.LayerId) ? blockRef.Layer : null);
                                 }
                             }
                             break;
@@ -170,11 +173,11 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
         if (plan.Count == 0)
         {
             transaction.Commit();
-            var none = CommandResult.Ok(lockedSkips.Count > 0 || timeouts > 0
+            var none = CommandResult.Ok(lockedSkips.Count > 0 || timeouts > 0 || formattingSkips > 0
                 ? "Không có văn bản nào thay được — xem lý do bên dưới."
                 : "Không tìm thấy văn bản nào khớp để thay.");
             none.Messages.AddRange(formattingNotes);
-            return none;
+            return none.WithIncompleteWork(lockedSkips.Count > 0 || timeouts > 0 || formattingSkips > 0);
         }
 
         if (config.DryRun)
@@ -188,7 +191,7 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
                 preview.Messages.Add($"[{kind}] {AcadHelpers.HandleOf(id)}: \"{oldValue}\" → \"{newValue}\"");
             }
             preview.Messages.AddRange(formattingNotes);
-            return preview;
+            return preview.WithIncompleteWork(lockedSkips.Count > 0 || timeouts > 0 || formattingSkips > 0);
         }
 
         foreach (var (id, kind, _, newValue) in plan)
@@ -217,7 +220,7 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
 
         var result = CommandResult.Ok($"Đã thay {plan.Count} đối tượng văn bản.", plan.Count);
         result.Messages.AddRange(formattingNotes);
-        return result;
+        return result.WithIncompleteWork(lockedSkips.Count > 0 || timeouts > 0 || formattingSkips > 0);
     }
 
     private static string Apply(string value, TextReplaceConfig config, Regex? regex, out bool timedOut)
