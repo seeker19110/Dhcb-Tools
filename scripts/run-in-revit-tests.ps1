@@ -120,8 +120,10 @@ if (-not $SkipBuild) {
 # viết tay ở đây từng thiếu nhánh net10, và Get-ChildItem trên thư mục không có thì im lặng: add-in
 # cũ vẫn nằm trong Addins và bộ ca "đạt" trên DLL cũ.
 $revitProj = Join-Path $repo 'src\DhcbTools.Revit\DhcbTools.Revit.csproj'
-$tfm = (& dotnet build $revitProj --nologo -v q -getProperty:TargetFramework -p:RevitVersion=$RevitVersion | Select-Object -Last 1).Trim()
-if (-not $tfm) { Stop-WithMessage "Không hỏi được TargetFramework của vỏ Revit cho RevitVersion=$RevitVersion" }
+$tfm = & dotnet msbuild $revitProj -nologo -getProperty:TargetFramework -p:RevitVersion=$RevitVersion
+if ($LASTEXITCODE -ne 0) { Stop-WithMessage "MSBuild không đọc được TargetFramework của vỏ Revit (mã $LASTEXITCODE)." }
+if ([string]::IsNullOrWhiteSpace($tfm)) { Stop-WithMessage "Không hỏi được TargetFramework của vỏ Revit cho RevitVersion=$RevitVersion" }
+$tfm = $tfm.Trim()
 $binDir = Join-Path $repo "src\DhcbTools.Revit\bin\Release\$tfm"
 if (-not (Test-Path $binDir)) { Stop-WithMessage "Chưa có $binDir — bỏ -SkipBuild hoặc build với -p:RevitVersion=$RevitVersion" }
 $addinDir = "$env:APPDATA\Autodesk\Revit\Addins\$RevitVersion"
@@ -234,7 +236,10 @@ Write-Host "== Job: $jobPath"
 # TFM của BatchRunner hỏi MSBuild, không viết tay: đường dẫn cứng "net8.0" ở đây từng đúng, và nó hỏng
 # IM LẶNG khi project đổi khung — script chỉ báo "không tìm thấy BatchRunner" chứ không nói vì sao.
 $runnerProj = Join-Path $repo 'src\DhcbTools.BatchRunner\DhcbTools.BatchRunner.csproj'
-$runnerTfm = (& dotnet build $runnerProj -getProperty:TargetFramework).Trim()
+$runnerTfm = & dotnet msbuild $runnerProj -getProperty:TargetFramework -nologo
+if ($LASTEXITCODE -ne 0) { Stop-WithMessage "MSBuild không đọc được TargetFramework của BatchRunner (mã $LASTEXITCODE)." }
+if ([string]::IsNullOrWhiteSpace($runnerTfm)) { Stop-WithMessage "Không hỏi được TargetFramework của BatchRunner." }
+$runnerTfm = $runnerTfm.Trim()
 $runner = Join-Path $repo "src\DhcbTools.BatchRunner\bin\Release\$runnerTfm\DhcbTools.BatchRunner.exe"
 if (-not (Test-Path $runner)) {
     Stop-WithMessage "Không tìm thấy BatchRunner: $runner (bỏ -SkipBuild để build)"

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Dựng và nâng cấp thư viện family cho TỪNG phiên bản Revit (§63).
 
@@ -88,7 +88,10 @@ if (-not $SkipBuild) {
 
 # TFM của BatchRunner hỏi MSBuild chứ không viết tay — đường dẫn cứng hỏng im lặng khi project đổi khung.
 $runnerProj = Join-Path $repo 'src\DhcbTools.BatchRunner\DhcbTools.BatchRunner.csproj'
-$runnerTfm = (& dotnet build $runnerProj -getProperty:TargetFramework).Trim()
+$runnerTfm = & dotnet msbuild $runnerProj -getProperty:TargetFramework -nologo
+if ($LASTEXITCODE -ne 0) { Stop-WithMessage "MSBuild không đọc được TargetFramework của BatchRunner (mã $LASTEXITCODE)." }
+if ([string]::IsNullOrWhiteSpace($runnerTfm)) { Stop-WithMessage "Không hỏi được TargetFramework của BatchRunner." }
+$runnerTfm = $runnerTfm.Trim()
 $runner = Join-Path $repo "src\DhcbTools.BatchRunner\bin\Release\$runnerTfm\DhcbTools.BatchRunner.exe"
 if (-not (Test-Path $runner)) { Stop-WithMessage "Không tìm thấy BatchRunner: $runner (bỏ -SkipBuild để build)" }
 

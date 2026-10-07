@@ -94,8 +94,10 @@ if (-not $SkipBuild) {
 # DLL MỚI NHẤT trong mọi thư mục TFM: máy vừa build 2024 (net48) rồi -SkipBuild với -AcadVersion 2026 là
 # NETLOAD nhầm DLL sai runtime vào accoreconsole.
 $coreProj = Join-Path $repo 'src\DhcbTools.AutoCAD.Core\DhcbTools.AutoCAD.Core.csproj'
-$acadTfm = (& dotnet build $coreProj --nologo -v q -getProperty:TargetFramework -p:AcadVersion=$AcadVersion | Select-Object -Last 1).Trim()
-if (-not $acadTfm) { Stop-WithMessage "Không hỏi được TargetFramework của vỏ AutoCAD.Core cho AcadVersion=$AcadVersion" }
+$acadTfm = & dotnet msbuild $coreProj -nologo -getProperty:TargetFramework -p:AcadVersion=$AcadVersion
+if ($LASTEXITCODE -ne 0) { Stop-WithMessage "MSBuild không đọc được TargetFramework của vỏ AutoCAD.Core (mã $LASTEXITCODE)." }
+if ([string]::IsNullOrWhiteSpace($acadTfm)) { Stop-WithMessage "Không hỏi được TargetFramework của vỏ AutoCAD.Core cho AcadVersion=$AcadVersion" }
+$acadTfm = $acadTfm.Trim()
 $pluginPath = Join-Path $repo "src\DhcbTools.AutoCAD.Core\bin\Release\$acadTfm\DhcbTools.AutoCAD.Core.dll"
 $plugin = Get-Item $pluginPath -ErrorAction SilentlyContinue
 if (-not $plugin) {
@@ -141,7 +143,10 @@ Write-Host "== Job: $jobPath"
 # TFM của BatchRunner hỏi MSBuild, không viết tay: đường dẫn cứng "net8.0" ở đây từng đúng, và nó hỏng
 # IM LẶNG khi project đổi khung — script chỉ báo "không tìm thấy BatchRunner" chứ không nói vì sao.
 $runnerProj = Join-Path $repo 'src\DhcbTools.BatchRunner\DhcbTools.BatchRunner.csproj'
-$runnerTfm = (& dotnet build $runnerProj -getProperty:TargetFramework).Trim()
+$runnerTfm = & dotnet msbuild $runnerProj -getProperty:TargetFramework -nologo
+if ($LASTEXITCODE -ne 0) { Stop-WithMessage "MSBuild không đọc được TargetFramework của BatchRunner (mã $LASTEXITCODE)." }
+if ([string]::IsNullOrWhiteSpace($runnerTfm)) { Stop-WithMessage "Không hỏi được TargetFramework của BatchRunner." }
+$runnerTfm = $runnerTfm.Trim()
 $runner = Join-Path $repo "src\DhcbTools.BatchRunner\bin\Release\$runnerTfm\DhcbTools.BatchRunner.exe"
 if (-not (Test-Path $runner)) {
     Stop-WithMessage "Không tìm thấy BatchRunner: $runner (bỏ -SkipBuild để build)"

@@ -22,6 +22,8 @@
 > thư mục "Inno Setup 6").
 > Vòng 4 (hoàn thiện installer, kiểm chứng lại 2026-10-07): gỡ DLL/bundle cũ khi bỏ chọn Revit/AutoCAD, lọc `PackageContents.xml` theo thành phần đã chọn. Sửa lỗi biên dịch `String`/`AnsiString`, giữ nguyên UTF-8; chỉ xoá đúng file Revit do DHCB cài. Test chạy bộ cài thật trong thư mục tạm phủ cả 8 tổ hợp AutoCAD và nâng cấp/bỏ chọn/chọn lại; CI Windows chạy kiểm tra này trước phát hành.
 > Nối tiếp cùng ngày: đóng gói dừng ngay khi MSBuild/ISCC trả mã lỗi và kiểm đúng file installer theo phiên bản; thiếu script không còn được bỏ qua. Thêm ca chạy PowerShell từ workflow và ca installer thật chặn AutoCAD không đúng runtime trước khi thay file bản cài trước (V4-2).
+> Tiếp tục 2026-10-07: script kiểm thử Revit/AutoCAD và dựng family cũng dừng khi MSBuild lỗi hoặc không trả TargetFramework, tránh chọn DLL cũ/ghi đè add-in. 15 tình huống thực thi PowerShell kiểm cả lỗi native có stdout, không stdout và đường thành công. Bộ `autocad-write` chạy lại trên AutoCAD 2026: **5/5 đạt**, build core-only và BatchRunner không lỗi/cảnh báo.
+> Đã kiểm trọn workflow release chạy tay trên `main` ([run 37647981610](https://github.com/seeker19110/Dhcb-Tools/actions/runs/37647981610)): các gói Revit/AutoCAD/BatchRunner và installer đều đạt; ZIP BatchRunner có đúng 6 script theo manifest, `.exe` và runtimeconfig. Gói kiểm chứng `0.0.0-verify-20261007` nằm trong artifact của run; không tạo GitHub Release.
 
 > Bổ sung 2026-09-28: audit bảo mật/quy trình/công cụ — Bridge không còn bị trang web khoá bằng request sai token,
 > client Python không đưa token Bridge ra proxy hệ thống, regex find/replace có trần thời gian, action ghim SHA,
