@@ -79,6 +79,7 @@ jobs:
           # (net48 / net8.0-windows / net10.0-windows). Bản cũ hardcode "-ge 2025 → net8" nên thêm
           # 2027 vào ma trận là đóng gói NHẦM thư mục mà không có bước nào đỏ.
           $tfm = (dotnet msbuild src/DhcbTools.Revit/DhcbTools.Revit.csproj -p:RevitVersion=${{ matrix.revit }} -getProperty:TargetFramework -nologo).Trim()
+          if ($LASTEXITCODE -ne 0) { throw "MSBuild không đọc được TargetFramework (mã $LASTEXITCODE)." }
           if (-not $tfm) { throw "Không đọc được TargetFramework từ MSBuild." }
           $out = "src/DhcbTools.Revit/bin/Release/$tfm"
           $pkg = "dist/DhcbTools.Revit-${{ matrix.revit }}-${{ needs.version.outputs.version }}"
@@ -138,6 +139,7 @@ jobs:
         run: |
           # Cùng lý do với job Revit: AutoCAD 2026+ là net10.0-windows, hardcode "-ge 2025 → net8" đóng gói nhầm.
           $tfm = (dotnet msbuild src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj -p:AcadVersion=${{ matrix.acad }} -getProperty:TargetFramework -nologo).Trim()
+          if ($LASTEXITCODE -ne 0) { throw "MSBuild không đọc được TargetFramework (mã $LASTEXITCODE)." }
           if (-not $tfm) { throw "Không đọc được TargetFramework từ MSBuild." }
           $pkg = "dist/DhcbTools.AutoCAD-${{ matrix.acad }}-${{ needs.version.outputs.version }}"
           New-Item -ItemType Directory -Force -Path $pkg | Out-Null
@@ -196,7 +198,9 @@ jobs:
           New-Item -ItemType Directory -Force -Path "$pkg/jobs", "$pkg/configs", "$pkg/scripts" | Out-Null
           # TFM hỏi MSBuild, không viết tay: hardcode ở đây đúng là lỗi đã sửa cho build-revit/build-autocad,
           # và nó im lặng — Copy-Item vào thư mục không tồn tại thì gói ra thiếu đúng cái .exe.
-          $tfm = (dotnet build src/DhcbTools.BatchRunner/DhcbTools.BatchRunner.csproj -getProperty:TargetFramework).Trim()
+          $tfm = (dotnet msbuild src/DhcbTools.BatchRunner/DhcbTools.BatchRunner.csproj -getProperty:TargetFramework -nologo).Trim()
+          if ($LASTEXITCODE -ne 0) { throw "MSBuild không đọc được TargetFramework (mã $LASTEXITCODE)." }
+          if (-not $tfm) { throw "Không đọc được TargetFramework từ MSBuild." }
           Copy-Item "src/DhcbTools.BatchRunner/bin/Release/$tfm/*" $pkg -Recurse
           Copy-Item jobs/*.json "$pkg/jobs"
           Copy-Item configs/* "$pkg/configs"
@@ -282,6 +286,10 @@ jobs:
             "/DVersion=${{ needs.version.outputs.version }}" `
             "/DStageDir=..\dist\stage" `
             installer/dhcb-tools.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC biên dịch installer thất bại (mã $LASTEXITCODE)." }
+          if (-not (Test-Path "dist/DhcbTools-Setup-${{ needs.version.outputs.version }}.exe" -PathType Leaf)) {
+            throw "ISCC không tạo ra installer của phiên bản đã yêu cầu."
+          }
           Get-ChildItem dist/*.exe
 
       - name: Ký số installer (nếu có chứng chỉ)

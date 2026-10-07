@@ -30,6 +30,8 @@ class InstallerTests(unittest.TestCase):
         cls.work = Path(cls.tmp.name)
         cls.profile = cls.work / "profile"
         stage = cls.work / "stage"
+        cls.stage = stage
+        cls.compiler = compiler
         for year in (2023, 2024, 2025, 2026):
             folder = stage / f"revit-{year}"
             folder.mkdir(parents=True)
@@ -40,6 +42,7 @@ class InstallerTests(unittest.TestCase):
             folder.mkdir()
             (folder / "DhcbTools.AutoCAD.dll").write_text(f"fixture {year}", encoding="utf-8")
         (stage / "batchrunner" / "scripts").mkdir(parents=True)
+        (stage / "batchrunner" / "DhcbTools.BatchRunner.exe").write_text("fixture batch", encoding="utf-8")
         (stage / "batchrunner" / "scripts" / "dhcb_agent.py").write_text("# fixture", encoding="utf-8")
         shutil.copyfile(ROOT / "installer" / "PackageContents.xml", stage / "PackageContents.xml")
         cls.original = ET.parse(stage / "PackageContents.xml").getroot()
@@ -54,28 +57,74 @@ class InstallerTests(unittest.TestCase):
         for constant, folder in (("userappdata", "roaming"), ("localappdata", "local"), ("group", "shortcuts")):
             text = text.replace("{" + constant + "}", str(cls.profile / folder))
         source = cls.work / "sandbox.iss"
+        cls.source = source
         source.write_text(text, encoding="utf-8-sig")
         cls.run_process([str(compiler), "/Q", "/DVersion=0.0.0-test", f"/DStageDir={stage}",
                          f"/O{cls.work}", str(source)])
         cls.setup = cls.work / "DhcbTools-Setup-0.0.0-test.exe"
 
     @staticmethod
-    def run_process(args):
+    def run_process(args, expect_success=True):
         result = subprocess.run(args, capture_output=True, timeout=60)
-        if result.returncode:
+        if expect_success and result.returncode:
             raise AssertionError(f"Exit {result.returncode}: {args}\n{result.stdout!r}\n{result.stderr!r}")
+        return result
 
     def setUp(self):
         if self.profile.exists():
             shutil.rmtree(self.profile)
         self.bundle = self.profile / "roaming" / "Autodesk" / "ApplicationPlugins" / "DhcbTools.bundle"
         self.addins = self.profile / "roaming" / "Autodesk" / "Revit" / "Addins"
+        (self.acad / "acad.exe").touch()
+        (self.acad / "acdbmgd.runtimeconfig.json").write_text('{"tfm":"net10.0"}', encoding="utf-8")
 
-    def install(self, components):
-        self.run_process([str(self.setup), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
+    def install(self, components, expect_success=True):
+        return self.run_process([str(self.setup), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
                           "/TYPE=custom", "/COMPONENTS=" + ",".join(components),
                           f"/DIR={self.profile / 'app'}", f"/ACAD2026DIR={self.acad}",
-                          f"/LOG={self.work / 'setup.log'}"])
+                          f"/LOG={self.work / 'setup.log'}"], expect_success=expect_success)
+
+    def test_scripts_only_install(self):
+        self.install(["scripts"])
+        self.assertEqual("# fixture", (self.profile / "app" / "scripts" / "dhcb_agent.py").read_text(encoding="utf-8"))
+        self.assert_bundle([])
+        self.assertFalse(self.addins.exists())
+        self.assertFalse((self.profile / "app" / "DhcbTools.BatchRunner.exe").exists())
+
+    def test_missing_scripts_fail_compilation(self):
+        scripts = self.stage / "batchrunner" / "scripts"
+        saved = self.work / "saved-scripts"
+        scripts.rename(saved)
+        try:
+            result = self.run_process([str(self.compiler), "/Q", "/DVersion=0.0.0-missing",
+                                       f"/DStageDir={self.stage}", f"/O{self.work}", str(self.source)],
+                                      expect_success=False)
+            self.assertNotEqual(0, result.returncode)
+            self.assertFalse((self.work / "DhcbTools-Setup-0.0.0-missing.exe").exists())
+        finally:
+            saved.rename(scripts)
+
+    def test_incompatible_autocad_does_not_change_existing_install(self):
+        self.install(["revit2024", "acad2025"])
+        before = {path.relative_to(self.profile): path.read_bytes()
+                  for path in self.profile.rglob("*") if path.is_file()}
+        runtime = self.acad / "acdbmgd.runtimeconfig.json"
+        exe = self.acad / "acad.exe"
+        for fault in ("missing-exe", "missing-runtime", "net8"):
+            with self.subTest(fault=fault):
+                exe.touch()
+                runtime.write_text('{"tfm":"net10.0"}', encoding="utf-8")
+                if fault == "missing-exe":
+                    exe.unlink()
+                elif fault == "missing-runtime":
+                    runtime.unlink()
+                else:
+                    runtime.write_text('{"tfm":"net8.0"}', encoding="utf-8")
+                result = self.install(["revit2026", "acad2026"], expect_success=False)
+                self.assertNotEqual(0, result.returncode)
+                after = {path.relative_to(self.profile): path.read_bytes()
+                         for path in self.profile.rglob("*") if path.is_file()}
+                self.assertEqual(before, after, "Runtime không đúng phải bị chặn trước khi ghi/xoá file")
 
     def assert_bundle(self, years):
         if not years:

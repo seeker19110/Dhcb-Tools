@@ -82,7 +82,7 @@ Source: "{#StageDir}\batchrunner\*"; DestDir: "{app}"; \
 ; (không cài batch runner) vẫn cần chúng: MCP server cho Claude Desktop và client dòng lệnh đều nằm ở đây.
 ; Chỉ cần Python 3.9+, không có dependency ngoài.
 Source: "{#StageDir}\batchrunner\scripts\*"; DestDir: "{app}\scripts"; \
-  Components: scripts; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+  Components: scripts; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Dirs]
 ; Tạo sẵn để shortcut log không trỏ vào thư mục chưa tồn tại (add-in tự tạo khi ghi dòng đầu tiên).
