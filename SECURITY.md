@@ -43,4 +43,9 @@ Mọi action ghim theo **commit SHA**; mọi workflow mặc định `contents: r
 ## Việc còn phụ thuộc chủ repo
 
 Ghi ở [`docs/audit-bao-mat-2026-09-28.md`](docs/audit-bao-mat-2026-09-28.md#việc-cần-chủ-repo-bật):
-branch protection cho `main`, private vulnerability reporting, Dependency graph, chứng chỉ ký mã.
+chứng chỉ ký mã và kiểm nghiệm bảo mật trong host.
+
+Đối chiếu GitHub ngày 2026-10-08: ruleset `main` active, không bypass, yêu cầu PR và 11 job tests;
+secret scanning/push protection đang bật. Private vulnerability reporting và Dependabot alerts đã được bật
+và kiểm lại qua API. Cổng `gitleaks` vẫn cần kiểm riêng trước auto-merge vì chưa nằm trong required checks.
+Dependabot security updates chưa bật; PR cập nhật định kỳ và workflow audit vẫn hoạt động theo cấu hình repo.

@@ -44,6 +44,10 @@ class InstallerTests(unittest.TestCase):
         (stage / "batchrunner" / "scripts").mkdir(parents=True)
         (stage / "batchrunner" / "DhcbTools.BatchRunner.exe").write_text("fixture batch", encoding="utf-8")
         (stage / "batchrunner" / "scripts" / "dhcb_agent.py").write_text("# fixture", encoding="utf-8")
+        for folder in ("jobs", "configs"):
+            (stage / "batchrunner" / folder).mkdir()
+            (stage / "batchrunner" / folder / "custom.json").write_text("fixture", encoding="utf-8")
+            (stage / "batchrunner" / folder / "fresh.sample.json").write_text("new sample", encoding="utf-8")
         shutil.copyfile(ROOT / "installer" / "PackageContents.xml", stage / "PackageContents.xml")
         cls.original = ET.parse(stage / "PackageContents.xml").getroot()
         cls.acad = cls.work / "fake-acad"
@@ -78,10 +82,11 @@ class InstallerTests(unittest.TestCase):
         (self.acad / "acad.exe").touch()
         (self.acad / "acdbmgd.runtimeconfig.json").write_text('{"tfm":"net10.0"}', encoding="utf-8")
 
-    def install(self, components, expect_success=True):
+    def install(self, components, expect_success=True, preserve_unselected=False):
         return self.run_process([str(self.setup), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
                           "/TYPE=custom", "/COMPONENTS=" + ",".join(components),
                           f"/DIR={self.profile / 'app'}", f"/ACAD2026DIR={self.acad}",
+                          f"/PRESERVEUNSELECTED={int(preserve_unselected)}",
                           f"/LOG={self.work / 'setup.log'}"], expect_success=expect_success)
 
     def test_scripts_only_install(self):
@@ -168,6 +173,117 @@ class InstallerTests(unittest.TestCase):
         self.install([])
         self.assert_bundle([])
         self.assertFalse((self.addins / "2026" / "DhcbTools.Revit.addin").exists())
+
+    def test_scoped_upgrade_preserves_revit_and_existing_autocad_settings(self):
+        self.install(["revit2024", "acad2024", "acad2026"])
+        state_paths = ("roaming/DHCB/settings.json", "roaming/DHCB/bridge-token.txt", "local/DHCB/ledger.jsonl")
+        for relative in state_paths:
+            path = self.profile / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("user state " + relative, encoding="utf-8")
+        state_before = {relative: (self.profile / relative).read_bytes() for relative in state_paths}
+        before_revit = {p.relative_to(self.addins): p.read_bytes()
+                        for p in self.addins.rglob("*") if p.is_file()}
+        xml = self.bundle / "PackageContents.xml"
+        tree = ET.parse(xml)
+        component = tree.getroot().findall("Components")[0]
+        component.set("Description", "Thiết lập cũ — tiếng Việt")
+        component.find("ComponentEntry").set("LoadOnAutoCADStartup", "False")
+        tree.write(xml, encoding="utf-8", xml_declaration=True)
+        xml.write_bytes(b"\xef\xbb\xbf" + xml.read_bytes())
+        old_acad = (self.bundle / "Contents" / "2024" / "DhcbTools.AutoCAD.dll").read_bytes()
+        self.install(["acad2025", "batch", "scripts"], preserve_unselected=True)
+        self.assert_bundle([2024, 2025, 2026])
+        self.assertEqual(before_revit, {p.relative_to(self.addins): p.read_bytes()
+                                      for p in self.addins.rglob("*") if p.is_file()})
+        self.assertEqual(state_before, {relative: (self.profile / relative).read_bytes() for relative in state_paths})
+        self.assertEqual(old_acad, (self.bundle / "Contents" / "2024" / "DhcbTools.AutoCAD.dll").read_bytes())
+        retained = ET.parse(xml).getroot().findall("Components")[0]
+        self.assertEqual("Thiết lập cũ — tiếng Việt", retained.attrib["Description"])
+        self.assertEqual("False", retained.find("ComponentEntry").attrib["LoadOnAutoCADStartup"])
+        # A scripts-only scoped upgrade leaves host manifests and binaries untouched.
+        before = {p.relative_to(self.bundle): p.read_bytes() for p in self.bundle.rglob("*") if p.is_file()}
+        self.install(["scripts"], preserve_unselected=True)
+        self.assertEqual(before, {p.relative_to(self.bundle): p.read_bytes()
+                                 for p in self.bundle.rglob("*") if p.is_file()})
+
+    def test_scoped_fresh_install_does_not_activate_unselected_hosts(self):
+        self.install(["acad2025"], preserve_unselected=True)
+        self.assert_bundle([2025])
+        self.assertFalse(self.addins.exists())
+
+    def test_noncanonical_and_commented_components_preserve_only_live_settings(self):
+        for variant in ("no-attributes", "newline", "single-quotes", "commented-decoy"):
+            with self.subTest(variant=variant):
+                self.setUp()
+                self.install(["acad2024"])
+                manifest = self.bundle / "PackageContents.xml"
+                original = manifest.read_text(encoding="utf-8-sig").replace('LoadOnAutoCADStartup="True"', 'LoadOnAutoCADStartup="False"')
+                if variant == "no-attributes":
+                    changed = original.replace('<Components Description="AutoCAD 2024">', '<Components>')
+                elif variant == "newline":
+                    changed = original.replace('<Components Description=', '<Components\n Description=')
+                else:
+                    changed = original.replace('ModuleName="./Contents/2024/DhcbTools.AutoCAD.dll"', "ModuleName='./Contents/2024/DhcbTools.AutoCAD.dll'")
+                    if variant == "commented-decoy":
+                        decoy = '<!-- <Components Description="Decoy"><ComponentEntry ModuleName="./Contents/2024/DhcbTools.AutoCAD.dll" LoadOnAutoCADStartup="True"/></Components> -->'
+                        changed = changed.replace('<Components Description="AutoCAD 2024">', decoy + '<Components Description="AutoCAD 2024">')
+                manifest.write_text(changed, encoding="utf-8")
+                self.install(["acad2025"], preserve_unselected=True)
+                self.assert_bundle([2024, 2025])
+                retained = ET.parse(manifest).getroot().findall("Components")[0]
+                self.assertEqual("False", retained.find("ComponentEntry").attrib["LoadOnAutoCADStartup"])
+                self.assertNotEqual("Decoy", retained.attrib.get("Description"))
+
+    def test_grouped_host_entries_block_scope_changes_without_duplication(self):
+        self.install(["acad2024", "acad2025"])
+        manifest = self.bundle / "PackageContents.xml"
+        tree = ET.parse(manifest)
+        first, second = tree.getroot().findall("Components")
+        first.append(second.find("ComponentEntry"))
+        tree.getroot().remove(second)
+        tree.write(manifest, encoding="utf-8", xml_declaration=True)
+        before = {p.relative_to(self.profile): p.read_bytes() for p in self.profile.rglob("*") if p.is_file()}
+        result = self.install(["acad2026"], preserve_unselected=True, expect_success=False)
+        self.assertNotEqual(0, result.returncode)
+        self.assertEqual(before, {p.relative_to(self.profile): p.read_bytes()
+                                 for p in self.profile.rglob("*") if p.is_file()})
+
+    def test_preserved_node_comment_cannot_activate_an_unselected_year(self):
+        self.install(["acad2024"])
+        manifest = self.bundle / "PackageContents.xml"
+        tree = ET.parse(manifest)
+        component = tree.getroot().find("Components")
+        component.append(ET.Comment('<Components Description="AutoCAD 2025"><ComponentEntry ModuleName="./Contents/2025/DhcbTools.AutoCAD.dll"/></Components>'))
+        tree.write(manifest, encoding="utf-8", xml_declaration=True)
+        self.install(["acad2026"], preserve_unselected=True)
+        self.assert_bundle([2024, 2026])
+
+    def test_invalid_existing_manifest_blocks_scoped_upgrade_without_changes(self):
+        self.install(["revit2024", "acad2024"])
+        manifest = self.bundle / "PackageContents.xml"
+        original = manifest.read_text(encoding="utf-8-sig")
+        for content in ("broken XML", "<ApplicationPackage/>", "<!DOCTYPE x [<!ENTITY e 'x'>]><ApplicationPackage>&e;</ApplicationPackage>",
+                        original.replace('./Contents/2024/DhcbTools.AutoCAD.dll', '.\\Contents\\2024\\DhcbTools.AutoCAD.dll')):
+            with self.subTest(content=content):
+                manifest.write_text(content, encoding="utf-8")
+                before = {p.relative_to(self.profile): p.read_bytes()
+                          for p in self.profile.rglob("*") if p.is_file()}
+                result = self.install(["acad2025"], preserve_unselected=True, expect_success=False)
+                self.assertNotEqual(0, result.returncode)
+                self.assertEqual(before, {p.relative_to(self.profile): p.read_bytes()
+                                         for p in self.profile.rglob("*") if p.is_file()})
+
+    def test_batch_upgrade_preserves_edited_jobs_configs_and_adds_new_samples(self):
+        self.install(["batch"])
+        app = self.profile / "app"
+        for folder in ("jobs", "configs"):
+            (app / folder / "custom.json").write_text("user edited", encoding="utf-8")
+            (app / folder / "fresh.sample.json").unlink()
+        self.install(["batch"])
+        for folder in ("jobs", "configs"):
+            self.assertEqual("user edited", (app / folder / "custom.json").read_text(encoding="utf-8"))
+            self.assertEqual("new sample", (app / folder / "fresh.sample.json").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

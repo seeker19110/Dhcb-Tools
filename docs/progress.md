@@ -1,5 +1,13 @@
 # Hiện trạng dự án
 
+> Cập nhật triển khai 2026-10-08: [PR #182](https://github.com/seeker19110/Dhcb-Tools/pull/182)
+> đã merge và cài AutoCAD 2026 + BatchRunner/scripts tại commit `2cac231`.
+> DLL đã cài đạt **105/105 ca AutoCAD và 5 tình huống PDF**, doctor 0 lỗi; 132 file trạng thái
+> và một task đêm được giữ nguyên. [Bằng chứng và giới hạn](bang-chung/2026-10-08/trien-khai.md).
+> Máy triển khai hiện tại không có Revit.exe; các mô tả máy có Revit và số lệnh ở những vòng trước
+> là bằng chứng lịch sử. Danh mục hiện có 53 lệnh Revit và 15 lệnh AutoCAD công khai;
+> `UsageReport`/`RunTests` là công cụ nội bộ.
+
 > Lượt nâng chất lượng 2026-10-07: [kế hoạch, thay đổi và kiểm chứng](ke-hoach-chat-luong-2026-10-07.md).
 > Hàng đợi/chạy thật/batch được rà lại; [hướng dẫn thí điểm](thi-diem-su-dung.md) có công cụ doctor và bảng đo tác vụ.
 

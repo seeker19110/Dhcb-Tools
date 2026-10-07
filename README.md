@@ -14,6 +14,7 @@ hiện trạng ở [`docs/progress.md`](docs/progress.md).
 
 Kế hoạch nâng chất lượng và kết quả kiểm chứng của lượt 2026-10-07:
 [`docs/ke-hoach-chat-luong-2026-10-07.md`](docs/ke-hoach-chat-luong-2026-10-07.md).
+[Bằng chứng triển khai và phần nghiệm thu còn lại](docs/bang-chung/2026-10-08/trien-khai.md).
 Dùng thử trên công việc thật: [`docs/thi-diem-su-dung.md`](docs/thi-diem-su-dung.md) và bảng đo thời gian đi kèm.
 
 ## Bắt đầu cho kỹ sư: cài → bấm 3 lệnh → thấy kết quả

@@ -37,9 +37,9 @@ windows-latest: build Release thật (có WPF) cho Revit 2023/2024/2025/2026 và
 đóng gói zip kèm `jobs/`, `configs/`, `scripts/`, dựng installer Inno Setup rồi tạo GitHub Release.
 Không chạy trên PR nên **không phải chờ nó** khi merge.
 
-## Merge PR — theo dõi check rồi merge tay, không dùng auto-merge
+## Merge PR — chờ check xanh; auto-merge khi được yêu cầu
 
-Giữ merge tay sau khi kiểm tra toàn bộ CI. Trước đây `main` chưa có required checks nên
+Mặc định merge tay sau khi kiểm tra toàn bộ CI. Trước đây `main` chưa có required checks nên
 `gh pr merge --auto` từng merge ngay khi CI còn chạy (PR #64, 2026-09-05).
 
 Đã đối chiếu GitHub ngày 2026-10-08: ruleset `main` đang **active**, áp dụng nhánh mặc định,
@@ -53,12 +53,21 @@ cần kiểm cả `GET /repos/{owner}/{repo}/rulesets` và nội dung ruleset.
    `tests.yml` chạy trên mọi PR nên luôn có check để chờ.
 3. **Toàn bộ job của `tests.yml` xanh + không xung đột → `gh pr merge <n> --squash`.** Còn job đang
    chạy → tiếp tục chờ. Có job đỏ → dừng, mở log của job đó, sửa và push lại, **không merge**.
-4. **Không merge khi có check đang đỏ hoặc đang chạy** — kể cả gián tiếp qua `--auto`.
+4. **Không merge khi có check đỏ hoặc đang chạy** trong quy trình tay. Auto-merge chỉ dùng theo ngoại lệ bên dưới.
 5. Nếu `main` tiến lên gây xung đột (`mergeable_state: dirty`) trong lúc chờ, merge `main` vào
    nhánh, giải xung đột, rồi mới tiếp tục từ bước 2.
 
-Không dùng `--auto` trong quy trình này. Khi đổi tên job hoặc ma trận CI, đối chiếu lại required checks
-của ruleset để tránh thiếu cổng kiểm hoặc chờ một job không còn tồn tại.
+Mặc định dùng quy trình merge tay trên. Khi chủ dự án yêu cầu auto-merge rõ ràng, có thể dùng
+`gh pr merge <n> --auto --squash --match-head-commit <SHA>` sau khi:
+
+- Đối chiếu ruleset đang active, không bypass, yêu cầu đủ 11 job `tests.yml` cho nhánh đích.
+- `gitleaks` xanh trên đúng head SHA; job này hiện chưa nằm trong required checks nên phải kiểm trước khi bật.
+- Rà diff và xác nhận không có check thất bại; các job required còn chạy sẽ do GitHub chờ hoàn tất.
+
+Không dùng `--admin` hoặc bỏ required checks để merge. Push head mới thì rà lại check không bắt buộc
+trước khi bật lại auto-merge. Nếu mọi check đã xanh, GitHub có thể merge ngay khi nhận lệnh.
+Khi đổi tên job hoặc ma trận CI, đối chiếu lại required checks của ruleset để tránh thiếu cổng kiểm
+hoặc chờ một job không còn tồn tại.
 
 ## Commit message — Conventional Commits
 
