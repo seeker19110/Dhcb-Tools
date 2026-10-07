@@ -233,7 +233,9 @@ def main():
         elif method == "tools/call":
             try:
                 result = call_tool(params.get("name", ""), params.get("arguments") or {})
-                is_error = ("success" in result and not result["success"]) or "error" in result
+                is_error = ("success" in result and (
+                    not result["success"] or bool(result.get("partialSuccess")) or bool(result.get("errors"))
+                )) or "error" in result
                 respond(msg_id, {"content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False, indent=2)}], "isError": is_error})
             except Exception as ex:  # noqa: BLE001
                 respond(msg_id, error={"code": -32000, "message": str(ex)})
