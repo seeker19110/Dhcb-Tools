@@ -17,28 +17,18 @@ public static partial class Program
 
     private static int RunAutoCad(BatchJob job, Options opts, string runLog, DateTime runTime)
     {
-        var console = opts.AccoreConsole ?? Directory.GetDirectories(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Autodesk"), "AutoCAD *")
-            .Select(d => Path.Combine(d, "accoreconsole.exe")).FirstOrDefault(File.Exists);
-        if (console is null || !File.Exists(console))
+        var installation = AutoCadInstallationResolver.Resolve(opts.AccoreConsole, opts.PluginDll,
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), AppContext.BaseDirectory);
+        if (!installation.Success)
         {
-            Console.Error.WriteLine("Không tìm thấy accoreconsole.exe (dùng --accoreconsole).");
+            Console.Error.WriteLine(installation.Error);
             return 2;
         }
-
-        // Ưu tiên vỏ core-only (không AcMgd) — NETLOAD chắc chắn trong accoreconsole; vỏ đầy đủ là dự phòng.
-        var plugin = opts.PluginDll
-                     ?? new[] { "DhcbTools.AutoCAD.Core.dll", "DhcbTools.AutoCAD.dll" }.Select(n => Path.Combine(AppContext.BaseDirectory, n)).FirstOrDefault(File.Exists)
-                     ?? Path.Combine(AppContext.BaseDirectory, "DhcbTools.AutoCAD.Core.dll");
-        if (!File.Exists(plugin))
-        {
-            Console.Error.WriteLine("Không tìm thấy DhcbTools.AutoCAD.Core.dll / DhcbTools.AutoCAD.dll (dùng --plugin-dll).");
-            return 2;
-        }
-
-        // Tuyệt đối hoá: accoreconsole không giải đường dẫn tương đối theo thư mục của runner —
-        // `--plugin-dll src\...\DhcbTools.AutoCAD.Core.dll` cho "Unable to load ... assembly", mọi DHCB_RUN
-        // thành "Unknown command", và runner báo "0 OK, 0 lỗi" (đóng vai kỹ sư AutoCAD, §57).
-        plugin = Path.GetFullPath(plugin);
+        var console = installation.ConsolePath!;
+        var plugin = installation.PluginPath!;
+        if (installation.Warning is not null) Console.Error.WriteLine(installation.Warning);
+        Console.WriteLine("AutoCAD: " + console + " · DLL: " + plugin);
 
         var outputFolder = job.ResolveOutputFolder(runTime);
         if (!string.IsNullOrEmpty(outputFolder)) Directory.CreateDirectory(outputFolder);
@@ -103,16 +93,26 @@ public static partial class Program
             var saveAs = saveTarget is null || job.SaveOnError ? saveTarget : StagedSave.StagingPath(saveTarget, runTime);
             var saveTargetExists = saveAs is not null && File.Exists(saveAs);
 
-            // Step đặc biệt "PlotPdf" (mục 7.13): không phải lệnh Core — sinh -PLOT trong script accoreconsole.
+            // -PLOT không ghi log từ add-in: giữ file đích cho tới khi xác minh kết quả thật.
+            var plots = new List<AutoCadPlot>();
             string? plotScript = null;
-            foreach (var step in job.StepsFor(file).Where(st => st.Command.Equals("PlotPdf", StringComparison.OrdinalIgnoreCase)))
+            try
             {
-                var cfg = JObject.Parse(job.ExpandStepConfig(step, outputFolder, file.Path, runTime));
-                var pdf = (string?)cfg["outputPath"] ?? Path.Combine(outputFolder, Path.GetFileNameWithoutExtension(file.Path) + ".pdf");
-                plotScript = (plotScript ?? string.Empty) + AcadScriptGen.PlotPdf(pdf,
-                    (string?)cfg["layout"] ?? "Model", (string?)cfg["paperSize"] ?? "ISO A3 (420.00 x 297.00 MM)",
-                    (string?)cfg["orientation"] ?? "Landscape", (string?)cfg["plotArea"] ?? "Extents", (string?)cfg["plotStyle"] ?? "monochrome.ctb");
-                RunLog.Append(runLog, new RunLogEntry { File = file.Path, Command = "PlotPdf", Success = true, Summary = "Đã xếp lệnh -PLOT → " + pdf + " (kết quả thật xem file PDF)." });
+                foreach (var step in job.StepsFor(file).Where(st => st.Command.Equals("PlotPdf", StringComparison.OrdinalIgnoreCase)))
+                {
+                    var cfg = JObject.Parse(job.ExpandStepConfig(step, outputFolder, file.Path, runTime));
+                    var plot = new AutoCadPlot(cfg, Path.Combine(outputFolder, Path.GetFileNameWithoutExtension(file.Path) + ".pdf"), opts.DryRun);
+                    plots.Add(plot);
+                    plotScript += plot.Script;
+                }
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is Newtonsoft.Json.JsonException)
+            {
+                foreach (var plot in plots) plot.Discard();
+                RunLog.Append(runLog, new RunLogEntry { File = file.Path, Command = "PlotPdf", Summary = "Lỗi cấu hình xuất PDF: " + ex.Message });
+                anyFailed = true;
+                stop = job.StopOnError;
+                continue;
             }
 
             var script = Path.Combine(work, $"{index:D3}.scr");
@@ -128,11 +128,22 @@ public static partial class Program
             };
             var startedAt = DateTime.Now;
             var linesBefore = File.Exists(runLog) ? File.ReadAllLines(runLog).Length : 0;
-            using var p = Process.Start(psi);
+            Process? startedProcess;
+            try { startedProcess = Process.Start(psi); }
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is IOException || ex is InvalidOperationException)
+            {
+                foreach (var plot in plots) plot.Discard();
+                RunLog.Append(runLog, new RunLogEntry { File = file.Path, Command = "Open", Summary = "Không khởi động được accoreconsole: " + ex.Message });
+                anyFailed = true;
+                stop = job.StopOnError;
+                continue;
+            }
+            using var p = startedProcess;
             if (p is null)
             {
                 RunLog.Append(runLog, new RunLogEntry { File = file.Path, Command = "Open", Success = false, Summary = "Không khởi động được accoreconsole." });
                 anyFailed = true;
+                foreach (var plot in plots) plot.Discard();
                 stop = job.StopOnError;
                 continue;
             }
@@ -195,6 +206,15 @@ public static partial class Program
                 var tail = Tail(errors.Length > 0 ? errors : output, 5);
                 RunLog.Append(runLog, new RunLogEntry { File = file.Path, Command = "*", Success = false, Summary = $"accoreconsole thoát mã {exitCode}." + (tail.Length > 0 ? " " + tail : string.Empty) });
                 anyFailed = true;
+            }
+
+            var plotBlocker = StagedSave.Blocker(timedOut, exitCode, netloadFailed, stepPaths.Count, stepEntries);
+            foreach (var plot in plots)
+            {
+                var plotEntry = plot.Complete(file.Path, plotBlocker);
+                RunLog.Append(runLog, plotEntry);
+                stepEntries.Add(plotEntry);
+                anyFailed |= !plotEntry.IsComplete;
             }
 
             if (saveTarget is not null && saveAs is not null)
