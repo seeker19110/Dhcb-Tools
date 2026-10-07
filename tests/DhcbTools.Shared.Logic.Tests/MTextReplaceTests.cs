@@ -69,6 +69,55 @@ public class MTextReplaceTests
         Assert.Equal(1, r.Skipped);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void IdentityAcrossFormatting_IsNotIncompleteWork(bool regex)
+    {
+        const string contents = "DH{\\C1;CB} và DHCB";
+        var result = regex
+            ? MTextReplace.Replace(contents, Rx("DHCB"), "$0")
+            : MTextReplace.ReplaceAll(contents, "DHCB", "DHCB", false);
+        Assert.Equal(contents, result.Contents);
+        Assert.Equal(0, result.Replaced);
+        Assert.Equal(0, result.Skipped);
+    }
+
+    [Fact]
+    public void IdentityMatchKeepsFormattingWhileOtherMatchesChange()
+    {
+        const string contents = "A{\\fArial|b1;B}C và X";
+        var result = MTextReplace.Replace(contents, Rx("ABC|X"), "ABC");
+        Assert.Equal("A{\\fArial|b1;B}C và ABC", result.Contents);
+        Assert.Equal(1, result.Replaced);
+        Assert.Equal(0, result.Skipped);
+    }
+
+    [Fact]
+    public void CaseInsensitiveSearchStillReportsBlockedCaseChange()
+    {
+        const string contents = "A{\\C1;B}C";
+        var result = MTextReplace.ReplaceAll(contents, "abc", "abc", true);
+        Assert.Equal(contents, result.Contents);
+        Assert.Equal(0, result.Replaced);
+        Assert.Equal(1, result.Skipped);
+        Assert.Equal(0, MTextReplace.ReplaceAll(contents, "abc", "ABC", true).Skipped);
+    }
+
+    [Fact]
+    public void IdentityOfEscapedTextAndEmptyInsertionPreservesRawContents()
+    {
+        const string contents = "30\\U+00B0C\\PA";
+        var result = MTextReplace.Replace(contents, Rx("30°C|\\n"), "$0");
+        Assert.Equal(contents, result.Contents);
+        Assert.Equal(0, result.Replaced);
+        Assert.Equal(0, result.Skipped);
+        var insertion = MTextReplace.Replace(contents, Rx("^|$"), "");
+        Assert.Equal(contents, insertion.Contents);
+        Assert.Equal(0, insertion.Replaced);
+        Assert.Equal(0, insertion.Skipped);
+    }
+
     /// <summary>Khớp có chứa xuống dòng (do <c>\P</c> sinh ra) cũng không thay — không được xoá mã xuống dòng.</summary>
     [Fact]
     public void KhopChuaXuongDong_KhongThay()

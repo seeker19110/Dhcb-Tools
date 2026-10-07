@@ -1,4 +1,6 @@
 using DhcbTools.Shared.Logic.Cad;
+using DhcbTools.Shared.Hosting;
+using DhcbTools.Shared.Logic.Batch;
 using Xunit;
 
 namespace DhcbTools.Shared.Logic.Tests;
@@ -45,4 +47,36 @@ public class LockedLayerSkipsTests
         Assert.DoesNotContain("\"L6\"", message);
         Assert.Contains("… và 2 layer khác", message);
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NoIncompleteWork_PreservesExistingCompletion(bool alreadyPartial)
+    {
+        var result = CommandResult.Ok("original", 3);
+        result.PartialSuccess = alreadyPartial;
+        Assert.Same(result, result.WithIncompleteWork(false));
+        Assert.Equal(alreadyPartial, result.PartialSuccess);
+        Assert.Equal(!alreadyPartial, result.IsComplete);
+        Assert.Equal(3, result.AffectedCount);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    public void IncompleteWork_PreventsBatchSaveWithoutHidingAffectedCount(int affected)
+    {
+        var skips = new LockedLayerSkips();
+        skips.Add("locked");
+        var result = CommandResult.Ok("original", affected).WithIncompleteWork(skips.Count > 0);
+        Assert.True(result.Success);
+        Assert.True(result.PartialSuccess);
+        Assert.False(result.IsComplete);
+        Assert.Equal(affected, result.AffectedCount);
+        Assert.NotNull(StagedSave.Blocker(false, 0, false, 1, new[]
+        {
+            new RunLogEntry { Success = result.Success, PartialSuccess = result.PartialSuccess, Affected = affected }
+        }));
+    }
+
 }

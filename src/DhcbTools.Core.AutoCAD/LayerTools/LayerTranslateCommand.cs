@@ -35,6 +35,7 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
         }
 
         var report = new List<string>();
+        var incompleteRules = false;
         var rows = new List<MapRow>();
         for (var i = 1; i < lines.Count; i++)
         {
@@ -46,6 +47,7 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
 
             if (cells.Length < 2 || string.IsNullOrWhiteSpace(cells[0]) || string.IsNullOrWhiteSpace(cells[1]))
             {
+                incompleteRules = true;
                 report.Add($"Bỏ qua dòng {i + 1}: cần đủ hai cột Source,Target.");
                 continue;
             }
@@ -54,6 +56,7 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
             var target = cells[1].Trim();
             if (!AcadHelpers.IsValidSymbolName(target))
             {
+                incompleteRules = true;
                 report.Add($"Bỏ qua dòng {i + 1}: tên layer đích \"{target}\" không hợp lệ với AutoCAD.");
                 continue;
             }
@@ -93,13 +96,13 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
             if (config.DryRun)
             {
                 report.Add($"[Xem trước] Sẽ tạo layer mới: \"{row.Target}\".");
-                DescribePlannedProperties(database, transaction, row, report);
+                incompleteRules |= DescribePlannedProperties(database, transaction, row, report);
                 continue;
             }
 
             var ltWrite = (LayerTable)transaction.GetObject(database.LayerTableId, OpenMode.ForWrite);
             var newLayer = new LayerTableRecord { Name = row.Target };
-            ApplyProperties(database, transaction, newLayer, row, report);
+            incompleteRules |= ApplyProperties(database, transaction, newLayer, row, report);
 
             ltWrite.Add(newLayer);
             transaction.AddNewlyCreatedDBObject(newLayer, true);
@@ -118,16 +121,22 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
 
         // Đổi layer của một entity hoặc attribute nếu layer của nó có trong bảng map. Layer khoá: bỏ qua + đếm
         // (UpgradeOpen trên layer khoá ném eOnLockedLayer, cả lệnh sập) — CollectUsedLayerNamesAfterMap xét đúng tập này.
-        void Translate(Entity ent)
+        void Translate(Entity ent, string? lockedParentLayer = null)
         {
             if (!sourceToTarget.TryGetValue(ent.Layer, out var target))
             {
                 return;
             }
 
-            if (lockedLayers.Contains(ent.LayerId))
+            // Mapping to the same layer is a true no-op, even when the source is locked.
+            if (string.Equals(ent.Layer, target, StringComparison.OrdinalIgnoreCase))
             {
-                lockedSkips.Add(ent.Layer);
+                return;
+            }
+
+            if (lockedParentLayer != null || lockedLayers.Contains(ent.LayerId))
+            {
+                lockedSkips.Add(lockedParentLayer ?? ent.Layer);
                 return;
             }
 
@@ -156,6 +165,8 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
                     continue;
                 }
 
+                // Capture the original parent lock before a layer move changes the parent.
+                var lockedParentLayer = lockedLayers.Contains(ent.LayerId) ? ent.Layer : null;
                 Translate(ent);
 
                 // AttributeReference thuộc BlockReference, KHÔNG nằm trong BlockTableRecord. Bản cũ bỏ sót: chữ khung tên
@@ -166,7 +177,7 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
                     {
                         if (transaction.GetObject(attId, OpenMode.ForRead) is AttributeReference attRef)
                         {
-                            Translate(attRef);
+                            Translate(attRef, lockedParentLayer);
                         }
                     }
                 }
@@ -234,7 +245,7 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
                 $"[Xem trước] Sẽ đổi layer của {changedCount} đối tượng (entity + attribute), xoá {deletedLayers.Count} layer nguồn rỗng.",
                 changedCount);
             preview.Messages.AddRange(report);
-            return preview;
+            return preview.WithIncompleteWork(lockedSkips.Count > 0 || incompleteRules);
         }
 
         transaction.Commit();
@@ -243,15 +254,16 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
             $"Đã đổi layer của {changedCount} đối tượng (entity + attribute) theo \"{config.MapCsvPath}\", xoá {deletedLayers.Count} layer nguồn rỗng.",
             changedCount);
         result.Messages.AddRange(report);
-        return result;
+        return result.WithIncompleteWork(lockedSkips.Count > 0 || incompleteRules);
     }
 
     private static string? Cell(string[] cells, int index)
         => cells.Length > index && cells[index].Trim().Length > 0 ? cells[index].Trim() : null;
 
     /// <summary>Gán Color/Linetype/Lineweight/Plottable từ CSV cho layer mới tạo; giá trị không đọc được thì báo.</summary>
-    private static void ApplyProperties(Database database, Transaction transaction, LayerTableRecord layer, MapRow row, List<string> report)
+    private static bool ApplyProperties(Database database, Transaction transaction, LayerTableRecord layer, MapRow row, List<string> report)
     {
+        var incomplete = false;
         if (row.Color is not null)
         {
             if (TryParseAci(row.Color, out var aci))
@@ -260,6 +272,7 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
             }
             else
             {
+                incomplete = true;
                 report.Add($"Dòng {row.Line}: màu \"{row.Color}\" không phải chỉ số ACI 1–255, layer \"{row.Target}\" giữ màu mặc định.");
             }
         }
@@ -271,6 +284,10 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
             {
                 layer.LinetypeObjectId = linetypeId;
             }
+            else
+            {
+                incomplete = true;
+            }
         }
 
         if (row.Lineweight is not null)
@@ -281,6 +298,7 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
             }
             else
             {
+                incomplete = true;
                 report.Add($"Dòng {row.Line}: lineweight \"{row.Lineweight}\" không có trong bảng chuẩn AutoCAD (đơn vị 1/100 mm, ví dụ 25 = 0.25 mm), layer \"{row.Target}\" giữ mặc định.");
             }
         }
@@ -293,19 +311,24 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
             }
             else
             {
+                incomplete = true;
                 report.Add($"Dòng {row.Line}: Plottable \"{row.Plottable}\" phải là true/false.");
             }
         }
+
+        return incomplete;
     }
 
     /// <summary>
     /// Xem trước: chỉ kiểm giá trị (kể cả linetype có nạp được không) mà không tạo gì. Báo đủ những ô mà
     /// <see cref="ApplyProperties"/> sẽ bỏ qua — bản cũ quên màu và Plottable, nên lỗi đó chỉ lộ ra lúc chạy thật.
     /// </summary>
-    private static void DescribePlannedProperties(Database database, Transaction transaction, MapRow row, List<string> report)
+    private static bool DescribePlannedProperties(Database database, Transaction transaction, MapRow row, List<string> report)
     {
+        var incomplete = false;
         if (row.Color is not null && !TryParseAci(row.Color, out _))
         {
+            incomplete = true;
             report.Add($"Dòng {row.Line}: màu \"{row.Color}\" không phải chỉ số ACI 1–255, layer \"{row.Target}\" sẽ giữ màu mặc định.");
         }
 
@@ -320,13 +343,17 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
 
         if (row.Lineweight is not null && !TryParseLineWeight(row.Lineweight, out _))
         {
+            incomplete = true;
             report.Add($"Dòng {row.Line}: lineweight \"{row.Lineweight}\" không có trong bảng chuẩn AutoCAD (đơn vị 1/100 mm).");
         }
 
         if (row.Plottable is not null && !TryParsePlottable(row.Plottable, out _))
         {
+            incomplete = true;
             report.Add($"Dòng {row.Line}: Plottable \"{row.Plottable}\" phải là true/false.");
         }
+
+        return incomplete;
     }
 
     /// <summary>Màu trong CSV: chỉ số ACI 1–255.</summary>

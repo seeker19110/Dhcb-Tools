@@ -153,10 +153,10 @@ internal static class BlockNumbering
                 continue;
             }
 
-            if (lockedLayers.Contains(attRef.LayerId))
+            if (lockedLayers.Contains(attRef.LayerId) || lockedLayers.Contains(blockRef.LayerId))
             {
                 // UpgradeOpen trên layer khoá ném eOnLockedLayer — bản cũ sập cả lệnh vì một attribute.
-                lockedSkips.Add(attRef.Layer);
+                lockedSkips.Add(lockedLayers.Contains(blockRef.LayerId) ? blockRef.Layer : attRef.Layer);
                 continue;
             }
 
@@ -195,7 +195,7 @@ internal static class BlockNumbering
                 preview.Messages.Add($"{AcadHelpers.HandleOf(refId)}: \"{value}\"");
             }
 
-            return preview;
+            return preview.WithIncompleteWork(lockedSkips.Count > 0 || missing > 0);
         }
 
         transaction.Commit();
@@ -209,6 +209,6 @@ internal static class BlockNumbering
         }
 
         result.Messages.AddRange(notes);
-        return result;
+        return result.WithIncompleteWork(lockedSkips.Count > 0 || missing > 0);
     }
 }

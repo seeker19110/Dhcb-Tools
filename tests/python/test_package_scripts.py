@@ -32,6 +32,7 @@ NOT_SHIPPED = {
     "dung-family.ps1": "build add-in từ mã nguồn rồi mới dựng family",
     "run-in-revit-tests.ps1": "cần tests/suites của repo",
     "run-in-autocad-tests.ps1": "cần tests/suites của repo",
+    "run-autocad-fixture-tests.ps1": "cần bộ fixture AutoLISP và tests/suites của repo",
 }
 
 SCRIPT_NAME = re.compile(r"[A-Za-z0-9_\-]+\.(?:py|ps1)\b")

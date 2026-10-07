@@ -219,11 +219,17 @@ namespace DhcbTools.Shared.Logic.Cad
         private static MTextReplaceResult Rebuild(string source, List<Unit> units, List<(int Index, int Length, string Replacement)> matches)
         {
             var sb = new StringBuilder(source.Length);
+            var display = Display(units);
             var position = 0;
             var replaced = 0;
             var skipped = 0;
             foreach (var (index, length, replacement) in matches)
             {
+                // Không cần thay chữ thì cũng không cần vượt qua mã định dạng. Giữ nguyên raw Contents,
+                // không đếm "bị bỏ qua" rồi khiến TextReplace báo partial cho một no-op thật.
+                if (length == replacement.Length && string.CompareOrdinal(display, index, replacement, 0, length) == 0)
+                    continue;
+
                 int start;
                 int end;
                 if (length == 0)

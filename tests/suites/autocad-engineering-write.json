@@ -1,0 +1,485 @@
+{
+  "name": "DHCB deterministic AutoCAD engineering writes",
+  "model": "Copied Autodesk sample with autocad-engineering.lsp fixture",
+  "//": [
+    "Run scripts/run-autocad-fixture-tests.ps1; fixture is created only in a sample copy.",
+    "Exact exported attribute values are independently checked by the runner; DBText/MText final contents are checked via AutoLISP.",
+    "No source drawing is saved. Every real write requires allowWrite and RunTests allowWrites."
+  ],
+  "cases": [
+    {
+      "name": "Attribute fixture baseline",
+      "command": "AttributeExport",
+      "config": {
+        "blockName": "DHCB-QA-ENGINEERING",
+        "outputPath": "{outputFolder}/attributes-baseline.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 6,
+        "maxAffected": 6,
+        "noErrors": true,
+        "maxMs": 30000,
+        "maxChangeEvents": 0,
+        "filesExist": [
+          "{outputFolder}/attributes-baseline.csv"
+        ]
+      }
+    },
+    {
+      "name": "Text preview covers DBText, formatted MText and attribute",
+      "command": "TextReplace",
+      "config": {
+        "find": "DHCB-QA-OLD",
+        "replace": "DHCB-QA-NEW"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 3,
+        "maxAffected": 3,
+        "noErrors": true,
+        "maxMs": 30000,
+        "maxChangeEvents": 0
+      }
+    },
+    {
+      "name": "Repeated text preview has no model changes",
+      "command": "TextReplace",
+      "config": {
+        "find": "DHCB-QA-OLD",
+        "replace": "DHCB-QA-NEW"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 3,
+        "maxAffected": 3,
+        "noErrors": true,
+        "maxMs": 30000,
+        "maxChangeEvents": 0
+      }
+    },
+    {
+      "name": "Text replacement commits three entities",
+      "command": "TextReplace",
+      "config": {
+        "find": "DHCB-QA-OLD",
+        "replace": "DHCB-QA-NEW"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 3,
+        "maxAffected": 3,
+        "noErrors": true,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "Repeated committed text replacement is a no-op",
+      "command": "TextReplace",
+      "config": {
+        "find": "DHCB-QA-OLD",
+        "replace": "DHCB-QA-NEW"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "Text restoration preview sees committed values",
+      "command": "TextReplace",
+      "config": {
+        "find": "DHCB-QA-NEW",
+        "replace": "DHCB-QA-OLD"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 3,
+        "maxAffected": 3,
+        "noErrors": true,
+        "maxMs": 30000,
+        "maxChangeEvents": 0
+      }
+    },
+    {
+      "name": "Restore fixture text",
+      "command": "TextReplace",
+      "config": {
+        "find": "DHCB-QA-NEW",
+        "replace": "DHCB-QA-OLD"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 3,
+        "maxAffected": 3,
+        "noErrors": true,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "Restoring fixture text again is a no-op",
+      "command": "TextReplace",
+      "config": {
+        "find": "DHCB-QA-NEW",
+        "replace": "DHCB-QA-OLD"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "Geometric numbering preview",
+      "command": "AutoNumbering",
+      "config": {
+        "blockName": "DHCB-QA-ENGINEERING",
+        "attributeTag": "NUM",
+        "prefix": "EQ-",
+        "startNumber": 1,
+        "padWidth": 2,
+        "rowToleranceMm": 100
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 3,
+        "maxAffected": 3,
+        "noErrors": true,
+        "maxMs": 30000,
+        "maxChangeEvents": 0
+      }
+    },
+    {
+      "name": "Geometric numbering commits",
+      "command": "AutoNumbering",
+      "config": {
+        "blockName": "DHCB-QA-ENGINEERING",
+        "attributeTag": "NUM",
+        "prefix": "EQ-",
+        "startNumber": 1,
+        "padWidth": 2,
+        "rowToleranceMm": 100
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 3,
+        "maxAffected": 3,
+        "noErrors": true,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "Repeated numbering is a no-op",
+      "command": "AutoNumbering",
+      "config": {
+        "blockName": "DHCB-QA-ENGINEERING",
+        "attributeTag": "NUM",
+        "prefix": "EQ-",
+        "startNumber": 1,
+        "padWidth": 2,
+        "rowToleranceMm": 100
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "Export actual numbering for exact spatial assertion",
+      "command": "AttributeExport",
+      "config": {
+        "blockName": "DHCB-QA-ENGINEERING",
+        "outputPath": "{outputFolder}/attributes-numbered.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 6,
+        "maxAffected": 6,
+        "noErrors": true,
+        "maxMs": 30000,
+        "maxChangeEvents": 0,
+        "filesExist": [
+          "{outputFolder}/attributes-numbered.csv"
+        ]
+      }
+    },
+    {
+      "name": "Pattern increment preview",
+      "command": "AttributeIncrement",
+      "config": {
+        "blockName": "DHCB-QA-ENGINEERING",
+        "attributeTag": "NUM",
+        "pattern": "CH-{n:000}",
+        "startNumber": 11,
+        "rowToleranceMm": 100
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 3,
+        "maxAffected": 3,
+        "noErrors": true,
+        "maxMs": 30000,
+        "maxChangeEvents": 0
+      }
+    },
+    {
+      "name": "Pattern increment commits",
+      "command": "AttributeIncrement",
+      "config": {
+        "blockName": "DHCB-QA-ENGINEERING",
+        "attributeTag": "NUM",
+        "pattern": "CH-{n:000}",
+        "startNumber": 11,
+        "rowToleranceMm": 100
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 3,
+        "maxAffected": 3,
+        "noErrors": true,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "Repeated pattern increment is a no-op",
+      "command": "AttributeIncrement",
+      "config": {
+        "blockName": "DHCB-QA-ENGINEERING",
+        "attributeTag": "NUM",
+        "pattern": "CH-{n:000}",
+        "startNumber": 11,
+        "rowToleranceMm": 100
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "Export actual pattern values",
+      "command": "AttributeExport",
+      "config": {
+        "blockName": "DHCB-QA-ENGINEERING",
+        "outputPath": "{outputFolder}/attributes-incremented.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 6,
+        "maxAffected": 6,
+        "noErrors": true,
+        "maxMs": 30000,
+        "maxChangeEvents": 0,
+        "filesExist": [
+          "{outputFolder}/attributes-incremented.csv"
+        ]
+      }
+    },
+    {
+      "name": "CSV attribute with comma and quotes preview",
+      "command": "AttributeImport",
+      "config": {
+        "inputPath": "{outputFolder}/attributes-edit.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 1,
+        "maxAffected": 1,
+        "noErrors": true,
+        "maxMs": 30000,
+        "maxChangeEvents": 0
+      }
+    },
+    {
+      "name": "CSV attribute with comma and quotes commits",
+      "command": "AttributeImport",
+      "config": {
+        "inputPath": "{outputFolder}/attributes-edit.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 1,
+        "maxAffected": 1,
+        "noErrors": true,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "Repeated CSV attribute import is a no-op",
+      "command": "AttributeImport",
+      "config": {
+        "inputPath": "{outputFolder}/attributes-edit.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "Export actual CSV attribute value",
+      "command": "AttributeExport",
+      "config": {
+        "blockName": "DHCB-QA-ENGINEERING",
+        "outputPath": "{outputFolder}/attributes-imported.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 6,
+        "maxAffected": 6,
+        "noErrors": true,
+        "maxMs": 30000,
+        "maxChangeEvents": 0,
+        "filesExist": [
+          "{outputFolder}/attributes-imported.csv"
+        ]
+      }
+    },
+    {
+      "name": "Attribute restore preview proves four committed changes",
+      "command": "AttributeImport",
+      "config": {
+        "inputPath": "{outputFolder}/attributes-baseline.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 4,
+        "maxAffected": 4,
+        "noErrors": true,
+        "maxMs": 30000,
+        "maxChangeEvents": 0
+      }
+    },
+    {
+      "name": "Restore all fixture attributes",
+      "command": "AttributeImport",
+      "config": {
+        "inputPath": "{outputFolder}/attributes-baseline.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 4,
+        "maxAffected": 4,
+        "noErrors": true,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "Repeated fixture restoration is a no-op",
+      "command": "AttributeImport",
+      "config": {
+        "inputPath": "{outputFolder}/attributes-baseline.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "noErrors": true,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "Export restored fixture attributes",
+      "command": "AttributeExport",
+      "config": {
+        "blockName": "DHCB-QA-ENGINEERING",
+        "outputPath": "{outputFolder}/attributes-restored.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 6,
+        "maxAffected": 6,
+        "noErrors": true,
+        "maxMs": 30000,
+        "maxChangeEvents": 0,
+        "filesExist": [
+          "{outputFolder}/attributes-restored.csv"
+        ]
+      }
+    }
+  ]
+}
