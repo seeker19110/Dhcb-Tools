@@ -27,7 +27,7 @@ GitHub Actions và pip mỗi tháng. Mô hình an toàn tổng thể: [`SECURITY
 |---|---|---|
 | `logic-tests` | ubuntu-latest | `dotnet restore/build/test` bộ `DhcbTools.Shared.Logic.Tests` (Release) **kèm cổng phủ 100% dòng** (`scripts/check-coverage.py`), test CLI BatchRunner, **bộ ca IDS chính thức của buildingSMART** (`scripts/ids-conformance.py`, đỏ khi một ca ngoài `tests/ids-buildingsmart/known-gaps.txt` lệch — sửa được ca nào thì xoá dòng đó), tải kết quả `.trx` lên artifact `test-results` |
 | `check-build` | ubuntu-latest, ma trận `2027` / `2026` / `2025` / `2024` / `2023` | Build `BatchRunner` + biên dịch Core và cả bốn vỏ (Revit, AutoCAD, AutoCAD core-only) bằng API package NuGet với `UseWPF=false`. `2026`/`2027` là đường **.NET 10** (AutoCAD ≥ 2026, Revit ≥ 2027), cần cả SDK 8 lẫn 10. Riêng nhánh `2025` còn chạy `py_compile` cho `scripts/*.py` + `tools/autocad-mcp-server/*.py`, `unittest discover` cho gateway panel **và cho `tests/python/`, kèm cổng phủ 100% câu lệnh**, một bước kiểm cú pháp JavaScript trong `panel.html`, và một bước kiểm mọi `scripts/*.ps1` đọc được bằng cú pháp chung của PowerShell 5.1 và 7 |
-| `build-wpf-windows` | windows-latest, ma trận Revit `2027` / `2026` / `2025` / `2024` / `2023` | Build **thật có WPF** vỏ Revit — bật WPF thì SDK bỏ `System.IO` khỏi implicit usings, nên job Linux ở trên không bắt được lỗi đó. `2027` là bản WPF đầu tiên trên net10.0-windows |
+| `build-wpf-windows` | windows-latest, ma trận Revit `2027` / `2026` / `2025` / `2024` / `2023` | Build **thật có WPF** vỏ Revit — bật WPF thì SDK bỏ `System.IO` khỏi implicit usings, nên job Linux ở trên không bắt được lỗi đó. `2027` là bản WPF đầu tiên trên net10.0-windows. Nhánh `2025` còn biên dịch và chạy installer Inno Setup 6.7.1 trên thư mục tạm: cả 8 tổ hợp AutoCAD, nâng cấp/bỏ chọn/chọn lại và giữ file add-in khác |
 
 Ma trận ba phiên bản là cố ý: lỗi chỉ xảy ra trên net48 (`Dictionary.GetValueOrDefault`) hoặc chỉ trên
 Revit ≤ 2023 (`ElementId.Value`) từng lọt tới tận bước phát hành khi CI chỉ build 2025.
@@ -137,6 +137,16 @@ Thêm lệnh Core mới = thêm class + một dòng trong `Shared.Logic/Ai/Comma
 - Lớp AI phải giữ offline: endpoint model chỉ loopback, không thêm SDK cloud, không commit API key.
 - Thay đổi ở `DhcbTools.Core`/`DhcbTools.Core.AutoCAD` ảnh hưởng cả Ribbon lẫn HTTP Bridge — kiểm
   tra cả hai đường gọi trước khi merge.
+- Lệnh ghi: xem trước và chạy thật đi **cùng một vòng** quyết định (cái gì ghi, cái gì bỏ qua), chỉ khác chỗ có ghi
+  hay không — để con số xem trước khớp chạy thật. Lệnh AutoCAD mở entity/attribute để ghi thì tra
+  `AcadHelpers.LockedLayerIds` và báo bằng `LockedLayerSkips` (mở trên layer khoá ném `eOnLockedLayer`, sập cả lệnh);
+  tra theo handle thì xét `ObjectId.IsErased` trước `GetObject`. Nhớ `AttributeReference` không nằm trong
+  `BlockTableRecord` — lặp entity thì xét thêm attribute của block reference.
+- Panel AutoCAD: route phát token (`/panel`) chỉ mở bằng khoá khởi chạy trong `%LOCALAPPDATA%` — đừng thêm đường
+  nào khác trả token hay HTML của panel mà không đòi khoá.
+- Thêm script vào `scripts/` thì xếp loại luôn: script người dùng chạy được từ thư mục cài đặt thì thêm vào
+  `installer/batchrunner-scripts.txt` (release chỉ chép đúng danh sách này); script repo/CI/ký số thì thêm vào
+  `NOT_SHIPPED` trong `tests/python/test_package_scripts.py` — chưa xếp loại là test đỏ.
 
 ## Tài liệu liên quan
 

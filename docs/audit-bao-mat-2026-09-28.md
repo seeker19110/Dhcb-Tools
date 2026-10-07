@@ -82,11 +82,11 @@ Phát hiện thêm trong vòng này:
 | `CancellationToken`/tiến độ cho lệnh dài | Đổi chữ ký `ICoreCommand` và mọi vỏ; Bridge 504 đã nói rõ "không huỷ được nữa" |
 | `RouteOptionGenerator`/`ClashClassifier` dây vào `AutoRoute`/`ClashDetection` | Tính năng mới trên luồng ghi mô hình — cần bộ ca trong Revit |
 | Vòng đời Bridge (batch trong `ApplicationInitialized`, hàng đợi khi Revit modal, revision do transaction tạm) | Hành vi luồng UI Revit, không có giả lập đáng tin |
-| TextReplace với mã định dạng MText (`\P`) | Cần ánh xạ offset Text ↔ Contents; hiện đã báo khi mã cắt ngang chuỗi |
+| ~~TextReplace với mã định dạng MText (`\P`)~~ | **Đã làm 2026-10-02** — `MTextReplace`, xem [audit 2026-10-01, vòng 3](audit-toan-dien-2026-10-01.md#vòng-3--xử-lý-việc-để-lại-2026-10-02-nối-tiếp-pr-175) (mục V3-2) |
 | `AuthLockout` khoá toàn cục | Loopback không có định danh client; đường tấn công thật (trang web) đã chặn ở vòng 1 |
 | `dhcb_mcp_server` `confirm` boolean | Không phải lỗ: Bridge đòi `previewToken` + `documentId` của lần xem trước; chuỗi xác nhận do cùng model điền không thêm an toàn |
 | `IfcStepParser` cấp phát/encoding; tách `AcadQueryHandler`/`SleeveCommand` | Tối ưu/nợ cấu trúc — cần đo trên file thật trước khi đổi |
-| IDS: bảng thuộc tính theo lược đồ, kiểu dữ liệu, property khớp nhiều cái (63 ca còn lệch) | Việc lớn (nhúng lược đồ IFC); danh sách từng ca ở `tests/ids-buildingsmart/known-gaps.txt` |
+| ~~IDS: bảng thuộc tính theo lược đồ, kiểu dữ liệu, property khớp nhiều cái (63 ca còn lệch)~~ | **Đã làm 2026-10-07** — 271 → 330/334, 4 ca còn lại là lựa chọn cố ý; xem [kiem-ids.md](kiem-ids.md#đường-ifc-so-giá-trị-có-kiểu-2026-10-07) |
 
 Kiểm chứng vòng 2: `Shared.Logic.Tests` **1.884** ca đạt, phủ dòng 100 %; `BatchRunner.Tests` 21 đạt; Python 100 %
 câu lệnh + pyflakes; build Core + bốn vỏ cho Revit/AutoCAD **2024 (net48) và 2026 (net8/net10)** bằng API NuGet;

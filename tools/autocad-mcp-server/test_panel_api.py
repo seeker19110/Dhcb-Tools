@@ -292,7 +292,7 @@ class AiHealthTests(unittest.TestCase):
 
 
 class GetAuthTests(unittest.TestCase):
-    """Only /panel and /alive are unauthenticated — /panel is the route that hands out the token."""
+    """Only /panel and /alive skip X-Panel-Token — /panel hands out the token, so it needs the launch key instead."""
 
     def test_health_rejects_missing_token(self) -> None:
         handler = make_handler("/health", token=None)
@@ -301,12 +301,30 @@ class GetAuthTests(unittest.TestCase):
             fetch.assert_not_called()
         self.assertEqual(handler.captured[0]["code"], 403)
 
-    def test_panel_stays_reachable_without_token(self) -> None:
-        handler = make_handler("/panel", token=None)
+    def test_panel_with_launch_key_needs_no_token(self) -> None:
+        handler = make_handler(f"/panel?k={panel_api.LAUNCH_KEY}", token=None)
         served: list[bool] = []
         handler.send_panel = lambda: served.append(True)  # type: ignore[method-assign]
         handler.do_GET()
         self.assertEqual(served, [True])
+
+    def test_panel_without_launch_key_does_not_hand_out_token(self) -> None:
+        """Audit 2026-10-01 vòng 2: loopback không phân biệt tài khoản Windows — /panel trần từng phát token cho mọi
+        tiến trình trên máy. Không có Origin (curl, tiến trình khác) vẫn phải bị chặn."""
+        for path in ("/panel", "/panel?k=", "/panel?k=sai", f"/panel?k={panel_api.LAUNCH_KEY}&k=sai",
+                     f"/panel?key={panel_api.LAUNCH_KEY}", f"/panel/?k={panel_api.LAUNCH_KEY}"):
+            with self.subTest(path=path):
+                handler = make_handler(path, token=None, origin=None)
+                texts: list[tuple[int, str]] = []
+                handler.send_panel = lambda: self.fail("panel served without the launch key")  # type: ignore[method-assign]
+                handler.send_text = lambda code, text: texts.append((code, text))  # type: ignore[method-assign]
+                handler.do_GET()
+                if path.startswith("/panel/"):
+                    self.assertEqual(handler.captured[0]["code"], 403)  # route khác → đòi X-Panel-Token như thường
+                else:
+                    self.assertEqual(texts[0][0], 403)
+                    self.assertIn("autocad_open_panel", texts[0][1])
+                    self.assertNotIn(panel_api.PANEL_TOKEN, texts[0][1])
 
 
 class PostProxyTests(unittest.TestCase):

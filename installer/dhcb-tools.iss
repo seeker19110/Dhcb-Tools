@@ -78,11 +78,11 @@ Source: "{#StageDir}\batchrunner\*"; DestDir: "{app}"; \
   Components: batch; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; ── Script Python: dhcb_agent.py / dhcb_mcp_server.py / dhcb_ai.py ──────────
-; release.yml đã chép scripts/*.py và *.ps1 vào gói batchrunner, nhưng người chỉ cài phần "scripts"
+; release.yml chép các script trong installer/batchrunner-scripts.txt vào gói batchrunner, nhưng người chỉ cài phần "scripts"
 ; (không cài batch runner) vẫn cần chúng: MCP server cho Claude Desktop và client dòng lệnh đều nằm ở đây.
 ; Chỉ cần Python 3.9+, không có dependency ngoài.
 Source: "{#StageDir}\batchrunner\scripts\*"; DestDir: "{app}\scripts"; \
-  Components: scripts; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+  Components: scripts; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Dirs]
 ; Tạo sẵn để shortcut log không trỏ vào thư mục chưa tồn tại (add-in tự tạo khi ghi dòng đầu tiên).
@@ -101,6 +101,37 @@ Filename: "{app}"; Description: "Mở thư mục batch runner"; \
 [UninstallDelete]
 ; Bundle AutoCAD: xoá cả thư mục để AutoCAD không còn thấy plugin.
 Type: filesandordirs; Name: "{userappdata}\Autodesk\ApplicationPlugins\DhcbTools.bundle"
+
+[InstallDelete]
+; Xoá add-in Revit tương ứng nếu phiên bản đó không được chọn trong lần cài/nâng cấp này
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2023\DhcbTools.Revit.addin"; Components: not revit2023
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2023\DhcbTools.Revit.dll"; Components: not revit2023
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2023\DhcbTools.Core.dll"; Components: not revit2023
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2023\DhcbTools.Shared.Logic.dll"; Components: not revit2023
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2023\DhcbTools.Shared.Hosting.dll"; Components: not revit2023
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2024\DhcbTools.Revit.addin"; Components: not revit2024
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2024\DhcbTools.Revit.dll"; Components: not revit2024
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2024\DhcbTools.Core.dll"; Components: not revit2024
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2024\DhcbTools.Shared.Logic.dll"; Components: not revit2024
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2024\DhcbTools.Shared.Hosting.dll"; Components: not revit2024
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2025\DhcbTools.Revit.addin"; Components: not revit2025
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2025\DhcbTools.Revit.dll"; Components: not revit2025
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2025\DhcbTools.Core.dll"; Components: not revit2025
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2025\DhcbTools.Shared.Logic.dll"; Components: not revit2025
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2025\DhcbTools.Shared.Hosting.dll"; Components: not revit2025
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2026\DhcbTools.Revit.addin"; Components: not revit2026
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2026\DhcbTools.Revit.dll"; Components: not revit2026
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2026\DhcbTools.Core.dll"; Components: not revit2026
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2026\DhcbTools.Shared.Logic.dll"; Components: not revit2026
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2026\DhcbTools.Shared.Hosting.dll"; Components: not revit2026
+
+; Xoá thư mục Contents theo năm trong bundle AutoCAD nếu bị bỏ chọn
+Type: filesandordirs; Name: "{userappdata}\Autodesk\ApplicationPlugins\DhcbTools.bundle\Contents\2024"; Components: not acad2024
+Type: filesandordirs; Name: "{userappdata}\Autodesk\ApplicationPlugins\DhcbTools.bundle\Contents\2025"; Components: not acad2025
+Type: filesandordirs; Name: "{userappdata}\Autodesk\ApplicationPlugins\DhcbTools.bundle\Contents\2026"; Components: not acad2026
+
+; Xoá toàn bộ bundle AutoCAD nếu không chọn bất kỳ phiên bản AutoCAD nào
+Type: filesandordirs; Name: "{userappdata}\Autodesk\ApplicationPlugins\DhcbTools.bundle"; Components: not acad2024 and not acad2025 and not acad2026
 
 [Code]
 var
@@ -143,18 +174,64 @@ begin
   Result := True;
 end;
 
+procedure RemoveXmlBlock(var S: AnsiString; const StartMarker: AnsiString);
+var
+  P1, P2: Integer;
+  SubStr: AnsiString;
+  EndMarker: AnsiString;
+begin
+  EndMarker := '</Components>';
+  P1 := Pos(StartMarker, S);
+  if P1 > 0 then
+  begin
+    SubStr := Copy(S, P1, Length(S) - P1 + 1);
+    P2 := Pos(EndMarker, SubStr);
+    if P2 > 0 then
+    begin
+      Delete(S, P1, P2 + Length(EndMarker) - 1);
+    end;
+  end;
+end;
+
+procedure UpdatePackageContents();
+var
+  XmlPath: String;
+  // Giữ nguyên byte UTF-8 của XML; LoadStringFromFile yêu cầu AnsiString.
+  XmlContent: AnsiString;
+begin
+  XmlPath := ExpandConstant('{userappdata}\Autodesk\ApplicationPlugins\DhcbTools.bundle\PackageContents.xml');
+  if not (WizardIsComponentSelected('acad2024') or
+          WizardIsComponentSelected('acad2025') or
+          WizardIsComponentSelected('acad2026')) then Exit;
+  if not LoadStringFromFile(XmlPath, XmlContent) then
+    RaiseException('Không đọc được manifest AutoCAD: ' + XmlPath);
+
+  if not WizardIsComponentSelected('acad2024') then
+    RemoveXmlBlock(XmlContent, '<Components Description="AutoCAD 2024">');
+
+  if not WizardIsComponentSelected('acad2025') then
+    RemoveXmlBlock(XmlContent, '<Components Description="AutoCAD 2025">');
+
+  if not WizardIsComponentSelected('acad2026') then
+    RemoveXmlBlock(XmlContent, '<Components Description="AutoCAD 2026 Update 1.2+ (.NET 10)">');
+
+  if not SaveStringToFile(XmlPath, XmlContent, False) then
+    RaiseException('Không ghi được manifest AutoCAD: ' + XmlPath);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
-  // WizardSilent: /SILENT hay /VERYSILENT. MsgBox do [Code] gọi KHÔNG bị /SUPPRESSMSGBOXES tắt, nên bản
-  // 1.1.0 cài im lặng xong vẫn treo một cửa sổ "Setup" trống chờ bấm OK — Task Scheduler hay script cài
-  // hàng loạt sẽ đứng mãi (bang-chung-test §45/§46).
-  if (CurStep = ssPostInstall) and not WizardSilent then
+  if CurStep = ssPostInstall then
   begin
-    // Revit hỏi "Unsigned Add-In" ở lần mở đầu tiên — nói trước để kỹ sư không tưởng là lỗi.
-    MsgBox('Đã cài xong.' + #13#10 + #13#10 +
-           'Lần đầu mở Revit sẽ có hộp thoại "Unsigned Add-In" — chọn "Always Load".' + #13#10 +
-           'AutoCAD: plugin tự nạp khi khởi động (không cần NETLOAD).' + #13#10 +
-           'Script Python (nếu đã chọn) nằm trong thư mục cài đặt, mục scripts\ — cần Python 3.9+.' + #13#10 + #13#10 +
-           'Log nằm ở %APPDATA%\DHCB\logs.', mbInformation, MB_OK);
+    UpdatePackageContents();
+    if not WizardSilent then
+    begin
+      // Revit hỏi "Unsigned Add-In" ở lần mở đầu tiên — nói trước để kỹ sư không tưởng là lỗi.
+      MsgBox('Đã cài xong.' + #13#10 + #13#10 +
+             'Lần đầu mở Revit sẽ có hộp thoại "Unsigned Add-In" — chọn "Always Load".' + #13#10 +
+             'AutoCAD: plugin tự nạp khi khởi động (không cần NETLOAD).' + #13#10 +
+             'Script Python (nếu đã chọn) nằm trong thư mục cài đặt, mục scripts\ — cần Python 3.9+.' + #13#10 + #13#10 +
+             'Log nằm ở %APPDATA%\DHCB\logs.', mbInformation, MB_OK);
+    end;
   end;
 end;

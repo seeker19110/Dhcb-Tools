@@ -170,32 +170,66 @@ python3 scripts/ids-conformance.py /tmp/bsids/Documentation/ImplementersDocument
   --runner src/DhcbTools.BatchRunner/bin/Release/net10.0/DhcbTools.BatchRunner.dll
 ```
 
-| Nhóm | 2026-09-23 | 2026-09-28 |
-|---|---|---|
-| tolerance | 22/36 | **36/36** |
-| material | 23/29 | **29/29** |
-| partof | 30/34 | **34/34** |
-| entity | 24/33 | 27/33 |
-| restriction | 18/25 | 20/25 |
-| ids | 7/12 | 9/12 |
-| classification | 24/27 | 23/27 |
-| attribute | 38/56 | 36/56 |
-| property | 54/82 | 57/82 |
-| **Tổng** | **240/334** | **271/334** |
+| Nhóm | 2026-09-23 | 2026-09-28 | 2026-10-07 |
+|---|---|---|---|
+| tolerance | 22/36 | **36/36** | **36/36** |
+| material | 23/29 | **29/29** | **29/29** |
+| partof | 30/34 | **34/34** | **34/34** |
+| entity | 24/33 | 27/33 | 32/33 |
+| restriction | 18/25 | 20/25 | **25/25** |
+| ids | 7/12 | 9/12 | 9/12 |
+| classification | 24/27 | 23/27 | **27/27** |
+| attribute | 38/56 | 36/56 | **56/56** |
+| property | 54/82 | 57/82 | **82/82** |
+| **Tổng** | **240/334** | **271/334** | **330/334** |
 
-Hai nhóm giảm (attribute, classification) là **đạt oan trước đây**: specification bắt buộc không có phần tử nào (vì DHCB chưa liệt kê thực thể
+Hai nhóm giảm ở 09-28 (attribute, classification) là **đạt oan trước đây**: specification bắt buộc không có phần tử nào (vì DHCB chưa liệt kê thực thể
 không có GlobalId như `IfcSurfaceStyleRefraction`, `IfcMaterial`) từng được tính là đạt. Nay tính đúng là không đạt.
 
-63 ca còn lệch, theo nguyên nhân:
+### Đường IFC so giá trị có kiểu (2026-10-07)
 
-- **Chưa có bảng thuộc tính theo lược đồ IFC** (~25 ca attribute/restriction/classification): `Attribute(name)` chỉ
-  biết thuộc tính chung (Name, Tag…) và bảng riêng của vài lớp; `IfcTask.IsMilestone`,
-  `IfcSurfaceStyleRefraction.RefractionIndex`… trả `null`. Cần nhúng bảng thuộc tính của IFC2X3/IFC4/IFC4X3.
-- **Chưa có kiểu dữ liệu của giá trị** (~20 ca property/attribute): `dataType` của facet, đo lường và đổi đơn
-  vị (`unit_conversions…`), pattern không áp cho số, số nguyên không nhận phần thập phân, select/list/logical.
-- **Property khớp nhiều cái** (~8 ca): tên property/pset khai bằng pattern hoặc nhiều property cùng khớp — mọi
-  cái phải đạt; hiện chỉ xét tên cố định.
-- **Bảng ánh xạ lớp IFC2X3** (4 ca `in_ifc2x3_…airterminal…`).
+59 ca lệch của 09-28 đã khớp. Mọi thay đổi chỉ ở **đường file IFC** (`--verify-ifc … --verify-ids`, gói bàn giao);
+đường Revit giữ nguyên cách so bằng chuỗi.
+
+- **Bảng thuộc tính theo lược đồ** — [`Ifc/ifc-schema.txt`](../src/DhcbTools.Shared.Logic/Ifc/ifc-schema.txt), mọi
+  lớp của IFC2X3, IFC4, IFC4X3_ADD2 (vị trí, thừa kế, thuộc tính khai lại thành dẫn xuất), sinh bằng
+  [`scripts/gen-ifc-schema.py`](../scripts/gen-ifc-schema.py) từ IfcOpenShell và nhúng trong DLL. Facet `attribute`
+  hỏi được thuộc tính bất kỳ (`IfcTask.IsMilestone`, `IfcStairFlight.NumberOfRisers`…); thuộc tính inverse/dẫn xuất
+  không kiểm được nên trượt; `$` là "không khai" (tuỳ chọn thì đạt), `''`/tập hợp rỗng/logical `.U.` là "có ghi mà
+  rỗng" (luôn trượt).
+- **Giá trị có kiểu** — số so theo số (`42` khớp `42.`, `1.2345e3` khớp `1234.5`), số nguyên không nhận `42.0`,
+  boolean chỉ nhận `true`/`false`/`1`/`0`, pattern không bao giờ khớp một số, biên số chỉ áp cho số, giá trị trỏ thực
+  thể/tập hợp chỉ đạt khi facet không ràng buộc giá trị.
+- **Property** — kiểm `dataType` (kiểu của giá trị, quantity theo loại số đo: `IfcQuantityLength` →
+  `IFCLENGTHMEASURE`); property danh sách/liệt kê/khoảng/bảng: một giá trị khớp là đủ (bảng: chỉ cột đúng
+  `dataType`); complex/reference: không kiểm được, trượt; pset định nghĩa sẵn (`IfcDoorPanelProperties`…) và
+  property của vật liệu (`IfcMaterialProperties`, IFC2X3 `IfcExtendedMaterialProperties`) đọc được; tên pset/property
+  khai bằng pattern: **mọi** cái khớp đều phải đạt. Pset của kiểu thừa kế xuống phần tử, phần tử đè theo từng property.
+- **Đổi đơn vị về SI** — số đo đổi theo đơn vị riêng của property hoặc đơn vị mặc định của dự án (tiền tố SI,
+  bình phương/lập phương cho diện tích/thể tích, gam → kg, đơn vị quy đổi như foot/độ theo `ConversionFactor`).
+  **Thay đổi hành vi:** file IFC ghi mm thì IDS phải viết mét — `Width = 200` (mm) nay trượt, phải viết `0.2`; đúng
+  chuẩn IDS và đúng như IfcTester. Thuộc tính (facet `attribute`) không đổi đơn vị, như IfcTester. Độ C và đơn vị
+  dẫn xuất giữ nguyên số.
+- **Phân loại** — gắn thẳng `IfcClassification` (không mã) vẫn là "có phân loại theo hệ đó"; phân loại của kiểu thừa
+  kế xuống phần tử **theo từng hệ** (bản trước bỏ hẳn của kiểu khi phần tử có bất kỳ phân loại nào); tài nguyên không
+  có GlobalId (`IfcMaterial`) nhận phân loại qua `IfcExternalReferenceRelationship`; `system` khai bằng pattern được
+  hiểu đúng (bản trước coi là "mọi hệ").
+- **Ánh xạ kiểu IFC2X3** — `IfcFlowTerminal` mang kiểu `IfcAirTerminalType` khớp `IFCAIRTERMINAL`: kiểu `IFC…TYPE`
+  mà lớp bỏ đuôi không có trong IFC2X3 nhưng có trong IFC4.
+- **Thực thể không có GlobalId** (`IfcMaterial`, `IfcTaskTime`…) là phần tử IDS khi applicability nêu đích danh lớp
+  đó bằng facet `entity` — không liệt kê hàng triệu thực thể hình học chỉ để lọc bỏ.
+- **Specification không có requirements** nay nhận khi nó **bắt buộc và có lọc applicability** ("mô hình phải có ít
+  nhất một X"); vẫn từ chối khi tuỳ chọn hoặc applicability rỗng (không kiểm gì).
+
+Ngoài bộ ca, đối chiếu trực tiếp với **IfcTester 0.9** trên 10 file mẫu của
+[buildingSMART/Sample-Test-Files](https://github.com/buildingSMART/Sample-Test-Files) (Simple-Scene Architecture/Hvac/
+Structural ở IFC2X3, IFC4, IFC4.3 và `wall-with-opening-and-window`): 2.815 specification sinh tự động — mỗi lớp × mỗi
+thuộc tính lược đồ (có mặt, bằng giá trị của phần tử đầu), mỗi property/quantity (có mặt + `dataType`, bằng giá trị
+gốc, bằng giá trị ÷ 1000) cùng phân loại và vật liệu. Số phần tử áp dụng và số đạt **trùng 2.815/2.815**, khoảng 40 %
+specification có phần tử trượt ở cả hai bên. (Lượt đo tại máy; script sinh specification không đưa vào repo vì cần IfcOpenShell và tải file mẫu — CI giữ phần đối chiếu bằng bộ ca buildingSMART ở trên.)
+
+4 ca còn lệch, đều là **lựa chọn cố ý**:
+
 - **Lọc `ifcVersion`** (3 ca `ids/`): bộ ca kỳ vọng kiểm bất kể lược đồ (IfcTester mặc định không lọc); DHCB
   **cố ý** bỏ qua specification không nhắm lược đồ của file (mục 11.4) — giữ nguyên.
 - **Tên lớp viết thường** (1 ca): DHCB nhận `IfcWall` và cảnh báo thay vì coi file là sai — xem trên.

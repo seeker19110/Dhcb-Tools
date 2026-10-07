@@ -26,11 +26,11 @@ jobs:
   logic-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
 
@@ -74,7 +74,7 @@ jobs:
 
       - name: Tải kết quả test
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: test-results
           path: '**/*-results.trx'
@@ -93,11 +93,11 @@ jobs:
         # hỗ trợ .NET 8 ngày 10/11/2026. release.yml chưa đóng gói 2026/2027: chưa chạy thật trên phần mềm đó.
         version: ['2027', '2026', '2025', '2024', '2023']
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           # Cần cả hai: nhánh net48/net8.0-windows (Revit/AutoCAD 2024–2026) build bằng SDK 8;
           # BatchRunner (net10.0) và nhánh net10.0-windows (AutoCAD 2026+, Revit 2027+) cần SDK 10.
@@ -178,11 +178,11 @@ jobs:
         # 2027 là bản WPF đầu tiên trên net10.0-windows — đúng chỗ SDK đổi implicit usings khi bật WPF.
         revit: ['2027', '2026', '2025', '2024', '2023']
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: |
             8.0.x
@@ -190,3 +190,14 @@ jobs:
 
       - name: Build đầy đủ vỏ Revit (WPF, Revit ${{ matrix.revit }})
         run: dotnet build src/DhcbTools.Revit/DhcbTools.Revit.csproj -c Release -p:RevitVersion=${{ matrix.revit }}
+
+      # Dựng và chạy bộ cài trên sandbox: lỗi Pascal/UTF-8 và nâng cấp bỏ chọn không lọt đến release.
+      - name: Kiểm installer (biên dịch và cài/nâng cấp trong thư mục tạm)
+        if: matrix.revit == '2025'
+        shell: pwsh
+        run: |
+          choco install innosetup --version=6.7.1 --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:DHCB_ISCC = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          python -m unittest discover -s tests/python -p test_installer.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

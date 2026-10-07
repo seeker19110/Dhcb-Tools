@@ -93,7 +93,7 @@ public static partial class Program
 
                     var model = IfcIdsModel.From(parsed);
 
-                    var check = IdsEvaluator.Check(specs, model.Elements(), model.Model.Schema);
+                    var check = IdsEvaluator.Check(specs, model.Elements(specs), model.Model.Schema);
                     var reportName = Path.GetFileNameWithoutExtension(ifc.RelativePath) + "-ids.html";
                     var reportPath = Path.Combine(outputFolder, reportName);
                     File.WriteAllText(reportPath, IdsReport.Html(Path.GetFileName(ifcPath), options.IdsPath!, IdsReport.IfcScopeNote, check, warnings), new UTF8Encoding(true));

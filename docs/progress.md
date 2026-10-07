@@ -2,11 +2,26 @@
 
 Ảnh chụp tại thời điểm cập nhật gần nhất. Kế hoạch phía trước xem [`roadmap.md`](roadmap.md).
 
+> Bổ sung 2026-10-07: kiểm IDS trên file IFC so giá trị **có kiểu** — bảng thuộc tính của cả ba lược đồ IFC (nhúng,
+> sinh từ IfcOpenShell), `dataType`, đổi đơn vị về SI, property nhiều giá trị, tên pset/property khai bằng pattern,
+> phân loại thừa kế theo hệ, ánh xạ kiểu IFC2X3. Bộ ca buildingSMART **271 → 330/334** (4 ca còn lại là lựa chọn cố
+> ý); đối chiếu thêm với IfcTester trên 10 file mẫu buildingSMART: 2.815/2.815 specification trùng. **Thay đổi hành
+> vi:** property số đo so theo đơn vị SI như chuẩn IDS — file mm thì IDS viết mét. Xem
+> [kiem-ids.md](kiem-ids.md#đường-ifc-so-giá-trị-có-kiểu-2026-10-07).
+
 > Bổ sung 2026-10-01: audit toàn diện lần ba — 17 mục đã sửa, đáng chú ý nhất: `RemoveUnusedViews` có thể xoá view
 > phụ thuộc, panel schedule và sheet chỉ có schedule **đang nằm trên sheet**; MCP server sập với câu tiếng Việt có "Đ"
 > trên Windows; batch AutoCAD bỏ qua `saveOnError` (lưu đè file gốc có bước lỗi); Revit sập giữa đêm vẫn ra mã thoát 0;
 > script cài task chạy đêm lỗi cú pháp trên Windows PowerShell 5.1. Xem
 > [audit-toan-dien-2026-10-01.md](audit-toan-dien-2026-10-01.md), gồm phần cần chạy lại trong Revit/AutoCAD.
+> Vòng 2 cùng ngày (9 mục): `ParameterImport` ghi tham số type một lần, báo xung đột thay vì phụ thuộc thứ tự dòng;
+> panel AutoCAD đòi khoá khởi chạy nên tài khoản Windows khác không lấy được token; `AttributeImport` hết ghi nhầm
+> attribute trùng tag; `LayerTranslate` đổi cả attribute; lệnh ghi AutoCAD không sập vì layer khoá.
+> Vòng 3 (2026-10-02, việc để lại): `TextReplace` không còn sửa vào mã định dạng MText; `LayerImport` gom dòng trùng
+> tên layer; gói phát hành chỉ kèm script người dùng; ghim Inno Setup 6.7.1 (bản 7 đã ra, `release.yml` gọi cứng
+> thư mục "Inno Setup 6").
+> Vòng 4 (hoàn thiện installer, kiểm chứng lại 2026-10-07): gỡ DLL/bundle cũ khi bỏ chọn Revit/AutoCAD, lọc `PackageContents.xml` theo thành phần đã chọn. Sửa lỗi biên dịch `String`/`AnsiString`, giữ nguyên UTF-8; chỉ xoá đúng file Revit do DHCB cài. Test chạy bộ cài thật trong thư mục tạm phủ cả 8 tổ hợp AutoCAD và nâng cấp/bỏ chọn/chọn lại; CI Windows chạy kiểm tra này trước phát hành.
+> Nối tiếp cùng ngày: đóng gói dừng ngay khi MSBuild/ISCC trả mã lỗi và kiểm đúng file installer theo phiên bản; thiếu script không còn được bỏ qua. Thêm ca chạy PowerShell từ workflow và ca installer thật chặn AutoCAD không đúng runtime trước khi thay file bản cài trước (V4-2).
 
 > Bổ sung 2026-09-28: audit bảo mật/quy trình/công cụ — Bridge không còn bị trang web khoá bằng request sai token,
 > client Python không đưa token Bridge ra proxy hệ thống, regex find/replace có trần thời gian, action ghim SHA,

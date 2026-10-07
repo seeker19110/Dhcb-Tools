@@ -364,7 +364,15 @@ public static class AcadQueryHandler
                 continue;
             }
 
-            if (id.IsNull || tr.GetObject(id, OpenMode.ForRead) is not Entity entity)
+            // Đối tượng đã xoá vẫn tra ra ObjectId (còn trong database tới khi lưu và mở lại) và GetObject ném eWasErased:
+            // một handle agent nhớ từ lượt trước từng làm sập cả truy vấn thay vì chỉ báo "không có".
+            if (id.IsNull || id.IsErased)
+            {
+                notFound.Add(text + " (không có trong bản vẽ)");
+                continue;
+            }
+
+            if (tr.GetObject(id, OpenMode.ForRead) is not Entity entity)
             {
                 notFound.Add(text + " (không phải entity)");
                 continue;

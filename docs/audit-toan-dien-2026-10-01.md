@@ -55,11 +55,11 @@ Tài liệu đi kèm: `docs/batch-runner.md` (ngữ nghĩa `saveOnError` hai bê
 
 | Mục | Vì sao để lại |
 |---|---|
-| `ParameterImport` ghi tham số **Type** theo từng dòng CSV và so với giá trị HIỆN TẠI: sửa một dòng của type, các dòng sau (vẫn mang giá trị cũ của bản xuất) ghi đè lại — kết quả phụ thuộc thứ tự dòng, summary đếm cả hai lần ghi | Sửa đúng là đổi ngữ nghĩa nhập: cần chốt "sửa một dòng có đổi cả type không". Đề xuất: so với giá trị **trước khi nhập**; nhiều giá trị mới khác nhau cho cùng một type → báo xung đột, không ghi |
-| Panel gateway phát token phiên cho mọi tiến trình loopback (tài khoản khác trên máy dùng chung) | Sửa tận gốc cần bí mật do trình khởi chạy trao cho trình duyệt, mà Hermes nhúng panel qua `::preview{file=…}` rồi chuyển hướng — không có kênh nào mang bí mật. Đã ghi giới hạn vào `SECURITY.md` và README của panel |
-| Gói BatchRunner chép **mọi** `scripts/*.py`/`*.ps1`, kể cả script quản trị repo (`apply-rulesets.py`, `fix-ruleset.py`, `check-coverage.py`, `sign-addin.ps1`) | Không gây hại; dọn danh sách đóng gói là việc của lần phát hành sau |
-| `release.yml` cài Inno Setup bằng `choco install innosetup` không ghim phiên bản | Choco kiểm checksum của gói; ghim phiên bản cần chọn bản đã kiểm trên installer hiện tại |
-| `PackageContents.xml` liệt kê cả ba thành phần AutoCAD dù người dùng chỉ chọn một | AutoCAD năm không được cài chỉ báo không nạp được DLL; cần dựng file theo thành phần đã chọn trong `[Code]` của installer |
+| ~~`ParameterImport` ghi tham số **Type** theo từng dòng CSV và so với giá trị HIỆN TẠI: sửa một dòng của type, các dòng sau (vẫn mang giá trị cũ của bản xuất) ghi đè lại — kết quả phụ thuộc thứ tự dòng, summary đếm cả hai lần ghi~~ | **Đã sửa ở vòng 2** (mục V2-1), theo đúng đề xuất: so với giá trị trước khi nhập, xung đột thì không ghi |
+| ~~Panel gateway phát token phiên cho mọi tiến trình loopback (tài khoản khác trên máy dùng chung)~~ | **Đã sửa ở vòng 2** (mục V2-2): kênh mang bí mật là chính file mà `::preview{file=…}` mở — gateway ghi nó vào `%LOCALAPPDATA%` |
+| ~~Gói BatchRunner chép **mọi** `scripts/*.py`/`*.ps1`, kể cả script quản trị repo (`apply-rulesets.py`, `fix-ruleset.py`, `check-coverage.py`, `sign-addin.ps1`)~~ | **Đã sửa ở vòng 3** (mục V3-3) |
+| ~~`release.yml` cài Inno Setup bằng `choco install innosetup` không ghim phiên bản~~ | **Đã sửa ở vòng 3** (mục V3-4) — hoá ra không chỉ là vệ sinh: Inno Setup 7 đã ra |
+| ~~`PackageContents.xml` liệt kê đủ ba năm AutoCAD; nâng cấp bỏ chọn còn DLL cũ~~ | **Đã hoàn thiện và kiểm chứng trên Windows 2026-10-07** — xem V4-1; biên dịch và chạy installer trong thư mục tạm, không thay bản add-in đang cài. |
 
 ## Cần chạy lại trong Revit/AutoCAD trước khi phát hành
 
@@ -86,3 +86,118 @@ thuần, nhưng hành vi trong phần mềm thật chưa chạy ở đây:
 | Bước CI PowerShell mới | Xanh trên nhánh này, đỏ trên `main` cũ đúng `install-nightly-task.ps1:41` (`?.`, `??`) |
 | `actionlint` / `zizmor` | Sạch / 0 high-medium |
 | `scripts/check-vulnerable.sh` | NuGet ba TFM (2023 / 2025 / 2027): 0 package dính lỗ hổng; `pip-audit`: 0 |
+
+---
+
+## Vòng 2 — cùng ngày, mốc `56b3a3b` (sau PR #173)
+
+Hai việc: (1) sửa tận gốc hai mục "Để lại" đầu tiên ở trên — chủ repo chọn hướng chất lượng cao, tức đổi ngữ nghĩa
+`ParameterImport` và thêm bí mật cho panel; (2) quét những phần vòng 1 chưa đọc sâu: `panel.html`, các lệnh **ghi** của
+Core AutoCAD (`AttributeImport`, `TextReplace`, `LayerTranslate`, `LayerImport`, đánh số block), `AutoNumbering`/`SheetRename`
+bên Revit, form nhập config lệnh, bộ đoán lệnh từ câu nói, đóng gói phát hành. Cùng cách làm: tái hiện trước khi sửa.
+Riêng phần chạm API AutoCAD thì không có AutoCAD ở máy audit: kết luận dựa trên ngữ nghĩa API, và đều được liệt kê ở
+"Cần chạy lại" bên dưới.
+
+### Đã sửa
+
+| # | Mức | Chỗ | Vấn đề | Sửa |
+|---|---|---|---|---|
+| V2-1 | Trung bình | `ParameterImport` (Core Revit) | Mục "Để lại" đầu tiên ở trên: tham số type lặp ở mọi dòng cùng type; sửa một dòng thì các dòng sau ghi đè lại giá trị cũ, kết quả phụ thuộc thứ tự dòng, xem trước đếm sai | Hai lượt. Lượt 1 chỉ đọc, so mọi ô với giá trị **trước khi nhập**. `ParameterImportPlanner` (tầng thuần, 7 ca test) gom theo (phần tử ghi thật — instance hay type của nó, tham số): đúng một giá trị mới → ghi **một lần**, kèm ghi chú "áp cho mọi phần tử cùng type"; hai giá trị mới khác nhau → **xung đột**: không ghi, báo dòng nào mang giá trị nào, `PartialSuccess` (Bridge không phát preview token cho lần xem trước có xung đột, nên không commit được tới khi sửa CSV). Lượt 2 ghi đúng các ô kế hoạch chọn |
+| V2-2 | Trung bình | Panel gateway AutoCAD | Mục "Để lại" thứ hai: loopback không phân biệt tài khoản Windows — trên máy dùng chung/RDS, tiến trình của tài khoản khác gọi `GET /panel` là có token phiên, rồi điều khiển AutoCAD của bạn qua gateway (gateway gọi Bridge bằng token **của bạn**, đi vòng ACL của `bridge-token.txt`) | **Khoá khởi chạy**: `/panel` đòi `?k=<khoá>` (32 byte, đổi mỗi lần gateway khởi động, so hằng thời gian); thiếu/sai → `403` chữ, không lộ token. Khoá chỉ nằm trong bộ nhớ gateway và file khởi chạy `%LOCALAPPDATA%\DHCB\autocad-panel.html` (ngoài Windows `~/.cache/DHCB`, quyền 600, ghi qua file tạm `O_EXCL`), gateway ghi **sau** khi bind được port và xoá khi tắt; lần chạy bind lỗi không đụng file của gateway đang chạy. Tool `autocad_open_panel` trả preview của file đó, báo rõ khi gateway đang chạy mà thiếu file (bản cũ, tài khoản khác). Không ghi được file mới thì xoá file cũ mang khoá đã hết hạn (`terminate()` không dọn nó), để tool báo rõ thay vì trỏ tới một trang 403. File mở với `O_BINARY` trên Windows (thiếu cờ này CRT đổi dòng hai lần). Trang kèm `Referrer-Policy: no-referrer`. Cách làm giống Jupyter phát token qua file `*-open.html` |
+| V2-3 | Trung bình | `AttributeImport` (Core AutoCAD) | AutoCAD cho phép hai attribute **cùng tag** trong một block; `AttributeExport` xuất cả hai dòng cùng (Handle, Tag). Lệnh nhập ghi mọi dòng vào attribute **đầu tiên** khớp tag: nhập lại nguyên file vừa xuất — thao tác "không đổi gì" — là attribute đầu nhận giá trị của attribute sau, im lặng | Tag khớp nhiều attribute → bỏ qua dòng, báo rõ; không đoán |
+| V2-4 | Trung bình | `LayerTranslate` (Core AutoCAD) | `AttributeReference` không nằm trong `BlockTableRecord` nên vòng đổi layer bỏ sót: chữ khung tên ở lại layer cũ — đúng thứ mà chuẩn hoá layer cần đổi. Trong khi đó xem trước (`CollectUsedLayerNamesAfterMap`) lại tính cả attribute là đã chuyển → báo "xoá N layer nguồn rỗng", chạy thật xoá ít hơn | Đổi cả attribute (ngoài block xref/anonymous), cùng tập với hàm tính của xem trước |
+| V2-5 | Trung bình | Lệnh ghi AutoCAD: `TextReplace`, `AttributeImport`, `AutoNumbering`/`AttributeIncrement`, `LayerTranslate` | Mở để ghi (`ForWrite`/`UpgradeOpen`) một entity hay attribute trên **layer khoá** thì AutoCAD ném `eOnLockedLayer`; không lệnh nào xét khoá, nên một chữ trên layer khung tên bị khoá làm **sập cả lệnh** với thông báo khó hiểu (transaction huỷ, không ghi gì) | Tôn trọng khoá như lệnh FIND của AutoCAD: bỏ qua, và cả xem trước lẫn chạy thật báo số đối tượng bỏ qua theo layer (`LockedLayerSkips`, tầng thuần, có test) — nên con số xem trước khớp chạy thật |
+| V2-6 | Thấp | `AttributeImport`; truy vấn theo handle (Bridge `entity_geometry`, UI chọn/zoom) | Đối tượng đã xoá **vẫn** tra ra ObjectId từ handle (còn trong database tới khi lưu và mở lại), và `GetObject` ném `eWasErased`. CSV xuất xong, kỹ sư xoá một block, nhập lại → cả lệnh sập; agent hỏi một handle nó thấy từ lượt trước → cả truy vấn sập | `IsErased` → bỏ qua dòng / báo "không có trong bản vẽ" |
+| V2-7 | Thấp | Đánh số (Revit `AutoNumbering`; AutoCAD `BlockNumbering`) | Xem trước chỉ đếm phần tử tìm được: Revit báo "sẽ đánh số 120" rồi chạy thật "40/120" vì phần tử thiếu tham số / tham số chỉ đọc; kết quả `Parameter.Set` bị bỏ qua (trả `false` vẫn đếm là đã đánh số); giá trị đã đúng vẫn ghi lại. Bên AutoCAD, xem trước và chạy thật là hai vòng riêng nên đếm khác nhau | Một danh sách đích dùng chung cho cả hai đường; đã đúng số thì không ghi; `Set` trả `false` thì báo. Bên AutoCAD gộp thành một vòng |
+| V2-8 | Thấp | `TextReplace` | (a) Đổi chữ DBText/attribute canh giữa/Fit/Aligned mà không `AdjustAlignment` — chữ lệch khỏi điểm canh (chính `AttributeImport` đã ghi nhận và sửa lỗi này cho nó); (b) chuỗi bị bỏ vì regex chạy quá trần 2 giây được giữ nguyên **im lặng** — xem trước "sẽ thay N" trong khi có chuỗi khớp mà không được thay | `AdjustAlignment` sau khi đổi; báo số chuỗi bị bỏ vì quá giờ |
+| V2-9 | Thấp | `LayerTranslate` (có từ trước, cùng loại xem trước ≠ chạy thật) | (a) Chỉ chạy thật mới xét layer **hiện hành**: xem trước báo "sẽ xoá" nó, chạy thật giữ lại — con số "xoá N layer" của hai lượt lệch nhau; (b) màu không phải ACI 1–255 và Plottable sai định dạng chỉ được báo lúc chạy thật | Xét layer hiện hành trước nhánh xem trước; một hàm đọc màu/Plottable dùng chung cho hai lượt, xem trước báo đủ |
+
+### Đã soát, không cần sửa
+
+| Chỗ | Vì sao ổn |
+|---|---|
+| `panel.html` hiển thị dữ liệu bản vẽ | Mọi chỗ gán `innerHTML` có dữ liệu bản vẽ/AI đều qua `escHtml` (escape cả `"`/`'`); khung chat dùng `textContent`; ô màu kẹp số 0–255; tô màu JSON escape trước rồi mới chèn thẻ `span` cố định. Không có đường XSS để lấy token phiên |
+| `LayerImport` | Mở bản ghi layer ở chế độ đọc, chỉ nâng lên ghi khi có ô khác; tên không hợp lệ báo và bỏ qua; không mở entity nên không vướng layer khoá |
+| `SheetRename` | Đổi số qua tên tạm hai vòng, khôi phục số gốc khi vòng thật lỗi; tên/số ngoài lô được giữ chỗ chống trùng |
+| `CommandFormWindow` (Revit) | Chạy thật chỉ mở sau khi xem trước thành công **và** config không đổi so với lúc xem trước (so snapshot); `dryRun` do cửa sổ điều khiển, người dùng không tự đặt |
+| `CommandIntentParser` | Lệnh ghi luôn có `dryRun: true`; xếp hạng ổn định giữa các lần chạy; hai lệnh sát điểm thì hạ độ tin cậy |
+| `BridgeCommitGuard` với V2-1 | Xem trước có `Errors`/`PartialSuccess` không được cấp preview token → CSV có xung đột không thể commit qua Bridge, đúng ý "sửa CSV rồi nhập lại" |
+
+### Để lại
+
+| Mục | Vì sao để lại |
+|---|---|
+| Ba mục đóng gói ở bảng "Để lại" vòng 1 | Hai mục đã sửa ở vòng 3 (V3-3, V3-4); `PackageContents.xml` còn để lại |
+| ~~`LayerImport` gặp hai dòng cùng tên layer~~ | **Đã sửa ở vòng 3** (mục V3-1) |
+
+### Cần chạy lại trong AutoCAD/Revit trước khi phát hành
+
+- **V2-3 → V2-9, phần AutoCAD** — trên bản chép của bản vẽ mẫu: khoá một layer có chữ và attribute, rồi chạy
+  `TextReplace`, `AttributeImport`, `AutoNumbering` và `LayerTranslate`, mỗi lệnh xem trước rồi chạy thật. Không lệnh nào
+  được sập; câu "Bỏ qua N … nằm trên layer đang khoá" phải có ở cả hai lượt, với cùng con số. `LayerTranslate` với một
+  layer chỉ chứa attribute: xem trước báo xoá layer đó, chạy thật cũng xoá. Đặt một layer nguồn làm layer hiện hành:
+  cả hai lượt đều nói "không xoá … vì đang là layer hiện hành". `AttributeImport`: xoá một block sau khi
+  xuất rồi nhập lại → một dòng "đã bị xoá", không sập. Bộ `smoke` AutoCAD phải giữ nguyên kết quả.
+- **V2-1, V2-7 (Revit)** — bộ `smoke` và `write` (ca `ParameterImport`, `AutoNumbering` giữ nguyên kỳ vọng); thêm một
+  lượt tay: xuất cửa, sửa `Fire Rating` (tham số type) ở **một** dòng → xem trước báo một lần ghi kèm ghi chú "áp cho
+  MỌI phần tử cùng type"; sửa thành hai giá trị khác nhau → báo xung đột, không ghi.
+- **V2-2** — đã chạy thật ở máy audit (socket, hai tiến trình gateway, Ctrl+C); trên Windows còn cần một lượt mở panel
+  từ Hermes để thấy `::preview{file=…}` mở được file trong `%LOCALAPPDATA%`.
+
+### Kiểm chứng tại máy audit
+
+| Kiểm tra | Kết quả |
+|---|---|
+| `DhcbTools.Shared.Logic.Tests` | **1.919** ca đạt (+7 `ParameterImportPlannerTests`, +3 `LockedLayerSkipsTests`), phủ dòng 100 % |
+| `DhcbTools.BatchRunner.Tests` | **24** đạt |
+| Python `coverage run -m pytest` | **351** đạt (+11 ca của gateway/tool panel), phủ câu lệnh 100 %, `pyflakes` sạch; chạy kiểu CI cũng xanh. Ba ca của lượt đọc lại sau cùng (cờ `O_BINARY`, xoá file khoá cũ, không xoá được vẫn phục vụ) đỏ trên mã trước đó |
+| Test panel đỏ trên mã cũ | Chạy hai ca mới của `GetAuthTests` trên `panel_api.py` cũ (bơm sẵn một `LAUNCH_KEY` giả để ca chạy được): `/panel` trần **được phục vụ kèm token** — ca đỏ đúng câu "panel served without the launch key"; ca có khoá đúng cũng đỏ vì mã cũ so path tuyệt đối. Các biến thể có query (`?k=sai`…) mã cũ vốn trả 403 qua kiểm token — đỏ vì dạng phản hồi khác, không phải lộ token |
+| Gateway chạy thật | `GET /panel` → `403 text/plain`, không có token; `GET /panel?k=<khoá trong file>` → `200`, kèm `Referrer-Policy`; file khởi chạy quyền `600`; gateway thứ hai (bind lỗi) không đổi file; Ctrl+C xoá file |
+| Biên dịch Core + bốn vỏ (API NuGet, `UseWPF=false`) | 2023 / 2024 / 2025 / 2026 / 2027: **0 lỗi, 0 cảnh báo** (25/25 project) |
+
+---
+
+## Vòng 3 — xử lý việc để lại (2026-10-02, nối tiếp PR #175)
+
+Chủ repo yêu cầu làm tiếp các việc còn lại. Gom từ ba báo cáo (09-23, 09-28, 10-01) — phần làm được và kiểm chứng
+được ở máy không có Revit/AutoCAD:
+
+### Đã sửa
+
+| # | Mức | Chỗ | Vấn đề | Sửa |
+|---|---|---|---|---|
+| V3-1 | Trung bình | `LayerImport` (Core AutoCAD) | (a) Hai dòng cùng layer (tên AutoCAD không phân biệt hoa thường) áp theo thứ tự: dòng sau ghi đè dòng trước; layer chưa có thì xem trước báo "tạo mới" hai lần. (b) Có từ trước, lộ ra khi sửa (a): lúc chạy thật layer vừa tạo còn bị đếm thêm "cập nhật"/"giữ nguyên" — "Đã nhập 2 layer (1 cập nhật, 1 tạo mới)" cho **một** layer, gấp đôi con số xem trước | `LayerImportPlanner` (tầng thuần, 14 ca test) gom trước khi áp: dòng giống hệt nhau áp một lần kèm ghi chú; khác nhau ở bất kỳ ô nào — kể cả một dòng để trống ô mà dòng kia có giá trị — là xung đột: không áp dòng nào của layer đó, báo vào `Errors`, `PartialSuccess` (Bridge không cấp preview token). Layer mới đếm một lần là "tạo mới" ở cả hai lượt; xem trước báo luôn linetype chưa có, lineweight sai như chạy thật |
+| V3-2 | Trung bình | `TextReplace` trên MText (Core AutoCAD) — "Chưa làm" của audit 09-28 | Thay thẳng trên `MText.Contents`, chuỗi CÓ mã định dạng: regex `\d+` đổi luôn chữ số trong `\H2.5x;` (chữ đổi cỡ), tìm "PL" trúng `\PLine` và biến mã xuống dòng thành `\X…`, tên font trong `{\fArial;…}` bị thay theo — hỏng định dạng, không báo | `MTextReplace` (tầng thuần, 15 ca test — mỗi ca hỏng chạy kèm cách cũ để thấy cái hỏng): tách `Contents` thành chữ hiển thị (kèm vị trí từng ký tự) và mã định dạng theo bảng mã của AutoCAD; so khớp trên chữ hiển thị (`\P` thành xuống dòng, nên `^`/`$` regex nhiều dòng theo đoạn, `$1` vẫn dùng được). Chỗ khớp nằm gọn trong một đoạn chữ liền thì thay; vắt qua mã, hoặc chứa ký tự do mã sinh ra (xuống dòng, phân số xếp chồng), thì giữ nguyên và báo "cần sửa tay". Chuỗi thay chèn như chữ: `\` `{` `}` được escape, xuống dòng thành `\P` |
+| V3-3 | Thấp | `release.yml` — gói BatchRunner, thành phần "scripts" của installer | Chép mọi `scripts/*.py`, `*.ps1`: máy kỹ sư nhận cả script ký số, CI, sửa ruleset, và `run-in-*-tests.ps1`/`dung-family.ps1` vốn cần cả repo nên chạy từ thư mục cài đặt là hỏng | Chỉ chép `installer/batchrunner-scripts.txt` (6 script — đã chạy thử từ một thư mục gói phẳng: `dhcb_mcp_server`/`dhcb_ai` import được `dhcb_agent` cạnh nó); thiếu file nào thì bước dừng. `tests/python/test_package_scripts.py`: script mà tài liệu đi kèm gói hay installer nhắc tới phải có trong gói, script phụ thuộc nhau (`$PSScriptRoot`, `import`) đi cùng nhau, mọi script trong `scripts/` phải được xếp loại — đỏ trên `release.yml` của `main` |
+| V3-4 | Trung bình | `release.yml` — bước dựng installer | Inno Setup 7 đã ra (tag `is-7_0_0` 2026-05-14, `is-7_1_0` 2026-08-10 của `jrsoftware/issrc`). `choco install innosetup` không ghim kéo 7.x, cài vào thư mục khác `Inno Setup 6` mà bước đóng gói gọi cứng — lần phát hành tới nhiều khả năng hỏng ở bước installer; `.iss` cũng chưa thử với trình biên dịch 7 | Ghim `--version=6.7.1`: bản 6.x cuối cùng từng là bản **mới nhất** (02→05/2026) nên chắc chắn có trên Chocolatey — 6.7.2 ra cùng ngày 7.0, 6.7.3 ra sau 7.0, bộ cập nhật tự động của Chocolatey có thể đã không đăng. Thiếu `ISCC.exe` thì báo rõ. Test ở V3-3 giữ bản ghim khớp đường dẫn |
+| V4-1 | Trung bình | Installer Inno Setup — gỡ bản cũ khi bỏ chọn và lọc `PackageContents.xml` | Manifest liệt kê đủ ba năm AutoCAD dù chỉ chọn một; bỏ chọn khi nâng cấp để lại DLL cũ. Bản làm dở dùng `String` cho `LoadStringFromFile` nên ISCC báo `Type mismatch`; test mô phỏng XML vẫn xanh | `[InstallDelete]` gỡ thành phần bỏ chọn; Revit chỉ xoá 5 file DHCB cụ thể, giữ file add-in khác và thư viện dùng chung. `UpdatePackageContents` dùng `AnsiString` để giữ byte UTF-8, báo lỗi đọc/ghi manifest. Kiểm chứng 2026-10-07: ISCC 6.7.1 biên dịch thành công; `test_installer.py` chạy bộ cài thật trong sandbox cho 8 tổ hợp AutoCAD, nâng cấp/bỏ chọn/chọn lại, giữ tiếng Việt và file bên ngoài DHCB. CI Windows chạy test này. |
+| V4-2 | Trung bình | Luồng đóng gói và kiểm đầu vào installer (2026-10-07) | PowerShell tiếp tục sau MSBuild/ISCC trả mã lỗi; chỉ kiểm TFM không rỗng hoặc liệt kê `dist/*.exe` có thể cho qua kết quả lỗi/file cũ. Installer còn bỏ qua thư mục script bị thiếu khi biên dịch | Kiểm mã thoát ngay sau ba lần hỏi TFM và sau ISCC, yêu cầu đúng file installer của phiên bản đang dựng; BatchRunner hỏi TFM bằng `msbuild -nologo`. Bỏ `skipifsourcedoesntexist` cho script. `test_release_workflow.py` thực thi đoạn PowerShell từ workflow với tiến trình native giả: 5 tình huống trượt trên workflow cũ, đạt sau sửa, kèm ca thành công. Windows chạy installer thật: chọn riêng scripts, thiếu script thì biên dịch thất bại; thiếu `acad.exe`/runtime hoặc runtime .NET 8 thì cài thất bại trước khi thay đổi bất kỳ file nào của bản cài trước. |
+
+### Để lại
+
+| Mục | Vì sao |
+|---|---|
+| ~~`PackageContents.xml` liệt kê đủ ba năm AutoCAD; nâng cấp bỏ chọn còn DLL cũ~~ | **Đã hoàn thiện và kiểm chứng trên Windows 2026-10-07** — xem V4-1; biên dịch và chạy installer trong thư mục tạm. |
+| Các mục "Chưa làm" khác của audit 09-28 (CancellationToken cho lệnh dài, dây `RouteOptionGenerator`/`ClashClassifier`, vòng đời Bridge, `AuthLockout` theo client, tối ưu `IfcStepParser`; ~~63 ca IDS còn lệch~~ — đã làm 2026-10-07, xem [kiem-ids.md](kiem-ids.md#đường-ifc-so-giá-trị-có-kiểu-2026-10-07)) | Như 09-28: đổi chữ ký `ICoreCommand`, tính năng mới trên luồng ghi mô hình, hành vi luồng UI Revit, hay việc lớn riêng — đều cần Revit/AutoCAD thật hoặc đo trên file thật |
+| Việc cần chủ repo bật (branch protection, private vulnerability reporting, Dependabot, chứng chỉ ký mã) | Cài đặt GitHub của chủ repo — xem audit 09-28 |
+
+### Cần chạy lại trong AutoCAD trước khi phát hành
+
+- **V3-1** — bộ `write` AutoCAD (bốn ca `LayerImport` giữ nguyên kỳ vọng: fixture không có tên trùng). Thêm một lượt
+  tay: CSV có hai dòng `A-WALL` giống hệt nhau → một lần cập nhật kèm ghi chú bản lặp; khác màu → báo xung đột, không
+  đổi layer; một layer mới có màu → xem trước và chạy thật cùng nói "tạo mới 1".
+- **V3-2** — `TextReplace` xem trước trên một MText có `\P`, đổi font giữa từ và chiều cao `\H…;`: regex `\d+` không
+  đổi cỡ chữ; "PL" không phá xuống dòng; chuỗi vắt qua chữ in đậm được báo "cần sửa tay".
+- **V3-3, V3-4** — một lượt `release.yml` (tag hoặc `workflow_dispatch`): bước cài Inno Setup 6.7.1 thành công, gói
+  BatchRunner có đúng 6 script.
+
+### Kiểm chứng tại máy audit
+
+| Kiểm tra | Kết quả |
+|---|---|
+| `DhcbTools.Shared.Logic.Tests` | **1.948** ca đạt (+14 `LayerImportPlannerTests`, +15 `MTextReplaceTests`), phủ dòng 100 % |
+| `DhcbTools.BatchRunner.Tests` | **24** đạt |
+| Python `coverage run -m pytest` | **357** đạt (+6 `test_package_scripts`), phủ câu lệnh 100 %, `pyflakes` sạch; chạy kiểu CI cũng xanh. Test đóng gói đỏ trên `release.yml` của `main` (chép cả thư mục, không ghim Inno Setup) |
+| Đoạn PowerShell chép script (pwsh 7) | Chép đúng 6 file; thêm một tên không có vào danh sách thì bước dừng với "Cannot find path" |
+| Biên dịch Core + bốn vỏ (API NuGet, `UseWPF=false`) | 2023 / 2024 / 2025 / 2026 / 2027: **0 lỗi, 0 cảnh báo** (25/25 project) |
+| `actionlint` / `zizmor` | Sạch / không thêm phát hiện (còn một gợi ý `self-repository` như trên `main`) |

@@ -170,8 +170,18 @@ def autocad_open_panel() -> str:
     if problem:
         return f"❌ {problem}"
 
+    # Xem trước FILE KHỞI CHẠY (do gateway ghi sau khi bind, mang khoá ?k=), không phải panel.html: /panel đòi khoá
+    # để tài khoản Windows khác trên cùng máy không lấy được token phiên — xem panel_api.LAUNCH_KEY.
+    launch_file = panel_api.launch_file_path()
+    if not launch_file.is_file():
+        return (
+            f"❌ Gateway panel đang chạy nhưng không có file khởi chạy {launch_file}.\n"
+            "→ Có thể đó là gateway bản cũ (chưa có khoá khởi chạy) hoặc của tài khoản Windows khác: tắt tiến trình "
+            f"`python panel_api.py` đang giữ port {panel_api.PORT} rồi gọi lại tool này."
+        )
+
     # Trả về marker mà Hermes sẽ render thành widget nhúng
-    abs_path = str(panel_path).replace("\\", "/")
+    abs_path = str(launch_file).replace("\\", "/")
     return f'::preview{{file="{abs_path}"}}'
 
 

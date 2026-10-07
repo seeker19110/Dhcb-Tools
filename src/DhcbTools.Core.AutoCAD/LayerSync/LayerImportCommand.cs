@@ -52,7 +52,10 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
         using var transaction = database.TransactionManager.StartTransaction();
         var layerTable = (LayerTable)transaction.GetObject(database.LayerTableId, OpenMode.ForRead);
 
+        // Lượt 1 — chỉ đọc CSV: cảnh báo từng ô, bỏ dòng rỗng và tên không hợp lệ. Dòng trùng tên layer được
+        // LayerImportPlanner gom lại TRƯỚC khi áp, nên kết quả không còn phụ thuộc thứ tự dòng.
         var invalid = 0;
+        var rows = new List<(int Row, LayerCsvRow Layer)>();
 
         for (var i = 1; i < lines.Count; i++)
         {
@@ -65,46 +68,61 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
             // Ô không đọc được (màu, lineweight, plot sai định dạng) phải nói ra, không bỏ im lặng.
             result.Messages.AddRange(row.Warnings);
 
-            var layerName = row.Name;
-
             // Tên có ký tự cấm (< > / \ " : ; ? * | , = `) làm LayerTableRecord.Name ném exception giữa
             // transaction — báo dòng lỗi rồi đi tiếp thay vì sập cả lệnh.
-            if (!AcadHelpers.IsValidSymbolName(layerName))
+            if (!AcadHelpers.IsValidSymbolName(row.Name))
             {
-                result.Messages.Add($"Bỏ qua dòng {i + 1}: tên layer \"{layerName}\" không hợp lệ với AutoCAD.");
+                result.Messages.Add($"Bỏ qua dòng {i + 1}: tên layer \"{row.Name}\" không hợp lệ với AutoCAD.");
                 invalid++;
                 continue;
             }
 
+            rows.Add((i + 1, row));
+        }
+
+        var plan = LayerImportPlanner.Plan(rows);
+        result.Messages.AddRange(plan.Notes);
+
+        // Lượt 2 — áp từng dòng kế hoạch chọn.
+        foreach (var (rowNumber, row) in plan.Rows)
+        {
+            var layerName = row.Name;
             var isNew = !layerTable.Has(layerName);
             if (isNew && !config.CreateMissing)
             {
-                result.Messages.Add($"Bỏ qua dòng {i + 1}: layer \"{layerName}\" không tồn tại.");
+                result.Messages.Add($"Bỏ qua dòng {rowNumber}: layer \"{layerName}\" không tồn tại.");
                 continue;
             }
 
-            if (isNew && config.DryRun)
+            if (isNew)
             {
-                result.Messages.Add($"[Xem trước] Sẽ tạo layer mới: \"{layerName}\".");
+                // Layer mới đếm MỘT lần là "tạo mới" ở cả hai lượt. Bản cũ lúc chạy thật đếm thêm "cập nhật" (hoặc
+                // "giữ nguyên") cho chính layer vừa tạo: "Đã nhập 2 layer (1 cập nhật, 1 tạo mới)" cho một layer, gấp
+                // đôi con số xem trước.
                 created++;
+                if (config.DryRun)
+                {
+                    result.Messages.Add($"[Xem trước] Sẽ tạo layer mới: \"{layerName}\".");
+                    // Cùng những câu PlanChanges sẽ nói lúc chạy thật — bản cũ chỉ lộ ra khi đã ghi.
+                    NoteUnusableCells(transaction, database, row, result.Messages);
+                    continue;
+                }
+
+                var ltWrite = (LayerTable)transaction.GetObject(database.LayerTableId, OpenMode.ForWrite);
+                var newLayer = new LayerTableRecord { Name = layerName };
+                ltWrite.Add(newLayer);
+                transaction.AddNewlyCreatedDBObject(newLayer, true);
+                foreach (var apply in PlanChanges(transaction, database, newLayer, row, result.Messages))
+                {
+                    apply(newLayer);
+                }
+
+                result.Messages.Add($"Đã tạo layer mới: \"{layerName}\".");
                 continue;
             }
 
             // Mở ở chế độ ĐỌC trước để so sánh; chỉ nâng lên ghi khi thật sự có ô khác.
-            LayerTableRecord layer;
-            if (isNew)
-            {
-                var ltWrite = (LayerTable)transaction.GetObject(database.LayerTableId, OpenMode.ForWrite);
-                layer = new LayerTableRecord { Name = layerName };
-                ltWrite.Add(layer);
-                transaction.AddNewlyCreatedDBObject(layer, true);
-                created++;
-            }
-            else
-            {
-                layer = (LayerTableRecord)transaction.GetObject(layerTable[layerName], OpenMode.ForRead);
-            }
-
+            var layer = (LayerTableRecord)transaction.GetObject(layerTable[layerName], OpenMode.ForRead);
             var changes = PlanChanges(transaction, database, layer, row, result.Messages);
             if (changes.Count == 0)
             {
@@ -112,11 +130,7 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
                 continue;
             }
 
-            if (!isNew)
-            {
-                layer.UpgradeOpen();
-            }
-
+            layer.UpgradeOpen();
             foreach (var apply in changes)
             {
                 apply(layer);
@@ -143,7 +157,7 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
                 $"[Xem trước] Sẽ cập nhật {updated} layer, tạo mới {created} layer (chưa ghi vào drawing).",
                 updated + created);
             preview.Messages.AddRange(result.Messages);
-            return preview;
+            return WithConflicts(preview, plan);
         }
 
         transaction.Commit();
@@ -151,8 +165,47 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
             $"Đã nhập {updated + created} layer từ \"{config.InputPath}\" ({updated} cập nhật, {created} tạo mới).",
             updated + created);
         final.Messages.AddRange(result.Messages);
-        return final;
+        return WithConflicts(final, plan);
     }
+
+    /// <summary>
+    /// Layer có nhiều dòng mâu thuẫn: không áp dòng nào (LayerImportPlanner), báo vào Errors và đánh dấu
+    /// PartialSuccess — báo cáo batch không được gọi là xanh, và Bridge không cấp preview token cho lần xem trước đó.
+    /// </summary>
+    private static CommandResult WithConflicts(CommandResult result, LayerImportPlan plan)
+    {
+        result.Errors.AddRange(plan.Conflicts);
+        if (plan.Conflicts.Count > 0)
+        {
+            result.PartialSuccess = true;
+        }
+
+        return result;
+    }
+
+    /// <summary>Những ô của một layer SẮP TẠO mà lúc tạo sẽ không áp được — đúng câu <see cref="PlanChanges"/> nói.</summary>
+    private static void NoteUnusableCells(Transaction transaction, Database database, LayerCsvRow row, List<string> notes)
+    {
+        if (!string.IsNullOrEmpty(row.Linetype))
+        {
+            var linetypeTable = (LinetypeTable)transaction.GetObject(database.LinetypeTableId, OpenMode.ForRead);
+            if (!linetypeTable.Has(row.Linetype))
+            {
+                notes.Add(LinetypeMissing(row.Name, row.Linetype!));
+            }
+        }
+
+        if (row.LineWeight.HasValue && !Enum.IsDefined(typeof(LineWeight), (LineWeight)row.LineWeight.Value))
+        {
+            notes.Add(LineWeightInvalid(row.Name, row.LineWeight.Value));
+        }
+    }
+
+    private static string LinetypeMissing(string layer, string linetype) =>
+        $"Layer \"{layer}\": linetype \"{linetype}\" chưa có trong drawing, giữ nguyên nét cũ.";
+
+    private static string LineWeightInvalid(string layer, int value) =>
+        $"Layer \"{layer}\": lineweight {value} không có trong bảng chuẩn của AutoCAD, giữ nguyên.";
 
     /// <summary>
     /// Danh sách thay đổi thật sự cần ghi cho một layer. Rỗng = dòng CSV trùng khớp hoàn toàn với
@@ -200,7 +253,7 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
             else
             {
                 // Không tự nạp linetype từ file .lin — nhưng phải NÓI, không bỏ im lặng rồi báo thành công.
-                notes.Add($"Layer \"{layer.Name}\": linetype \"{wanted}\" chưa có trong drawing, giữ nguyên nét cũ.");
+                notes.Add(LinetypeMissing(layer.Name, wanted));
             }
         }
 
@@ -209,7 +262,7 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
             var lineWeight = (LineWeight)row.LineWeight.Value;
             if (!Enum.IsDefined(typeof(LineWeight), lineWeight))
             {
-                notes.Add($"Layer \"{layer.Name}\": lineweight {row.LineWeight.Value} không có trong bảng chuẩn của AutoCAD, giữ nguyên.");
+                notes.Add(LineWeightInvalid(layer.Name, row.LineWeight.Value));
             }
             else if (layer.LineWeight != lineWeight)
             {

@@ -319,7 +319,8 @@ internal static class AcadUiQueryHandler
             try
             {
                 var id = database.GetObjectId(false, new Handle(raw), 0);
-                if (id.IsNull)
+                // Đối tượng đã xoá vẫn tra ra ObjectId (tới khi lưu và mở lại) — chọn/zoom tới nó là lỗi eWasErased.
+                if (id.IsNull || id.IsErased)
                 {
                     notFound.Add(text + " (không có trong bản vẽ)");
                     continue;

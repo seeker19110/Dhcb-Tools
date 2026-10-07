@@ -171,12 +171,25 @@ class OpenPanelToolTests(unittest.TestCase):
         with mock.patch.object(server, "_ensure_panel_api", return_value="Port bị chiếm"):
             self.assertEqual("❌ Port bị chiếm", server.autocad_open_panel())
 
-    def test_tra_directive_preview_cho_hermes(self) -> None:
-        with mock.patch.object(server, "_ensure_panel_api", return_value=None):
+    def test_tra_directive_preview_file_khoi_chay(self) -> None:
+        """Xem trước file khởi chạy (mang khoá ?k=), không phải panel.html — /panel trần bị gateway trả 403."""
+        with tempfile.TemporaryDirectory() as tmp:
+            launch = Path(tmp) / "autocad-panel.html"
+            launch.write_text("<meta>", encoding="utf-8")
+            with mock.patch.object(server, "_ensure_panel_api", return_value=None), \
+                    mock.patch.object(server.panel_api, "launch_file_path", return_value=launch):
+                text = server.autocad_open_panel()
+
+        self.assertEqual(f'::preview{{file="{str(launch).replace(chr(92), "/")}"}}', text)
+
+    def test_gateway_chay_ma_khong_co_file_khoi_chay_thi_noi_ro(self) -> None:
+        """Gateway bản cũ hoặc của tài khoản khác giữ port: không trỏ người dùng tới một trang sẽ bị 403."""
+        with mock.patch.object(server, "_ensure_panel_api", return_value=None), \
+                mock.patch.object(server.panel_api, "launch_file_path", return_value=Path("/khong-co/autocad-panel.html")):
             text = server.autocad_open_panel()
 
-        self.assertTrue(text.startswith("::preview{file="))
-        self.assertIn("panel.html", text)
+        self.assertTrue(text.startswith("❌ Gateway panel đang chạy nhưng không có file khởi chạy"))
+        self.assertIn("panel_api.py", text)
 
 
 class QueryToolTests(unittest.TestCase):

@@ -62,10 +62,10 @@ jobs:
         # 2026 (net8.0-windows) thêm 2026-09-06 sau khi ba bộ ca kiểm chạy thật trên Revit 2026 — bang-chung-test.md §51.
         revit: [2023, 2024, 2025, 2026]
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '8.0.x'
 
@@ -79,6 +79,7 @@ jobs:
           # (net48 / net8.0-windows / net10.0-windows). Bản cũ hardcode "-ge 2025 → net8" nên thêm
           # 2027 vào ma trận là đóng gói NHẦM thư mục mà không có bước nào đỏ.
           $tfm = (dotnet msbuild src/DhcbTools.Revit/DhcbTools.Revit.csproj -p:RevitVersion=${{ matrix.revit }} -getProperty:TargetFramework -nologo).Trim()
+          if ($LASTEXITCODE -ne 0) { throw "MSBuild không đọc được TargetFramework (mã $LASTEXITCODE)." }
           if (-not $tfm) { throw "Không đọc được TargetFramework từ MSBuild." }
           $out = "src/DhcbTools.Revit/bin/Release/$tfm"
           $pkg = "dist/DhcbTools.Revit-${{ matrix.revit }}-${{ needs.version.outputs.version }}"
@@ -103,7 +104,7 @@ jobs:
           $pkg = "dist/DhcbTools.Revit-${{ matrix.revit }}-${{ needs.version.outputs.version }}"
           Compress-Archive -Path "$pkg/*" -DestinationPath "$pkg.zip"
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: DhcbTools.Revit-${{ matrix.revit }}
           path: dist/*.zip
@@ -117,10 +118,10 @@ jobs:
       matrix:
         acad: [2024, 2025, 2026]   # 2026 = R25.1, .NET 10 — đã chạy thật (bang-chung-test.md §24, §25)
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           # AutoCAD 2026 (net10.0-windows) cần SDK 10; 2024/2025 vẫn dùng SDK 8.
           dotnet-version: |
@@ -138,6 +139,7 @@ jobs:
         run: |
           # Cùng lý do với job Revit: AutoCAD 2026+ là net10.0-windows, hardcode "-ge 2025 → net8" đóng gói nhầm.
           $tfm = (dotnet msbuild src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj -p:AcadVersion=${{ matrix.acad }} -getProperty:TargetFramework -nologo).Trim()
+          if ($LASTEXITCODE -ne 0) { throw "MSBuild không đọc được TargetFramework (mã $LASTEXITCODE)." }
           if (-not $tfm) { throw "Không đọc được TargetFramework từ MSBuild." }
           $pkg = "dist/DhcbTools.AutoCAD-${{ matrix.acad }}-${{ needs.version.outputs.version }}"
           New-Item -ItemType Directory -Force -Path $pkg | Out-Null
@@ -169,7 +171,7 @@ jobs:
           $pkg = "dist/DhcbTools.AutoCAD-${{ matrix.acad }}-${{ needs.version.outputs.version }}"
           Compress-Archive -Path "$pkg/*" -DestinationPath "$pkg.zip"
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: DhcbTools.AutoCAD-${{ matrix.acad }}
           path: dist/*.zip
@@ -179,10 +181,10 @@ jobs:
     needs: version
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
 
@@ -196,11 +198,18 @@ jobs:
           New-Item -ItemType Directory -Force -Path "$pkg/jobs", "$pkg/configs", "$pkg/scripts" | Out-Null
           # TFM hỏi MSBuild, không viết tay: hardcode ở đây đúng là lỗi đã sửa cho build-revit/build-autocad,
           # và nó im lặng — Copy-Item vào thư mục không tồn tại thì gói ra thiếu đúng cái .exe.
-          $tfm = (dotnet build src/DhcbTools.BatchRunner/DhcbTools.BatchRunner.csproj -getProperty:TargetFramework).Trim()
+          $tfm = (dotnet msbuild src/DhcbTools.BatchRunner/DhcbTools.BatchRunner.csproj -getProperty:TargetFramework -nologo).Trim()
+          if ($LASTEXITCODE -ne 0) { throw "MSBuild không đọc được TargetFramework (mã $LASTEXITCODE)." }
+          if (-not $tfm) { throw "Không đọc được TargetFramework từ MSBuild." }
           Copy-Item "src/DhcbTools.BatchRunner/bin/Release/$tfm/*" $pkg -Recurse
           Copy-Item jobs/*.json "$pkg/jobs"
           Copy-Item configs/* "$pkg/configs"
-          Copy-Item scripts/*.py, scripts/*.ps1 "$pkg/scripts"
+          # Chỉ script người dùng — installer/batchrunner-scripts.txt. Trước đây scripts/*.py, *.ps1 kéo theo cả script
+          # ký số/CI/ruleset vào máy kỹ sư. Thiếu file nào thì dừng: gói thiếu script là lỗi im lặng tới tay người dùng.
+          Get-Content installer/batchrunner-scripts.txt |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { $_ -and -not $_.StartsWith('#') } |
+            ForEach-Object { Copy-Item (Join-Path scripts $_) "$pkg/scripts" -ErrorAction Stop }
           Copy-Item docs/batch-runner.md, docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md $pkg
 
       # Ký Authenticode khi repo có secret chứng chỉ (DHCB_SIGN_PFX_BASE64/_PASSWORD); không có thì bỏ qua, gói
@@ -218,7 +227,7 @@ jobs:
           $pkg = "dist/DhcbTools.BatchRunner-${{ needs.version.outputs.version }}"
           Compress-Archive -Path "$pkg/*" -DestinationPath "$pkg.zip"
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: DhcbTools.BatchRunner
           path: dist/*.zip
@@ -229,12 +238,12 @@ jobs:
     needs: [verify, version, build-revit, build-autocad, build-batchrunner]
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Tải mọi gói zip đã build
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: artifacts
           merge-multiple: true
@@ -261,16 +270,26 @@ jobs:
 
           Get-ChildItem $stage | Format-Table Name, Mode
 
+      # Ghim 6.7.1. Inno Setup 7 đã ra (7.0.0 ngày 2026-05-14, 7.1.0 ngày 2026-08-10 — tag is-7_* của jrsoftware/issrc):
+      # `choco install innosetup` không ghim sẽ kéo 7.x, cài vào thư mục khác "Inno Setup 6" mà bước dưới gọi, và
+      # dhcb-tools.iss chưa thử với trình biên dịch 7. 6.7.1 là bản 6.x cuối cùng từng là bản mới nhất (02→05/2026)
+      # nên chắc chắn có trên Chocolatey; 6.7.2/6.7.3 ra cùng ngày hoặc sau 7.0 nên có thể không được đăng.
       - name: Cài Inno Setup
-        run: choco install innosetup -y --no-progress
+        run: choco install innosetup --version=6.7.1 -y --no-progress
 
       - name: Đóng gói installer
         shell: pwsh
         run: |
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "Không thấy $iscc — bước cài Inno Setup (ghim 6.7.1) không cài được bản 6." }
+          & $iscc `
             "/DVersion=${{ needs.version.outputs.version }}" `
             "/DStageDir=..\dist\stage" `
             installer/dhcb-tools.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC biên dịch installer thất bại (mã $LASTEXITCODE)." }
+          if (-not (Test-Path "dist/DhcbTools-Setup-${{ needs.version.outputs.version }}.exe" -PathType Leaf)) {
+            throw "ISCC không tạo ra installer của phiên bản đã yêu cầu."
+          }
           Get-ChildItem dist/*.exe
 
       - name: Ký số installer (nếu có chứng chỉ)
@@ -285,7 +304,7 @@ jobs:
           ./scripts/sign-release.ps1 -Path dist/setup
           Move-Item dist/setup/*.exe dist
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: DhcbTools-Setup
           path: dist/*.exe
@@ -298,7 +317,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: dist
           merge-multiple: true
@@ -307,7 +326,7 @@ jobs:
         run: ls -la dist
 
       # Ghim SHA (v2.4.x) thay vì tag di động: action này chạy trong job duy nhất có contents: write.
-      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           files: |
             dist/*.zip

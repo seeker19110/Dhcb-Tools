@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Autodesk.AutoCAD.DatabaseServices;
+using DhcbTools.Shared.Logic.Cad;
 
 namespace DhcbTools.Core.AutoCAD.TextTools;
 
@@ -8,11 +9,11 @@ namespace DhcbTools.Core.AutoCAD.TextTools;
 /// (Model Space, Paper Space và cả block definition) chứ không chỉ Model Space, vì text hay nằm
 /// trong block định nghĩa (title block, ghi chú lặp lại). Bỏ qua block của xref và block anonymous.
 /// <para>
-/// <b>MText:</b> phép thay chạy trên <c>Contents</c> — chuỗi CÓ mã định dạng (\\pxqc;, {\\H0.7x;…}).
-/// Vì vậy chuỗi cần tìm nằm vắt qua một mốc định dạng ("DHCB" viết nửa đậm nửa thường) sẽ KHÔNG khớp,
-/// dù nhìn trên màn hình vẫn là "DHCB". Khi chuỗi không có trong <c>Contents</c> nhưng có trong
-/// <c>Text</c> (bản đã bỏ định dạng), lệnh không tự sửa — vì ghi lại <c>Text</c> sẽ xoá sạch định dạng
-/// của cả đối tượng — mà BÁO ra để kỹ sư xử lý tay. Không báo thành công im lặng.
+/// <b>MText:</b> so khớp trên CHỮ HIỂN THỊ và chỉ thay chữ — không bao giờ sửa vào mã định dạng (\P, \pxqc;,
+/// {\H0.7x;…}); xem <see cref="MTextReplace"/>. Bản trước thay thẳng trên <c>Contents</c>: regex <c>\d+</c> đổi luôn
+/// chữ số trong <c>\H2.5x;</c>, tìm "PL" trúng <c>\PLine</c> — hỏng định dạng không báo. Chuỗi khớp nằm vắt qua một
+/// mốc định dạng ("DHCB" viết nửa đậm nửa thường) thì không tự sửa — gộp lại sẽ xoá định dạng của một phần — mà BÁO
+/// ra để kỹ sư xử lý tay. Không báo thành công im lặng.
 /// </para>
 /// </summary>
 public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
@@ -49,8 +50,51 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
 
         var plan = new List<(ObjectId Id, string Kind, string OldValue, string NewValue)>();
         var formattingNotes = new List<string>();
+        var timeouts = 0;
 
         using var transaction = database.TransactionManager.StartTransaction();
+        var lockedLayers = AcadHelpers.LockedLayerIds(database, transaction);
+        var lockedSkips = new LockedLayerSkips();
+
+        // Đưa một đối tượng vào kế hoạch — trừ khi nó nằm trên layer khoá: mở ForWrite sẽ ném eOnLockedLayer và sập
+        // cả lệnh (bản cũ). Bỏ qua ngay lúc lập kế hoạch nên xem trước và chạy thật cùng một con số, như FIND của AutoCAD.
+        void AddToPlan(Entity entity, ObjectId id, string kind, string oldValue, string newValue)
+        {
+            if (lockedLayers.Contains(entity.LayerId))
+            {
+                lockedSkips.Add(entity.Layer);
+                return;
+            }
+
+            plan.Add((id, kind, oldValue, newValue));
+        }
+
+        string Substitute(string value)
+        {
+            var replaced = Apply(value, config, regex, out var timedOut);
+            if (timedOut)
+            {
+                timeouts++;
+            }
+
+            return replaced;
+        }
+
+        MTextReplaceResult SubstituteMText(string contents)
+        {
+            try
+            {
+                return regex is not null
+                    ? MTextReplace.Replace(contents, regex, config.Replace)
+                    : MTextReplace.ReplaceAll(contents, config.Find, config.Replace, config.IgnoreCase);
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                // Như Substitute: một chuỗi quá lâu không làm hỏng cả lệnh — giữ nguyên và báo ở cuối.
+                timeouts++;
+                return new MTextReplaceResult(contents, 0, 0);
+            }
+        }
 
         var blockTable = (BlockTable)transaction.GetObject(database.BlockTableId, OpenMode.ForRead);
 
@@ -70,26 +114,27 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
                 {
                     case DBText text:
                         {
-                            var replaced = Apply(text.TextString, config, regex);
+                            var replaced = Substitute(text.TextString);
                             if (replaced != text.TextString)
                             {
-                                plan.Add((entityId, "DBText", text.TextString, replaced));
+                                AddToPlan(text, entityId, "DBText", text.TextString, replaced);
                             }
                             break;
                         }
                     case MText mtext:
                         {
-                            var replaced = Apply(mtext.Contents, config, regex);
-                            if (replaced != mtext.Contents)
+                            var outcome = SubstituteMText(mtext.Contents);
+                            if (outcome.Contents != mtext.Contents)
                             {
-                                plan.Add((entityId, "MText", mtext.Contents, replaced));
+                                AddToPlan(mtext, entityId, "MText", mtext.Contents, outcome.Contents);
                             }
-                            else if (Matches(mtext.Text, config, regex))
+
+                            if (outcome.Skipped > 0)
                             {
-                                // Có trong chuỗi đã bỏ định dạng nhưng không có trong Contents: chuỗi bị mã định dạng
-                                // cắt ngang. Ghi đè Contents bằng Text sẽ xoá định dạng nên chỉ báo, không tự sửa.
+                                // Khớp trên chữ hiển thị nhưng vắt qua mã định dạng: gộp lại sẽ xoá định dạng của một
+                                // phần chuỗi, nên chỉ báo, không tự sửa.
                                 formattingNotes.Add(
-                                    $"[MText] {AcadHelpers.HandleOf(entityId)}: khớp trên nội dung hiển thị nhưng mã định dạng cắt ngang chuỗi — cần sửa tay.");
+                                    $"[MText] {AcadHelpers.HandleOf(entityId)}: {outcome.Skipped} chỗ khớp vắt qua mã định dạng — không thay, cần sửa tay.");
                             }
                             break;
                         }
@@ -98,10 +143,10 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
                             foreach (ObjectId attId in blockRef.AttributeCollection)
                             {
                                 var attRef = (AttributeReference)transaction.GetObject(attId, OpenMode.ForRead);
-                                var replaced = Apply(attRef.TextString, config, regex);
+                                var replaced = Substitute(attRef.TextString);
                                 if (replaced != attRef.TextString)
                                 {
-                                    plan.Add((attId, "Attribute", attRef.TextString, replaced));
+                                    AddToPlan(attRef, attId, "Attribute", attRef.TextString, replaced);
                                 }
                             }
                             break;
@@ -110,10 +155,24 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
             }
         }
 
+        if (lockedSkips.Message("đối tượng văn bản") is { } lockedNote)
+        {
+            formattingNotes.Insert(0, lockedNote);
+        }
+
+        if (timeouts > 0)
+        {
+            // Bản cũ giữ nguyên im lặng: xem trước "sẽ thay N" trong khi có chuỗi khớp mà không được thay.
+            formattingNotes.Insert(0,
+                $"{timeouts} chuỗi văn bản bị bỏ qua vì regex chạy quá {MatchTimeout.TotalSeconds:0} giây — đơn giản hoá biểu thức rồi chạy lại.");
+        }
+
         if (plan.Count == 0)
         {
             transaction.Commit();
-            var none = CommandResult.Ok("Không tìm thấy văn bản nào khớp để thay.");
+            var none = CommandResult.Ok(lockedSkips.Count > 0 || timeouts > 0
+                ? "Không có văn bản nào thay được — xem lý do bên dưới."
+                : "Không tìm thấy văn bản nào khớp để thay.");
             none.Messages.AddRange(formattingNotes);
             return none;
         }
@@ -141,9 +200,12 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
                 // nếu không case DBText sẽ "nuốt" mất case này (CS8120: unreachable).
                 case AttributeReference attRef:
                     attRef.TextString = newValue;
+                    // Như AttributeImport: attribute canh giữa/Fit/Aligned giữ hình học canh cũ sau khi đổi chữ.
+                    attRef.AdjustAlignment(database);
                     break;
                 case DBText text:
                     text.TextString = newValue;
+                    text.AdjustAlignment(database);
                     break;
                 case MText mtext:
                     mtext.Contents = newValue;
@@ -158,8 +220,9 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
         return result;
     }
 
-    private static string Apply(string value, TextReplaceConfig config, Regex? regex)
+    private static string Apply(string value, TextReplaceConfig config, Regex? regex, out bool timedOut)
     {
+        timedOut = false;
         try
         {
             return regex is not null
@@ -168,22 +231,9 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
         }
         catch (RegexMatchTimeoutException)
         {
-            // Một chuỗi quá lâu không được phép làm hỏng cả lệnh: giữ nguyên đối tượng đó.
+            // Một chuỗi quá lâu không được phép làm hỏng cả lệnh: giữ nguyên đối tượng đó — và BÁO (timedOut).
+            timedOut = true;
             return value;
-        }
-    }
-
-    private static bool Matches(string value, TextReplaceConfig config, Regex? regex)
-    {
-        try
-        {
-            return regex is not null
-                ? regex.IsMatch(value)
-                : value.IndexOf(config.Find, config.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal) >= 0;
-        }
-        catch (RegexMatchTimeoutException)
-        {
-            return false;
         }
     }
 }

@@ -171,7 +171,8 @@ Chạy `panel_api.py` trên cổng riêng rồi gọi thật bằng `curl`:
 | `GET /alive` không token | 200, không mang dữ liệu | ✅ 200 `{"panelApi": "ok"}` |
 | `GET /health` không token | 403 | ✅ 403 |
 | `GET /health` có token | 200 | ✅ 200 |
-| `GET /panel` không token | 200 (nơi phát token) | ✅ 200 |
+| `GET /panel` không khoá khởi chạy (audit 2026-10-01 vòng 2) | 403, không lộ token | ✅ 403 `text/plain`, chỉ có hướng dẫn |
+| `GET /panel?k=<khoá trong file khởi chạy>` | 200 (nơi phát token) | ✅ 200, kèm `Referrer-Policy: no-referrer` |
 | `POST /execute` lệnh ngoài whitelist | từ chối | ✅ `{"ok": false, "error": "command không hợp lệ"}` |
 
 Và kiểm chứng lớp AI:

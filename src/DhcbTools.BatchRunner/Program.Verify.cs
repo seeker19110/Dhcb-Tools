@@ -123,7 +123,7 @@ public static partial class Program
             return 2;
         }
 
-        var elements = model.Elements();
+        var elements = model.Elements(specifications);
         var check = IdsEvaluator.Check(specifications, elements, model.Model.Schema);
 
         Console.WriteLine(ifcPath);
