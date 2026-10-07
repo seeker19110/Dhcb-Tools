@@ -87,7 +87,7 @@ Chưa nâng nhãn Revit 2027 từ biên dịch sang hỗ trợ phát hành.
 
 Năm ca installer bị skip trong lượt Python WSL đã được chạy riêng và đạt trên Windows; không đăng ký uninstall hoặc thay bản cài đang dùng. Script doctor đã được kiểm vào manifest đóng gói.
 Chưa thu phản hồi người dùng, chưa đo tiết kiệm thời gian thực tế; chưa nghiệm thu family sản xuất/tọa độ công trường/BCF bằng phần mềm nhận.
-Hủy giữa lệnh dài cần thiết kế cancellation/rollback riêng. LICENSE, chứng chỉ ký và bảo vệ nhánh cần chủ dự án quyết định/tài nguyên.
+Hủy giữa lệnh dài cần thiết kế cancellation/rollback riêng. LICENSE và chứng chỉ ký cần chủ dự án quyết định/tài nguyên; trạng thái bảo vệ nhánh cần đối chiếu GitHub.
 
 ## Rà soát bổ sung trước triển khai
 
@@ -106,3 +106,50 @@ và BatchRunner/scripts. Cần giữ các Revit manifest hiện có; installer c
 dọn thành phần Revit bị bỏ chọn, nên lượt cài tại máy dùng chép gói có backup/rollback.
 Không đổi định nghĩa task đêm, cấu hình, token hoặc ledger chống lặp; gói và báo cáo cài đặt
 đặt ngoài repo tại `C:\Users\liend\DHCB-deploy`.
+
+
+## Kiểm vận hành bổ sung — 2026-10-08
+
+Nhánh `feat/operational-readiness` khép các lỗi phát hiện khi chạy bản đã cài:
+
+- BatchRunner chọn cặp host/DLL tương thích trong AutoCAD 2024–2026, đọc metadata DLL mà không nạp mã.
+  Host 2022 bị bỏ qua; bản 2026 dùng runtime cũ bị chặn. DLL đã cài trong bundle được tìm tự động.
+  Đường host tùy chọn không được suy năm chỉ từ runtime; cần DLL portable/chỉ định và cảnh báo rõ.
+- `PlotPdf --dry-run` không chạy `-PLOT`. PDF thật được tạo ở file tạm cùng thư mục và chỉ thay đích
+  khi có header PDF, host thoát thành công và bước CAD hoàn tất. File cũ được giữ khi lỗi;
+  lỗi in PDF chặn lưu DWG mặc định. Lỗi khởi động Core Console được ghi vào báo cáo/mã thoát.
+- Doctor bổ sung kiểm manifest/module/bộ DLL và runtime Windows, có `--acad-dir` cho AutoCAD 2026
+  cài nơi khác; vẫn chỉ đọc và không in token/nội dung cấu hình. [Hướng dẫn](chan-doan-windows.md).
+- Bộ [engineering write](../tests/suites/autocad-engineering-write.json) dùng
+  [fixture AutoLISP](../tests/suites/fixtures/autocad-engineering.lsp) trên bản chép sample Autodesk.
+  [Runner](../scripts/run-autocad-fixture-tests.ps1) đối chiếu CSV độc lập với kết quả lệnh:
+  đánh số theo vị trí, pattern thuộc tính, CSV có dấu phẩy/ngoặc kép, khôi phục giá trị, định dạng MText.
+  Kiểm hash DWG gốc và bản chép để chắc chắn không lưu các sửa đổi thử vào file.
+
+Năm tình huống PDF đã chạy trên AutoCAD 2026 thật: xem trước, xuất thành công, khổ giấy sai,
+step CAD không tồn tại, và khổ giấy sai khi `saveMode:SaveAs`. Mã thoát đúng 0/1;
+PDF cũ và DWG đích giữ nguyên trong ca lỗi; không còn PDF tạm sau lượt chạy.
+Chỉ kiểm header PDF và kết quả tạo file, chưa nghiệm thu nội dung bản in.
+
+Công cụ điều khiển GUI Windows của phiên này lỗi trước khi chạy thao tác vì không nhận cwd WSL.
+Không ghi nhận Ribbon/form/Bridge GUI là đã nghiệm thu. Máy không có Revit.exe để chạy host Revit;
+ma trận biên dịch không thay thế nghiệm thu trong host.
+
+Ruleset GitHub `main` đã được đối chiếu ngày 2026-10-08: active, yêu cầu PR và11job `tests.yml`,
+cấm xóa/force-push, không có bypass actor. Đã sửa hướng dẫn CONTRIBUTING vốn còn mô tả thời kỳ chưa có
+required checks; vẫn giữ chờ mọi check xanh và merge tay.
+
+Lệnh ghi CAD nay báo một phần khi công việc bị bỏ qua do layer/INSERT cha khóa,
+CSV lỗi hoặc thiếu đối tượng/tag, đoạn MText không thay được mà vẫn giữ định dạng,
+regex timeout hoặc cấu hình layer không hợp lệ. Thuộc tính layer0 không được ghi xuyên khóa INSERT cha.
+Mapping cùng layer và thay chữ bằng chính chữ hiện có vẫn là no-op, không bị báo partial thừa.
+Kết quả một phần giữ số đối tượng đã xử lý và chặn lưu DWG mặc định.
+
+Bản chốt trước PR: **2.048/2.048 Shared.Logic/Hosting, phủ dòng100%; 66/66 BatchRunner;
+389 Python +115subtest, phủ100%1.776statement; pyflakes và parserPS5.1 sạch**.
+Core AutoCAD2026 build0warning/0error. Host: [24/24 engineering write](bang-chung/2026-10-08/autocad-engineering-write.md)
+và [51/51 edge](bang-chung/2026-10-08/autocad-engineering-edge.md), gồm khóa layer/INSERT cha,
+CSV/thuộc tính/format không xử lý được, no-op và preview không sửa model.
+Runner đối chiếu CSV, layer thuộc tính, định dạng MText và hash cả DWG gốc/bản chép độc lập.
+Bằng chứng thô tại `C:\Users\liend\DHCB-test-results\autocad-engineering-write-2026-10-08_00-51-20-617`.
+Các kết quả trên là kiểm nguồn trước merge; kiểm lại DLL đã cài sẽ được lưu cùng gói ngoài repo.

@@ -28,6 +28,8 @@ Dùng thử trên công việc thật: [`docs/thi-diem-su-dung.md`](docs/thi-die
 **Kiểm tra cài đặt chỉ đọc:** `python scripts/dhcb_doctor.py --app revit` (hoặc `autocad`);
 `--offline` không kết nối Bridge, `--json` in báo cáo không chứa token/nội dung cấu hình.
 Script có trong repo và gói BatchRunner; không cần dependency ngoài Python.
+Trên Windows, doctor kiểm thêm bundle và runtime AutoCAD;
+xem [chẩn đoán Windows và thư mục host tùy chọn](docs/chan-doan-windows.md).
 
 Trang riêng theo vai trò (chỉ 3 lệnh nên dùng trước, không phải đọc hết README):
 [kiến trúc](docs/vai-tro-kien-truc.md) · [MEP](docs/vai-tro-mep.md) · [BIM manager](docs/vai-tro-bim-manager.md) ·

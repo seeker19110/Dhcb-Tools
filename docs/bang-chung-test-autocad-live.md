@@ -1,4 +1,8 @@
 # Bằng chứng Test Live — AutoCAD Bridge
+
+> Báo cáo lịch sử ngày 2026-09-02. Các ví dụ NETLOAD/net48 và HTTP chưa có token bên dưới không phải hướng dẫn cài hoặc gọi Bridge hiện tại.
+> Dùng [hướng dẫn cài đặt hiện hành](huong-dan-cai-dat-va-kiem-thu-thu-cong.md) và [chẩn đoán Windows](chan-doan-windows.md); chọn DLL đúng năm/runtime, gọi loopback với Bearer token và tuân thủ preview/commit.
+
 **Ngày:** 2026-09-02 09:10 ICT  
 **AutoCAD:** Autodesk AutoCAD 2026 (Education)  
 **Drawing:** bản vẽ thông gió tầng mái của một dự án thực tế (đặt tên `<bản vẽ MVAC>.dwg` trong tài liệu này)  

@@ -39,11 +39,14 @@ Không chạy trên PR nên **không phải chờ nó** khi merge.
 
 ## Merge PR — theo dõi check rồi merge tay, không dùng auto-merge
 
-Quy ước gốc lấy từ `donghanh` (mục 11 `CLAUDE.md`) là "thử bật auto-merge rồi chờ". **Trên repo này
-không làm thế**: `main` chưa có branch protection (không có required status check), nên
-`gh pr merge --auto` **merge ngay lập tức** thay vì chờ `tests.yml` — ngày 2026-09-05 PR #64 ở trạng
-thái *merged* khi 2/11 job còn đang chạy. Auto-merge chỉ có nghĩa khi Settings → Branches có rule đòi
-check xanh; chừng nào chưa bật rule đó thì đường an toàn là:
+Giữ merge tay sau khi kiểm tra toàn bộ CI. Trước đây `main` chưa có required checks nên
+`gh pr merge --auto` từng merge ngay khi CI còn chạy (PR #64, 2026-09-05).
+
+Đã đối chiếu GitHub ngày 2026-10-08: ruleset `main` đang **active**, áp dụng nhánh mặc định,
+không có bypass actor; yêu cầu PR và đủ **11 job `tests.yml`** (logic, năm build API, năm build WPF),
+cấm xóa nhánh và force-push. Không thấy classic branch protection không có nghĩa nhánh không được bảo vệ:
+cần kiểm cả `GET /repos/{owner}/{repo}/rulesets` và nội dung ruleset.
+`gitleaks` cũng chạy trên PR; quy trình vẫn chờ mọi check xanh rồi merge tay:
 
 1. **Tạo PR ở trạng thái sẵn sàng** (không để nháp).
 2. **Chờ check xanh** bằng `gh pr checks <n> --watch --fail-fast` (hoặc poll mỗi ~2,5 phút).
@@ -54,8 +57,8 @@ check xanh; chừng nào chưa bật rule đó thì đường an toàn là:
 5. Nếu `main` tiến lên gây xung đột (`mergeable_state: dirty`) trong lúc chờ, merge `main` vào
    nhánh, giải xung đột, rồi mới tiếp tục từ bước 2.
 
-Muốn quay lại dùng auto-merge thì trước hết bật branch protection cho `main` với required checks là
-đủ 11 job của `tests.yml` — khi đó `--auto` mới thật sự chờ.
+Không dùng `--auto` trong quy trình này. Khi đổi tên job hoặc ma trận CI, đối chiếu lại required checks
+của ruleset để tránh thiếu cổng kiểm hoặc chờ một job không còn tồn tại.
 
 ## Commit message — Conventional Commits
 
