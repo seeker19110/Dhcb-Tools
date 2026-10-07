@@ -661,6 +661,7 @@ public sealed class DhcbCommands
     /// <summary>Mọi đường ghi tương tác phải xem trước và duyệt, kể cả khi kỹ sư chọn chế độ Thật.</summary>
     private static CommandResult ExecuteWithPreview(Document doc, string command, object config)
     {
+        Bridge.DhcbHttpBridge.TrackDocument(doc.Database);
         var json = JObject.FromObject(config, new JsonSerializer
         {
             ContractResolver = new CamelCasePropertyNamesContractResolver(),

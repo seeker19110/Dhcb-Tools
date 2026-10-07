@@ -11,8 +11,10 @@ namespace DhcbTools.Shared.Logic.Tests;
 [Collection(EnvironmentCollection.Name)]
 public class BridgeCancellationTests
 {
-    [Fact]
-    public async Task ShutdownGiuaNhanHttpVaDangKyJob_KhongChoJobChayMuon()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ShutdownGiuaNhanHttpVaDangKyJob_KhongChoJobChayMuon(bool renewedSession)
     {
         var probe = new TcpListener(IPAddress.Loopback, 0);
         probe.Start(); var port = ((IPEndPoint)probe.LocalEndpoint).Port; probe.Stop();
@@ -27,15 +29,45 @@ public class BridgeCancellationTests
             http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", server.Token);
             await http.GetStringAsync("/health");
             // Tiêm đúng thời điểm Stop đã hủy token nhưng chưa Stop listener; request đã được nhận vẫn trả lời.
-            var cts = (CancellationTokenSource)typeof(HttpBridgeServer)
-                .GetField("_cts", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(server)!;
+            var ctsField = typeof(HttpBridgeServer)
+                .GetField("_cts", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            var cts = (CancellationTokenSource)ctsField.GetValue(server)!;
             cts.Cancel();
+            // Phiên mới không được hồi sinh request đã nhận ở phiên cũ.
+            if (renewedSession)
+            {
+                ctsField.SetValue(server, new CancellationTokenSource());
+                cts.Dispose(); // server.Dispose sẽ dọn nguồn token thay thế.
+            }
             var response = await http.PostAsync("/execute", Json("{\"command\":\"AutoNumbering\",\"async\":true}"));
             var body = JObject.Parse(await response.Content.ReadAsStringAsync());
             Assert.Equal("abandoned", body["status"]!.ToString());
             Assert.False(item!.TryClaim());
         }
         finally { File.Delete(tokenPath); }
+    }
+
+    [Fact]
+    public void StopNgaySauDangKy_TruocOnClaimed_KhongThucThiHoacThongBaoClaim()
+    {
+        using var server = new HttpBridgeServer(12345, "test", "test");
+        var item = new BridgeWorkItem<BridgeRequest, CommandResult>(new BridgeRequest { Command = "AutoNumbering" });
+        var job = server.Jobs.TryAdd("AutoNumbering", DateTime.UtcNow, TimeSpan.FromMinutes(1),
+            tryAbandonWork: item.MarkAbandoned)!;
+        // Đúng cửa sổ trước đây: TryAdd đã công bố job, handler chưa gắn OnClaimed/Completion.
+        // Hook hủy phải tồn tại ngay lúc công bố; nếu không, Stop chỉ hủy job còn item vẫn chạy.
+        server.Stop();
+        var notifications = 0;
+        item.OnClaimed = () => { notifications++; job.MarkStarted(); };
+        var writes = 0;
+        if (item.TryClaim()) writes++;
+        job.Complete("kết quả muộn", DateTime.UtcNow);
+        Assert.Equal(BridgeJobStatus.Abandoned, job.Status);
+        Assert.True(item.Abandoned);
+        Assert.False(job.Started);
+        Assert.Equal(0, notifications);
+        Assert.Equal(0, writes);
+        Assert.Null(job.Result);
     }
 
     [Theory]

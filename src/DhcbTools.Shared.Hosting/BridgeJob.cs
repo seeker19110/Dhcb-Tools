@@ -182,11 +182,14 @@ namespace DhcbTools.Shared.Hosting
             get { lock (_gate) { return _jobs.Values.Count(j => j.Status == BridgeJobStatus.Running && !j.Started); } }
         }
 
-        public BridgeJob Add(string command, DateTime utcNow, string? id = null, TimeSpan? timeout = null)
+        public BridgeJob Add(string command, DateTime utcNow, string? id = null, TimeSpan? timeout = null,
+            Func<bool>? tryAbandonWork = null)
         {
             var job = new BridgeJob(id ?? Guid.NewGuid().ToString("N").Substring(0, 12), command, utcNow)
             {
                 TimeoutUtc = timeout.HasValue ? utcNow + timeout.Value : (DateTime?)null,
+                // Gắn quyền hủy trước khi công bố job: Stop không được thấy job thiếu work item.
+                TryAbandonWork = tryAbandonWork,
             };
             lock (_gate)
             {
@@ -200,7 +203,8 @@ namespace DhcbTools.Shared.Hosting
         /// Như <see cref="Add"/> nhưng trả <c>null</c> khi hàng đợi đã đầy (<see cref="MaxQueued"/>).
         /// Job quá hạn nhận việc được huỷ trước khi đếm, để job "chết" không chiếm chỗ.
         /// </summary>
-        public BridgeJob? TryAdd(string command, DateTime utcNow, TimeSpan timeout, string? id = null)
+        public BridgeJob? TryAdd(string command, DateTime utcNow, TimeSpan timeout, string? id = null,
+            Func<bool>? tryAbandonWork = null)
         {
             ExpireQueued(utcNow);
             lock (_gate)
@@ -210,7 +214,7 @@ namespace DhcbTools.Shared.Hosting
                     return null;
                 }
                 // Kiểm trần và thêm trong cùng khóa; hai request không thể cùng giành chỗ cuối.
-                return Add(command, utcNow, id, timeout);
+                return Add(command, utcNow, id, timeout, tryAbandonWork);
             }
         }
 

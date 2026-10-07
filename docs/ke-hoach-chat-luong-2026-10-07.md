@@ -88,3 +88,21 @@ Chưa nâng nhãn Revit 2027 từ biên dịch sang hỗ trợ phát hành.
 Năm ca installer bị skip trong lượt Python WSL đã được chạy riêng và đạt trên Windows; không đăng ký uninstall hoặc thay bản cài đang dùng. Script doctor đã được kiểm vào manifest đóng gói.
 Chưa thu phản hồi người dùng, chưa đo tiết kiệm thời gian thực tế; chưa nghiệm thu family sản xuất/tọa độ công trường/BCF bằng phần mềm nhận.
 Hủy giữa lệnh dài cần thiết kế cancellation/rollback riêng. LICENSE, chứng chỉ ký và bảo vệ nhánh cần chủ dự án quyết định/tài nguyên.
+
+## Rà soát bổ sung trước triển khai
+
+Rà soát độc lập phát hiện cửa sổ giữa đăng ký job và gắn hook hủy: Stop có thể đánh dấu job
+`abandoned` trong khi work item vẫn được nhận chạy. Hook hủy nay được gắn trước khi công bố job;
+request giữ token phiên đã nhận để phiên Start mới không hồi sinh việc của phiên cũ.
+Hai ca hồi quy bổ sung nâng bộ test logic lên **2.039/2.039 đạt, phủ dòng 100%**.
+Kết quả nằm ở `C:\Users\liend\DHCB-test-results\review-race`.
+
+Ribbon AutoCAD nay đăng ký theo dõi sự kiện database trước khi chụp snapshot, dùng chung watcher
+với Bridge. Kiểm revision không còn phụ thuộc việc Bridge đã được gọi hay chưa/bật hay tắt.
+Thư viện đầu vào Revit lớn hơn 4.096 file cần chia thư mục cho tác vụ preview hiện tại.
+
+Chủ dự án đã chọn merge vào main và cài trên máy này. Phạm vi cài là AutoCAD 2026 (.NET 10)
+và BatchRunner/scripts. Cần giữ các Revit manifest hiện có; installer chọn riêng AutoCAD sẽ
+dọn thành phần Revit bị bỏ chọn, nên lượt cài tại máy dùng chép gói có backup/rollback.
+Không đổi định nghĩa task đêm, cấu hình, token hoặc ledger chống lặp; gói và báo cáo cài đặt
+đặt ngoài repo tại `C:\Users\liend\DHCB-deploy`.
