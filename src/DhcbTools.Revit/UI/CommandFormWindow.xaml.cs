@@ -128,38 +128,8 @@ public partial class CommandFormWindow : Window
     /// </summary>
     private string Snapshot(JObject config)
     {
-        var paths = new List<string>();
-        var folderStamps = new JObject();
-        foreach (var editor in _editors)
-        {
-            var value = config[editor.Field.Name]?.ToString() ?? string.Empty;
-            if (editor.Field.Kind == FieldKind.FilePath)
-            {
-                paths.Add(value);
-            }
-            else if (editor.Field.Kind == FieldKind.FolderPath && !string.IsNullOrWhiteSpace(value) && Directory.Exists(value))
-            {
-                // Thư viện 30.000 .rfa: không băm từng file (chậm, thứ tự liệt kê không ổn định) — đủ để
-                // "thêm/bớt/sửa file" đổi ảnh chụp là: số file, mtime mới nhất, tổng cỡ.
-                try
-                {
-                    long count = 0, size = 0; var newest = DateTime.MinValue;
-                    foreach (var f in Directory.EnumerateFiles(value, "*", SearchOption.AllDirectories))
-                    {
-                        var info = new FileInfo(f);
-                        count++; size += info.Length;
-                        if (info.LastWriteTimeUtc > newest) newest = info.LastWriteTimeUtc;
-                    }
-                    folderStamps[editor.Field.Name] = $"{count}|{size}|{newest:O}";
-                }
-                catch (Exception ex)
-                {
-                    folderStamps[editor.Field.Name] = "lỗi:" + ex.Message;
-                }
-            }
-        }
-
-        return PreviewSnapshot.Capture(config.ToString() + "\n" + folderStamps.ToString(Newtonsoft.Json.Formatting.None), paths);
+        return config.ToString(Newtonsoft.Json.Formatting.None) + "\n"
+            + BridgeCommitGuard.CaptureInputSnapshot(config, BridgeDocumentContext.RevisionFor(_document));
     }
 
     private void OnRun(object sender, RoutedEventArgs e)
@@ -181,10 +151,12 @@ public partial class CommandFormWindow : Window
     private void Execute(bool dryRun)
     {
         JObject config;
+        string? beforePreview = null;
         if (dryRun) InvalidatePreview();
         try
         {
             config = Collect();
+            if (dryRun) beforePreview = Snapshot(config);
             if (!dryRun && (_previewSnapshot == null || _previewSnapshot != Snapshot(config)))
             {
                 InvalidatePreview();
@@ -226,12 +198,17 @@ public partial class CommandFormWindow : Window
         ShowText(Format(result));
 
         // Chỉ mở nút chạy thật sau khi xem trước thành công — đúng nguyên tắc DryRun mặc định của roadmap.
-        if (dryRun && result.Success)
+        if (dryRun && result.IsComplete)
         {
             config.Remove("dryRun");
             try
             {
-                _previewSnapshot = Snapshot(config);
+                if (beforePreview != Snapshot(config))
+                {
+                    ShowText(Format(result) + "\nModel hoặc file đầu vào đã đổi trong khi xem trước. Hãy Xem trước lại.");
+                    return;
+                }
+                _previewSnapshot = beforePreview;
                 RunButton.IsEnabled = true;
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException)
@@ -248,6 +225,8 @@ public partial class CommandFormWindow : Window
     private static string Format(CommandResult result)
     {
         var lines = new List<string> { result.Summary };
+        if (result.Success && !result.IsComplete)
+            lines.Insert(0, "⚠ Kết quả chưa hoàn tất. Kiểm tra các lỗi trước khi sử dụng.");
 
         if (result.Errors.Count > 0)
         {

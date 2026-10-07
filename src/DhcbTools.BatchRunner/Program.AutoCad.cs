@@ -175,6 +175,7 @@ public static partial class Program
             var linesAfter = logLines.Length;
             // Dòng DHCB_RUN của RIÊNG file này (ghi trong lúc accoreconsole chạy) — căn cứ để quyết định lưu.
             var stepEntries = logLines.Skip(linesBefore).Select(RunLog.Deserialize).OfType<RunLogEntry>().ToList();
+            anyFailed |= stepEntries.Any(e => !e.IsComplete) || stepEntries.Count < stepPaths.Count;
             var netloadFailed = netload != null || (stepPaths.Count > 0 && linesAfter == linesBefore);
             if (!timedOut && netloadFailed)
             {

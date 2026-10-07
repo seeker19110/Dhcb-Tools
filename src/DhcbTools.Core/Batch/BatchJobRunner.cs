@@ -122,10 +122,10 @@ public sealed class BatchJobRunner
                     };
                     RunLog.Append(runLogPath, entry);
                     entries.Add(entry);
-                    Log?.Invoke($"  {(result.Success ? "OK " : "ERR")} {step.Command}: {result.Summary}");
-                    previousFailed = !result.Success;
-                    anyStepFailed |= !result.Success;
-                    if (!result.Success && job.StopOnError)
+                    Log?.Invoke($"  {(result.IsComplete ? "OK " : "ERR")} {step.Command}: {result.Summary}");
+                    previousFailed = !result.IsComplete;
+                    anyStepFailed |= !result.IsComplete;
+                    if (!result.IsComplete && job.StopOnError)
                     {
                         stop = true;
                         break;

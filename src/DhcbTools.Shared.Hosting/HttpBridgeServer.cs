@@ -19,6 +19,7 @@ namespace DhcbTools.Shared.Hosting
     ///   GET  /health          — không cần token, chỉ trả trạng thái + phiên bản (không lộ tên file, tên lệnh)
     ///   GET  /tools           — cần token; danh sách lệnh + schema tóm tắt (nguồn cho MCP server và agent)
     ///   GET  /progress/&lt;id&gt;   — cần token; trạng thái lệnh chạy nền (giai đoạn 10.5)
+    ///   POST /cancel/&lt;id&gt;     — cần token; chỉ hủy việc còn xếp hàng, giữ việc đã nhận chạy
     ///   POST /execute         — cần token; { "command": "...", "config": {...}, "async": true|false }
     ///   POST /query           — cần token; { "query": "...", "params": {...} }
     ///   POST /chat            — cần token; { "text": "..." } → đề xuất lệnh (KHÔNG thực thi)
@@ -132,6 +133,7 @@ namespace DhcbTools.Shared.Hosting
         public void Stop()
         {
             _cts?.Cancel();
+            _jobs.AbandonQueued("Bridge đã dừng trước khi nhận lệnh — lệnh KHÔNG chạy.", DateTime.UtcNow);
             try { _listener.Stop(); } catch { /* đang dừng */ }
             try { _listenTask?.Wait(2000); } catch { /* timeout ok */ }
         }
@@ -223,7 +225,7 @@ namespace DhcbTools.Shared.Hosting
 
                 if (req.HttpMethod != "POST")
                 {
-                    WriteJson(res, 405, new { error = "Chỉ hỗ trợ GET /health, GET /tools, GET /progress/<id>, POST /execute, POST /query, POST /chat" });
+                    WriteJson(res, 405, new { error = "Chỉ hỗ trợ GET /health, GET /tools, GET /progress/<id>, POST /cancel/<id>, POST /execute, POST /query, POST /chat" });
                     return;
                 }
 
@@ -245,6 +247,12 @@ namespace DhcbTools.Shared.Hosting
                 if (body == null)
                 {
                     WriteJson(res, 413, new { error = "Body quá lớn (tối đa " + MaxBodyBytes + " byte)." });
+                    return;
+                }
+
+                if (path.StartsWith("/cancel/", StringComparison.Ordinal))
+                {
+                    HandleCancel(res, path.Substring("/cancel/".Length));
                     return;
                 }
 
@@ -430,6 +438,10 @@ namespace DhcbTools.Shared.Hosting
             job.TryAbandonWork = item.MarkAbandoned;
             AttachCompletion(job, item);
 
+            // Stop có thể chen giữa nhận HTTP và đăng ký job. Không để việc của phiên cũ chạy muộn.
+            if (_cts?.IsCancellationRequested == true)
+                job.Abandon("Bridge đã dừng trước khi nhận lệnh — lệnh KHÔNG chạy.", DateTime.UtcNow);
+
             // Đồng hồ hạn nhận việc: hết giờ mà chưa ai claim → huỷ (MarkAbandoned) rồi ghi Abandoned.
             _ = Task.Delay(timeout).ContinueWith(_ =>
             {
@@ -458,7 +470,7 @@ namespace DhcbTools.Shared.Hosting
             WriteJson(res, 202, new
             {
                 id = job.Id,
-                status = "running",
+                status = StatusName(job.Status),
                 command = job.Command,
                 progressUrl = "/progress/" + job.Id,
                 timeoutSeconds = (int)timeout.TotalSeconds,
@@ -506,6 +518,29 @@ namespace DhcbTools.Shared.Hosting
                 elapsedMs = job.ElapsedMs(now),
                 result = job.Result,
                 error = job.Error,
+            });
+        }
+
+        private void HandleCancel(HttpListenerResponse res, string id)
+        {
+            var job = _jobs.Find(id);
+            if (job == null)
+            {
+                WriteJson(res, 404, new { error = "Không có lệnh nền mang id này (sai id hoặc kết quả đã hết hạn)." });
+                return;
+            }
+
+            job.Abandon("Đã hủy theo yêu cầu trước khi nhận việc — lệnh KHÔNG chạy.", DateTime.UtcNow);
+            var status = job.Status;
+            var stillRunning = status == BridgeJobStatus.Running;
+            WriteJson(res, stillRunning ? 409 : 200, new
+            {
+                id = job.Id,
+                status = StatusName(status),
+                started = job.Started,
+                cancelled = status == BridgeJobStatus.Abandoned,
+                progressUrl = "/progress/" + job.Id,
+                error = stillRunning ? "Lệnh đã được nhận: không hủy cưỡng bức transaction. Hỏi progress để lấy kết quả; KHÔNG gửi lại lệnh." : null,
             });
         }
 

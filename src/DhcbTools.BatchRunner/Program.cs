@@ -113,7 +113,7 @@ public static partial class Program
 
         // Mã của đường chạy cũng tính: Revit sập giữa đêm thì log chỉ có dòng xanh của các file đã kịp chạy.
         var code = RunLog.ExitCode(entries, launched);
-        Console.WriteLine($"Kết thúc, mã thoát {code}: {entries.Count(e => e.Success && !e.Skipped)} OK, {entries.Count(e => !e.Success && !e.Skipped)} lỗi, {entries.Count(e => e.Skipped)} bỏ qua.");
+        Console.WriteLine($"Kết thúc, mã thoát {code}: {entries.Count(e => e.IsComplete)} OK, {entries.Count(e => e.Success && !e.IsComplete && !e.Skipped)} một phần, {entries.Count(e => !e.Success && !e.Skipped)} lỗi, {entries.Count(e => e.Skipped)} bỏ qua.");
 
         if (job.Handover != null && job.Handover.Enabled)
         {

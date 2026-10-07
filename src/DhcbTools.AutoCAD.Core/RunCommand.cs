@@ -38,11 +38,12 @@ public sealed class RunCommand
             using var lock_ = doc.LockDocument();
             var result = AcadCommandTable.Dispatch(doc.Database, entry.Command, step["config"]?.ToString(Newtonsoft.Json.Formatting.None) ?? "{}");
             entry.Success = result.Success;
+            entry.PartialSuccess = result.PartialSuccess;
             entry.Affected = result.AffectedCount;
             entry.Summary = result.Summary;
             entry.Messages = result.Messages.Take(2000).ToList();
             entry.Errors = result.Errors;
-            ed.WriteMessage($"\n{(result.Success ? "✓" : "✗")} {result.Summary}\n");
+            ed.WriteMessage($"\n{(result.IsComplete ? "✓" : "✗")} {result.Summary}\n");
         }
         catch (System.Exception ex)
         {

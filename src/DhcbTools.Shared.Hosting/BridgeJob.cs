@@ -39,6 +39,8 @@ namespace DhcbTools.Shared.Hosting
     /// </summary>
     public sealed class BridgeJob
     {
+        private readonly object _gate = new object();
+        private DateTime? _finishedUtc;
         private int _state;
         private int _started;
         private object? _result;
@@ -58,7 +60,7 @@ namespace DhcbTools.Shared.Hosting
         /// <summary>Lúc nhận lệnh (vào hàng đợi).</summary>
         public DateTime StartedUtc { get; }
 
-        public DateTime? FinishedUtc { get; private set; }
+        public DateTime? FinishedUtc { get { lock (_gate) { return _finishedUtc; } } }
 
         /// <summary>Hạn chót để luồng UI nhận việc; null = không hạn.</summary>
         public DateTime? TimeoutUtc { get; set; }
@@ -84,13 +86,23 @@ namespace DhcbTools.Shared.Hosting
         public long ElapsedMs(DateTime utcNow) =>
             (long)((FinishedUtc ?? utcNow) - StartedUtc).TotalMilliseconds;
 
-        public void MarkStarted() => Volatile.Write(ref _started, 1);
+        public void MarkStarted()
+        {
+            lock (_gate)
+            {
+                if (Status == BridgeJobStatus.Running) Volatile.Write(ref _started, 1);
+            }
+        }
 
         public void Complete(object result, DateTime utcNow)
         {
-            Volatile.Write(ref _result, result);
-            FinishedUtc = utcNow;
-            Volatile.Write(ref _state, (int)BridgeJobStatus.Done);
+            lock (_gate)
+            {
+                if (Status != BridgeJobStatus.Running) return;
+                Volatile.Write(ref _result, result);
+                _finishedUtc = utcNow;
+                Volatile.Write(ref _state, (int)BridgeJobStatus.Done);
+            }
         }
 
         /// <summary>
@@ -100,14 +112,14 @@ namespace DhcbTools.Shared.Hosting
         /// </summary>
         public bool Fail(string error, DateTime utcNow)
         {
-            if (Interlocked.CompareExchange(ref _state, (int)BridgeJobStatus.Error, (int)BridgeJobStatus.Running) != (int)BridgeJobStatus.Running)
+            lock (_gate)
             {
-                return false;
+                if (Status != BridgeJobStatus.Running) return false;
+                Volatile.Write(ref _error, error);
+                _finishedUtc = utcNow;
+                Volatile.Write(ref _state, (int)BridgeJobStatus.Error);
+                return true;
             }
-
-            Volatile.Write(ref _error, error);
-            FinishedUtc = utcNow;
-            return true;
         }
 
         /// <summary>
@@ -116,22 +128,21 @@ namespace DhcbTools.Shared.Hosting
         /// </summary>
         public bool Abandon(string reason, DateTime utcNow)
         {
-            if (Status != BridgeJobStatus.Running || Started)
+            lock (_gate)
             {
-                return false;
-            }
+                if (Status != BridgeJobStatus.Running || Started) return false;
+                var hook = TryAbandonWork;
+                if (hook != null && !hook())
+                {
+                    MarkStarted();
+                    return false;
+                }
 
-            var hook = TryAbandonWork;
-            if (hook != null && !hook())
-            {
-                MarkStarted();
-                return false;
+                Volatile.Write(ref _error, reason);
+                _finishedUtc = utcNow;
+                Volatile.Write(ref _state, (int)BridgeJobStatus.Abandoned);
+                return true;
             }
-
-            Volatile.Write(ref _error, reason);
-            FinishedUtc = utcNow;
-            Volatile.Write(ref _state, (int)BridgeJobStatus.Abandoned);
-            return true;
         }
 
         /// <summary>Quá hạn nhận việc chưa?</summary>
@@ -179,7 +190,7 @@ namespace DhcbTools.Shared.Hosting
             };
             lock (_gate)
             {
-                _jobs[job.Id] = job;
+                _jobs.Add(job.Id, job);
             }
             Prune(utcNow);
             return job;
@@ -198,9 +209,9 @@ namespace DhcbTools.Shared.Hosting
                 {
                     return null;
                 }
+                // Kiểm trần và thêm trong cùng khóa; hai request không thể cùng giành chỗ cuối.
+                return Add(command, utcNow, id, timeout);
             }
-
-            return Add(command, utcNow, id, timeout);
         }
 
         public BridgeJob? Find(string id)
@@ -230,6 +241,14 @@ namespace DhcbTools.Shared.Hosting
             }
 
             return count;
+        }
+
+        /// <summary>Dừng Bridge: hủy việc chưa chạy, giữ nguyên kết quả và lệnh đã được nhận.</summary>
+        public int AbandonQueued(string reason, DateTime utcNow)
+        {
+            List<BridgeJob> pending;
+            lock (_gate) { pending = _jobs.Values.Where(j => j.Status == BridgeJobStatus.Running && !j.Started).ToList(); }
+            return pending.Count(job => job.Abandon(reason, utcNow));
         }
 
         /// <summary>Bỏ mục đã xong (Done/Error/Abandoned) quá hạn hoặc vượt số lượng. Trả về số mục đã bỏ.</summary>

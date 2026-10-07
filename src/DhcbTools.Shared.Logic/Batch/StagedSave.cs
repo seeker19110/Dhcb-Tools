@@ -65,7 +65,7 @@ namespace DhcbTools.Shared.Logic.Batch
 
             foreach (var entry in stepEntries)
             {
-                if (!entry.Success)
+                if (!entry.IsComplete)
                 {
                     return "step " + entry.Command + " lỗi: " + entry.Summary;
                 }

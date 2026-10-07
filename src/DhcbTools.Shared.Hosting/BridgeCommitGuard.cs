@@ -108,15 +108,15 @@ namespace DhcbTools.Shared.Hosting
             if (!dry && (!_plans.TryGetValue(token!, out var found) || found.Fingerprint != fingerprint))
                 return CommandResult.Fail("E-PREVIEW-INVALID: Token hết hạn, không tồn tại hoặc cấu hình khác preview. Xem trước lại.");
 
-            var snapshot = Capture(config, revision());
+            var snapshot = CaptureInputSnapshot(config, revision());
             if (dry)
             {
                 if (_plans.Count >= MaxPlans)
                     return CommandResult.Fail("E-PREVIEW-CAPACITY: Quá nhiều preview còn hiệu lực. Đợi hết hạn rồi thử lại.");
                 var result = dispatch(normalized);
-                if (!result.Success || result.PartialSuccess || result.Errors.Count > 0)
+                if (!result.IsComplete)
                     return result;
-                if (snapshot != Capture(config, revision()))
+                if (snapshot != CaptureInputSnapshot(config, revision()))
                     return CommandResult.Fail("E-PREVIEW-CHANGED: Mô hình/file đã đổi trong lúc preview. Xem trước lại.");
                 token = Guid.NewGuid().ToString("N");
                 var expires = _utcNow().Add(Lifetime);
@@ -172,7 +172,8 @@ namespace DhcbTools.Shared.Hosting
             return token.DeepClone();
         }
 
-        private static string Capture(JObject config, long revision)
+        /// <summary>Băm revision và mọi nguồn file/thư mục đầu vào; dùng chung cho Bridge và Ribbon.</summary>
+        public static string CaptureInputSnapshot(JObject config, long revision)
         {
             var paths = new List<string>();
             foreach (var p in config.Properties())

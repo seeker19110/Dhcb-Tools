@@ -10,6 +10,29 @@ namespace DhcbTools.BatchRunner.Tests;
 /// </summary>
 public class HandoverCliTests
 {
+    [Theory]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, true)]
+    public void GocBanGiao_KhongGhiDatKhiJobMotPhanBoQuaHoacCoErrors(bool partial, bool skipped, bool errors)
+    {
+        using var cli = new Cli();
+        var output = cli.Path_("out");
+        Directory.CreateDirectory(output);
+        var job = WriteJob(cli, output, null);
+        var log = WriteRunLog(cli, cli.Path_("logs"));
+        RunLog.Append(log, new RunLogEntry
+        {
+            File = "a.rvt", Command = "ScheduleExport", Success = true,
+            PartialSuccess = partial, Skipped = skipped, Summary = "chưa trọn vẹn",
+            Errors = errors ? new List<string> { "thiếu đầu ra" } : new List<string>(),
+        });
+        var (code, text) = cli.Run("--job", job, "--log-dir", cli.Path_("logs"), "--report-only");
+        Assert.Equal(1, code);
+        Assert.Contains("một phần", text);
+        Assert.Contains(Checks(output), c => c["Name"]!.ToString() == "Các bước của job" && !c["Ok"]!.ToObject<bool>());
+    }
+
     /// <summary>Job chỉ có handover; các bước coi như đã chạy xong (log ghi sẵn), nên không cần Revit.</summary>
     private static string WriteJob(Cli cli, string outputFolder, string? idsPath)
     {

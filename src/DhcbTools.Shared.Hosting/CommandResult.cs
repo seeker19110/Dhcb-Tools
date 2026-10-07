@@ -28,6 +28,10 @@ namespace DhcbTools.Shared.Hosting
         /// </summary>
         public bool PartialSuccess { get; set; }
 
+        /// <summary>Đủ điều kiện duyệt chạy thật hoặc tiếp tục batch: không có lỗi hay kết quả một phần.</summary>
+        [JsonIgnore]
+        public bool IsComplete => Success && !PartialSuccess && Errors.Count == 0;
+
         public string Summary { get; set; } = string.Empty;
 
         public List<string> Messages { get; } = new List<string>();

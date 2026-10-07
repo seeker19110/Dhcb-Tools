@@ -130,10 +130,12 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
                 continue;
             }
 
-            layer.UpgradeOpen();
-            foreach (var apply in changes)
+            // Xem trước chỉ đọc: ghi tạm rồi Abort vẫn phát ObjectModified và làm revision Bridge đổi,
+            // khiến preview hợp lệ bị từ chối token (E-PREVIEW-CHANGED).
+            if (!config.DryRun)
             {
-                apply(layer);
+                layer.UpgradeOpen();
+                foreach (var apply in changes) apply(layer);
             }
 
             updated++;
