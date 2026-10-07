@@ -1,6 +1,7 @@
 # Preview và ghi có chống lặp trên Bridge
 
 Phạm vi: HTTP Bridge Revit/AutoCAD. Ribbon và batch gọi Core trực tiếp vẫn theo quy trình riêng.
+Ribbon Revit và AutoCAD cũng yêu cầu preview hoàn tất trước khi ghi, kiểm lại revision model và nội dung file đầu vào.
 Thay đổi nối tiếp PR #150. Cập nhật DLL cùng CLI/MCP/panel trước khi dùng đường ghi mới.
 
 ## Giao thức
@@ -38,6 +39,25 @@ Chỉ chạy dòng thứ hai sau khi duyệt. Với `raw`, hai trường nằm �
 MCP chung nhận `documentId/previewToken`; MCP AutoCAD nhận `document_id/preview_token`.
 Panel giữ token trong trang của người dùng; chỉnh config sau preview sẽ bị server từ chối ghi.
 Client không tự preview lại để vượt lỗi hết hạn/khác model.
+
+## Job nền, timeout và hủy việc còn xếp hàng
+
+```text
+python scripts/dhcb_agent.py revit progress ID_JOB
+python scripts/dhcb_agent.py revit cancel ID_JOB
+```
+
+`cancel` gửi `POST /cancel/<id>` với Bearer token và `Content-Type: application/json`.
+Job chưa được nhận chuyển sang `abandoned`, không chạy về sau; hủy lại trả cùng trạng thái.
+Job đã được nhận trả `409`: tiếp tục hỏi `progress`, không gửi lại lệnh để tránh ghi hai lần.
+Job `done`/`error` giữ kết quả, còn ID không tồn tại hoặc đã hết thời hạn giữ trả `404`.
+Dừng Bridge cũng hủy các việc chưa được nhận; việc đã nhận được phép kết thúc.
+Đây là hủy hàng đợi. Lệnh dài đang chạy chưa hỗ trợ hủy hợp tác và rollback theo yêu cầu người dùng.
+
+Sau timeout `504`, xem `id` và trạng thái trước khi thao tác tiếp. Khi phản hồi không có bằng chứng
+việc chưa chạy, client báo kết quả chưa xác định; không diễn giải timeout thành “chắc chắn không chạy”.
+CLI, MCP và panel báo cảnh báo/lỗi cho `partialSuccess:true` hoặc `errors` không rỗng dù `success:true`.
+Panel chỉ giữ token từ preview hoàn tất, không mở đường ghi từ preview một phần.
 
 ## Lưu chống lặp và phục hồi
 

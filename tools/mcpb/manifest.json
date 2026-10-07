@@ -4,14 +4,13 @@
   "display_name": "DHCB Tools — Revit",
   "version": "0.9.0",
   "description": "Điều khiển Revit đang mở từ Claude: đọc mô hình, chạy lệnh tự động hoá có xem trước, chỉ và chụp lại kết quả.",
-  "long_description": "Nối Claude vào Revit desktop qua HTTP Bridge chạy trong add-in DHCB Tools (127.0.0.1:8765, có token).\n\nKhác với Revit 2027 MCP Server của Autodesk (chỉ đọc, chỉ chạy trên 2027), bản này chạy với Revit 2021–2026 và có ghi — nhưng mọi lệnh sửa mô hình đều chạy xem trước trước, chỉ ghi thật khi truyền confirm.\n\nAgent nhìn và kiểm được kết quả: element_geometry trả hộp bao/đường tâm/connector theo mm, snapshot trả ảnh PNG của view, show_elements zoom cho kỹ sư nhìn, và mọi lệnh ghi trả về changedIds.",
+  "long_description": "Nối Claude vào Revit desktop qua HTTP Bridge của add-in DHCB Tools (127.0.0.1:8765, có token). Hỗ trợ phát hành Revit 2023–2026; bản 2027 mới được kiểm biên dịch. Mọi lệnh sửa mô hình mặc định xem trước; chạy thật cần giữ documentId và previewToken của lần xem trước đã duyệt.\n\nAgent đọc hình học, tham số, ảnh view và kiểm lại changedIds của phần tử vừa đổi. Giấy phép sử dụng toàn dự án đang chờ chủ dự án quyết định.",
   "author": {
     "name": "DHCB",
     "url": "https://github.com/seeker19110/Dhcb-Tools"
   },
   "homepage": "https://github.com/seeker19110/Dhcb-Tools",
   "documentation": "https://github.com/seeker19110/Dhcb-Tools/blob/main/docs/agent-khep-vong.md",
-  "license": "MIT",
   "keywords": [
     "revit",
     "bim",

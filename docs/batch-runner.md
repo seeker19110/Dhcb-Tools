@@ -22,7 +22,7 @@ Xem [`jobs/nightly.sample.json`](../jobs/nightly.sample.json) (Revit) và
 - `saveMode`: `None` (đóng không lưu) · `Save` · `SaveAs` (lưu bản sao vào `outputFolder`, **mặc định**, không đụng bản gốc).
   ⚠️ **Đổi hành vi:** bên AutoCAD, `Save` nay **lưu đè file gốc thật** bằng `SAVEAS`; trước đây nó chỉ ghi một dòng log
   mà không lưu gì. Job cũ đang để `Save` vì tưởng vô hại thì phải đổi sang `None`/`SaveAs` trước khi chạy lại.
-- `saveOnError` (bool, mặc định `false`): **không lưu** file có bước lỗi — cả Revit lẫn AutoCAD. Đặt `true` nếu muốn giữ
+- `saveOnError` (bool, mặc định `false`): **không lưu** file có bước lỗi, `partialSuccess:true`, danh sách `errors` không rỗng hoặc bước bị bỏ qua — cả Revit lẫn AutoCAD. Đặt `true` nếu muốn giữ
   lại phần đã làm được của file lỗi.
   Bên AutoCAD (từ audit 2026-10-01): script không tự bỏ được dòng `SAVEAS` khi một `DHCB_RUN` lỗi, nên khi
   `saveOnError: false` script lưu vào file tạm **cạnh** file đích (`<tên>.dhcb-luu-<dấu giờ>.dwg`, cùng thư mục để đường dẫn
@@ -33,6 +33,8 @@ Xem [`jobs/nightly.sample.json`](../jobs/nightly.sample.json) (Revit) và
 - `files[]`: `path`, `detachFromCentral`, `worksets` (chỉ mở các workset này), `onlySteps` (lọc step cho riêng file).
 - `steps[]`: `command` = đúng `CommandName` của Core (xem `dhcb_agent.py revit tools`), `config` = config của lệnh,
   `skipIfPreviousFailed`.
+  `stopOnError` và `skipIfPreviousFailed` cũng coi kết quả một phần/có lỗi là chưa hoàn tất, dù `success:true`.
+  Mã thoát và kiểm tra bàn giao chỉ đạt khi mọi bước cần chạy đều hoàn tất; `saveOnError:true` không đổi tiêu chí này.
 - Token trong chuỗi config: `{outputFolder}`, `{fileName}`, `{yyyy-MM-dd}`, `{HH-mm}`, và token tự khai báo trong `tokens`.
 
 ## Chạy

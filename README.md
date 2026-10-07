@@ -12,6 +12,10 @@ khoảng trống theo chặng công việc (thiết kế → BIM → shop → th
 [`docs/nghien-cuu-chuoi-den-hoan-cong.md`](docs/nghien-cuu-chuoi-den-hoan-cong.md),
 hiện trạng ở [`docs/progress.md`](docs/progress.md).
 
+Kế hoạch nâng chất lượng và kết quả kiểm chứng của lượt 2026-10-07:
+[`docs/ke-hoach-chat-luong-2026-10-07.md`](docs/ke-hoach-chat-luong-2026-10-07.md).
+Dùng thử trên công việc thật: [`docs/thi-diem-su-dung.md`](docs/thi-diem-su-dung.md) và bảng đo thời gian đi kèm.
+
 ## Bắt đầu cho kỹ sư: cài → bấm 3 lệnh → thấy kết quả
 
 1. **Cài add-in** — cách nhanh nhất là tải installer ở [Releases](https://github.com/seeker19110/Dhcb-Tools/releases)
@@ -20,6 +24,10 @@ hiện trạng ở [`docs/progress.md`](docs/progress.md).
 3. **Bấm một trong 14 lệnh đã kiểm giá trị rõ** (bậc *hỗ trợ*, xem bảng ở [`docs/tong-quan.md`](docs/tong-quan.md))
    — ví dụ `WarningsExport` hoặc `HealthReport`. Lệnh luôn **xem trước** (dry-run) trước khi hỏi *Chạy thật*, nên
    bấm thử không sợ hỏng model.
+
+**Kiểm tra cài đặt chỉ đọc:** `python scripts/dhcb_doctor.py --app revit` (hoặc `autocad`);
+`--offline` không kết nối Bridge, `--json` in báo cáo không chứa token/nội dung cấu hình.
+Script có trong repo và gói BatchRunner; không cần dependency ngoài Python.
 
 Trang riêng theo vai trò (chỉ 3 lệnh nên dùng trước, không phải đọc hết README):
 [kiến trúc](docs/vai-tro-kien-truc.md) · [MEP](docs/vai-tro-mep.md) · [BIM manager](docs/vai-tro-bim-manager.md) ·
@@ -151,16 +159,18 @@ Revit `http://127.0.0.1:8765`, AutoCAD `http://127.0.0.1:8766`. Token sinh lần
 
 | Mã | Khi nào |
 |---|---|
-| `401` / `429` | Sai token · khoá 5 phút vì dò token, **hoặc** `/execute` async khi hàng đợi đã đủ 20 job |
-| `403` | Request do trang web trong trình duyệt gửi (có header `Origin` / `Sec-Fetch-Site`) — Bridge chỉ phục vụ script, MCP server và panel gateway; không tính vào khoá dò token |
-
-Máy không dùng agent/MCP/panel thì tắt hẳn Bridge: `%APPDATA%\DHCB\settings.json` → `{"bridge": {"enabled": false}}`.
-Đường dẫn file trong config gửi qua Bridge phải mang đuôi định dạng DHCB dùng (`.csv`, `.html`, `.json`…), không thì
-`E-PATH-UNSAFE` — xem [`SECURITY.md`](SECURITY.md).
+| `401` | Sai token |
+| `429` | Khóa vì sai token nhiều lần, hoặc hàng đợi nền đã đủ 20 job; xem nội dung lỗi để phân biệt |
+| `403` | Request có `Origin` / `Sec-Fetch-Site` từ trang web; không tính vào khóa dò token |
+| `409` | Yêu cầu hủy một job đã được host nhận; hỏi progress để lấy kết quả |
 | `413` | Body quá 4 MB |
-| `415` | Sai `Content-Type` — trước đây lẫn vào `401` và bị tính nhầm vào bộ đếm dò token |
+| `415` | Content-Type không phải application/json |
 | `503` | Quá 8 request đang xử lý cùng lúc |
-| `504` | Hết thời gian chờ của `/execute` đồng bộ |
+| `504` | Hết thời gian chờ của execute đồng bộ; có thể đã chạy nếu có id/progressUrl |
+
+Máy không dùng agent/MCP/panel có thể tắt Bridge trong `%APPDATA%\DHCB\settings.json`:
+`{"bridge":{"enabled":false}}`. Trường đường dẫn file qua Bridge phải mang định dạng DHCB cho phép
+(`.csv`, `.html`, `.json`…); xem [`SECURITY.md`](SECURITY.md).
 
 **Về `504`:** chỉ khi Bridge giành được quyền huỷ **trước lúc lệnh bắt đầu** thì mới khẳng định lệnh *không chạy*.
 Ngược lại `504` kèm `id` + `progressUrl` và nghĩa là **"có thể đã chạy — đừng gửi lại"**: hỏi `GET /progress/<id>`
@@ -176,6 +186,11 @@ config không phải đoán), `element_geometry` (hộp bao, đường tâm, con
 `attributes_of`, `selection`, `show_entities`, `active_layout`, `snapshot` (ảnh PNG — render off-screen sống hoặc ảnh xem trước trong DWG, kết quả ghi rõ `source`) — định danh bằng **handle** hex.
 Mọi `CommandResult` mang theo `changedIds` nên agent kiểm lại được đúng phần tử vừa đổi.
 Chi tiết: [`docs/agent-khep-vong.md`](docs/agent-khep-vong.md).
+
+**Quản lý job nền:** `GET /progress/<id>` đọc trạng thái; `POST /cancel/<id>` với body `{}`
+và token hủy **job chưa được nhận**. Job đã nhận trả `409`, kết quả đã hoàn thành giữ nguyên.
+CLI: `python scripts/dhcb_agent.py revit progress ID` / `cancel ID` (đổi thành `autocad` khi cần).
+Khi Bridge dừng, job còn xếp hàng bị hủy; không hủy cưỡng bức transaction đã bắt đầu.
 
 **Lệnh chạy lâu**: gửi `POST /execute` kèm `"async": true` → nhận ngay `202 {id}`, rồi hỏi
 `GET /progress/<id>` tới khi `status` là `done`. Kết quả nằm ở server theo id nên đứt kết nối giữa chừng
@@ -201,7 +216,7 @@ DhcbTools.BatchRunner.exe --job jobs\nightly.json --log-dir D:\DHCB\logs --max-m
 ```
 
 Ra `logs/{yyyy-MM-dd}/run-HHmmss.jsonl` (mỗi lượt chạy một file log), `report.html`, `warnings-summary.md`;
-mã thoát 0/1/2 cho Task Scheduler. Job có thêm `saveOnError` (mặc định `false`: file có bước lỗi **không được lưu**, ở
+mã thoát 0/1/2 cho Task Scheduler. Job có thêm `saveOnError` (mặc định `false`: file có bước lỗi, có errors hoặc thành công một phần **không được lưu**, ở
 cả Revit lẫn AutoCAD) và `dwgVersion` (mặc định `"2018"`); **bên AutoCAD `saveMode: "Save"` nay lưu đè file gốc thật**
 (bản trước giữ ở `.bak`). Chi tiết:
 [`docs/batch-runner.md`](docs/batch-runner.md).
