@@ -11,6 +11,8 @@
 ;   revit-2023\  revit-2024\  revit-2025\  revit-2026\   (DLL + .addin cho từng phiên bản)
 ;   autocad-2024\ autocad-2025\ autocad-2026\  (DLL vỏ đầy đủ + vỏ core-only; 2026 là .NET 10)
 ;   batchrunner\                            (exe + jobs/ configs/ scripts/)
+; Nâng cấp theo phạm vi: /PRESERVEUNSELECTED=1 giữ thành phần đang cài nhưng không chọn trong lượt này.
+; Mặc định vẫn gỡ thành phần bị bỏ chọn; cờ này không tự chọn hoặc cài thêm host.
 
 #ifndef Version
   #define Version "0.0.0-dev"
@@ -75,7 +77,12 @@ Source: "{#StageDir}\PackageContents.xml"; DestDir: "{userappdata}\Autodesk\Appl
 
 ; ── Batch runner: thư mục chương trình bình thường ──────────────────────────
 Source: "{#StageDir}\batchrunner\*"; DestDir: "{app}"; \
-  Components: batch; Flags: ignoreversion recursesubdirs createallsubdirs
+  Excludes: "jobs\*, configs\*"; Components: batch; Flags: ignoreversion recursesubdirs createallsubdirs
+; Jobs/configs có thể được chỉnh sửa: nâng cấp không ghi đè nội dung người dùng đang dùng.
+Source: "{#StageDir}\batchrunner\jobs\*"; DestDir: "{app}\jobs"; \
+  Components: batch; Flags: onlyifdoesntexist recursesubdirs createallsubdirs
+Source: "{#StageDir}\batchrunner\configs\*"; DestDir: "{app}\configs"; \
+  Components: batch; Flags: onlyifdoesntexist recursesubdirs createallsubdirs
 
 ; ── Script Python: dhcb_agent.py / dhcb_mcp_server.py / dhcb_ai.py ──────────
 ; release.yml chép các script trong installer/batchrunner-scripts.txt vào gói batchrunner, nhưng người chỉ cài phần "scripts"
@@ -104,41 +111,105 @@ Type: filesandordirs; Name: "{userappdata}\Autodesk\ApplicationPlugins\DhcbTools
 
 [InstallDelete]
 ; Xoá add-in Revit tương ứng nếu phiên bản đó không được chọn trong lần cài/nâng cấp này
-Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2023\DhcbTools.Revit.addin"; Components: not revit2023
-Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2023\DhcbTools.Revit.dll"; Components: not revit2023
-Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2023\DhcbTools.Core.dll"; Components: not revit2023
-Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2023\DhcbTools.Shared.Logic.dll"; Components: not revit2023
-Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2023\DhcbTools.Shared.Hosting.dll"; Components: not revit2023
-Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2024\DhcbTools.Revit.addin"; Components: not revit2024
-Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2024\DhcbTools.Revit.dll"; Components: not revit2024
-Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2024\DhcbTools.Core.dll"; Components: not revit2024
-Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2024\DhcbTools.Shared.Logic.dll"; Components: not revit2024
-Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2024\DhcbTools.Shared.Hosting.dll"; Components: not revit2024
-Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2025\DhcbTools.Revit.addin"; Components: not revit2025
-Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2025\DhcbTools.Revit.dll"; Components: not revit2025
-Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2025\DhcbTools.Core.dll"; Components: not revit2025
-Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2025\DhcbTools.Shared.Logic.dll"; Components: not revit2025
-Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2025\DhcbTools.Shared.Hosting.dll"; Components: not revit2025
-Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2026\DhcbTools.Revit.addin"; Components: not revit2026
-Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2026\DhcbTools.Revit.dll"; Components: not revit2026
-Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2026\DhcbTools.Core.dll"; Components: not revit2026
-Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2026\DhcbTools.Shared.Logic.dll"; Components: not revit2026
-Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2026\DhcbTools.Shared.Hosting.dll"; Components: not revit2026
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2023\DhcbTools.Revit.addin"; Components: not revit2023; Check: RemoveUnselectedComponents
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2023\DhcbTools.Revit.dll"; Components: not revit2023; Check: RemoveUnselectedComponents
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2023\DhcbTools.Core.dll"; Components: not revit2023; Check: RemoveUnselectedComponents
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2023\DhcbTools.Shared.Logic.dll"; Components: not revit2023; Check: RemoveUnselectedComponents
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2023\DhcbTools.Shared.Hosting.dll"; Components: not revit2023; Check: RemoveUnselectedComponents
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2024\DhcbTools.Revit.addin"; Components: not revit2024; Check: RemoveUnselectedComponents
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2024\DhcbTools.Revit.dll"; Components: not revit2024; Check: RemoveUnselectedComponents
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2024\DhcbTools.Core.dll"; Components: not revit2024; Check: RemoveUnselectedComponents
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2024\DhcbTools.Shared.Logic.dll"; Components: not revit2024; Check: RemoveUnselectedComponents
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2024\DhcbTools.Shared.Hosting.dll"; Components: not revit2024; Check: RemoveUnselectedComponents
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2025\DhcbTools.Revit.addin"; Components: not revit2025; Check: RemoveUnselectedComponents
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2025\DhcbTools.Revit.dll"; Components: not revit2025; Check: RemoveUnselectedComponents
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2025\DhcbTools.Core.dll"; Components: not revit2025; Check: RemoveUnselectedComponents
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2025\DhcbTools.Shared.Logic.dll"; Components: not revit2025; Check: RemoveUnselectedComponents
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2025\DhcbTools.Shared.Hosting.dll"; Components: not revit2025; Check: RemoveUnselectedComponents
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2026\DhcbTools.Revit.addin"; Components: not revit2026; Check: RemoveUnselectedComponents
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2026\DhcbTools.Revit.dll"; Components: not revit2026; Check: RemoveUnselectedComponents
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2026\DhcbTools.Core.dll"; Components: not revit2026; Check: RemoveUnselectedComponents
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2026\DhcbTools.Shared.Logic.dll"; Components: not revit2026; Check: RemoveUnselectedComponents
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2026\DhcbTools.Shared.Hosting.dll"; Components: not revit2026; Check: RemoveUnselectedComponents
 
 ; Xoá thư mục Contents theo năm trong bundle AutoCAD nếu bị bỏ chọn
-Type: filesandordirs; Name: "{userappdata}\Autodesk\ApplicationPlugins\DhcbTools.bundle\Contents\2024"; Components: not acad2024
-Type: filesandordirs; Name: "{userappdata}\Autodesk\ApplicationPlugins\DhcbTools.bundle\Contents\2025"; Components: not acad2025
-Type: filesandordirs; Name: "{userappdata}\Autodesk\ApplicationPlugins\DhcbTools.bundle\Contents\2026"; Components: not acad2026
+Type: filesandordirs; Name: "{userappdata}\Autodesk\ApplicationPlugins\DhcbTools.bundle\Contents\2024"; Components: not acad2024; Check: RemoveUnselectedComponents
+Type: filesandordirs; Name: "{userappdata}\Autodesk\ApplicationPlugins\DhcbTools.bundle\Contents\2025"; Components: not acad2025; Check: RemoveUnselectedComponents
+Type: filesandordirs; Name: "{userappdata}\Autodesk\ApplicationPlugins\DhcbTools.bundle\Contents\2026"; Components: not acad2026; Check: RemoveUnselectedComponents
 
 ; Xoá toàn bộ bundle AutoCAD nếu không chọn bất kỳ phiên bản AutoCAD nào
-Type: filesandordirs; Name: "{userappdata}\Autodesk\ApplicationPlugins\DhcbTools.bundle"; Components: not acad2024 and not acad2025 and not acad2026
+Type: filesandordirs; Name: "{userappdata}\Autodesk\ApplicationPlugins\DhcbTools.bundle"; Components: not acad2024 and not acad2025 and not acad2026; Check: RemoveUnselectedComponents
 
 [Code]
 var
   Acad2026Page: TInputDirWizardPage;
+  ExistingAcad2024, ExistingAcad2025, ExistingAcad2026: AnsiString;
+  ExistingAcadManifestError: String;
+
+function RemoveUnselectedComponents(): Boolean;
+begin
+  Result := ExpandConstant('{param:PRESERVEUNSELECTED|0}') <> '1';
+end;
+
+function ExistingAcadBlock(const Year: String; const XmlDocument: Variant): AnsiString;
+var
+  Nodes, Component, Entries: Variant;
+begin
+  Result := '';
+  if not FileExists(ExpandConstant('{userappdata}\Autodesk\ApplicationPlugins\DhcbTools.bundle\Contents\') +
+    Year + '\DhcbTools.AutoCAD.dll') then Exit;
+  Nodes := XmlDocument.selectNodes('/ApplicationPackage/Components/ComponentEntry[@ModuleName="./Contents/' + Year + '/DhcbTools.AutoCAD.dll"]');
+  if Nodes.length <> 1 then
+  begin
+    ExistingAcadManifestError := 'Không xác định được duy nhất thành phần AutoCAD ' + Year + ' trong manifest hiện có; sửa manifest trước khi nâng cấp theo phạm vi.';
+    Exit;
+  end;
+  Component := Nodes.item(0).parentNode;
+  Entries := Component.selectNodes('ComponentEntry');
+  if Entries.length <> 1 then
+  begin
+    ExistingAcadManifestError := 'Thành phần AutoCAD ' + Year + ' có nhiều ModuleName; tách riêng từng năm trong manifest trước khi nâng cấp theo phạm vi.';
+    Exit;
+  end;
+  // DOM ignores commented-out modules and normalizes quotes/whitespace. Encode its Unicode XML explicitly.
+  Result := UTF8Encode(Component.xml);
+end;
+
+procedure RememberExistingAcadComponents();
+var
+  XmlContent: AnsiString;
+  BundlePath: String;
+  XmlDocument: Variant;
+begin
+  if RemoveUnselectedComponents() then Exit;
+  BundlePath := ExpandConstant('{userappdata}\Autodesk\ApplicationPlugins\DhcbTools.bundle');
+  if not DirExists(BundlePath) then Exit;
+  if not LoadStringFromFile(BundlePath + '\PackageContents.xml', XmlContent) then
+  begin
+    ExistingAcadManifestError := 'Không đọc được manifest AutoCAD hiện có; sửa manifest hoặc bỏ /PRESERVEUNSELECTED=1 trước khi cài.';
+    Exit;
+  end;
+  try
+    XmlDocument := CreateOleObject('Msxml2.DOMDocument.6.0');
+    XmlDocument.resolveExternals := False;
+    XmlDocument.validateOnParse := False;
+    XmlDocument.setProperty('ProhibitDTD', True);
+    if not XmlDocument.load(BundlePath + '\PackageContents.xml') then
+      RaiseException('XML không hợp lệ.');
+    if XmlDocument.documentElement.nodeName <> 'ApplicationPackage' then
+      RaiseException('Không phải ApplicationPackage.');
+  except
+    ExistingAcadManifestError := 'Manifest AutoCAD hiện có không hợp lệ; sửa manifest trước khi nâng cấp theo phạm vi.';
+    Exit;
+  end;
+  ExistingAcad2024 := ExistingAcadBlock('2024', XmlDocument);
+  ExistingAcad2025 := ExistingAcadBlock('2025', XmlDocument);
+  ExistingAcad2026 := ExistingAcadBlock('2026', XmlDocument);
+end;
 
 procedure InitializeWizard();
 begin
+  RememberExistingAcadComponents();
   Acad2026Page := CreateInputDirPage(wpSelectComponents,
     'AutoCAD 2026 Update 1.2 trở lên', 'Chọn thư mục AutoCAD cần cài plugin',
     'Gói này cần AutoCAD 2026 Update 1.2 trở lên dùng .NET 10. Bộ cài sẽ kiểm tra runtime của AutoCAD trong thư mục đã chọn.',
@@ -157,7 +228,8 @@ var
   RuntimeText: AnsiString;
   AcadFolder: String;
 begin
-  Result := '';
+  Result := ExistingAcadManifestError;
+  if Result <> '' then Exit;
   if not WizardIsComponentSelected('acad2026') then Exit;
   AcadFolder := ExpandConstant('{param:ACAD2026DIR|}') ;
   if AcadFolder = '' then AcadFolder := Acad2026Page.Values[0];
@@ -174,7 +246,7 @@ begin
   Result := True;
 end;
 
-procedure RemoveXmlBlock(var S: AnsiString; const StartMarker: AnsiString);
+procedure ReplaceXmlBlock(var S: AnsiString; const StartMarker, Replacement: AnsiString);
 var
   P1, P2: Integer;
   SubStr: AnsiString;
@@ -188,7 +260,7 @@ begin
     P2 := Pos(EndMarker, SubStr);
     if P2 > 0 then
     begin
-      Delete(S, P1, P2 + Length(EndMarker) - 1);
+      S := Copy(S, 1, P1 - 1) + Replacement + Copy(S, P1 + P2 + Length(EndMarker) - 1, Length(S));
     end;
   end;
 end;
@@ -206,14 +278,15 @@ begin
   if not LoadStringFromFile(XmlPath, XmlContent) then
     RaiseException('Không đọc được manifest AutoCAD: ' + XmlPath);
 
-  if not WizardIsComponentSelected('acad2024') then
-    RemoveXmlBlock(XmlContent, '<Components Description="AutoCAD 2024">');
+  // Edit from the end of the shipped manifest so comments in preserved nodes cannot become later markers.
+  if not WizardIsComponentSelected('acad2026') then
+    ReplaceXmlBlock(XmlContent, '<Components Description="AutoCAD 2026 Update 1.2+ (.NET 10)">', ExistingAcad2026);
 
   if not WizardIsComponentSelected('acad2025') then
-    RemoveXmlBlock(XmlContent, '<Components Description="AutoCAD 2025">');
+    ReplaceXmlBlock(XmlContent, '<Components Description="AutoCAD 2025">', ExistingAcad2025);
 
-  if not WizardIsComponentSelected('acad2026') then
-    RemoveXmlBlock(XmlContent, '<Components Description="AutoCAD 2026 Update 1.2+ (.NET 10)">');
+  if not WizardIsComponentSelected('acad2024') then
+    ReplaceXmlBlock(XmlContent, '<Components Description="AutoCAD 2024">', ExistingAcad2024);
 
   if not SaveStringToFile(XmlPath, XmlContent, False) then
     RaiseException('Không ghi được manifest AutoCAD: ' + XmlPath);

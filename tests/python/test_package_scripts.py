@@ -123,9 +123,9 @@ class PackageScriptsTests(unittest.TestCase):
         self.assertIn("not revit2024", text)
         self.assertIn("not acad2024", text)
         self.assertIn("procedure UpdatePackageContents", text)
-        self.assertIn("procedure RemoveXmlBlock", text)
+        self.assertIn("procedure ReplaceXmlBlock", text)
 
-        # Mô phỏng RemoveXmlBlock trên PackageContents.xml thật
+        # Mô phỏng ReplaceXmlBlock với replacement rỗng trên PackageContents.xml thật
         xml_text = (ROOT / "installer" / "PackageContents.xml").read_text(encoding="utf-8")
         import xml.etree.ElementTree as ET
 
