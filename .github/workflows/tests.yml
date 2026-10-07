@@ -190,3 +190,14 @@ jobs:
 
       - name: Build đầy đủ vỏ Revit (WPF, Revit ${{ matrix.revit }})
         run: dotnet build src/DhcbTools.Revit/DhcbTools.Revit.csproj -c Release -p:RevitVersion=${{ matrix.revit }}
+
+      # Dựng và chạy bộ cài trên sandbox: lỗi Pascal/UTF-8 và nâng cấp bỏ chọn không lọt đến release.
+      - name: Kiểm installer (biên dịch và cài/nâng cấp trong thư mục tạm)
+        if: matrix.revit == '2025'
+        shell: pwsh
+        run: |
+          choco install innosetup --version=6.7.1 --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:DHCB_ISCC = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          python -m unittest discover -s tests/python -p test_installer.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
