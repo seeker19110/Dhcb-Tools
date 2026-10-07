@@ -10,6 +10,9 @@ kèm mẫu ghi kết quả.
 
 Ký hiệu: ✅ đạt · ❌ lỗi (ghi lại thông báo) · ⏭ bỏ qua (ghi lý do).
 
+Kết quả cài và kiểm DLL mới nhất: [nghiệm thu triển khai 2026-10-08](bang-chung/2026-10-08/trien-khai.md).
+Các vòng Revit trước là bằng chứng lịch sử; máy triển khai hiện tại không có Revit.exe.
+
 ---
 
 ## 1. Yêu cầu máy
@@ -17,9 +20,9 @@ Ký hiệu: ✅ đạt · ❌ lỗi (ghi lại thông báo) · ⏭ bỏ qua (ghi
 | Thành phần | Yêu cầu | Ghi chú |
 |---|---|---|
 | Windows | 10/11 x64 | Add-in chỉ chạy trên Windows |
-| Revit | 2023, 2024 (net48) hoặc 2025 (net8) | Một máy có thể cài nhiều bản; build riêng cho từng bản |
-| AutoCAD | 2024 (net48) hoặc 2025 (net8) | Bản 2026.1+ dùng .NET 10, chưa kiểm — xem §9 |
-| .NET SDK | 8.0.x | `dotnet --version` ≥ 8.0; build net48 dùng cùng SDK (không cần VS) |
+| Revit | 2023–2024 (net48), 2025–2026 (net8) | Build riêng từng năm; 2027 (net10) mới được kiểm biên dịch |
+| AutoCAD | 2024 (net48), 2025 (net8), 2026 Update 1.2+ (net10) | Bản 2026 dùng net8 không tương thích gói này; xem [doctor](chan-doan-windows.md) |
+| .NET SDK khi build | 8.0.x và 10.0.x | SDK 10 cho BatchRunner, AutoCAD 2026 và Revit 2027; máy chỉ cài gói cần runtime tương ứng |
 | Python | 3.9+ | Cho `scripts/dhcb_agent.py`, `dhcb_mcp_server.py`, `dhcb_ai.py` — không cần thư viện ngoài |
 | Ollama (tuỳ chọn) | bản mới, model `qwen3:8b` | Chỉ cho phần AI có model; mọi tính năng AI đều có đường heuristic không cần model |
 | Quyền | Ghi vào `%ProgramData%\Autodesk\Revit\Addins\<năm>` và `%APPDATA%\DHCB` | Không cần quyền admin nếu dùng thư mục Addins của user (§3.2) |
@@ -69,7 +72,14 @@ dotnet build src\DhcbTools.AutoCAD\DhcbTools.AutoCAD.csproj -c Release -p:RevitV
 dotnet build src\DhcbTools.AutoCAD.Core\DhcbTools.AutoCAD.Core.csproj -c Release -p:RevitVersion=2024 -p:AcadVersion=2024
 ```
 
-`-p:RevitVersion` ở đây chỉ để chọn TargetFramework (2024 → net48, 2025 → net8), đặt **cùng năm với AcadVersion**.
+TargetFramework của các project AutoCAD chọn theo **AcadVersion**: 2024 → net48, 2025 → net8.0-windows,
+2026 → net10.0-windows. `RevitVersion` không thay thế `AcadVersion`.
+
+```powershell
+# AutoCAD 2026 Update 1.2+
+dotnet build src\DhcbTools.AutoCAD\DhcbTools.AutoCAD.csproj -c Release -p:AcadVersion=2026
+dotnet build src\DhcbTools.AutoCAD.Core\DhcbTools.AutoCAD.Core.csproj -c Release -p:AcadVersion=2026
+```
 
 ### 2.4 Build batch runner
 
@@ -79,13 +89,34 @@ dotnet build src\DhcbTools.BatchRunner\DhcbTools.BatchRunner.csproj -c Release
 
 Ra `src\DhcbTools.BatchRunner\bin\Release\net10.0\DhcbTools.BatchRunner.exe`. Copy toàn bộ thư mục này sang
 `D:\DHCB\bin\` và **copy thêm** `DhcbTools.AutoCAD.Core.dll` (+ `DhcbTools.Core.AutoCAD.dll`, `DhcbTools.Shared.*.dll`)
-vào cùng thư mục để runner tự tìm plugin cho accoreconsole.
+vào cùng thư mục để runner tự tìm plugin cho accoreconsole. Runner cũng tự tìm core-only DLL
+trong bundle đã cài và chọn host/DLL tương thích; không trộn DLL từ các năm khác nhau.
 
 Ghi kết quả §2: build 2024 ☐ · build 2025 ☐ · AutoCAD ☐ · AutoCAD.Core ☐ · BatchRunner ☐
 
 ---
 
 ## 3. Cài đặt
+
+### Nâng cấp có phạm vi bằng bộ cài
+
+Mặc định, bỏ chọn add-in Revit/AutoCAD trong bộ cài sẽ gỡ thành phần đó. Để chỉ cập nhật
+một nhóm thành phần và giữ những add-in đã cài của năm khác, dùng `/PRESERVEUNSELECTED=1`:
+
+```powershell
+# Từ thư mục chứa installer đã xác minh; đổi tên file theo phiên bản gói thực tế.
+& .\DhcbTools-Setup-0.9.0-dev.exe /TYPE=custom /COMPONENTS="acad2026,batch,scripts" /PRESERVEUNSELECTED=1
+```
+
+Chế độ này giữ file Revit/AutoCAD không chọn và khối manifest AutoCAD tương ứng có DLL cũ;
+không cài thêm host chỉ vì xuất hiện trong manifest gói. Thành phần chọn được cập nhật;
+job/config có sẵn trong thư mục BatchRunner giữ nguyên, file mẫu còn thiếu mới được chép.
+Manifest AutoCAD cũ không đọc được/hỏng hoặc cấu trúc không nhận diện được thì bộ cài dừng trước khi thay file.
+Khi muốn gỡ thành phần bằng cách bỏ chọn, chạy lại **không** có cờ preserve.
+
+Đóng host trước khi thay DLL, sao lưu job/config và thư mục add-in trước khi nâng cấp.
+Cờ này không thay thế backup hoặc rollback. Không dùng uninstaller để nâng cấp có phạm vi:
+uninstaller có luồng gỡ riêng. Chạy doctor sau cài và kiểm host trên bản chép fixture.
 
 ### 3.1 Revit
 
@@ -110,20 +141,24 @@ Nếu tab không hiện: xem `%APPDATA%\Autodesk\Revit\Autodesk Revit 2024\Journ
 
 Cách nhanh: trong AutoCAD gõ `NETLOAD`, chọn `DhcbTools.AutoCAD.dll` (kèm DLL phụ cùng thư mục). Gõ `DHCB` → in danh sách lệnh.
 
-Cách tự load: tạo `%APPDATA%\Autodesk\ApplicationPlugins\DhcbTools.bundle\PackageContents.xml`:
+Cách tự load: ưu tiên bộ cài hoặc chép nguyên bundle từ gói đúng phiên bản. Khi tự dựng bundle,
+dùng [manifest trong repo](../installer/PackageContents.xml), đặt DLL theo `Contents\<năm>\`
+và chỉ giữ khối `Components` của những năm đã chép đầy đủ DLL. Mỗi khối giới hạn một series:
+2024 = R24.3, 2025 = R25.0, 2026 = R25.1. Không dùng chung một DLL cho hai runtime khác nhau.
 
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<ApplicationPackage SchemaVersion="1.0" Name="DHCB Tools" AppVersion="1.0" ProductCode="{7B3D2C1E-DHCB-4A2B-8C3D-000000000001}">
-  <Components>
-    <RuntimeRequirements OS="Win64" Platform="AutoCAD" SeriesMin="R24.3" SeriesMax="R25.0" />
-    <ComponentEntry AppName="DhcbTools" ModuleName="./Contents/DhcbTools.AutoCAD.dll" LoadOnAutoCADStartup="True" />
-  </Components>
-</ApplicationPackage>
+```text
+%APPDATA%\Autodesk\ApplicationPlugins\DhcbTools.bundle\
+  PackageContents.xml
+  Contents\2026\DhcbTools.AutoCAD.dll
+  Contents\2026\DhcbTools.AutoCAD.Core.dll
+  Contents\2026\DhcbTools.Core.AutoCAD.dll
+  Contents\2026\DhcbTools.Shared.Logic.dll
+  Contents\2026\DhcbTools.Shared.Hosting.dll
+  Contents\2026\Newtonsoft.Json.dll
 ```
 
-và copy DLL vào `Contents\`. Nếu AutoCAD hỏi SECURELOAD → chọn *Always Load*, hoặc thêm thư mục vào
-`TRUSTEDPATHS`.
+Chạy doctor trước khi mở host; nếu AutoCAD yêu cầu SECURELOAD, duyệt thư mục plugin đã xác minh
+hoặc thêm đúng thư mục vào `TRUSTEDPATHS` theo chính sách của máy.
 
 ### 3.3 Thư mục làm việc `%APPDATA%\DHCB`
 
@@ -200,11 +235,11 @@ lệnh thật: **Ctrl+Z hoàn tác được trọn một bước** (một lệnh
 | # | Việc | Kỳ vọng | Kết quả |
 |---|---|---|---|
 | R1 | Mở Revit, mở `test-model.rvt` | Tab DHCB Tools, 6 panel (*Nền tảng · Xuất & Báo cáo · Khởi tạo dự án · MEPF · Hồ sơ & Style · Kiểm tra & AI*), không hộp thoại lỗi | ☐ |
-| R2 | `type %APPDATA%\DHCB\bridge-token.txt` | Có chuỗi ~43 ký tự | ☐ |
-| R3 | `python scripts\dhcb_agent.py revit tools` | Liệt kê 42 lệnh Revit | ☐ |
-| R4 | `curl http://127.0.0.1:8765/health` | 200, chỉ có status/version, không lộ tên file | ☐ |
-| R5 | `curl -X POST http://127.0.0.1:8765/execute -d "{}"` (không token) | 401 `{"error":"unauthorized"}` | ☐ |
-| R6 | Gửi sai token 5 lần liên tiếp rồi lần 6 đúng token | Lần 6 vẫn 401/429 trong 5 phút | ☐ |
+| R2 | `python scripts\dhcb_doctor.py --app revit --offline` | Token tồn tại và đọc được; báo cáo không in token | ☐ |
+| R3 | `python scripts\dhcb_agent.py revit tools` | Danh mục khớp bản đã cài và `CommandCatalog`; không cố định số lệnh của bản cũ | ☐ |
+| R4 | `curl.exe --noproxy "*" http://127.0.0.1:8765/health` | 200, chỉ có status/app/version, không lộ tên file | ☐ |
+| R5 | `curl.exe --noproxy "*" -X POST http://127.0.0.1:8765/execute -d "{}"` (không token) | 401 `{"error":"unauthorized"}` | ☐ |
+| R6 | Trong phiên kiểm riêng: gửi sai token 5 lần trong 60 giây rồi gọi lại bằng client đúng token | Năm lần sai trả 401; lần kế tiếp trả 429 trong 5 phút; `/health` vẫn 200. Request có `Origin` bị chặn 403 trước bộ đếm | ☐ |
 | R7 | `python scripts\dhcb_agent.py revit query document_info` | JSON có title, số element | ☐ |
 | R8 | Từ máy khác trong LAN gọi `http://<ip>:8765/health` | Không kết nối được | ☐ |
 
@@ -287,7 +322,7 @@ Mở `test-drawing.dwg`. Mọi lệnh ghi đều hỏi `[Xemtrước/Thật]`, m
 
 | # | Lệnh | Kỳ vọng | Kết quả |
 |---|---|---|---|
-| C1 | `DHCB_BRIDGE` | Bật/tắt Bridge 8766, in trạng thái; danh sách 15 lệnh xem bằng `python scripts\dhcb_agent.py autocad tools` | ☐ |
+| C1 | `DHCB_BRIDGE` | Bật/tắt Bridge 8766, in trạng thái; danh mục của bản đã cài xem bằng `python scripts\dhcb_agent.py autocad tools` | ☐ |
 | C2 | `DHCB_LAYER_EXPORT` → sửa CSV → `DHCB_LAYER_IMPORT` | Round-trip tiếng Việt không mất dấu; layer trùng tên cập nhật, không nhân đôi | ☐ |
 | C3 | `DHCB_CLEANUP` (Thật) | Không xoá CLAYER, không xoá linetype của layer, `0`/`Defpoints` giữ; transaction không hỏng | ☐ |
 | C4 | Bridge: `dhcb_agent.py autocad exec DrawingCleanup` với `purgeUnusedTextStyles:true, purgeUnusedDimStyles:true` | Text style không dùng bị xoá, `Standard` giữ | ☐ |
@@ -374,12 +409,13 @@ Cấu hình theo [`ai-offline.md`](ai-offline.md) mục MCP, trỏ `command` t�
 |---|---|---|
 | Tab DHCB Tools không hiện | DLL bị chặn (Zone.Identifier) hoặc thiếu Newtonsoft | Unblock file; kiểm journal Revit |
 | Nút Ribbon báo "Không khởi động được HTTP Bridge" | Cổng 8765 bị chiếm (Revit khác đang mở) | Đóng phiên cũ, hoặc chỉ dùng Ribbon — lệnh vẫn chạy |
-| `401 unauthorized` dù đúng token | Content-Type không phải `application/json`, hoặc đang bị khoá 5 phút | Dùng `dhcb_agent.py` (đặt header đúng); chờ 5 phút |
+| `401 unauthorized` | Token client thiếu/cũ hoặc `DHCB_BRIDGE_TOKEN` ghi đè file token | Chạy doctor; kiểm nguồn token, không in hay gửi token vào báo cáo |
+| `415` / `429 locked` / `403` | Thiếu JSON Content-Type / 5 lần sai token trong 60 giây / request có header trình duyệt | Dùng `dhcb_agent.py`; với `locked`, chờ 5 phút; panel phải qua gateway |
 | Lệnh MEPF báo "Không tìm thấy family" | Family hanger/sleeve chưa load vào model | Load family rồi ghi đúng tên vào config |
 | RouteFromLines/PipeKick báo fitting không dựng được | Routing preference của type thiếu elbow góc tương ứng | Sửa Routing Preferences của Pipe/Duct Type |
 | Batch: Revit mở nhưng không chạy job | Add-in cài cho bản Revit khác với bản được mở | Cài add-in đúng năm; xem `%APPDATA%\DHCB\batch-error.txt` |
 | accoreconsole: "Cannot load assembly" | Dùng vỏ đầy đủ (AcMgd) thay core-only | Copy `DhcbTools.AutoCAD.Core.dll` cạnh runner hoặc `--plugin-dll` |
-| AutoCAD 2026.1+ | Package 25.1.x dùng .NET 10; chưa build/kiểm | Build với `-p:AcadVersion=2026` khi có SDK .NET 10 và AutoCAD 2026.1; ghi kết quả vào tài liệu này |
+| AutoCAD 2026 không nạp plugin | Host chưa lên Update 1.2+ hoặc DLL sai runtime | Chạy doctor; gói net10 đã được kiểm Core Console, GUI còn nghiệm thu riêng |
 | Ollama không phản hồi | Endpoint không phải loopback hoặc model chưa pull | `dhcb_ai.py ollama-check`; giữ `endpoint` = `http://127.0.0.1:11434` |
 
 ---

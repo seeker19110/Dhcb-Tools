@@ -87,7 +87,7 @@ Chưa nâng nhãn Revit 2027 từ biên dịch sang hỗ trợ phát hành.
 
 Năm ca installer bị skip trong lượt Python WSL đã được chạy riêng và đạt trên Windows; không đăng ký uninstall hoặc thay bản cài đang dùng. Script doctor đã được kiểm vào manifest đóng gói.
 Chưa thu phản hồi người dùng, chưa đo tiết kiệm thời gian thực tế; chưa nghiệm thu family sản xuất/tọa độ công trường/BCF bằng phần mềm nhận.
-Hủy giữa lệnh dài cần thiết kế cancellation/rollback riêng. LICENSE và chứng chỉ ký cần chủ dự án quyết định/tài nguyên; trạng thái bảo vệ nhánh cần đối chiếu GitHub.
+Hủy giữa lệnh dài cần thiết kế cancellation/rollback riêng. LICENSE và chứng chỉ ký cần chủ dự án quyết định/tài nguyên; ruleset GitHub đã được đối chiếu ở vòng 2026-10-08.
 
 ## Rà soát bổ sung trước triển khai
 
@@ -153,3 +153,30 @@ CSV/thuộc tính/format không xử lý được, no-op và preview không sử
 Runner đối chiếu CSV, layer thuộc tính, định dạng MText và hash cả DWG gốc/bản chép độc lập.
 Bằng chứng thô tại `C:\Users\liend\DHCB-test-results\autocad-engineering-write-2026-10-08_00-51-20-617`.
 Các kết quả trên là kiểm nguồn trước merge; kiểm lại DLL đã cài sẽ được lưu cùng gói ngoài repo.
+
+
+## Khép triển khai và rà soát phần còn lại — 2026-10-08
+
+PR #182 đã merge vào `main` tại `2cac2316f6b6248a5a8ffcc45bec45aa862aff6b`;
+CI của PR và main đều đạt. DLL đã cài kiểm lại **105/105 ca AutoCAD + 5 tình huống PDF**,
+doctor 0 lỗi (5 cảnh báo cấu hình tùy chọn/Bridge offline). Đối chiếu trước host postflight:
+**132 file trạng thái và 1 task đêm giữ nguyên**. [Báo cáo nghiệm thu](bang-chung/2026-10-08/trien-khai.md).
+
+Private vulnerability reporting và Dependabot alerts nay được bật và kiểm qua API;
+không còn là việc chờ chủ repo thao tác. Nhánh chính vẫn giữ required checks.
+Theo yêu cầu mới của chủ dự án, PR tiếp theo dùng auto-merge sau khi kiểm `gitleaks` xanh trên
+đúng head; GitHub chờ đủ 11 required job. [Quy trình](../CONTRIBUTING.md#merge-pr--chờ-check-xanh-auto-merge-khi-được-yêu-cầu).
+
+Không ghi những mục cần host/người/dữ liệu là đã hoàn thành: nghiệm thu Ribbon/form/Undo,
+Revit host, thí điểm 2/4 tuần, family sản xuất, tọa độ thực địa, BCF trong phần mềm nhận,
+LICENSE và chứng chỉ ký. Những mục này có tiêu chí và bằng chứng cần thu trong báo cáo;
+không có thao tác hợp lệ tại máy hiện tại để thay thế bằng kết quả giả.
+
+PDF đã xuất được kiểm thêm bằng PDFium và đối chiếu cấu trúc/hình học: trang A3 ngang,
+đủ hai mặt bằng, không trắng/cắt mép. Fit toàn Model làm chữ chú giải nhỏ (trung vị 2,345 pt),
+nên đạt xuất/render nhưng chưa đạt đọc hồ sơ giấy. Bằng chứng và giới hạn ghi trong báo cáo triển khai.
+
+Bộ cài thêm `/PRESERVEUNSELECTED=1` để cập nhật riêng AutoCAD/BatchRunner mà giữ add-in
+Revit/các năm khác; job/config đã sửa không bị ghi đè. Đã kiểm 12/12 ca bằng Inno Setup thật
+trong profile tạm. Python WSL giữ 389 +115 subtest đạt, coverage100%, 12 ca installer skip
+đã được kiểm riêng trên Windows. Không thay DLL của bản đang cài trong vòng này.
