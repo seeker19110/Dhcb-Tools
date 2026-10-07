@@ -13,6 +13,11 @@ namespace DhcbTools.Shared.Logic.Testing
     {
         public bool Success { get; set; }
 
+        public bool PartialSuccess { get; set; }
+
+        /// <summary>Số sự kiện thay đổi object đo trên host; null nếu host chưa đo.</summary>
+        public int? ChangeEvents { get; set; }
+
         public string Summary { get; set; } = string.Empty;
 
         public List<string> Messages { get; set; } = new List<string>();
@@ -35,6 +40,13 @@ namespace DhcbTools.Shared.Logic.Testing
     {
         [JsonProperty("success")]
         public bool? Success { get; set; } = true;
+
+        [JsonProperty("partialSuccess")]
+        public bool? PartialSuccess { get; set; }
+
+        /// <summary>Xem trước phải không phát sự kiện sửa model, kể cả sửa tạm rồi rollback.</summary>
+        [JsonProperty("maxChangeEvents")]
+        public int? MaxChangeEvents { get; set; }
 
         /// <summary>Số phần tử bị ảnh hưởng tối thiểu.</summary>
         [JsonProperty("minAffected")]
@@ -103,6 +115,13 @@ namespace DhcbTools.Shared.Logic.Testing
                 failures.Add($"mong Success={Success.Value} nhưng nhận {observed.Success}"
                              + (observed.Success ? string.Empty : " — " + observed.Summary));
             }
+
+            if (PartialSuccess.HasValue && observed.PartialSuccess != PartialSuccess.Value)
+                failures.Add($"mong PartialSuccess={PartialSuccess.Value} nhưng nhận {observed.PartialSuccess}");
+            if (MaxChangeEvents.HasValue && (!observed.ChangeEvents.HasValue || observed.ChangeEvents.Value > MaxChangeEvents.Value))
+                failures.Add(observed.ChangeEvents.HasValue
+                    ? $"mong sự kiện thay đổi ≤ {MaxChangeEvents.Value} nhưng nhận {observed.ChangeEvents.Value}"
+                    : "host chưa đo sự kiện thay đổi; không thể xác nhận xem trước chỉ đọc");
 
             if (MinAffected.HasValue && observed.AffectedCount < MinAffected.Value)
             {

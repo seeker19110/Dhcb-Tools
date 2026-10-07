@@ -252,6 +252,11 @@ class QueryToolTests(unittest.TestCase):
 
 
 class ExecuteToolTests(unittest.TestCase):
+    def test_partial_or_errors_display_warning(self):
+        for result in ({"success": True, "partialSuccess": True}, {"success": True, "errors": ["hỏng"]}):
+            with self.subTest(result=result), mock.patch.object(server, "_fetch", return_value=result):
+                self.assertTrue(server.autocad_execute("DrawingCleanup").startswith("⚠️"))
+
     def test_preview_token_display_and_commit_forwarding(self):
         with mock.patch.object(server, "_fetch", return_value={"success": True, "documentId": "A",
                                                               "previewToken": "token-A"}) as send:
@@ -285,6 +290,11 @@ class ExecuteToolTests(unittest.TestCase):
 
 
 class ExportLayersToolTests(unittest.TestCase):
+    def test_partial_or_errors_do_not_claim_successful_export(self):
+        for result in ({"success": True, "partialSuccess": True}, {"success": True, "errors": ["hỏng"]}):
+            with self.subTest(result=result), mock.patch.object(server, "_fetch", return_value=result):
+                self.assertNotIn("✅", server.autocad_export_layers())
+
     def test_duong_dan_ngoai_thu_muc_tam_bi_tu_choi(self) -> None:
         with mock.patch.object(server, "_fetch") as fetch:
             text = server.autocad_export_layers("/etc/passwd.csv")

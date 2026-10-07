@@ -372,7 +372,7 @@ def autocad_execute(
     messages = result.get("messages", [])
     errors = result.get("errors", [])
 
-    icon = "✅" if success else "❌"
+    icon = "❌" if not success else "⚠️" if result.get("partialSuccess") or errors else "✅"
     dry_note = " [DRY RUN — chưa ghi thật]" if dry_run and command != "LayerExport" else ""
 
     lines = [f"{icon} {summary}{dry_note}", f"   Affected: {count}"]
@@ -407,7 +407,7 @@ def autocad_export_layers(output_path: str = "") -> str:
     output_path = payload["config"]["outputPath"]
 
     result = _fetch("/execute", payload)
-    if result.get("success"):
+    if result.get("success") and not result.get("partialSuccess") and not result.get("errors"):
         count = result.get("affectedCount", 0)
         return f"✅ Xuất {count} layers → {output_path}"
     return f"❌ {result.get('summary', str(result))}"

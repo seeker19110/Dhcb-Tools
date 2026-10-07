@@ -35,6 +35,18 @@ vm.runInContext(source.slice(start, end), context);
   assert.equal(calls[1].documentId,'A');
   await context.apiFetch('/execute',{...write,previewToken:'explicit',documentId:'B'});
   assert.equal(calls[3].previewToken,'explicit');
+  for (const incomplete of [{success:true,partialSuccess:true},{success:true,errors:['hỏng']}]) {
+    reply = {...incomplete,previewToken:'unsafe',documentId:'A'};
+    await context.apiFetch('/execute',{command:'DrawingCleanup',config:{dryRun:true}});
+    const before = calls.length;
+    assert.equal((await context.apiFetch('/execute',write)).success,false);
+    assert.equal(calls.length,before);
+    assert.ok(context.outcomeBadge(incomplete,false,'ĐÃ GHI').includes('MỘT PHẦN'));
+    assert.ok(context.outcomeBadge(incomplete,true,'ĐÃ GHI').includes('MỘT PHẦN'));
+  }
+  assert.ok(context.outcomeBadge({success:false},true,'ĐÃ GHI').includes('THẤT BẠI'));
+  assert.ok(context.outcomeBadge({success:true},true,'ĐÃ GHI').includes('DRY RUN'));
+  assert.ok(context.outcomeBadge({success:true},false,'ĐÃ GHI').includes('ĐÃ GHI'));
   reply = {success:false};
   await context.apiFetch('/execute',{command:'DrawingCleanup',config:{dryRun:true}});
   const count = calls.length;

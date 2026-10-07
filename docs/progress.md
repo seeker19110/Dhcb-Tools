@@ -1,4 +1,8 @@
-﻿# Hiện trạng dự án
+# Hiện trạng dự án
+
+> Lượt nâng chất lượng 2026-10-07: [kế hoạch, thay đổi và kiểm chứng](ke-hoach-chat-luong-2026-10-07.md).
+> Hàng đợi/chạy thật/batch được rà lại; [hướng dẫn thí điểm](thi-diem-su-dung.md) có công cụ doctor và bảng đo tác vụ.
+
 
 Ảnh chụp tại thời điểm cập nhật gần nhất. Kế hoạch phía trước xem [`roadmap.md`](roadmap.md).
 
@@ -247,11 +251,9 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
   `ProjectFromTemplate` (worksharing cần môi trường mạng), `StylePurge` (phân tích tham chiếu có thể thiếu trường hợp —
   luôn xem trước), `SlopePipes` trên ống đã nối fitting hai đầu (Revit có thể từ chối dịch điểm cuối — trên ống đồng
   17 m nối hai đầu của Snowdon thì dịch được, §53).
-- **`ScheduleExport` trả `success: true` khi mất một phần đầu ra.** §24: thư mục đầu ra dài 218 ký tự làm một
-  schedule vượt MAX_PATH (263 > 260) nên không ghi được. Lệnh báo **đúng và đủ** trong `errors` (tên schedule +
-  nguyên nhân) và summary ghi "35/36", nhưng `Success` vẫn là true nên `report.html` hiện *OK* và mã thoát không
-  phản ánh. Khác với ca "0 kết quả" mà `E-PRECOND`/`ElevationTag` đã chặn: đây là thành công **một phần** thật,
-  đổi thành thất bại thì 35 file xuất được cũng bị gắn cờ đỏ. Để ngỏ tới khi có người dùng thật quyết định.
+- **`ScheduleExport` đã phân biệt thành công một phần bằng `PartialSuccess`.** Lượt 2026-10-07 đồng nhất quyết định
+  batch: bước một phần hoặc có `Errors` không được coi là hoàn thành trọn vẹn, dừng theo `stopOnError`, không lưu
+  mặc định và gói bàn giao không ghi "Đạt". `Success=true` vẫn giữ nghĩa có đầu ra, để không mất thông tin file đã xuất.
 - `RvtFileInfo` nhận phiên bản bằng cách quét chuỗi trong 2 MB đầu file thay vì parse OLE — đủ cho batch, nhưng file mã hoá/
   bất thường sẽ rơi về `revitVersion` của job.
 - `AcadScriptGen.PlotPdf` theo thứ tự prompt `-PLOT` của AutoCAD 2018+ tiếng Anh; bản địa hoá hoặc phiên bản khác có thể lệch

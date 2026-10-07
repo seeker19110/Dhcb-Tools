@@ -86,9 +86,19 @@ internal static class CommandRunner
 #endif
 
         // Bước 1 — xem trước, không ghi vào mô hình.
+        string snapshot;
+        try
+        {
+            snapshot = BridgeCommitGuard.CaptureInputSnapshot(config, BridgeDocumentContext.RevisionFor(uiDocument.Document));
+        }
+        catch (Exception ex)
+        {
+            TaskDialog.Show(commandName, "Không xác minh được file đầu vào: " + ex.Message);
+            return Result.Failed;
+        }
         var preview = Dispatch(uiDocument.Document, commandName, config, dryRun: true);
         Feedback.Show($"{commandName} — xem trước", preview);
-        if (!preview.Success)
+        if (!preview.IsComplete)
         {
             return Result.Failed;
         }
@@ -104,6 +114,20 @@ internal static class CommandRunner
         if (confirm.Show() != TaskDialogResult.Yes)
         {
             return Result.Cancelled;
+        }
+
+        try
+        {
+            if (snapshot != BridgeCommitGuard.CaptureInputSnapshot(config, BridgeDocumentContext.RevisionFor(uiDocument.Document)))
+            {
+                TaskDialog.Show(commandName, "Model hoặc file đầu vào đã thay đổi. Hãy xem trước lại.");
+                return Result.Cancelled;
+            }
+        }
+        catch (Exception ex)
+        {
+            TaskDialog.Show(commandName, "Không xác minh được file đầu vào: " + ex.Message);
+            return Result.Failed;
         }
 
         var result = Dispatch(uiDocument.Document, commandName, config, dryRun: false);

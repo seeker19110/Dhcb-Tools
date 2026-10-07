@@ -1,4 +1,4 @@
-# Fixture cho bộ kiểm thử chạy trong Revit
+# Fixture cho bộ kiểm thử chạy trong Revit và AutoCAD
 
 File đầu vào cho các lệnh cần đọc file (`GridFromCsv`, `SheetBatchCreate`, `CadLayerMap`, `SpecToConfig`…).
 Bộ test trỏ tới đây bằng token `{suiteFolder}/fixtures/...` — token do `RunTestsCommand` cấp, để bộ ca kiểm
@@ -18,13 +18,24 @@ chứ không phải đọc lại file kia.
 Sinh lại (cần máy có AutoCAD; đổi 2026 theo bản đang cài):
 
 ```powershell
-# 1. dời toạ độ Y của tuyen-ong.dxf thêm 20000 (mã nhóm 20/21) → <temp>	uyen-ong-dwg.dxf
+# 1. dời toạ độ Y của tuyen-ong.dxf thêm 20000 (mã nhóm 20/21) → <temp>\tuyen-ong-dwg.dxf
 # 2. accoreconsole đọc DXF đó rồi SAVEAS DWG 2018:
 $scr = "$env:TEMP\save.scr"
-Set-Content $scr "FILEDIA`n0`n_.SAVEAS`n_2018`n`"$PWD	uyen-ong.dwg`"`n_.QUIT`n_Y`n" -Encoding ascii
-& 'C:\Program Files\Autodesk\AutoCAD 2026ccoreconsole.exe' /i "$env:TEMP	uyen-ong-dwg.dxf" /s $scr
+Set-Content $scr "FILEDIA`n0`n_.SAVEAS`n_2018`n`"$PWD\tuyen-ong.dwg`"`n_.QUIT`n_Y`n" -Encoding ascii
+& 'C:\Program Files\Autodesk\AutoCAD 2026\accoreconsole.exe' /i "$env:TEMP\tuyen-ong-dwg.dxf" /s $scr
 ```
 
 `tuyen-ong-giua.dxf` là bản sao của `tuyen-ong.dxf` chỉ để chạy ca `placement: centered` — một file đã link
 thì lần sau bị bỏ qua (đúng tính idempotent), nên hai cách đặt khác nhau cần hai file khác nhau.
 
+
+## CSV layer AutoCAD
+
+`layers-doi-mot-o.csv` đổi đúng một ô để kiểm ghi thật rồi khôi phục từ CSV gốc.
+`layers-duplicate-same.csv` có hai dòng giống nhau: phải tạo/cập nhật đúng một layer và chạy lại không đổi.
+`layers-duplicate-conflict.csv` có hai giá trị khác nhau cho cùng layer: phải báo `partialSuccess:true` và giữ nguyên layer đó.
+
+Bộ `autocad-write.json` dùng `partialSuccess` trong expectation để phân biệt xung đột dự kiến
+với thành công toàn bộ. `maxChangeEvents:0` đếm sự kiện sửa/thêm/xóa của AutoCAD trong ca xem trước:
+transaction abort vẫn không được phát sinh ghi tạm. Host không đo trường này phải báo test trượt.
+Chạy `run-in-autocad-tests.ps1 -Suite write -AllowWrites` để script tự chép DWG sang thư mục kết quả.

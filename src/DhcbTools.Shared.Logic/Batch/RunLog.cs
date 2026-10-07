@@ -46,6 +46,10 @@ namespace DhcbTools.Shared.Logic.Batch
         [JsonProperty("skipped")]
         public bool Skipped { get; set; }
 
+        /// <summary>Step hoàn thành trọn vẹn; dùng chung cho lưu file, mã thoát và báo cáo.</summary>
+        [JsonIgnore]
+        public bool IsComplete => Success && !PartialSuccess && !Skipped && Errors.Count == 0;
+
         /// <summary>
         /// Băm của dòng ngay trước trong cùng file — mắt xích nối chuỗi (mục 11.5). Do
         /// <see cref="RunLog.Append"/> đặt; dòng đầu tiên mang <see cref="HashChain.Genesis"/>.
@@ -196,7 +200,7 @@ namespace DhcbTools.Shared.Logic.Batch
         {
             foreach (var e in entries)
             {
-                if (!e.Success || e.Skipped || e.PartialSuccess)
+                if (!e.IsComplete)
                 {
                     return 1;
                 }

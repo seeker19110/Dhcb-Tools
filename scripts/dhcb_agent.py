@@ -28,6 +28,7 @@ import json
 import time
 import os
 import sys
+import urllib.parse
 import urllib.error
 import urllib.request
 
@@ -42,7 +43,14 @@ PORTS = {"revit": 8765, "autocad": 8766}
 # ProxyServer trong Internet Settings của Windows) và KHÔNG tự bỏ qua 127.0.0.1 — "<local>" trong ProxyOverride
 # chỉ khớp tên không có dấu chấm. Trên máy công ty có proxy cấu hình tĩnh, request tới Bridge vì thế đi ra proxy
 # kèm header "Authorization: Bearer <token>" và cả config lệnh: lộ token cho proxy, còn lệnh thì không tới được Bridge.
-LOOPBACK = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Không để redirect mang Bearer/prompt từ loopback sang một địa chỉ khác."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+LOOPBACK = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
 
 
 def base_url(app: str) -> str:
@@ -84,22 +92,28 @@ def request(app: str, method: str, path: str, payload=None, timeout: int = 35) -
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
         with LOOPBACK.open(req, timeout=timeout) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+            parsed = json.loads(resp.read().decode("utf-8"))
+            return parsed if isinstance(parsed, dict) else {"success": False, "summary": "Bridge trả JSON không phải object."}
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")
         try:
             parsed = json.loads(body)
         except Exception:
             parsed = {"error": body}
+        if not isinstance(parsed, dict):
+            parsed = {"error": "Bridge trả JSON không phải object."}
         if e.code == 401:
             parsed.setdefault("summary", "401 — sai token. Kiểm tra %APPDATA%\\DHCB\\bridge-token.txt hoặc DHCB_BRIDGE_TOKEN.")
         elif e.code == 429:
-            parsed.setdefault("summary", "429 — Bridge đang khoá 5 phút vì sai token nhiều lần.")
+            parsed.setdefault("summary", "429 — Bridge đang khoá 5 phút vì sai token nhiều lần."
+                              if parsed.get("error") == "locked" else "429 — " + str(parsed.get("error", "Bridge quá tải hoặc hàng đợi đầy; hỏi progress rồi thử lại.")))
         elif e.code == 504:
-            parsed.setdefault("summary", "504 — hết thời gian chờ; lệnh đã bị huỷ, không chạy.")
+            parsed.setdefault("summary", "504 — chưa xác định kết quả; hỏi progressUrl/id nếu có và KHÔNG gửi lại lệnh ghi.")
         parsed.setdefault("success", False)
         parsed.setdefault("summary", f"HTTP {e.code}: {body}")
         return parsed
+    except (ValueError, UnicodeError):
+        return {"success": False, "summary": "Bridge trả dữ liệu không phải JSON UTF-8 hợp lệ. Kiểm cổng và phiên bản add-in."}
     except urllib.error.URLError as e:
         return {"success": False, "summary": f"Không kết nối được ({e.reason}). {app.capitalize()} có đang mở và plugin đã load chưa?"}
 
@@ -171,9 +185,14 @@ def run(app: str, command: str, config: dict, args, *, document_id=None, preview
     return send(app, command, config, document_id=document_id, preview_token=preview_token)
 
 
+def is_complete(result: dict) -> bool:
+    """Thành công một phần hoặc có errors phải có mã thoát lỗi, giống batch C#."""
+    return result.get("success") is True and not result.get("partialSuccess") and not result.get("errors")
+
+
 def print_result(result: dict):
     if "success" in result:
-        icon = "✓" if result.get("success") else "✗"
+        icon = "✓" if is_complete(result) else "⚠" if result.get("success") else "✗"
         print(f"\n{icon} {result.get('summary', '')}")
         if result.get("previewToken"):
             print(f"  documentId: {result['documentId']}")
@@ -227,7 +246,7 @@ def build_config(args, app: str, dry_run: bool) -> dict:
 def main():
     parser = argparse.ArgumentParser(description="DHCB Agent Client — gửi lệnh vào Revit/AutoCAD qua HTTP Bridge (offline)")
     parser.add_argument("app", choices=["revit", "autocad"])
-    parser.add_argument("command", help="Tên lệnh, hoặc: tools | chat | query | raw | exec")
+    parser.add_argument("command", help="Tên lệnh, hoặc: tools | chat | query | progress | cancel | raw | exec")
     parser.add_argument("arg", nargs="?", help="chat: câu tiếng Việt · query: tên query · raw: JSON · exec: tên lệnh")
     parser.add_argument("--config", help="(exec) JSON config inline")
     parser.add_argument("--config-file", help="(exec) file JSON config")
@@ -270,6 +289,16 @@ def main():
             sys.exit(0)
         print_result(result)
         sys.exit(1)
+
+    if cmd in {"progress", "cancel"}:
+        if not args.arg:
+            print("Cần id của lệnh nền sau '" + cmd + "'.", file=sys.stderr)
+            sys.exit(2)
+        path = "/" + cmd + "/" + urllib.parse.quote(args.arg, safe="")
+        result = request(app, "POST" if cmd == "cancel" else "GET", path,
+                         {} if cmd == "cancel" else None)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        sys.exit(1 if result.get("error") or result.get("success") is False else 0)
 
     if cmd == "chat":
         if not args.arg:
@@ -315,7 +344,7 @@ def main():
         result = run(app, data["command"], config, args, document_id=document_id,
                      preview_token=data.get("previewToken"))
         print_result(result)
-        sys.exit(0 if result.get("success") else 1)
+        sys.exit(0 if is_complete(result) else 1)
 
     if cmd == "exec":
         if not args.arg:
@@ -350,12 +379,12 @@ def main():
         result = run(app, args.arg, config, args, document_id=args.document_id,
                      preview_token=args.preview_token)
         print_result(result)
-        sys.exit(0 if result.get("success") else 1)
+        sys.exit(0 if is_complete(result) else 1)
 
     result = run(app, args.command, build_config(args, app, dry_run), args,
                  document_id=args.document_id, preview_token=args.preview_token)
     print_result(result)
-    sys.exit(0 if result.get("success") else 1)
+    sys.exit(0 if is_complete(result) else 1)
 
 
 if __name__ == "__main__":

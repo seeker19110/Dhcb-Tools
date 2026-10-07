@@ -1005,6 +1005,18 @@ let allLayers = [];
 const previews = new Map();
 
 // ── Helpers ──────────────────────────────────────
+function isComplete(result) {
+  return result.success === true && !result.partialSuccess && !result.errors?.length;
+}
+
+function outcomeBadge(result, isDry, doneText, dryText = 'DRY RUN') {
+  if (!result.success) return '<span class="badge badge-err">✗ THẤT BẠI</span>';
+  if (!isComplete(result)) return '<span class="badge badge-dry">⚠ MỘT PHẦN — XEM LỖI</span>';
+  return isDry
+    ? `<span class="badge badge-dry">⚠ ${dryText}</span>`
+    : `<span class="badge badge-done">✓ ${doneText}</span>`;
+}
+
 async function apiFetch(path, body) {
   const executing = path === '/execute' && body && body.command;
   if (executing && body.config?.dryRun === false && !body.previewToken) {
@@ -1019,7 +1031,7 @@ async function apiFetch(path, body) {
   const result = await r.json();
   if (executing && body.config?.dryRun !== false) {
     previews.delete(body.command);
-    if (result.success && result.previewToken) previews.set(body.command, result);
+    if (isComplete(result) && result.previewToken) previews.set(body.command, result);
   }
   return result;
 }
@@ -1172,7 +1184,7 @@ async function exportLayers() {
   const out = 'dhcb_layers_export.csv';
   try {
     const d = await apiFetch('/execute', { command:'LayerExport', config:{ outputPath: out } });
-    if (d.success) {
+    if (isComplete(d)) {
       msg.textContent = `✓ ${d.summary}`;
       msg.style.color = 'var(--green)';
     } else {
@@ -1210,9 +1222,7 @@ async function runNumbering() {
     const request = { command: 'AutoNumbering', config };
     if (!isDry) request.confirmation = 'WRITE_AUTONUMBER';
     const d = await apiFetch('/execute', request);
-    badge.innerHTML = isDry
-      ? '<span class="badge badge-dry">⚠ DRY RUN</span>'
-      : (d.success ? '<span class="badge badge-done">✓ ĐÃ GHI</span>' : '<span class="badge badge-err">✗ THẤT BẠI</span>');
+    badge.innerHTML = outcomeBadge(d, isDry, 'ĐÃ GHI');
     showResult('numResult', d, 'numLabel',
       `AutoNumbering — ${d.affectedCount} blocks — ${new Date().toLocaleTimeString('vi')}`);
   } catch(e) {
@@ -1260,9 +1270,7 @@ async function runCleanup(isDry = true) {
     const request = { command: 'DrawingCleanup', config };
     if (!isDry) request.confirmation = 'DELETE_UNUSED';
     const d = await apiFetch('/execute', request);
-    badge.innerHTML = isDry
-      ? '<span class="badge badge-dry">⚠ DRY RUN — CHƯA XOÁ</span>'
-      : (d.success ? '<span class="badge badge-done">✓ ĐÃ XOÁ THẬT</span>' : '<span class="badge badge-err">✗ XOÁ THẤT BẠI</span>');
+    badge.innerHTML = outcomeBadge(d, isDry, 'ĐÃ XOÁ THẬT', 'DRY RUN — CHƯA XOÁ');
     showResult('cleanResult', d, 'cleanLabel',
       `${isDry ? 'Xem trước' : 'ĐÃ XOÁ THẬT'} — ${d.affectedCount || 0} objects — ${new Date().toLocaleTimeString('vi')}`);
   } catch(e) {

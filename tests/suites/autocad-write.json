@@ -28,6 +28,21 @@
       }
     },
     {
+      "name": "Nhập layer có thay đổi — xem trước không phát sự kiện ghi tạm",
+      "command": "LayerImport",
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/layers-doi-mot-o.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 1,
+        "maxAffected": 1,
+        "maxChangeEvents": 0,
+        "noErrors": true
+      }
+    },
+    {
       "name": "Nhập CSV đổi đúng một ô — GHI THẬT",
       "command": "LayerImport",
       "allowWrite": true,
@@ -99,6 +114,118 @@
         ],
         "maxMs": 30000
       }
+    },
+    {
+      "name": "Dòng trùng giống nhau — xem trước tạo đúng một layer",
+      "command": "LayerImport",
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/layers-duplicate-same.csv",
+        "createMissing": true
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 1,
+        "maxAffected": 1,
+        "maxMs": 30000,
+        "maxChangeEvents": 0,
+        "noErrors": true
+      }
+    },
+    {
+      "name": "Dòng trùng giống nhau — ghi thật tạo đúng một layer",
+      "command": "LayerImport",
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/layers-duplicate-same.csv",
+        "createMissing": true
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 1,
+        "maxAffected": 1,
+        "maxMs": 30000,
+        "noErrors": true,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "Nhập lại layer mới — không còn gì để đổi",
+      "command": "LayerImport",
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/layers-duplicate-same.csv",
+        "createMissing": true
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxMs": 30000,
+        "noErrors": true,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "Dòng trùng xung đột — xem trước không ghi",
+      "command": "LayerImport",
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/layers-duplicate-conflict.csv",
+        "createMissing": true
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxMs": 30000,
+        "maxChangeEvents": 0
+      }
+    },
+    {
+      "name": "Dòng trùng xung đột — ghi thật cũng giữ nguyên",
+      "command": "LayerImport",
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/layers-duplicate-conflict.csv",
+        "createMissing": true
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxMs": 30000,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "Sau xung đột — layer vẫn giữ giá trị đã duyệt",
+      "command": "LayerImport",
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/layers-duplicate-same.csv",
+        "createMissing": true
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 0,
+        "maxAffected": 0,
+        "maxMs": 30000,
+        "noErrors": true,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
     }
   ]
 }

@@ -125,6 +125,12 @@ public sealed class RunTestsCommand : ICoreCommand<RunTestsConfig>
     private static TestObservation Run(Database database, TestCase testCase, bool allowWrites, JobTokenContext tokens)
     {
         var stopwatch = Stopwatch.StartNew();
+        var changeEvents = 0;
+        void OnChange(object sender, ObjectEventArgs args) => changeEvents++;
+        void OnErased(object sender, ObjectErasedEventArgs args) => changeEvents++;
+        database.ObjectModified += OnChange;
+        database.ObjectAppended += OnChange;
+        database.ObjectErased += OnErased;
         try
         {
             // Ép dryRun trừ khi ca này khai báo allowWrite VÀ người chạy bật AllowWrites — hai lớp khoá
@@ -142,6 +148,8 @@ public sealed class RunTestsCommand : ICoreCommand<RunTestsConfig>
             var observation = new TestObservation
             {
                 Success = result.Success,
+                PartialSuccess = result.PartialSuccess,
+                ChangeEvents = changeEvents,
                 Summary = result.Summary,
                 AffectedCount = result.AffectedCount,
                 ElapsedMs = stopwatch.ElapsedMilliseconds,
@@ -159,6 +167,12 @@ public sealed class RunTestsCommand : ICoreCommand<RunTestsConfig>
                 ElapsedMs = stopwatch.ElapsedMilliseconds,
                 Exception = ex.ToString(),
             };
+        }
+        finally
+        {
+            database.ObjectModified -= OnChange;
+            database.ObjectAppended -= OnChange;
+            database.ObjectErased -= OnErased;
         }
     }
 }

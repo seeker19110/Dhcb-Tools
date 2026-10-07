@@ -24,8 +24,8 @@ namespace DhcbTools.Shared.Logic.Batch
                 byKey[e.File + KeySeparator + e.Command] = e; // lần chạy sau ghi đè lần trước
             }
 
-            var ok = entries.Count(e => e.Success && !e.PartialSuccess && !e.Skipped);
-            var partial = entries.Count(e => e.Success && e.PartialSuccess && !e.Skipped);
+            var ok = entries.Count(e => e.IsComplete);
+            var partial = entries.Count(e => e.Success && !e.IsComplete && !e.Skipped);
             var failed = entries.Count(e => !e.Success && !e.Skipped);
             var skipped = entries.Count(e => e.Skipped);
 
@@ -63,7 +63,7 @@ namespace DhcbTools.Shared.Logic.Batch
                         continue;
                     }
 
-                    var cls = e.Skipped ? "skip" : !e.Success ? "fail" : e.PartialSuccess ? "partial" : "ok";
+                    var cls = e.Skipped ? "skip" : !e.Success ? "fail" : !e.IsComplete ? "partial" : "ok";
                     sb.Append("<td class=\"").Append(cls).Append("\"><details><summary>")
                       .Append(HtmlText.Escape(e.Summary))
                       .Append(" <small>(").Append(e.ElapsedMs).Append(" ms)</small></summary>");

@@ -10,6 +10,11 @@ using DhcbTools.Core.AutoCAD.LayerTools;
 using DhcbTools.Core.AutoCAD.Reporting;
 using DhcbTools.Core.AutoCAD.TextTools;
 using DhcbTools.Shared.Hosting;
+using DhcbTools.Core.AutoCAD;
+using DhcbTools.Shared.Logic.Ai;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Serialization;
 
 namespace DhcbTools.AutoCAD.Commands;
 
@@ -57,7 +62,7 @@ public sealed class DhcbCommands
         };
 
         var command = new LayerExportCommand();
-        var result = command.Execute(doc.Database, config);
+        var result = ExecuteWithPreview(doc, command.CommandName, config);
 
         PrintResult(ed, result);
     }
@@ -89,7 +94,7 @@ public sealed class DhcbCommands
         };
 
         var command = new LayerImportCommand();
-        var result = command.Execute(doc.Database, config);
+        var result = ExecuteWithPreview(doc, command.CommandName, config);
 
         PrintResult(ed, result);
     }
@@ -130,7 +135,7 @@ public sealed class DhcbCommands
         };
 
         var command = new DrawingCleanupCommand();
-        var result = command.Execute(doc.Database, config);
+        var result = ExecuteWithPreview(doc, command.CommandName, config);
 
         PrintResult(ed, result);
     }
@@ -178,7 +183,7 @@ public sealed class DhcbCommands
         };
 
         var command = new AutoNumberingCommand();
-        var result = command.Execute(doc.Database, config);
+        var result = ExecuteWithPreview(doc, command.CommandName, config);
 
         PrintResult(ed, result);
     }
@@ -214,7 +219,7 @@ public sealed class DhcbCommands
         };
 
         var command = new AttributeExportCommand();
-        var result = command.Execute(doc.Database, config);
+        var result = ExecuteWithPreview(doc, command.CommandName, config);
 
         PrintResult(ed, result);
     }
@@ -245,7 +250,7 @@ public sealed class DhcbCommands
         };
 
         var command = new AttributeImportCommand();
-        var result = command.Execute(doc.Database, config);
+        var result = ExecuteWithPreview(doc, command.CommandName, config);
 
         PrintResult(ed, result);
     }
@@ -289,7 +294,7 @@ public sealed class DhcbCommands
         };
 
         var command = new TextReplaceCommand();
-        var result = command.Execute(doc.Database, config);
+        var result = ExecuteWithPreview(doc, command.CommandName, config);
 
         PrintResult(ed, result);
     }
@@ -321,7 +326,7 @@ public sealed class DhcbCommands
         };
 
         var command = new LayerStandardCheckCommand();
-        var result = command.Execute(doc.Database, config);
+        var result = ExecuteWithPreview(doc, command.CommandName, config);
 
         PrintResult(ed, result);
     }
@@ -353,7 +358,7 @@ public sealed class DhcbCommands
         };
 
         var command = new GridExtractCommand();
-        var result = command.Execute(doc.Database, config);
+        var result = ExecuteWithPreview(doc, command.CommandName, config);
 
         PrintResult(ed, result);
     }
@@ -385,7 +390,7 @@ public sealed class DhcbCommands
         };
 
         var command = new XrefAuditCommand();
-        var result = command.Execute(doc.Database, config);
+        var result = ExecuteWithPreview(doc, command.CommandName, config);
 
         PrintResult(ed, result);
     }
@@ -424,7 +429,7 @@ public sealed class DhcbCommands
         };
 
         var command = new LayerTranslateCommand();
-        var result = command.Execute(doc.Database, config);
+        var result = ExecuteWithPreview(doc, command.CommandName, config);
 
         PrintResult(ed, result);
     }
@@ -457,7 +462,7 @@ public sealed class DhcbCommands
         };
 
         var command = new DrawingCompareCommand();
-        var result = command.Execute(doc.Database, config);
+        var result = ExecuteWithPreview(doc, command.CommandName, config);
 
         PrintResult(ed, result);
     }
@@ -502,7 +507,7 @@ public sealed class DhcbCommands
         };
 
         var command = new BlockQuantityCommand();
-        var result = command.Execute(doc.Database, config);
+        var result = ExecuteWithPreview(doc, command.CommandName, config);
 
         PrintResult(ed, result);
     }
@@ -555,7 +560,7 @@ public sealed class DhcbCommands
         };
 
         var command = new AttributeIncrementCommand();
-        var result = command.Execute(doc.Database, config);
+        var result = ExecuteWithPreview(doc, command.CommandName, config);
 
         PrintResult(ed, result);
     }
@@ -595,7 +600,7 @@ public sealed class DhcbCommands
         };
 
         var command = new CadLayerMapCommand();
-        var result = command.Execute(doc.Database, config);
+        var result = ExecuteWithPreview(doc, command.CommandName, config);
 
         PrintResult(ed, result);
     }
@@ -653,9 +658,41 @@ public sealed class DhcbCommands
         return string.IsNullOrWhiteSpace(result.StringResult) ? fallback : result.StringResult;
     }
 
+    /// <summary>Mọi đường ghi tương tác phải xem trước và duyệt, kể cả khi kỹ sư chọn chế độ Thật.</summary>
+    private static CommandResult ExecuteWithPreview(Document doc, string command, object config)
+    {
+        Bridge.DhcbHttpBridge.TrackDocument(doc.Database);
+        var json = JObject.FromObject(config, new JsonSerializer
+        {
+            ContractResolver = new CamelCasePropertyNamesContractResolver(),
+        });
+        var descriptor = CommandCatalog.Find(CommandCatalog.AutoCad, command);
+        if (descriptor?.WritesModel != true || json["dryRun"]?.Value<bool>() != false)
+            return AcadCommandTable.Dispatch(doc.Database, command, json.ToString(Formatting.None));
+
+        var snapshot = BridgeCommitGuard.CaptureInputSnapshot(json, BridgeDocumentContext.RevisionFor(doc.Database));
+        json["dryRun"] = true;
+        var preview = AcadCommandTable.Dispatch(doc.Database, command, json.ToString(Formatting.None));
+        if (!preview.IsComplete) return preview;
+        PrintResult(doc.Editor, preview);
+
+        var confirm = new PromptKeywordOptions("\nĐã xem trước. Ghi thay đổi vào bản vẽ [Có/Không] <Không>: ");
+        confirm.Keywords.Add("Có");
+        confirm.Keywords.Add("Không");
+        confirm.AllowNone = true;
+        var answer = doc.Editor.GetKeywords(confirm);
+        if (answer.Status != PromptStatus.OK || answer.StringResult != "Có")
+            return CommandResult.Ok("Đã huỷ chạy thật; bản vẽ không đổi.");
+
+        if (snapshot != BridgeCommitGuard.CaptureInputSnapshot(json, BridgeDocumentContext.RevisionFor(doc.Database)))
+            return CommandResult.Fail("Cấu hình/model hoặc file đầu vào đã thay đổi. Hãy xem trước lại.");
+        json["dryRun"] = false;
+        return AcadCommandTable.Dispatch(doc.Database, command, json.ToString(Formatting.None));
+    }
+
     private static void PrintResult(Editor ed, CommandResult result)
     {
-        ed.WriteMessage($"\n{(result.Success ? "✓" : "✗")} {result.Summary}\n");
+        ed.WriteMessage($"\n{(result.IsComplete ? "✓" : "✗")} {result.Summary}\n");
         foreach (var msg in result.Messages)
         {
             ed.WriteMessage($"  • {msg}\n");

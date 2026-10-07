@@ -178,9 +178,9 @@ class RequestTests(unittest.TestCase):
         with http_error(429, json.dumps({"error": "locked"})):
             self.assertIn("khoá 5 phút", dhcb_agent.request("revit", "GET", "/tools")["summary"])
 
-    def test_504_noi_ro_lenh_khong_chay(self) -> None:
+    def test_504_khong_khang_dinh_da_huy_khi_thieu_bang_chung(self) -> None:
         with http_error(504, json.dumps({"error": "timeout"})):
-            self.assertIn("không chạy", dhcb_agent.request("revit", "GET", "/tools")["summary"])
+            self.assertIn("KHÔNG gửi lại", dhcb_agent.request("revit", "GET", "/tools")["summary"])
 
     def test_ma_loi_khac_giu_nguyen_van_body(self) -> None:
         with http_error(500, json.dumps({"error": "nổ"})):
@@ -316,7 +316,7 @@ class PrintResultTests(unittest.TestCase):
             "affectedCount": 3,
         })
 
-        self.assertIn("✓ xong", text)
+        self.assertIn("⚠ xong", text)
         self.assertIn("Phần tử đã đổi: 1, 2, 3", text)
         self.assertIn("• một cảnh báo", text)
         self.assertIn("! một lỗi", text)

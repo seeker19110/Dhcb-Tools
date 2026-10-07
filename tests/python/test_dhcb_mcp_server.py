@@ -313,6 +313,14 @@ class ProtocolTests(unittest.TestCase):
 
         self.assertEqual("nổ", replies[0]["error"]["message"])
 
+    def test_tools_call_partial_or_errors_are_not_complete(self) -> None:
+        for result in ({"success": True, "partialSuccess": True}, {"success": True, "errors": ["hỏng"]}):
+            with self.subTest(result=result), load() as (module, agent):
+                agent.send.return_value = result
+                replies = self._serve(module, [{"jsonrpc": "2.0", "id": 6, "method": "tools/call",
+                                                "params": {"name": "HealthReport"}}])
+            self.assertTrue(replies[0]["result"]["isError"])
+
     def test_ping(self) -> None:
         with load() as (module, _):
             replies = self._serve(module, [{"jsonrpc": "2.0", "id": 7, "method": "ping"}])

@@ -145,6 +145,7 @@ public sealed class RunTestsCommand : ICoreCommand<RunTestsConfig>
             var observation = new TestObservation
             {
                 Success = result.Success,
+                PartialSuccess = result.PartialSuccess,
                 Summary = result.Summary,
                 AffectedCount = result.AffectedCount,
                 ElapsedMs = stopwatch.ElapsedMilliseconds,

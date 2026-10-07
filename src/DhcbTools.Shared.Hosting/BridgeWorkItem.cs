@@ -62,7 +62,7 @@ namespace DhcbTools.Shared.Hosting
                 return true;
             }
 
-            return previous == ClaimedState;
+            return false; // Quyền thực thi chỉ cấp đúng một lần, kể cả hai consumer cùng nhận item.
         }
     }
 }

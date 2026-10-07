@@ -27,7 +27,14 @@ DEFAULT_MODEL = "qwen3:8b"
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 # Ollama chỉ ở loopback (is_loopback) nên không bao giờ cần proxy; đi qua proxy hệ thống thì request hỏng
 # và lộ endpoint nội bộ ra proxy công ty — cùng lý do với dhcb_agent.LOOPBACK.
-LOOPBACK = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Không để redirect mang Bearer/prompt từ loopback sang một địa chỉ khác."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+LOOPBACK = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
 
 
 def appdata_dhcb() -> str:

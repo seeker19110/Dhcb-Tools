@@ -11,7 +11,8 @@ internal static class Feedback
         var dialog = new TaskDialog(title)
         {
             MainInstruction = result.Summary,
-            MainIcon = result.Success ? TaskDialogIcon.TaskDialogIconInformation : TaskDialogIcon.TaskDialogIconError,
+            MainIcon = result.IsComplete ? TaskDialogIcon.TaskDialogIconInformation
+                : result.Success ? TaskDialogIcon.TaskDialogIconWarning : TaskDialogIcon.TaskDialogIconError,
         };
 
         if (result.Messages.Count > 0)

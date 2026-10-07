@@ -10,6 +10,7 @@
 #   dung-family.ps1                       build add-in từ mã nguồn rồi mới dựng family
 #   run-in-revit-tests.ps1, run-in-autocad-tests.ps1   cần tests/suites của repo
 dhcb_agent.py
+dhcb_doctor.py
 dhcb_mcp_server.py
 dhcb_ai.py
 doi-chieu-setout-ifc.py

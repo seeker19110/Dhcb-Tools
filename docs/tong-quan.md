@@ -35,7 +35,7 @@ Nút Ribbon của các lệnh còn lại (bậc **thử nghiệm**) có ghi chú
 
 - **Chưa có người dùng thật.** Mọi con số kiểm thử (bộ ca kiểm, vòng đóng vai kỹ sư) đều do tác giả tự tạo
   trên máy của mình — xem [`danh-gia-va-tam-nhin-2026-09-06.md`](danh-gia-va-tam-nhin-2026-09-06.md) §4.1.
-- **Chưa có giấy phép (`LICENSE`) và DLL chưa ký** — SmartScreen/chính sách IT có thể chặn ở máy công ty.
+- **Chưa có giấy phép (`LICENSE`); chữ ký gói phụ thuộc chứng chỉ của tổ chức** — SmartScreen/chính sách IT có thể chặn ở máy công ty.
   Đây là quyết định đang chờ chốt, không phải việc quên làm.
 - **Nhóm MEPF (`SleeveAuto`, `HangerAuto`…) cần family/tham số đúng tên dự án** để hết báo lỗi "không tìm
   thấy" — `DictionaryLearn` giúp dò tên nhưng chưa phải một nút.
@@ -50,6 +50,14 @@ Nút Ribbon của các lệnh còn lại (bậc **thử nghiệm**) có ghi chú
 | MEP (điện/nước/HVAC) | [`vai-tro-mep.md`](vai-tro-mep.md) |
 | BIM manager / QLDA | [`vai-tro-bim-manager.md`](vai-tro-bim-manager.md) |
 | AutoCAD | [`vai-tro-autocad.md`](vai-tro-autocad.md) |
+
+## Kiểm cài đặt và dùng thử
+
+`python scripts/dhcb_doctor.py --app revit` (hoặc `autocad`) kiểm cấu hình và Bridge bằng thao tác chỉ đọc;
+`--offline` không kết nối host. Script nằm trong repo/gói BatchRunner, không in token hay dữ liệu mô hình.
+
+[Thí điểm 2–4 tuần](thi-diem-su-dung.md) có danh sách tác vụ và bảng đo thời gian, lỗi và lý do bỏ cuộc.
+[Kế hoạch chất lượng](ke-hoach-chat-luong-2026-10-07.md) ghi rõ phần đã kiểm chứng và phần còn cần nghiệm thu.
 
 ## Đọc tiếp ở đâu
 

@@ -109,11 +109,11 @@ public static partial class Program
             }
         }
 
-        var failedSteps = entries.Count(e => !e.Success && !e.Skipped);
+        var incompleteSteps = entries.Count(e => !e.IsComplete);
         input.Checks.Add(new HandoverCheck(
             "Các bước của job",
-            failedSteps == 0 && entries.Count > 0,
-            $"{entries.Count(e => e.Success && !e.Skipped)} thành công, {failedSteps} lỗi, {entries.Count(e => e.Skipped)} bỏ qua"));
+            incompleteSteps == 0 && entries.Count > 0,
+            $"{entries.Count(e => e.IsComplete)} thành công trọn vẹn, {incompleteSteps} bước chưa trọn vẹn (lỗi/một phần/bỏ qua)"));
 
         var html = Path.Combine(outputFolder, HandoverPackage.HtmlName);
         File.WriteAllText(html, HandoverPackage.Html(input), new UTF8Encoding(true));

@@ -38,13 +38,7 @@ public sealed class DhcbHttpBridge : IDisposable
                 item,
                 database =>
                 {
-                    Tracked.GetValue(database, db =>
-                    {
-                        db.ObjectModified += (_, _) => BridgeDocumentContext.Touch(db);
-                        db.ObjectAppended += (_, _) => BridgeDocumentContext.Touch(db);
-                        db.ObjectErased += (_, _) => BridgeDocumentContext.Touch(db);
-                        return new object();
-                    });
+                    TrackDocument(database);
                     return _commits.Execute("autocad", item.Request, BridgeDocumentContext.IdFor(database),
                         () => BridgeDocumentContext.RevisionFor(database),
                         request => AcadCommandTable.Dispatch(database, request.Command, request.ConfigJson));
@@ -65,6 +59,18 @@ public sealed class DhcbHttpBridge : IDisposable
     }
 
     public string? TokenPath => BridgeTokenStore.DefaultPath;
+
+    /// <summary>Theo dõi revision cho cả Ribbon và Bridge, kể cả khi Bridge bị tắt.</summary>
+    internal static void TrackDocument(Autodesk.AutoCAD.DatabaseServices.Database database)
+    {
+        Tracked.GetValue(database, db =>
+        {
+            db.ObjectModified += (_, _) => BridgeDocumentContext.Touch(db);
+            db.ObjectAppended += (_, _) => BridgeDocumentContext.Touch(db);
+            db.ObjectErased += (_, _) => BridgeDocumentContext.Touch(db);
+            return new object();
+        });
+    }
 
     public void Start() => _server.Start();
 

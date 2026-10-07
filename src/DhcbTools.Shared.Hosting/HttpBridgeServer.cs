@@ -19,6 +19,7 @@ namespace DhcbTools.Shared.Hosting
     ///   GET  /health          — không cần token, chỉ trả trạng thái + phiên bản (không lộ tên file, tên lệnh)
     ///   GET  /tools           — cần token; danh sách lệnh + schema tóm tắt (nguồn cho MCP server và agent)
     ///   GET  /progress/&lt;id&gt;   — cần token; trạng thái lệnh chạy nền (giai đoạn 10.5)
+    ///   POST /cancel/&lt;id&gt;     — cần token; chỉ hủy việc còn xếp hàng, giữ việc đã nhận chạy
     ///   POST /execute         — cần token; { "command": "...", "config": {...}, "async": true|false }
     ///   POST /query           — cần token; { "query": "...", "params": {...} }
     ///   POST /chat            — cần token; { "text": "..." } → đề xuất lệnh (KHÔNG thực thi)
@@ -125,13 +126,15 @@ namespace DhcbTools.Shared.Hosting
             }
 
             _cts = new CancellationTokenSource();
-            _listenTask = Task.Run(() => ListenLoop(_cts.Token));
+            var sessionToken = _cts.Token;
+            _listenTask = Task.Run(() => ListenLoop(sessionToken));
             Log?.Invoke("[DHCB Bridge] " + AppName + " lắng nghe tại http://127.0.0.1:" + Port + "/ (token: " + BridgeTokenStore.DefaultPath + ")");
         }
 
         public void Stop()
         {
             _cts?.Cancel();
+            _jobs.AbandonQueued("Bridge đã dừng trước khi nhận lệnh — lệnh KHÔNG chạy.", DateTime.UtcNow);
             try { _listener.Stop(); } catch { /* đang dừng */ }
             try { _listenTask?.Wait(2000); } catch { /* timeout ok */ }
         }
@@ -150,13 +153,13 @@ namespace DhcbTools.Shared.Hosting
                     break;
                 }
 
-                // Không truyền ct: request đã nhận phải luôn được trả lời (kể cả khi đang Stop), nếu không
-                // client treo tới timeout của chính nó. Vòng lặp đã tự thoát khi ct huỷ.
-                _ = Task.Run(() => HandleRequest(ctx));
+                // Không dùng ct để hủy Task.Run: request đã nhận phải luôn được trả lời (kể cả khi Stop).
+                // Vẫn mang token phiên vào handler để việc chưa chạy không hồi sinh sau khi Start lại.
+                _ = Task.Run(() => HandleRequest(ctx, ct));
             }
         }
 
-        private void HandleRequest(HttpListenerContext ctx)
+        private void HandleRequest(HttpListenerContext ctx, CancellationToken sessionToken)
         {
             var req = ctx.Request;
             var res = ctx.Response;
@@ -223,7 +226,7 @@ namespace DhcbTools.Shared.Hosting
 
                 if (req.HttpMethod != "POST")
                 {
-                    WriteJson(res, 405, new { error = "Chỉ hỗ trợ GET /health, GET /tools, GET /progress/<id>, POST /execute, POST /query, POST /chat" });
+                    WriteJson(res, 405, new { error = "Chỉ hỗ trợ GET /health, GET /tools, GET /progress/<id>, POST /cancel/<id>, POST /execute, POST /query, POST /chat" });
                     return;
                 }
 
@@ -248,10 +251,16 @@ namespace DhcbTools.Shared.Hosting
                     return;
                 }
 
+                if (path.StartsWith("/cancel/", StringComparison.Ordinal))
+                {
+                    HandleCancel(res, path.Substring("/cancel/".Length));
+                    return;
+                }
+
                 switch (path)
                 {
                     case "/execute":
-                        HandleExecute(res, body);
+                        HandleExecute(res, body, sessionToken);
                         return;
                     case "/query":
                         HandleQuery(res, body);
@@ -341,7 +350,7 @@ namespace DhcbTools.Shared.Hosting
             }
         }
 
-        private void HandleExecute(HttpListenerResponse res, string body)
+        private void HandleExecute(HttpListenerResponse res, string body, CancellationToken sessionToken)
         {
             BridgeRequest? request;
             try
@@ -368,7 +377,7 @@ namespace DhcbTools.Shared.Hosting
 
             if (request.Async)
             {
-                HandleExecuteAsync(res, request);
+                HandleExecuteAsync(res, request, sessionToken);
                 return;
             }
 
@@ -410,11 +419,12 @@ namespace DhcbTools.Shared.Hosting
         /// <see cref="MaxTimeout"/>): quá hạn → Abandoned, không bao giờ chạy. Hàng đợi có trần
         /// <see cref="BridgeJobStore.MaxQueued"/> → 429.
         /// </summary>
-        private void HandleExecuteAsync(HttpListenerResponse res, BridgeRequest request)
+        private void HandleExecuteAsync(HttpListenerResponse res, BridgeRequest request, CancellationToken sessionToken)
         {
             var timeout = ResolveTimeout(request.TimeoutSeconds);
             var now = DateTime.UtcNow;
-            var job = _jobs.TryAdd(request.Command, now, timeout);
+            var item = new BridgeWorkItem<BridgeRequest, CommandResult>(request);
+            var job = _jobs.TryAdd(request.Command, now, timeout, tryAbandonWork: item.MarkAbandoned);
             if (job == null)
             {
                 WriteJson(res, 429, new
@@ -425,10 +435,12 @@ namespace DhcbTools.Shared.Hosting
                 return;
             }
 
-            var item = new BridgeWorkItem<BridgeRequest, CommandResult>(request);
             item.OnClaimed = job.MarkStarted;
-            job.TryAbandonWork = item.MarkAbandoned;
             AttachCompletion(job, item);
+
+            // Stop có thể chen giữa nhận HTTP và đăng ký job. Không để việc của phiên cũ chạy muộn.
+            if (sessionToken.IsCancellationRequested)
+                job.Abandon("Bridge đã dừng trước khi nhận lệnh — lệnh KHÔNG chạy.", DateTime.UtcNow);
 
             // Đồng hồ hạn nhận việc: hết giờ mà chưa ai claim → huỷ (MarkAbandoned) rồi ghi Abandoned.
             _ = Task.Delay(timeout).ContinueWith(_ =>
@@ -458,7 +470,7 @@ namespace DhcbTools.Shared.Hosting
             WriteJson(res, 202, new
             {
                 id = job.Id,
-                status = "running",
+                status = StatusName(job.Status),
                 command = job.Command,
                 progressUrl = "/progress/" + job.Id,
                 timeoutSeconds = (int)timeout.TotalSeconds,
@@ -506,6 +518,29 @@ namespace DhcbTools.Shared.Hosting
                 elapsedMs = job.ElapsedMs(now),
                 result = job.Result,
                 error = job.Error,
+            });
+        }
+
+        private void HandleCancel(HttpListenerResponse res, string id)
+        {
+            var job = _jobs.Find(id);
+            if (job == null)
+            {
+                WriteJson(res, 404, new { error = "Không có lệnh nền mang id này (sai id hoặc kết quả đã hết hạn)." });
+                return;
+            }
+
+            job.Abandon("Đã hủy theo yêu cầu trước khi nhận việc — lệnh KHÔNG chạy.", DateTime.UtcNow);
+            var status = job.Status;
+            var stillRunning = status == BridgeJobStatus.Running;
+            WriteJson(res, stillRunning ? 409 : 200, new
+            {
+                id = job.Id,
+                status = StatusName(status),
+                started = job.Started,
+                cancelled = status == BridgeJobStatus.Abandoned,
+                progressUrl = "/progress/" + job.Id,
+                error = stillRunning ? "Lệnh đã được nhận: không hủy cưỡng bức transaction. Hỏi progress để lấy kết quả; KHÔNG gửi lại lệnh." : null,
             });
         }
 

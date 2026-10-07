@@ -39,7 +39,14 @@ MAX_BODY_BYTES = 64 * 1024
 # chỉ khớp tên không có dấu chấm. Trên máy công ty có proxy cấu hình tĩnh, request tới Bridge vì thế đi ra proxy
 # kèm header "Authorization: Bearer <token>" và cả config lệnh: lộ token cho proxy, còn lệnh thì không tới được Bridge.
 # server.py dùng chung opener này.
-LOOPBACK = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Không để redirect mang Bearer/prompt từ loopback sang một địa chỉ khác."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+LOOPBACK = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
 ALLOWED_QUERIES = {
     "drawing_info", "layers", "blocks", "inserts", "entities",
     "text", "xrefs", "layouts", "stats",
