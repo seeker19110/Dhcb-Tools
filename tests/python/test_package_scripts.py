@@ -115,6 +115,40 @@ class PackageScriptsTests(unittest.TestCase):
         major = re.search(r"--version=(\d+)\.", installs[0]).group(1)
         self.assertIn(f"Inno Setup {major}\\ISCC.exe", release)
 
+    def test_inno_setup_co_installdelete_va_update_packagecontents(self) -> None:
+        """Kiểm tra installer gỡ DLL/bundle cũ khi bỏ chọn thành phần và lọc PackageContents.xml."""
+        text = INSTALLER.read_text(encoding="utf-8")
+        self.assertIn("[InstallDelete]", text)
+        self.assertIn("not revit2024", text)
+        self.assertIn("not acad2024", text)
+        self.assertIn("procedure UpdatePackageContents", text)
+        self.assertIn("procedure RemoveXmlBlock", text)
+
+        # Mô phỏng RemoveXmlBlock trên PackageContents.xml thật
+        xml_text = (ROOT / "installer" / "PackageContents.xml").read_text(encoding="utf-8")
+        import xml.etree.ElementTree as ET
+
+        # Parse XML gốc
+        root = ET.fromstring(xml_text)
+        components_before = root.findall("Components")
+        self.assertEqual(len(components_before), 3)
+
+        # Mô phỏng xoá block AutoCAD 2024
+        marker = '<Components Description="AutoCAD 2024">'
+        p1 = xml_text.find(marker)
+        self.assertGreater(p1, -1)
+        substr = xml_text[p1:]
+        p2 = substr.find("</Components>")
+        self.assertGreater(p2, -1)
+        filtered_xml = xml_text[:p1] + xml_text[p1 + p2 + len("</Components>"):]
+
+        root_after = ET.fromstring(filtered_xml)
+        components_after = root_after.findall("Components")
+        self.assertEqual(len(components_after), 2)
+        descriptions = [c.attrib.get("Description") for c in components_after]
+        self.assertNotIn("AutoCAD 2024", descriptions)
+        self.assertIn("AutoCAD 2025", descriptions)
+
 
 if __name__ == "__main__":
     unittest.main()
