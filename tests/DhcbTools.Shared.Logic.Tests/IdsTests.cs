@@ -155,11 +155,21 @@ public class IdsSpecTests
     }
 
     [Fact]
-    public void SpecificationKhongCoYeuCau_LaLoi()
+    public void SpecificationKhongCoYeuCau_LaLoi_TruKhiApplicabilityLaDieuKien()
     {
+        // Tuỳ chọn mà không có yêu cầu: không kiểm gì cả.
         var ex = Assert.Throws<IdsParseException>(() => Parse(
-            "<specification name=\"Rỗng\"><applicability><entity><name><simpleValue>IfcWall</simpleValue></name></entity></applicability></specification>"));
+            "<specification name=\"Rỗng\"><applicability minOccurs=\"0\"><entity><name><simpleValue>IfcWall</simpleValue></name></entity></applicability></specification>"));
         Assert.Contains("luôn đạt", ex.Message);
+
+        // Bắt buộc + có lọc: "mô hình phải có ít nhất một tường" — IDS 1.0 hợp lệ (bộ ca buildingSMART "there must be…").
+        var spec = Assert.Single(Parse(
+            "<specification name=\"Phải có tường\"><applicability><entity><name><simpleValue>IfcWall</simpleValue></name></entity></applicability></specification>"));
+        Assert.Empty(spec.Requirements);
+        var none = IdsEvaluator.Check(new[] { spec }, new[] { new FakeIdsElement { IfcEntity = "IfcSlab" } });
+        Assert.False(none.AllPassed);
+        var one = IdsEvaluator.Check(new[] { spec }, new[] { new FakeIdsElement { IfcEntity = "IfcWall" } });
+        Assert.True(one.AllPassed);
     }
 
     [Fact]

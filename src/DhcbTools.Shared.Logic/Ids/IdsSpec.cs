@@ -142,16 +142,11 @@ namespace DhcbTools.Shared.Logic.Ids
         public bool Accepts(string? text)
         {
             var value = (text ?? string.Empty).Trim();
-            if (value.Length == 0)
-            {
-                return false;
-            }
+            return value.Length > 0 && (IsAny || AcceptsText(value));
+        }
 
-            if (IsAny)
-            {
-                return true;
-            }
-
+        private bool AcceptsText(string value)
+        {
             if (!string.IsNullOrEmpty(Simple) && !ValuesEqual(value, Simple!))
             {
                 return false;
@@ -182,39 +177,29 @@ namespace DhcbTools.Shared.Logic.Ids
                 }
             }
 
-            if (Length != null && value.Length != Length.Value)
-            {
-                return false;
-            }
-
-            if (MinLength != null && value.Length < MinLength.Value)
-            {
-                return false;
-            }
-
-            if (MaxLength != null && value.Length > MaxLength.Value)
+            if (!LengthOk(value))
             {
                 return false;
             }
 
             if (MinInclusive != null || MaxInclusive != null || MinExclusive != null || MaxExclusive != null)
             {
-                if (!TryNumber(value, out var number))
-                {
-                    return false;
-                }
-
-                if (!((MinInclusive == null || number >= MinInclusive)
-                      && (MaxInclusive == null || number <= MaxInclusive)
-                      && (MinExclusive == null || number > MinExclusive)
-                      && (MaxExclusive == null || number < MaxExclusive)))
-                {
-                    return false;
-                }
+                return TryNumber(value, out var number) && BoundsOk(number);
             }
 
             return true;
         }
+
+        private bool LengthOk(string value) =>
+            (Length == null || value.Length == Length.Value)
+            && (MinLength == null || value.Length >= MinLength.Value)
+            && (MaxLength == null || value.Length <= MaxLength.Value);
+
+        private bool BoundsOk(double number) =>
+            (MinInclusive == null || number >= MinInclusive)
+            && (MaxInclusive == null || number <= MaxInclusive)
+            && (MinExclusive == null || number > MinExclusive)
+            && (MaxExclusive == null || number < MaxExclusive);
 
         /// <summary>
         /// Hai giá trị bằng nhau: cả hai là số thì so số theo <see cref="NumericTolerance"/> (<c>0.3</c> bằng
@@ -227,15 +212,57 @@ namespace DhcbTools.Shared.Logic.Ids
         {
             if (TryNumber(actual, out var a) && TryNumber(expected, out var b))
             {
-                // × (1 + 1e-9): bộ ca đặt giá trị ĐÚNG trên biên, mà trong double |1.000002 − 1| = 2.0000000003e-6
-                // > 2e-6 — thiếu phần đệm này thì 8/14 ca "pass" của buildingSMART trượt vì sai số làm tròn.
-                return Math.Abs(a - b) <= (Math.Abs(b) * NumericTolerance + NumericTolerance) * (1 + 1e-9);
+                return ValuesEqual(a, b);
             }
 
             return string.Equals(actual, expected, StringComparison.Ordinal);
         }
 
-        private static bool TryNumber(string text, out double number)
+        /// <summary>Hai số bằng nhau theo dung sai IDS 1.0 (<see cref="NumericTolerance"/>).</summary>
+        internal static bool ValuesEqual(double actual, double expected)
+        {
+            // × (1 + 1e-9): bộ ca đặt giá trị ĐÚNG trên biên, mà trong double |1.000002 − 1| = 2.0000000003e-6
+            // > 2e-6 — thiếu phần đệm này thì 8/14 ca "pass" của buildingSMART trượt vì sai số làm tròn.
+            return Math.Abs(actual - expected) <= (Math.Abs(expected) * NumericTolerance + NumericTolerance) * (1 + 1e-9);
+        }
+
+        /// <summary>
+        /// Giá trị CÓ KIỂU có thoả không — như <see cref="Accepts(string)"/> nhưng theo kiểu của giá trị: so bằng/liệt kê
+        /// ép chuỗi IDS về kiểu đó (<see cref="IdsTypedValue.EqualsText"/>), pattern chỉ áp cho chuỗi (IDS: "patterns always
+        /// fail on any number"), biên số chỉ áp cho số hoặc chuỗi đọc được thành số. Tham chiếu và tập hợp chỉ đạt khi không
+        /// ràng buộc giá trị — IDS không so được chúng với chuỗi nào.
+        /// </summary>
+        public bool AcceptsTyped(IdsTypedValue value)
+        {
+            if (IsAny)
+            {
+                return true;
+            }
+
+            if (value.Kind == IdsTypedKind.String)
+            {
+                // Chuỗi: giữ nguyên luật cũ (đã khớp bộ ca), trừ việc không cắt khoảng trắng hai đầu.
+                return value.Text.Length > 0 && AcceptsText(value.Text);
+            }
+
+            if (value.Kind == IdsTypedKind.Reference || value.Kind == IdsTypedKind.Aggregate || !string.IsNullOrEmpty(Pattern))
+            {
+                return false;
+            }
+
+            if ((!string.IsNullOrEmpty(Simple) && !value.EqualsText(Simple!))
+                || (Enumeration.Count > 0 && !Enumeration.Any(value.EqualsText))
+                || !LengthOk(value.Text))
+            {
+                return false;
+            }
+
+            return value.Kind == IdsTypedKind.Boolean
+                ? MinInclusive == null && MaxInclusive == null && MinExclusive == null && MaxExclusive == null
+                : BoundsOk(value.Number);
+        }
+
+        internal static bool TryNumber(string text, out double number)
         {
             // "3." (STEP real) hợp lệ với NumberStyles.Float; NaN/∞ không phải số đo.
             if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out number)
@@ -527,8 +554,11 @@ namespace DhcbTools.Shared.Logic.Ids
 
                 // Specification không có yêu cầu nào thì luôn đạt. Nhận nó là in ra một dòng "✓" cho một
                 // điều kiện chưa ai viết — đúng loại no-op im lặng mà E-PRECOND sinh ra để chặn.
-                // Ngoại lệ đúng chuẩn: specification CẤM (maxOccurs="0") — applicability chính là điều kiện.
-                if (spec.Requirements.Count == 0 && !spec.IsProhibited)
+                // Ngoại lệ đúng chuẩn, vì khi đó applicability CHÍNH LÀ điều kiện: specification CẤM (maxOccurs="0"
+                // — "không được có X"), và specification BẮT BUỘC có lọc applicability ("mô hình phải có ít nhất một
+                // X" — bộ ca buildingSMART "there must be an airterminal…"). Chỉ còn từ chối khi không có gì để kiểm:
+                // tuỳ chọn, hoặc applicability rỗng (mọi mô hình có phần tử đều đạt).
+                if (spec.Requirements.Count == 0 && !spec.IsProhibited && (spec.MinOccurs == 0 || spec.Applicability.Count == 0))
                 {
                     throw new IdsParseException(
                         "Specification \"" + spec.Name + "\" không có <requirements> nào — nó sẽ luôn đạt, tức là không kiểm gì cả.");

@@ -20,12 +20,12 @@ namespace DhcbTools.Shared.Logic.Ids
     /// (qua <c>IfcRelDefinesByType</c>) được thừa kế xuống phần tử.
     /// </para>
     /// </summary>
-    public sealed class IfcIdsModel
+    public sealed partial class IfcIdsModel
     {
         private readonly IfcModel _model;
         private readonly Dictionary<int, int> _typeOf = new Dictionary<int, int>();
         private readonly Dictionary<int, List<string>> _materials = new Dictionary<int, List<string>>();
-        private readonly Dictionary<int, List<KeyValuePair<string, string>>> _classifications = new Dictionary<int, List<KeyValuePair<string, string>>>();
+        private readonly Dictionary<int, List<KeyValuePair<string, string?>>> _classifications = new Dictionary<int, List<KeyValuePair<string, string?>>>();
         private readonly Dictionary<int, List<(string? Relation, string Entity)>> _partOf = new Dictionary<int, List<(string?, string)>>();
 
         /// <summary>Như <see cref="_partOf"/> nhưng giữ số hiệu tổ tiên — để đọc PredefinedType của nó.</summary>
@@ -84,8 +84,8 @@ namespace DhcbTools.Shared.Logic.Ids
         internal IReadOnlyList<string> MaterialsOf(int id) =>
             _materials.TryGetValue(id, out var list) ? list : (IReadOnlyList<string>)Array.Empty<string>();
 
-        internal IReadOnlyList<KeyValuePair<string, string>> ClassificationsOf(int id) =>
-            _classifications.TryGetValue(id, out var list) ? list : (IReadOnlyList<KeyValuePair<string, string>>)Array.Empty<KeyValuePair<string, string>>();
+        internal IReadOnlyList<KeyValuePair<string, string?>> ClassificationsOf(int id) =>
+            _classifications.TryGetValue(id, out var list) ? list : (IReadOnlyList<KeyValuePair<string, string?>>)Array.Empty<KeyValuePair<string, string?>>();
 
         internal IReadOnlyList<(string? Relation, string Entity)> PartOfOf(int id) =>
             _partOf.TryGetValue(id, out var list) ? list : (IReadOnlyList<(string?, string)>)Array.Empty<(string?, string)>();
@@ -247,23 +247,28 @@ namespace DhcbTools.Shared.Logic.Ids
         /// <summary>
         /// Phân loại: mỗi tham chiếu cho (hệ, mã). Hệ = <c>Name</c> của <c>IfcClassification</c> ở gốc chuỗi
         /// <c>ReferencedSource</c>; mã = <c>Identification</c> (IFC4) / <c>ItemReference</c> (IFC2X3) — cùng vị trí 1.
-        /// Tham chiếu cha trong chuỗi cũng tính (IfcTester gộp "inherited references").
+        /// Tham chiếu cha trong chuỗi cũng tính (IfcTester gộp "inherited references"). Gắn thẳng một
+        /// <c>IfcClassification</c> (không qua tham chiếu) cho một cặp mã <c>null</c>: phần tử CÓ phân loại theo hệ đó.
+        /// Nguồn: <c>IfcRelAssociatesClassification</c> (đối tượng) và <c>IfcExternalReferenceRelationship</c> (tài
+        /// nguyên không có GlobalId như <c>IfcMaterial</c>). Phân loại của KIỂU thừa kế xuống phần tử theo TỪNG HỆ:
+        /// hệ nào phần tử tự khai thì của phần tử thắng, hệ khác vẫn lấy của kiểu — như IfcOpenShell
+        /// <c>get_references</c>. Bản trước bỏ hẳn phân loại của kiểu khi phần tử có bất kỳ phân loại nào.
         /// </summary>
         private void BuildClassifications()
         {
-            // IfcRelAssociatesClassification: (…, RelatedObjects=4, RelatingClassification=5)
-            foreach (var rel in _model.OfType("IFCRELASSOCIATESCLASSIFICATION"))
+            var expanded = new Dictionary<int, List<(int Root, KeyValuePair<string, string?> Pair)>>();
+
+            List<(int Root, KeyValuePair<string, string?> Pair)> Expand(int refId)
             {
-                var refId = rel.At(5).AsReference();
-                if (refId == null)
+                if (expanded.TryGetValue(refId, out var cached))
                 {
-                    continue;
+                    return cached;
                 }
 
-                var pairs = new List<KeyValuePair<string, string>>();
+                var codes = new List<string?>();
                 var system = string.Empty;
-                var chain = new List<string>();
-                var current = _model.ById(refId.Value);
+                var root = -refId;
+                var current = _model.ById(refId);
                 var guard = 0;
                 while (current != null && guard++ < 32)
                 {
@@ -271,6 +276,12 @@ namespace DhcbTools.Shared.Logic.Ids
                     {
                         // IfcClassification: (Source, Edition, EditionDate, Name, …)
                         system = current.At(3).AsText() ?? string.Empty;
+                        root = current.Id;
+                        if (codes.Count == 0)
+                        {
+                            codes.Add(null);
+                        }
+
                         break;
                     }
 
@@ -278,36 +289,75 @@ namespace DhcbTools.Shared.Logic.Ids
                     var code = current.At(1).AsText();
                     if (!string.IsNullOrEmpty(code))
                     {
-                        chain.Add(code!);
+                        codes.Add(code);
                     }
 
                     var next = current.At(3).AsReference();
                     current = next == null ? null : _model.ById(next.Value);
                 }
 
-                foreach (var code in chain)
+                var list = codes.Select(c => (root, new KeyValuePair<string, string?>(system, c))).ToList();
+                expanded[refId] = list;
+                return list;
+            }
+
+            var direct = new Dictionary<int, List<(int Root, KeyValuePair<string, string?> Pair)>>();
+            void Associate(int? refId, IEnumerable<int> targets)
+            {
+                if (refId == null)
                 {
-                    pairs.Add(new KeyValuePair<string, string>(system, code));
+                    return;
                 }
 
-                if (pairs.Count == 0)
+                var pairs = Expand(refId.Value);
+                foreach (var target in targets)
                 {
-                    continue;
-                }
-
-                foreach (var target in References(rel.At(4)))
-                {
-                    if (!_classifications.TryGetValue(target, out var list))
+                    if (!direct.TryGetValue(target, out var list))
                     {
-                        list = new List<KeyValuePair<string, string>>();
-                        _classifications[target] = list;
+                        list = new List<(int, KeyValuePair<string, string?>)>();
+                        direct[target] = list;
                     }
 
                     list.AddRange(pairs);
                 }
             }
 
-            InheritFromType(_classifications);
+            // IfcRelAssociatesClassification: (…, RelatedObjects=4, RelatingClassification=5)
+            foreach (var rel in _model.OfType("IFCRELASSOCIATESCLASSIFICATION"))
+            {
+                Associate(rel.At(5).AsReference(), References(rel.At(4)));
+            }
+
+            // IfcExternalReferenceRelationship (IFC4): (Name, Description, RelatingReference=2, RelatedResourceObjects=3)
+            foreach (var rel in _model.OfType("IFCEXTERNALREFERENCERELATIONSHIP"))
+            {
+                var reference = rel.At(2).AsReference();
+                var type = reference == null ? null : _model.ById(reference.Value)?.Type;
+                if (type == "IFCCLASSIFICATIONREFERENCE" || type == "IFCCLASSIFICATION")
+                {
+                    Associate(reference, References(rel.At(3)));
+                }
+            }
+
+            foreach (var pair in direct)
+            {
+                var own = pair.Value;
+                if (_typeOf.TryGetValue(pair.Key, out var typeId) && direct.TryGetValue(typeId, out var fromType))
+                {
+                    var ownSystems = new HashSet<int>(own.Select(e => e.Root));
+                    own = own.Concat(fromType.Where(e => !ownSystems.Contains(e.Root))).ToList();
+                }
+
+                _classifications[pair.Key] = own.Select(e => e.Pair).ToList();
+            }
+
+            foreach (var pair in _typeOf)
+            {
+                if (!direct.ContainsKey(pair.Key) && direct.TryGetValue(pair.Value, out var fromType))
+                {
+                    _classifications[pair.Key] = fromType.Select(e => e.Pair).ToList();
+                }
+            }
         }
 
         /// <summary>
@@ -671,7 +721,7 @@ namespace DhcbTools.Shared.Logic.Ids
     }
 
     /// <summary>Một thực thể IFC nhìn dưới con mắt IDS. Toàn bộ chỗ dịch IFC → IDS nằm ở đây.</summary>
-    public sealed class IfcIdsElement : IIdsElement, IIdsElementDetails
+    public sealed partial class IfcIdsElement : IIdsElement, IIdsElementDetails, IIdsTypedElement
     {
         // Vị trí tham số theo lược đồ IFC — giống nhau ở mọi lớp con của IfcObject/IfcTypeObject:
         // IfcRoot: GlobalId 0, OwnerHistory 1, Name 2, Description 3. IfcObject: ObjectType 4.
@@ -860,12 +910,15 @@ namespace DhcbTools.Shared.Logic.Ids
         {
             foreach (var pair in _model.ClassificationsOf(_entity.Id))
             {
-                if (string.IsNullOrWhiteSpace(system) || string.Equals(pair.Key, system, StringComparison.OrdinalIgnoreCase))
+                if (pair.Value != null && (string.IsNullOrWhiteSpace(system) || string.Equals(pair.Key, system, StringComparison.OrdinalIgnoreCase)))
                 {
                     yield return pair.Value;
                 }
             }
         }
+
+        /// <inheritdoc />
+        public IReadOnlyList<KeyValuePair<string, string?>> ClassificationReferences() => _model.ClassificationsOf(_entity.Id);
 
         /// <summary>Tên vật liệu, tên lớp/thành phần và Category của chúng.</summary>
         public IEnumerable<string> Materials => _model.MaterialsOf(_entity.Id);
