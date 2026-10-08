@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using Newtonsoft.Json;
 
@@ -99,11 +100,12 @@ namespace DhcbTools.Shared.Logic.Batch
 
         /// <summary>
         /// Bước in PDF không hộp thoại bằng <c>-PLOT</c> (mục 7.13, thay batch plot): layout, thiết bị "DWG To PDF.pc3",
-        /// khổ giấy, hướng, tỉ lệ Fit, vùng in Extents/Layout, plot style. Mỗi tham số một dòng theo đúng thứ tự prompt của
+        /// khổ giấy, hướng, tỷ lệ cấu hình, vùng in Extents/Layout, plot style. Mỗi tham số một dòng theo đúng thứ tự prompt của
         /// AutoCAD 2018+. Layout rỗng = "Model".
         /// </summary>
         public static string PlotPdf(string outputPdfPath, string layout = "Model", string paperSize = "ISO A3 (420.00 x 297.00 MM)",
-            string orientation = "Landscape", string plotArea = "Extents", string plotStyle = "monochrome.ctb", string device = "DWG To PDF.pc3")
+            string orientation = "Landscape", string plotArea = "Extents", string plotStyle = "monochrome.ctb", string device = "DWG To PDF.pc3",
+            string? plotScale = null, string? pageSetupName = null)
         {
             if (string.IsNullOrWhiteSpace(outputPdfPath))
             {
@@ -112,7 +114,25 @@ namespace DhcbTools.Shared.Logic.Batch
 
             var isModel = string.IsNullOrEmpty(layout) || layout.Equals("Model", StringComparison.OrdinalIgnoreCase);
             var sb = new StringBuilder();
+            if (pageSetupName == null)
+            {
+                var area = plotArea.ToUpperInvariant();
+                if (area != "EXTENTS" && area != "DISPLAY" && area != "LIMITS" && area != "LAYOUT")
+                    throw new ArgumentException("plotArea hỗ trợ Extents/Display/Limits/ Layout; Window và View cần thêm prompt chưa hỗ trợ.");
+                if ((isModel && area == "LAYOUT") || (!isModel && area == "LIMITS"))
+                    throw new ArgumentException("Layout chỉ dùng với paper space; Limits chỉ dùng với Model.");
+            }
+            var scale = NormalizePlotScale(plotScale, isModel);
+            if (pageSetupName != null && (string.IsNullOrWhiteSpace(pageSetupName) || pageSetupName.IndexOfAny(new[] { '\r', '\n' }) >= 0))
+                throw new ArgumentException("Tên page setup không được rỗng hoặc có ký tự xuống dòng.", nameof(pageSetupName));
             sb.Append("-PLOT\n");
+            if (pageSetupName != null)
+            {
+                sb.Append("N\n").Append(isModel ? "Model" : Escape(layout)).Append('\n');
+                sb.Append(Escape(pageSetupName)).Append('\n').Append(Escape(device)).Append('\n');
+                sb.Append(Escape(outputPdfPath)).Append("\nN\nY\n");
+                return sb.ToString();
+            }
             sb.Append("Y\n");                                   // Detailed plot configuration? Yes
             sb.Append(isModel ? "Model\n" : Escape(layout) + "\n"); // layout name
             sb.Append(Escape(device)).Append("\n");              // output device
@@ -121,8 +141,8 @@ namespace DhcbTools.Shared.Logic.Batch
             sb.Append(Escape(orientation)).Append("\n");         // orientation
             sb.Append("N\n");                                   // plot upside down? No
             sb.Append(Escape(plotArea)).Append("\n");            // plot area: Extents / Layout / Display
-            sb.Append("Fit\n");                                 // scale
-            sb.Append("Center\n");                              // plot offset
+            sb.Append(scale).Append("\n");                       // scale
+            sb.Append(plotArea.Equals("Layout", StringComparison.OrdinalIgnoreCase) ? "0,0\n" : "Center\n"); // paper origin
             sb.Append("Y\n");                                   // plot with plot styles
             sb.Append(Escape(plotStyle)).Append("\n");           // plot style table
             sb.Append("Y\n");                                   // plot with lineweights
@@ -140,6 +160,46 @@ namespace DhcbTools.Shared.Logic.Batch
             sb.Append("N\n");                                   // save changes to page setup? No
             sb.Append("Y\n");                                   // proceed with plot
             return sb.ToString();
+        }
+
+        /// <summary>Tỷ lệ mm trên giấy = đơn vị bản vẽ; Layout mặc định 1:1, Model giữ Fit.</summary>
+        public static string NormalizePlotScale(string? scale, bool isModel)
+        {
+            if (scale == null) return isModel ? "Fit" : "1=1";
+            scale = scale.Trim();
+            if (scale.Equals("Fit", StringComparison.OrdinalIgnoreCase)) return "Fit";
+            var parts = scale.Replace(':', '=').Split('=');
+            if (parts.Length < 1 || parts.Length > 2) throw new ArgumentException("plotScale cần Fit, số dương hoặc tỷ lệ 1=100.");
+            for (var i = 0; i < parts.Length; i++)
+            {
+                if (!double.TryParse(parts[i], NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var value)
+                    || double.IsNaN(value) || double.IsInfinity(value) || value <= 0)
+                    throw new ArgumentException("plotScale cần Fit, số dương hoặc tỷ lệ 1=100.");
+                parts[i] = value.ToString("G", CultureInfo.InvariantCulture);
+            }
+            return string.Join("=", parts);
+        }
+
+        /// <summary>Core Console thường ghi UTF-16LE không BOM; host giả và bản khác có thể dùng UTF-8.</summary>
+        public static string DecodeConsole(byte[] bytes)
+        {
+            if (bytes.Length >= 2 && bytes[0] == 0xff && bytes[1] == 0xfe)
+                return Encoding.Unicode.GetString(bytes, 2, bytes.Length - 2);
+            if (bytes.Length >= 2 && bytes[0] == 0xfe && bytes[1] == 0xff)
+                return Encoding.BigEndianUnicode.GetString(bytes, 2, bytes.Length - 2);
+            var pairs = Math.Min(bytes.Length / 2, 256);
+            var oddZeros = 0;
+            var evenZeros = 0;
+            for (var i = 0; i < pairs; i++)
+            {
+                if (bytes[i * 2] == 0) evenZeros++;
+                if (bytes[i * 2 + 1] == 0) oddZeros++;
+            }
+            if (pairs >= 4 && oddZeros > pairs / 2 && evenZeros < pairs / 4)
+                return Encoding.Unicode.GetString(bytes);
+            if (pairs >= 4 && evenZeros > pairs / 2 && oddZeros < pairs / 4)
+                return Encoding.BigEndianUnicode.GetString(bytes);
+            return Encoding.UTF8.GetString(bytes).TrimStart('\ufeff');
         }
 
         /// <summary>Từ khoá phiên bản DWG hợp lệ cho SAVEAS; sai/trống → 2018.</summary>

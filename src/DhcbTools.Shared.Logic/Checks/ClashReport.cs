@@ -11,7 +11,7 @@ namespace DhcbTools.Shared.Logic.Checks
     public sealed class ClashRecord
     {
         public ClashRecord(long idA, string? categoryA, string? nameA, long idB, string? categoryB,
-            double xMm, double yMm, double zMm, string key, string? linkName)
+            double xMm, double yMm, double zMm, string key, string? linkName, ClassifiedClash? classification = null)
         {
             IdA = idA;
             CategoryA = categoryA ?? string.Empty;
@@ -23,6 +23,7 @@ namespace DhcbTools.Shared.Logic.Checks
             ZMm = zMm;
             Key = key ?? throw new ArgumentNullException(nameof(key));
             LinkName = linkName;
+            Classification = classification;
         }
 
         public long IdA { get; }
@@ -46,6 +47,9 @@ namespace DhcbTools.Shared.Logic.Checks
 
         /// <summary>Tên link chứa phần tử B; null = cùng file.</summary>
         public string? LinkName { get; }
+
+        /// <summary>Phân loại ước lượng từ hộp bao; không thay phép đo khoảng cách/độ sâu solid.</summary>
+        public ClassifiedClash? Classification { get; }
 
         public bool FromLink => LinkName != null;
 
@@ -174,7 +178,11 @@ namespace DhcbTools.Shared.Logic.Checks
                 sb.Append("<tr><td>").Append(i++).Append("</td><td>").Append(c.IdA).Append("</td><td>").Append(HtmlText.Escape(c.CategoryA))
                   .Append("</td><td>").Append(c.IdB).Append("</td><td>").Append(HtmlText.Escape(c.CategoryB))
                   .Append("</td><td>").Append(c.XMm.ToString("F0", CultureInfo.InvariantCulture)).Append("</td><td>").Append(c.YMm.ToString("F0", CultureInfo.InvariantCulture)).Append("</td><td>").Append(c.ZMm.ToString("F0", CultureInfo.InvariantCulture))
-                  .Append("</td><td><code>").Append(HtmlText.Escape(c.Key)).Append("</code></td></tr>");
+                  .Append("</td><td><code>").Append(HtmlText.Escape(c.Key)).Append("</code>");
+                if (c.Classification != null)
+                    sb.Append("<br>Phân loại ước lượng hộp bao: ").Append(HtmlText.Escape(c.Classification.ClashType.ToString()))
+                      .Append("<br>").Append(HtmlText.Escape(c.Classification.Recommendation));
+                sb.Append("</td></tr>");
             }
 
             sb.Append("</tbody></table></body></html>");
@@ -198,6 +206,13 @@ namespace DhcbTools.Shared.Logic.Checks
                     Target = new BcfPoint(c.XMm / 1000.0, c.YMm / 1000.0, c.ZMm / 1000.0),
                     Author = "DHCB Tools",
                 };
+                if (c.Classification != null)
+                {
+                    issue.Labels.Add(c.Classification.ClashType.ToString());
+                    issue.Description += " Phân loại ước lượng hộp bao: " + c.Classification.Recommendation;
+                    issue.ViewDistance = ClassifiedClash.CameraOffsetMm * Math.Sqrt(2.64) / 1000.0;
+                    issue.ViewDirection = c.Classification.ViewDirection;
+                }
                 issue.Labels.Add(c.FromLink ? "Với model liên kết" : "Trong file");
                 issue.Components.Add(new BcfComponent(c.IdA.ToString(), null, title));
                 issue.Components.Add(new BcfComponent(c.IdB.ToString(), null, c.LinkName ?? title));

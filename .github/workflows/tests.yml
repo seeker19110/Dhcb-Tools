@@ -118,6 +118,10 @@ jobs:
               -p:UseWPF=false -c Release
           done
 
+      - name: Build fixture nghiệm thu AutoCAD (không cài vào bundle)
+        if: matrix.version == '2026'
+        run: dotnet build tools/acceptance/DhcbTools.AutoCAD.Acceptance.csproj -c Release -p:AcadVersion=2026 -p:EnableWindowsTargeting=true
+
       - name: Kiểm tra script Python (ngưỡng phủ 100% câu lệnh)
         if: matrix.version == '2025'   # không phụ thuộc TFM, chạy một lần là đủ
         run: |
@@ -150,15 +154,15 @@ jobs:
         run: |
           $ps7Only = 'QuestionDot', 'QuestionQuestion', 'QuestionQuestionEquals', 'QuestionLBracket', 'AndAnd', 'OrOr', 'QuestionMark'
           $bad = 0
-          foreach ($f in Get-ChildItem scripts/*.ps1) {
+          foreach ($f in Get-ChildItem scripts/*.ps1, tools/acceptance/*.ps1) {
             $tokens = $null; $errors = $null
             [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$tokens, [ref]$errors) | Out-Null
             foreach ($e in $errors) {
-              Write-Host "::error file=scripts/$($f.Name),line=$($e.Extent.StartLineNumber)::$($e.Message)"
+              Write-Host "::error file=$($f.FullName),line=$($e.Extent.StartLineNumber)::$($e.Message)"
               $bad++
             }
             foreach ($t in @($tokens | Where-Object { $ps7Only -contains $_.Kind.ToString() })) {
-              Write-Host "::error file=scripts/$($f.Name),line=$($t.Extent.StartLineNumber)::'$($t.Text)' chỉ có ở PowerShell 7 — Windows PowerShell 5.1 báo lỗi cú pháp cả file."
+              Write-Host "::error file=$($f.FullName),line=$($t.Extent.StartLineNumber)::'$($t.Text)' chỉ có ở PowerShell 7 — Windows PowerShell 5.1 báo lỗi cú pháp cả file."
               $bad++
             }
           }

@@ -55,5 +55,6 @@
     "Cài: mở file .mcpb bằng Claude Desktop.",
     "Yêu cầu: Revit đang mở, add-in DHCB Tools đã nạp (Bridge nghe ở 127.0.0.1:8765).",
     "Không có dependency Python ngoài — dhcb_mcp_server.py chỉ dùng thư viện chuẩn."
-  ]
+  ],
+  "license": "Apache-2.0"
 }

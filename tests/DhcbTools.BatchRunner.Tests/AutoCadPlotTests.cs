@@ -142,4 +142,16 @@ public sealed class AutoCadPlotTests
         Assert.Equal("%PDF-old", File.ReadAllText(target));
         Assert.False(File.Exists(plot.Staging));
     }
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void InvalidScaleAndConflictingPageSetupFailBeforeCreatingDirectory(bool dryRun)
+    {
+        using var cli = new Cli();
+        var target = cli.Path_("missing", "drawing.pdf");
+        Assert.Throws<ArgumentException>(() => new AutoCadPlot(new JObject { ["plotScale"] = "1=0" }, target, dryRun));
+        Assert.Throws<ArgumentException>(() => new AutoCadPlot(new JObject { ["pageSetupName"] = "A3", ["plotScale"] = "1=100" }, target, dryRun));
+        Assert.False(Directory.Exists(Path.GetDirectoryName(target)));
+    }
+
 }

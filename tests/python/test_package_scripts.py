@@ -62,6 +62,14 @@ def commands(text: str) -> list[str]:
 
 
 class PackageScriptsTests(unittest.TestCase):
+    def test_non_ascii_powershell_files_have_utf8_bom_for_windows_51(self) -> None:
+        # 5.1 đọc file không BOM như ANSI; tiếng Việt có thể làm sai dấu nháy và hỏng cú pháp.
+        for script in list(SCRIPTS.glob("*.ps1")) + list((ROOT / "tools" / "acceptance").glob("*.ps1")):
+            with self.subTest(script=script.name):
+                raw = script.read_bytes()
+                if any(byte >= 128 for byte in raw):
+                    self.assertTrue(raw.startswith(b"\xef\xbb\xbf"), f"{script.name}: cần BOM UTF-8 cho Windows PowerShell 5.1")
+
     def test_moi_dong_la_mot_script_co_that_khong_trung(self) -> None:
         names = shipped()
         self.assertTrue(names)

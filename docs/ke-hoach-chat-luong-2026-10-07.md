@@ -1,5 +1,9 @@
 # Kế hoạch nâng chất lượng DHCB Tools — 2026-10-07
 
+> Tiếp nối 2026-10-08: [báo cáo nâng cấp vận hành](nang-cap-san-xuat-2026-10-08.md).
+> Apache-2.0 đã được chủ dự án chọn; chính sách ký tag, công cụ tổng hợp thí điểm và tính năng P2 đã có mã/test.
+> Bảng dưới giữ kết quả vòng 2026-10-07; nghiệm thu Revit/GUI và dữ liệu thực được theo dõi trong báo cáo mới.
+
 Mục tiêu: kỹ sư cài được, biết cấu hình, xem trước đáng tin, chạy không mất dữ liệu và nhận kết quả trung thực.
 Mốc bắt đầu: `af617fe`; nhánh triển khai: `feat/reliability-and-adoption`. Không tăng số lệnh Core chỉ để tăng bề mặt.
 

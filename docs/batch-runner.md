@@ -190,3 +190,24 @@ Task chạy dưới tài khoản đang đăng nhập (có license). Last Run Res
 Chạy lại cùng job hai lần cho kết quả như nhau khi các lệnh để `dryRun:true` hoặc chỉ đọc (HealthReport, BatchExport,
 ConnectorChecker, ClashDetection, RuleCheck). Lệnh ghi (`SleeveAuto`, `HangerAuto`…) chỉ nên bật `dryRun:false` sau khi
 đã xem log dryRun của đêm trước.
+
+## Tỷ lệ PDF và page setup
+
+`PlotPdf.config.plotScale` nhận `Fit`, số dương (`0.5`) hoặc tỷ lệ (`1=100`, `1:100`). Đơn vị đầu tiên
+là mm giấy, đơn vị thứ hai là đơn vị bản vẽ; kiểm `INSUNITS` trước khi kết luận tỷ lệ vật lý.
+Model mặc định vẫn Fit để giữ tương thích job cũ; paper layout mặc định 1:1. `plotArea:Layout` dùng gốc `0,0`.
+
+```json
+{"command":"PlotPdf","config":{"layout":"A3-01","plotArea":"Layout","plotScale":"1=1","outputPath":"D:/DHCB/pdf/A3-01.pdf"}}
+```
+
+Để giữ nguyên page setup đã duyệt trong DWG:
+
+```json
+{"command":"PlotPdf","config":{"layout":"A3-01","pageSetupName":"A3-project","outputPath":"D:/DHCB/pdf/A3-01.pdf"}}
+```
+
+Không truyền đồng thời `pageSetupName` và `paperSize`, `orientation`, `plotArea`, `plotStyle`, `plotScale`.
+Named setup dùng thiết bị PDF; các thiết lập giấy/tỷ lệ lấy từ setup. Tên layout/setup phải tồn tại trong DWG.
+Vùng Window/View cần các prompt bổ sung, hiện bị từ chối rõ ràng thay vì để script chạy lệch prompt.
+Preview kiểm cấu hình, không xuất PDF hoặc tạo thư mục. Cần đọc PDF và đo kích thước sau khi xuất trước khi dùng cho hồ sơ.

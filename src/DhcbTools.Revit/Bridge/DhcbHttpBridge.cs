@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Reflection;
 using Autodesk.Revit.UI;
 using DhcbTools.Core;
@@ -94,6 +94,7 @@ internal sealed class BridgeEventHandler : IExternalEventHandler
                     continue;
                 }
 
+                using var executionScope = item.Execution.Enter();
                 item.Completion.TrySetResult(_commits.Execute("revit", item.Request,
                     BridgeDocumentContext.IdFor(doc), () => BridgeDocumentContext.RevisionFor(doc),
                     request => DispatchWithFailurePolicy(doc, request.Command, request.ConfigJson)));

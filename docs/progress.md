@@ -1,5 +1,10 @@
 # Hiện trạng dự án
 
+> Nâng cấp source 2026-10-08: [PDF tỷ lệ/page setup, query phân trang, tiến độ/hủy hợp tác,
+> phương án tuyến, clash ước lượng, tổng hợp thí điểm và Apache-2.0](nang-cap-san-xuat-2026-10-08.md).
+> AutoCAD Core Console đã có bằng chứng mới; bản cài PR #182 vẫn là mốc triển khai riêng.
+> Revit/GUI, family, tọa độ, BCF viewer, người dùng và chữ ký thật còn theo bảng nghiệm thu trong báo cáo.
+
 > Cập nhật triển khai 2026-10-08: [PR #182](https://github.com/seeker19110/Dhcb-Tools/pull/182)
 > đã merge và cài AutoCAD 2026 + BatchRunner/scripts tại commit `2cac231`.
 > DLL đã cài đạt **105/105 ca AutoCAD và 5 tình huống PDF**, doctor 0 lỗi; 132 file trạng thái

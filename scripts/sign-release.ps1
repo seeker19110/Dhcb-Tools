@@ -6,7 +6,8 @@
     Chứng chỉ đọc từ hai biến môi trường, do secret của repo cấp:
       DHCB_SIGN_PFX_BASE64    nội dung file .pfx mã base64
       DHCB_SIGN_PFX_PASSWORD  mật khẩu của .pfx
-    Không có DHCB_SIGN_PFX_BASE64 → in một dòng rồi thoát 0: bản phát hành vẫn build như trước, chỉ là chưa ký.
+    Không có DHCB_SIGN_PFX_BASE64 → build dev in một dòng rồi thoát 0; -RequireSignature trả lỗi.
+    Release từ tag luôn bật -RequireSignature và yêu cầu trạng thái chữ ký Valid.
 
     Chỉ ký file của DHCB (DhcbTools*.dll, DhcbTools*.exe) — Newtonsoft.Json.dll đã có chữ ký của nhà phát hành,
     ký đè là mất chữ ký gốc. Khác scripts/sign-addin.ps1 (ký bản cài trên máy dev, được tự tạo chứng chỉ): script
@@ -20,12 +21,14 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Path,
 
-    [string]$TimestampServer = 'http://timestamp.digicert.com'
+    [string]$TimestampServer = 'http://timestamp.digicert.com',
+    [switch]$RequireSignature
 )
 
 $ErrorActionPreference = 'Stop'
 
 if (-not $env:DHCB_SIGN_PFX_BASE64) {
+    if ($RequireSignature) { throw "Ban phat hanh yeu cau chung chi ky; chua cau hinh DHCB_SIGN_PFX_BASE64." }
     Write-Host "Chua cau hinh chung chi ky (secret DHCB_SIGN_PFX_BASE64) - bo qua ky so, goi phat hanh KHONG ky."
     exit 0
 }
@@ -45,10 +48,12 @@ try {
 
     foreach ($file in $files) {
         $result = Set-AuthenticodeSignature -FilePath $file.FullName -Certificate $cert -TimestampServer $TimestampServer -HashAlgorithm SHA256
-        # Status có thể khác "Valid" khi gốc chứng chỉ chưa được máy runner tin (chứng chỉ nội bộ) — file vẫn đã ký.
-        # Cái phải chặn là KHÔNG có chữ ký nào được gắn.
+        # Build dev có thể dùng chứng chỉ nội bộ; bản tag yêu cầu máy runner xác minh Valid.
         if (-not $result.SignerCertificate -or $result.SignerCertificate.Thumbprint -ne $cert.Thumbprint) {
             throw "Ky that bai: $($file.Name) - $($result.StatusMessage)"
+        }
+        if ($RequireSignature -and $result.Status -ne 'Valid') {
+            throw "Chu ky khong duoc xac minh: $($file.Name) ($($result.Status))."
         }
         Write-Host "Da ky: $($file.Name) ($($result.Status))"
     }

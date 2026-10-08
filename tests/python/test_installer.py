@@ -60,6 +60,7 @@ class InstallerTests(unittest.TestCase):
         text = text.replace("[Setup]", "[Setup]\nUninstallable=no\nCreateUninstallRegKey=no")
         for constant, folder in (("userappdata", "roaming"), ("localappdata", "local"), ("group", "shortcuts")):
             text = text.replace("{" + constant + "}", str(cls.profile / folder))
+        text = text.replace(r"..\LICENSE", str(ROOT / "LICENSE")).replace(r"..\NOTICE", str(ROOT / "NOTICE"))
         source = cls.work / "sandbox.iss"
         cls.source = source
         source.write_text(text, encoding="utf-8-sig")

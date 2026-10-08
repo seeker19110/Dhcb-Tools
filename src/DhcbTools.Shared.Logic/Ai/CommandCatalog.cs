@@ -316,6 +316,8 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("maxExpandedNodes", "trần ô A* mở rộng (rỗng = tự chọn theo lưới)", FieldKind.Number)
                 .Field("includeLinkedModels", "xét vật cản ở model liên kết (mặc định bật)", FieldKind.Bool)
                 .Field("linkNameContains", "chỉ link có tên chứa (rỗng = mọi link)", FieldKind.TextList)
+                .Field("generateOptions", "so sánh các phương án tuyến", FieldKind.Bool)
+                .Field("selectedOptionId", "OPT-id từ kết quả xem trước")
                 .Field("lineStyleName", "line style").Field("buildRoute", "dựng luôn").Field("dryRun", "xem trước")
                 .Words("tự động tìm tuyến", "auto route", "pathfinding", "né va chạm", "routing tự động"),
             new CommandDescriptor("ScheduleExport", Revit, "Xuất schedule ra CSV đúng cột/hàng đang hiển thị", false, "ExportSchedules")
@@ -382,6 +384,10 @@ namespace DhcbTools.Shared.Logic.Ai
             new CommandDescriptor("ClashDetection", Revit, "Va chạm nội bộ giữa hai nhóm category → HTML + 3D view", true, "Clash")
                 .Field("categoriesA", "nhóm A").Field("categoriesB", "nhóm B").Field("outputPath", "file HTML").Field("acceptedPath", "clash-accepted.json")
                 .Field("includeLinkedModels", "xét cả model liên kết cho nhóm B (mặc định bật)", FieldKind.Bool).Field("create3dView", "true = GHI một 3D view isolate phần tử va chạm (chỉ khi dryRun=false)").Field("dryRun", "xem trước: không tạo view")
+                .Field("classifyResults", "phân loại ước lượng hộp bao; cần duyệt hình học", FieldKind.Bool)
+                .Field("requiredClearanceMm", "khoảng hở cần kiểm (mm)", FieldKind.Number)
+                .Field("constructionToleranceMm", "dung sai phân loại (mm)", FieldKind.Number)
+                .Field("bcfPath", "file BCF 2.1 để điều phối").Field("maxResults", "giới hạn số vấn đề", FieldKind.Number)
                 .Words("clash", "va chạm", "kiểm tra va chạm").Endorsed(),
 
             // ── Revit — AI (offline) ────────────────────────────────────────

@@ -39,6 +39,7 @@ public sealed class DhcbHttpBridge : IDisposable
                 database =>
                 {
                     TrackDocument(database);
+                    using var executionScope = item.Execution.Enter();
                     return _commits.Execute("autocad", item.Request, BridgeDocumentContext.IdFor(database),
                         () => BridgeDocumentContext.RevisionFor(database),
                         request => AcadCommandTable.Dispatch(database, request.Command, request.ConfigJson));

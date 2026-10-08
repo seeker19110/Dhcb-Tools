@@ -116,6 +116,48 @@ public class BridgeCancellationTests
     }
 
     [Fact]
+    public async Task CooperativeCancelReportsRequestThenPreservesFinalResult()
+    {
+        var probe = new TcpListener(IPAddress.Loopback, 0);
+        probe.Start(); var port = ((IPEndPoint)probe.LocalEndpoint).Port; probe.Stop();
+        var tokenPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".txt");
+        using var server = new HttpBridgeServer(port, "test", "test");
+        BridgeWorkItem<BridgeRequest, CommandResult>? item = null;
+        server.ExecuteAsync = work => { item = work; return Task.CompletedTask; };
+        try
+        {
+            server.Start(tokenPath);
+            using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{port}") };
+            http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", server.Token);
+            var created = await http.PostAsync("/execute", Json("{\"command\":\"AutoRoute\",\"async\":true}"));
+            var id = JObject.Parse(await created.Content.ReadAsStringAsync())["id"]!.ToString();
+            Assert.True(item!.TryClaim());
+            item.Execution.EnableCancellation();
+            item.Execution.Report("finding-route", 1024);
+            var progress = JObject.Parse(await http.GetStringAsync("/progress/" + id));
+            Assert.True(progress["canCancel"]!.Value<bool>());
+            Assert.Equal("finding-route", progress["progress"]!["stage"]!.ToString());
+            var response = await http.PostAsync("/cancel/" + id, Json("{}"));
+            Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+            var body = JObject.Parse(await response.Content.ReadAsStringAsync());
+            Assert.True(body["cancellationRequested"]!.Value<bool>());
+            Assert.False(body["cancelled"]!.Value<bool>());
+            Assert.Null(body["error"]!.Value<string>());
+            Assert.True(item.Execution.CancellationToken.IsCancellationRequested);
+            item.Completion.SetResult(CommandResult.Fail("Đã hủy; rollback"));
+            for (var attempt = 0; attempt < 100 && server.Jobs.Find(id)!.Status == BridgeJobStatus.Running; attempt++)
+                await Task.Delay(10);
+            progress = JObject.Parse(await http.GetStringAsync("/progress/" + id));
+            Assert.Equal("done", progress["status"]!.ToString());
+            Assert.False(progress["canCancel"]!.Value<bool>());
+            Assert.False(progress["result"]!["success"]!.Value<bool>());
+            var again = await http.PostAsync("/cancel/" + id, Json("{}"));
+            Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+        }
+        finally { File.Delete(tokenPath); }
+    }
+
+    [Fact]
     public void Stop_HuyHangDoi_GiuLenhDangChayVaKetQua()
     {
         using var server = new HttpBridgeServer(12345, "test", "test");

@@ -54,6 +54,10 @@ public sealed class ClashDetectionConfig
 
     /// <summary>Giới hạn số va chạm báo (0 = không giới hạn).</summary>
     public int MaxResults { get; init; } = 2000;
+    /// <summary>Phân loại ước lượng hộp bao và báo cặp có khả năng thiếu khoảng hở; cần kỹ sư duyệt.</summary>
+    public bool ClassifyResults { get; init; } = false;
+    public double RequiredClearanceMm { get; init; } = 100;
+    public double ConstructionToleranceMm { get; init; } = 5;
 }
 
 /// <summary>
@@ -72,6 +76,21 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
 
     public CommandResult Execute(Document document, ClashDetectionConfig config)
     {
+        try { return ExecuteCore(document, config); }
+        catch (OperationCanceledException)
+        { return CommandResult.Fail("Đã hủy kiểm va chạm; chưa xuất báo cáo hoặc sửa mô hình."); }
+    }
+
+    private CommandResult ExecuteCore(Document document, ClashDetectionConfig config)
+    {
+        var control = CommandExecution.Current;
+        control?.EnableCancellation();
+        control?.Report("collecting-clash-candidates");
+        var cancellation = control?.CancellationToken ?? default;
+        if (config.RequiredClearanceMm < 0 || config.ConstructionToleranceMm < 0
+            || double.IsNaN(config.RequiredClearanceMm) || double.IsInfinity(config.RequiredClearanceMm)
+            || double.IsNaN(config.ConstructionToleranceMm) || double.IsInfinity(config.ConstructionToleranceMm))
+            return CommandResult.Fail("Khoảng hở và dung sai phải là số hữu hạn không âm.");
         var idsA = ParameterSync.ParameterExportCommand.ResolveCategoryIds(document, config.CategoriesA, out var unknownA);
         var idsB = ParameterSync.ParameterExportCommand.ResolveCategoryIds(document, config.CategoriesB, out var unknownB);
         if (idsA.Count == 0 || idsB.Count == 0)
@@ -152,7 +171,7 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
         }
 
         var accepted = ClashAcceptance.LoadKeys(config.AcceptedPath);
-        var tol = RevitCompat.MmToFt(config.BoundingBoxToleranceMm);
+        var tol = RevitCompat.MmToFt(Math.Max(config.BoundingBoxToleranceMm, config.ClassifyResults ? config.RequiredClearanceMm : 0));
         var clashes = new List<Clash>();
         var skippedAccepted = 0;
         var seen = new HashSet<string>();
@@ -161,8 +180,11 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
         // danh sách B cho MỖI A — 50.000 ống × 20.000 dầm/tường = 10⁹ phép so hộp trên luồng UI.
         var indexB = Shared.Logic.Geometry.BoxSpatialHash<Candidate>.Build(elementsB, c => c.Box);
 
+        var scanned = 0;
         foreach (var a in elementsA)
         {
+            cancellation.ThrowIfCancellationRequested();
+            control?.Report("checking-clashes", ++scanned, elementsA.Count);
             var boxA = a.get_BoundingBox(null);
             if (boxA == null) continue;
 
@@ -172,8 +194,13 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
 
             var hits = PreciseHits(document, a, candidates, result);
 
+            // Chỉ thêm cặp hộp KHÔNG giao: hộp giao nhưng solid không giao không được gọi hard clash.
+            if (config.ClassifyResults)
+                hits.AddRange(candidates.Where(c => !hits.Contains(c) && BoxDistance(queryBox, c.Box) > 0
+                    && RevitCompat.FtToMm(BoxDistance(queryBox, c.Box)) < config.RequiredClearanceMm));
             foreach (var b in hits)
             {
+                cancellation.ThrowIfCancellationRequested();
                 var centre = ClashReport.IntersectionCentre(
                     boxA.Min.X, boxA.Min.Y, boxA.Min.Z, boxA.Max.X, boxA.Max.Y, boxA.Max.Z,
                     b.Box.MinX, b.Box.MinY, b.Box.MinZ, b.Box.MaxX, b.Box.MaxY, b.Box.MaxZ);
@@ -193,7 +220,8 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
                 var record = new ClashRecord(
                     RevitCompat.IdValue(a.Id), a.Category?.Name, a.Name,
                     RevitCompat.IdValue(b.Element.Id), b.Element.Category?.Name,
-                    xMm, yMm, zMm, key, b.LinkName);
+                    xMm, yMm, zMm, key, b.LinkName,
+                    config.ClassifyResults ? ClassifyBoxes(a, b, queryBox, xMm, yMm, zMm, config) : null);
                 clashes.Add(new Clash(a, b.Element, record, b.LinkInstanceId));
                 if (config.MaxResults > 0 && clashes.Count >= config.MaxResults)
                 {
@@ -204,6 +232,11 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
         }
 
     Done:
+        // Điểm đóng quyền hủy trước xuất file và transaction: không công bố kết quả sau yêu cầu hủy đã nhận.
+        control?.Seal();
+        control?.Report("writing-clash-report");
+        if (config.ClassifyResults)
+            result.Messages.Add("Phân loại và khoảng hở là ước lượng hộp bao, không phải khoảng cách/độ sâu solid; kỹ sư phải duyệt.");
         var records = clashes.Select(c => c.Record).ToList();
         RevitCompat.EnsureParentDirectory(config.OutputPath);
         File.WriteAllText(config.OutputPath, ClashReport.Html(document.Title, config.CategoriesA, config.CategoriesB, records, skippedAccepted), Encoding.UTF8);
@@ -250,7 +283,26 @@ public sealed class ClashDetectionCommand : ICoreCommand<ClashDetectionConfig>
         result.Messages.AddRange(ClashReport.Notes(records, inDocument, inLinks, linkSummary));
         result.Summary = ClashReport.Summary(records, skippedAccepted, config.OutputPath, elementsA.Count, inDocument, inLinks, config.IncludeLinkedModels);
         result.AffectedCount = clashes.Count;
+        control?.Report("done", scanned, elementsA.Count);
         return result;
+    }
+
+    private static double BoxDistance(Box3 a, Box3 b)
+    {
+        var dx = Math.Max(0, Math.Max(a.MinX - b.MaxX, b.MinX - a.MaxX));
+        var dy = Math.Max(0, Math.Max(a.MinY - b.MaxY, b.MinY - a.MaxY));
+        var dz = Math.Max(0, Math.Max(a.MinZ - b.MaxZ, b.MinZ - a.MaxZ));
+        return Math.Sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    private static ClassifiedClash ClassifyBoxes(Element a, Candidate b, Box3 box, double x, double y, double z, ClashDetectionConfig config)
+    {
+        var dx = Math.Max(0, RevitCompat.FtToMm(Math.Min(box.MaxX, b.Box.MaxX) - Math.Max(box.MinX, b.Box.MinX)));
+        var dy = Math.Max(0, RevitCompat.FtToMm(Math.Min(box.MaxY, b.Box.MaxY) - Math.Max(box.MinY, b.Box.MinY)));
+        var dz = Math.Max(0, RevitCompat.FtToMm(Math.Min(box.MaxZ, b.Box.MaxZ) - Math.Max(box.MinZ, b.Box.MinZ)));
+        return ClashClassifier.Classify(RevitCompat.IdValue(a.Id), a.Category?.Name ?? "", RevitCompat.IdValue(b.Element.Id),
+            b.Element.Category?.Name ?? "", x, y, z, dx * dy * dz, RevitCompat.FtToMm(BoxDistance(box, b.Box)),
+            config.ConstructionToleranceMm, config.RequiredClearanceMm, Math.Min(dx, Math.Min(dy, dz)));
     }
 
     /// <summary>

@@ -87,16 +87,17 @@ jobs:
           Copy-Item "$out/DhcbTools.Revit.addin" $pkg
           Copy-Item "$out/DhcbTools.Revit.dll", "$out/DhcbTools.Core.dll", "$out/DhcbTools.Shared.Logic.dll", `
                     "$out/DhcbTools.Shared.Hosting.dll", "$out/Newtonsoft.Json.dll" $pkg
+          Copy-Item LICENSE, NOTICE $pkg
           Copy-Item docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md $pkg
 
-      # Ký Authenticode khi repo có secret chứng chỉ (DHCB_SIGN_PFX_BASE64/_PASSWORD); không có thì bỏ qua, gói
+      # Tag yêu cầu chứng chỉ (DHCB_SIGN_PFX_BASE64/_PASSWORD); build thủ công không có thì bỏ qua, gói
       # vẫn phát hành như trước. Bước riêng để secret chỉ vào đúng bước này, không vào bước build/restore.
       - name: Ký số DLL (nếu có chứng chỉ)
         shell: pwsh
         env:
           DHCB_SIGN_PFX_BASE64: ${{ secrets.DHCB_SIGN_PFX_BASE64 }}
           DHCB_SIGN_PFX_PASSWORD: ${{ secrets.DHCB_SIGN_PFX_PASSWORD }}
-        run: ./scripts/sign-release.ps1 -Path dist
+        run: ./scripts/sign-release.ps1 -Path dist -RequireSignature:($env:GITHUB_REF -like 'refs/tags/*')
 
       - name: Nén
         shell: pwsh
@@ -154,16 +155,17 @@ jobs:
           # KHÔNG đóng gói System.Drawing.Common.dll dù nó nằm trong bin của net8/net10: AcDbMgd tham chiếu
           # nó nên chính AutoCAD đã cấp — §25 chạy thật với bundle KHÔNG có file này. Chép thêm bản riêng
           # chỉ tạo nguy cơ lệch phiên bản với bản AutoCAD đang chạy.
+          Copy-Item LICENSE, NOTICE $pkg
           Copy-Item docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md $pkg
 
-      # Ký Authenticode khi repo có secret chứng chỉ (DHCB_SIGN_PFX_BASE64/_PASSWORD); không có thì bỏ qua, gói
+      # Tag yêu cầu chứng chỉ (DHCB_SIGN_PFX_BASE64/_PASSWORD); build thủ công không có thì bỏ qua, gói
       # vẫn phát hành như trước. Bước riêng để secret chỉ vào đúng bước này, không vào bước build/restore.
       - name: Ký số DLL (nếu có chứng chỉ)
         shell: pwsh
         env:
           DHCB_SIGN_PFX_BASE64: ${{ secrets.DHCB_SIGN_PFX_BASE64 }}
           DHCB_SIGN_PFX_PASSWORD: ${{ secrets.DHCB_SIGN_PFX_PASSWORD }}
-        run: ./scripts/sign-release.ps1 -Path dist
+        run: ./scripts/sign-release.ps1 -Path dist -RequireSignature:($env:GITHUB_REF -like 'refs/tags/*')
 
       - name: Nén
         shell: pwsh
@@ -210,16 +212,17 @@ jobs:
             ForEach-Object { $_.Trim() } |
             Where-Object { $_ -and -not $_.StartsWith('#') } |
             ForEach-Object { Copy-Item (Join-Path scripts $_) "$pkg/scripts" -ErrorAction Stop }
+          Copy-Item LICENSE, NOTICE $pkg
           Copy-Item docs/batch-runner.md, docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md $pkg
 
-      # Ký Authenticode khi repo có secret chứng chỉ (DHCB_SIGN_PFX_BASE64/_PASSWORD); không có thì bỏ qua, gói
+      # Tag yêu cầu chứng chỉ (DHCB_SIGN_PFX_BASE64/_PASSWORD); build thủ công không có thì bỏ qua, gói
       # vẫn phát hành như trước. Bước riêng để secret chỉ vào đúng bước này, không vào bước build/restore.
       - name: Ký số DLL (nếu có chứng chỉ)
         shell: pwsh
         env:
           DHCB_SIGN_PFX_BASE64: ${{ secrets.DHCB_SIGN_PFX_BASE64 }}
           DHCB_SIGN_PFX_PASSWORD: ${{ secrets.DHCB_SIGN_PFX_PASSWORD }}
-        run: ./scripts/sign-release.ps1 -Path dist
+        run: ./scripts/sign-release.ps1 -Path dist -RequireSignature:($env:GITHUB_REF -like 'refs/tags/*')
 
       - name: Nén
         shell: pwsh
@@ -301,7 +304,7 @@ jobs:
           # dist/ lúc này có cả stage (DLL đã ký ở job build) và file Setup vừa dựng; chỉ cần ký file .exe.
           New-Item -ItemType Directory -Force -Path dist/setup | Out-Null
           Move-Item dist/*.exe dist/setup
-          ./scripts/sign-release.ps1 -Path dist/setup
+          ./scripts/sign-release.ps1 -Path dist/setup -RequireSignature:($env:GITHUB_REF -like 'refs/tags/*')
           Move-Item dist/setup/*.exe dist
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

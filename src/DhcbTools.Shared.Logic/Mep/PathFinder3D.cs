@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace DhcbTools.Shared.Logic.Mep
 {
@@ -33,6 +34,9 @@ namespace DhcbTools.Shared.Logic.Mep
     {
         /// <summary>Bước lưới (mm). Mặc định 100 theo đặc tả 6.1.</summary>
         public double StepMm { get; set; } = 100;
+
+        public CancellationToken CancellationToken { get; set; }
+        public Action<int>? ReportExpandedNodes { get; set; }
 
         /// <summary>Khoảng hở tối thiểu tới chướng ngại (mm) — bán kính ống + cách nhiệt + dung sai lắp.</summary>
         public double ClearanceMm { get; set; } = 100;
@@ -185,6 +189,7 @@ namespace DhcbTools.Shared.Logic.Mep
             }
 
             options = options ?? new PathFinderOptions();
+            options.CancellationToken.ThrowIfCancellationRequested();
             if (options.StepMm <= 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(options), "Bước lưới phải > 0.");
@@ -219,7 +224,7 @@ namespace DhcbTools.Shared.Logic.Mep
             }
 
             var grid = new OccupancyGrid(searchBounds, size, step, obstacles, options.ClearanceMm,
-                options.NearObstaclePenalty > 0 ? options.ClearanceMm * 2 : (double?)null);
+                options.NearObstaclePenalty > 0 ? options.ClearanceMm * 2 : (double?)null, options.CancellationToken);
 
             var goalIndex = grid.Index(g);
             if (grid.IsBlocked(grid.Index(s)) || grid.IsBlocked(goalIndex))
@@ -244,6 +249,12 @@ namespace DhcbTools.Shared.Logic.Mep
 
             while (open.Count > 0)
             {
+                if ((expanded & 1023) == 0)
+                {
+                    options.CancellationToken.ThrowIfCancellationRequested();
+                    options.ReportExpandedNodes?.Invoke(expanded);
+                    options.CancellationToken.ThrowIfCancellationRequested();
+                }
                 var currentKey = open.Dequeue();
                 var cell = grid.FromIndex((int)(currentKey / 7));
                 var dir = (int)(currentKey % 7) - 1;
@@ -343,6 +354,7 @@ namespace DhcbTools.Shared.Logic.Mep
 
             while (stack.Count > 0)
             {
+                grid.CheckCancellation();
                 var cell = stack.Pop();
                 for (var d = 0; d < Directions.Length; d++)
                 {
@@ -456,13 +468,16 @@ namespace DhcbTools.Shared.Logic.Mep
         /// </summary>
         private sealed class OccupancyGrid
         {
+            private readonly CancellationToken _cancellation;
+            public void CheckCancellation() => _cancellation.ThrowIfCancellationRequested();
             private readonly bool[] _blocked;
             private readonly bool[]? _near;
             private readonly int _strideY;
             private readonly int _strideX;
 
-            public OccupancyGrid(Box3 bounds, int[] size, double step, IReadOnlyList<Box3> obstacles, double clearance, double? nearClearance)
+            public OccupancyGrid(Box3 bounds, int[] size, double step, IReadOnlyList<Box3> obstacles, double clearance, double? nearClearance, CancellationToken cancellation)
             {
+                _cancellation = cancellation;
                 Size = size;
                 Count = size[0] * size[1] * size[2];
                 _strideY = size[2];
@@ -472,6 +487,7 @@ namespace DhcbTools.Shared.Logic.Mep
 
                 for (var i = 0; i < obstacles.Count; i++)
                 {
+                    CheckCancellation();
                     Rasterize(_blocked, obstacles[i], bounds, size, step, clearance);
                     if (_near != null)
                     {
@@ -513,6 +529,7 @@ namespace DhcbTools.Shared.Logic.Mep
 
                 for (var x = x0; x <= x1; x++)
                 {
+                    CheckCancellation();
                     var bx = x * _strideX;
                     for (var y = y0; y <= y1; y++)
                     {

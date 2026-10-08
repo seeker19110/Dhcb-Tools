@@ -151,8 +151,8 @@ public static partial class Program
             // Đọc cả stdout lẫn stderr bất đồng bộ TRƯỚC khi chờ: ReadToEnd() một ống rồi mới WaitForExit
             // treo chết khi ống kia đầy (accoreconsole in khá nhiều ra stderr), và kill-khi-quá-giờ không
             // bao giờ tới lượt vì ReadToEnd chặn vô hạn.
-            var stdoutTask = p.StandardOutput.ReadToEndAsync();
-            var stderrTask = p.StandardError.ReadToEndAsync();
+            var stdoutTask = ReadConsoleAsync(p.StandardOutput.BaseStream);
+            var stderrTask = ReadConsoleAsync(p.StandardError.BaseStream);
             var timedOut = !p.WaitForExit((int)Math.Min(int.MaxValue, Math.Max(60_000, (deadline - DateTime.Now).TotalMilliseconds)));
             if (timedOut)
             {
@@ -285,6 +285,14 @@ public static partial class Program
     private static void TryDelete(string path)
     {
         try { File.Delete(path); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { /* file tạm, dọn tay */ }
+    }
+
+    /// <summary>Đọc hai pipe đồng thời và giải mã output native theo byte.</summary>
+    private static async Task<string> ReadConsoleAsync(Stream stream)
+    {
+        using var buffer = new MemoryStream();
+        await stream.CopyToAsync(buffer).ConfigureAwait(false);
+        return AcadScriptGen.DecodeConsole(buffer.ToArray());
     }
 
     /// <summary>Vài dòng cuối không rỗng của output — đủ để đọc lý do trong report.</summary>

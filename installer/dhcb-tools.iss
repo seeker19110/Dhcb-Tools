@@ -26,6 +26,7 @@ AppId={{B4E7C2A9-3D51-4F86-9A2C-7E0D5B1F8C43}
 AppName=DHCB Tools
 AppVersion={#Version}
 AppPublisher=DHCB
+LicenseFile=..\LICENSE
 AppPublisherURL=https://github.com/seeker19110/Dhcb-Tools
 DefaultDirName={localappdata}\Programs\DHCB Tools
 DefaultGroupName=DHCB Tools
@@ -55,6 +56,8 @@ Name: "batch";      Description: "Batch runner chạy đêm";  Types: full
 Name: "scripts";    Description: "Script Python (agent client, MCP server, AI offline)"; Types: full
 
 [Files]
+Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\NOTICE"; DestDir: "{app}"; Flags: ignoreversion
 ; ── Revit: %APPDATA%\Autodesk\Revit\Addins\<năm>\ ────────────────────────────
 Source: "{#StageDir}\revit-2023\*"; DestDir: "{userappdata}\Autodesk\Revit\Addins\2023"; Excludes: "*.md"; \
   Components: revit2023; Flags: ignoreversion recursesubdirs createallsubdirs

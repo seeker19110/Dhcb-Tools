@@ -52,8 +52,11 @@ public sealed class AcadQueryParams
     /// <summary>[entity_geometry, selection, show_entities] Handle (hex) của entity cần xem/chọn/zoom.</summary>
     public List<string> Handles { get; set; } = new();
 
-    /// <summary>Giới hạn số record trả về (0 = không giới hạn).</summary>
+    /// <summary>Giới hạn số record trả về (0 = mặc định 2000, tối đa 10000).</summary>
     public int Limit { get; set; } = 0;
+
+    /// <summary>Bỏ qua N record đã lọc; chỉ dùng khi bản vẽ giữ nguyên giữa các trang.</summary>
+    public int Offset { get; set; } = 0;
 
     /// <summary>[snapshot] Chiều rộng ảnh (pixel) khi render sống; kẹp 200–4000. Ảnh xem trước thì cỡ có sẵn.</summary>
     public int ImageWidth { get; set; } = 1200;
