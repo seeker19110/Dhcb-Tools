@@ -1,0 +1,216 @@
+{
+  "name": "DHCB readiness — chuẩn bị, CHƯA nghiệm thu trong Revit",
+  "model": "Snowdon Towers Sample HVAC.rvt",
+  "//": "Chỉ preview trên bản sao Snowdon HVAC với đủ links. Chưa kiểm hủy/rollback/Undo bằng suite này; xem tools/acceptance/remaining.md.",
+  "cases": [
+    {
+      "name": "So sánh tuyến trên Snowdon HVAC",
+      "command": "AutoRoute",
+      "config": {
+        "startMm": {
+          "x": -10733,
+          "y": 5816,
+          "z": 9002
+        },
+        "endMm": {
+          "x": -10733,
+          "y": 9000,
+          "z": 9530
+        },
+        "searchMarginMm": 2000,
+        "searchMarginZMm": 1000,
+        "stepMm": 100,
+        "clearanceMm": 100,
+        "allowVertical": true,
+        "obstacleCategories": [
+          "Structural Framing",
+          "Structural Columns",
+          "Walls",
+          "Floors"
+        ],
+        "buildRoute": false,
+        "respectOpenings": false,
+        "dryRun": true,
+        "generateOptions": true
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 180000,
+        "neverContains": [
+          "Exception"
+        ],
+        "messagesContain": [
+          "OPT-"
+        ]
+      }
+    },
+    {
+      "name": "Chọn tuyến OPT-1 sau preview",
+      "command": "AutoRoute",
+      "config": {
+        "startMm": {
+          "x": -10733,
+          "y": 5816,
+          "z": 9002
+        },
+        "endMm": {
+          "x": -10733,
+          "y": 9000,
+          "z": 9530
+        },
+        "searchMarginMm": 2000,
+        "searchMarginZMm": 1000,
+        "stepMm": 100,
+        "clearanceMm": 100,
+        "allowVertical": true,
+        "obstacleCategories": [
+          "Structural Framing",
+          "Structural Columns",
+          "Walls",
+          "Floors"
+        ],
+        "buildRoute": false,
+        "respectOpenings": false,
+        "dryRun": true,
+        "generateOptions": true,
+        "selectedOptionId": "OPT-1"
+      },
+      "expect": {
+        "success": true,
+        "maxMs": 180000,
+        "neverContains": [
+          "Exception"
+        ],
+        "messagesContain": [
+          "OPT-1"
+        ]
+      }
+    },
+    {
+      "name": "Từ chối OPT-id không có",
+      "command": "AutoRoute",
+      "config": {
+        "startMm": {
+          "x": -10733,
+          "y": 5816,
+          "z": 9002
+        },
+        "endMm": {
+          "x": -10733,
+          "y": 9000,
+          "z": 9530
+        },
+        "searchMarginMm": 2000,
+        "searchMarginZMm": 1000,
+        "stepMm": 100,
+        "clearanceMm": 100,
+        "allowVertical": true,
+        "obstacleCategories": [
+          "Structural Framing",
+          "Structural Columns",
+          "Walls",
+          "Floors"
+        ],
+        "buildRoute": false,
+        "respectOpenings": false,
+        "dryRun": true,
+        "selectedOptionId": "OPT-404"
+      },
+      "expect": {
+        "success": false,
+        "maxMs": 180000,
+        "neverContains": [
+          "Exception"
+        ],
+        "summaryContains": [
+          "OPT-id"
+        ]
+      }
+    },
+    {
+      "name": "Clash baseline trên link kết cấu",
+      "command": "ClashDetection",
+      "config": {
+        "categoriesA": [
+          "Ducts"
+        ],
+        "categoriesB": [
+          "Structural Framing"
+        ],
+        "outputPath": "{outputFolder}/clash-baseline.html",
+        "bcfPath": "{outputFolder}/clash-baseline.bcf",
+        "create3dView": false,
+        "dryRun": true,
+        "maxResults": 10,
+        "classifyResults": false
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "noErrors": true,
+        "maxMs": 180000,
+        "filesExist": [
+          "{outputFolder}/clash-baseline.html",
+          "{outputFolder}/clash-baseline.bcf"
+        ]
+      }
+    },
+    {
+      "name": "Clash classified trên link kết cấu",
+      "command": "ClashDetection",
+      "config": {
+        "categoriesA": [
+          "Ducts"
+        ],
+        "categoriesB": [
+          "Structural Framing"
+        ],
+        "outputPath": "{outputFolder}/clash-classified.html",
+        "bcfPath": "{outputFolder}/clash-classified.bcf",
+        "create3dView": false,
+        "dryRun": true,
+        "maxResults": 10,
+        "classifyResults": true
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "noErrors": true,
+        "maxMs": 180000,
+        "filesExist": [
+          "{outputFolder}/clash-classified.html",
+          "{outputFolder}/clash-classified.bcf"
+        ],
+        "messagesContain": [
+          "ước lượng hộp bao"
+        ]
+      }
+    },
+    {
+      "name": "Khoảng hở âm bị từ chối trước xuất báo cáo",
+      "command": "ClashDetection",
+      "config": {
+        "categoriesA": [
+          "Ducts"
+        ],
+        "categoriesB": [
+          "Structural Framing"
+        ],
+        "outputPath": "{outputFolder}/clash.html",
+        "bcfPath": "{outputFolder}/clash.bcf",
+        "create3dView": false,
+        "dryRun": true,
+        "maxResults": 10,
+        "classifyResults": true,
+        "requiredClearanceMm": -1
+      },
+      "expect": {
+        "success": false,
+        "maxMs": 10000,
+        "summaryContains": [
+          "không âm"
+        ]
+      }
+    }
+  ]
+}

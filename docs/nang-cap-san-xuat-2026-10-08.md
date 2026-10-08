@@ -1,5 +1,7 @@
 # Nâng cấp vận hành DHCB Tools — 2026-10-08
 
+> PR #184 đã merge tại `e088829`. Lượt tiếp theo có [nghiệm thu BCF độc lập và suite Revit chuẩn bị](bang-chung/2026-10-08/nghiem-thu-tiep.md).
+
 Mốc bắt đầu `67807b7`, nhánh `codex/production-readiness`. Đợt này hoàn thiện các phần kỹ thuật còn lại
 trong [kế hoạch chất lượng](ke-hoach-chat-luong-2026-10-07.md). Source và fixture mới đã được kiểm trên máy
 phát triển; bản add-in đang cài từ PR #182 chưa tự động được thay bằng source của đợt này.
@@ -29,7 +31,7 @@ Trang sau dùng đúng `nextOffset`, giữ nguyên bộ lọc và bản vẽ. N�
 hãy bắt đầu lại: đây là phân trang theo thứ tự duyệt database, chưa phải snapshot/cursor bất biến.
 `limit=0` ở Bridge dùng mặc định 2.000; MCP yêu cầu 1–200. Cấu hình âm/quá trần bị từ chối.
 
-AutoRoute nhận `generateOptions=true`. Xem `OPT-01/02/03` trong messages, đặt `selectedOptionId`
+AutoRoute nhận `generateOptions=true`. Xem `OPT-1/2/3` trong messages, đặt `selectedOptionId`
 vào cấu hình đã chọn rồi **preview lại** trước commit; thay cấu hình làm token preview trước không còn hợp lệ.
 `dryRun=true` vẫn là mặc định. BuildRoute thất bại sẽ rollback cả group; phần Undo/rollback này cần Revit thật nghiệm thu.
 

@@ -77,11 +77,9 @@ namespace DhcbTools.Shared.Logic.Bcf
             using (var zip = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
             {
                 AddText(zip, "bcf.version", VersionXml());
-                AddText(zip, "extensions.xml", ExtensionsXml(list));
-                if (project != null && (!string.IsNullOrEmpty(project.ProjectId) || !string.IsNullOrEmpty(project.Name)))
-                {
-                    AddText(zip, "project.bcfp", ProjectXml(project));
-                }
+                AddText(zip, "extensions.xsd", ExtensionsXsd(list));
+                // BCF 2.1 công bố extension bằng XSD qua project.bcfp; extensions.xml thuộc 3.0.
+                AddText(zip, "project.bcfp", ProjectXml(project ?? new BcfProject { Name = "DHCB Tools" }));
 
                 var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var issue in list)
@@ -123,13 +121,13 @@ namespace DhcbTools.Shared.Logic.Bcf
                 new XElement("Project",
                     new XAttribute("ProjectId", string.IsNullOrEmpty(project.ProjectId) ? Guid.NewGuid().ToString("D") : project.ProjectId!),
                     new XElement("Name", project.Name ?? string.Empty)),
-                new XElement("ExtensionSchema", string.Empty)));
+                new XElement("ExtensionSchema", "extensions.xsd")));
 
         /// <summary>
-        /// Danh sách giá trị hợp lệ cho status/type/nhãn. Phần mềm đọc BCF lấy đây làm danh sách chọn;
-        /// nhãn nào dùng trong markup mà không khai ở đây thì hoặc bị bỏ, hoặc bị báo là giá trị lạ.
+        /// Danh sách giá trị hợp lệ cho BCF 2.1: redefine các simpleType trong markup.xsd của chuẩn.
+        /// Viewer cung cấp schema chuẩn; đọc nhãn không cần truy cập mạng.
         /// </summary>
-        internal static string ExtensionsXml(IEnumerable<BcfIssue> issues)
+        internal static string ExtensionsXsd(IEnumerable<BcfIssue> issues)
         {
             var list = issues.ToList();
             var statuses = Distinct(list.Select(i => i.TopicStatus).Concat(new[] { "Open", "Closed" }));
@@ -139,13 +137,14 @@ namespace DhcbTools.Shared.Logic.Bcf
             var users = Distinct(list.Select(i => i.Author));
             var stages = Distinct(list.Select(i => i.Stage));
 
-            return Serialise(new XElement("Extensions",
-                new XElement("TopicTypes", types.Select(v => new XElement("TopicType", v))),
-                new XElement("TopicStatuses", statuses.Select(v => new XElement("TopicStatus", v))),
-                new XElement("Priorities", priorities.Select(v => new XElement("Priority", v))),
-                new XElement("TopicLabels", labels.Select(v => new XElement("TopicLabel", v))),
-                new XElement("Users", users.Select(v => new XElement("User", v))),
-                new XElement("Stages", stages.Select(v => new XElement("Stage", v)))));
+            XNamespace xs = "http://www.w3.org/2001/XMLSchema";
+            XElement Type(string name, IEnumerable<string> values) => new XElement(xs + "simpleType", new XAttribute("name", name),
+                new XElement(xs + "restriction", new XAttribute("base", name),
+                    values.Select(v => new XElement(xs + "enumeration", new XAttribute("value", v)))));
+            return Serialise(new XElement(xs + "schema", new XAttribute(XNamespace.Xmlns + "xs", xs.NamespaceName),
+                new XElement(xs + "redefine", new XAttribute("schemaLocation", "markup.xsd"),
+                    Type("TopicType", types), Type("TopicStatus", statuses), Type("Priority", priorities),
+                    Type("TopicLabel", labels), Type("UserIdType", users), Type("Stage", stages))));
         }
 
         /// <summary>
@@ -255,7 +254,7 @@ namespace DhcbTools.Shared.Logic.Bcf
             => value.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
 
         private static IEnumerable<string> Distinct(IEnumerable<string?> values)
-            => values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => v!.Trim())
+            => values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => v!)
                      .Distinct(StringComparer.Ordinal).OrderBy(v => v, StringComparer.Ordinal);
 
         private static string Serialise(XElement root)

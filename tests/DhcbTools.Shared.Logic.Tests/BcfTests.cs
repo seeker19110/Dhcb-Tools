@@ -50,7 +50,8 @@ public class BcfTests
 
         var names = zip.Entries.Select(e => e.FullName).ToList();
         Assert.Contains("bcf.version", names);
-        Assert.Contains("extensions.xml", names);
+        Assert.Contains("extensions.xsd", names);
+        Assert.DoesNotContain("extensions.xml", names);
         Assert.Contains("project.bcfp", names);
         Assert.Contains(a.Guid + "/markup.bcf", names);
         Assert.Contains(a.Guid + "/viewpoint.bcfv", names);
@@ -245,26 +246,36 @@ public class BcfTests
         Assert.DoesNotContain(",", xml, StringComparison.Ordinal);
     }
 
-    // ── extensions.xml ───────────────────────────────────────────────────────
+    // ── extensions.xsd (BCF 2.1) ─────────────────────────────────────────────
 
     [Fact]
     public void Extensions_KhaiDuNhanDaDung()
     {
         var issue = Issue();
         issue.Labels.Add("Với model liên kết");
-        var xml = XElement.Parse(BcfWriter.ExtensionsXml(new[] { issue }));
-
-        Assert.Contains("Với model liên kết", xml.Element("TopicLabels")!.Elements().Select(e => e.Value));
-        Assert.Contains("Clash", xml.Element("TopicTypes")!.Elements().Select(e => e.Value));
-        Assert.Contains("Open", xml.Element("TopicStatuses")!.Elements().Select(e => e.Value));
-        Assert.Contains("DHCB Tools", xml.Element("Users")!.Elements().Select(e => e.Value));
+        issue.Stage = "Thi công & điều phối";
+        issue.Labels.Add(" Nhãn & <MEP> ");
+        var xml = XElement.Parse(BcfWriter.ExtensionsXsd(new[] { issue }));
+        XNamespace xs = "http://www.w3.org/2001/XMLSchema";
+        Assert.Equal(xs + "schema", xml.Name);
+        Assert.Equal("markup.xsd", xml.Element(xs + "redefine")!.Attribute("schemaLocation")!.Value);
+        string[] Values(string name) => xml.Descendants(xs + "restriction")
+            .Single(e => (string?)e.Attribute("base") == name).Elements(xs + "enumeration").Select(e => (string)e.Attribute("value")!).ToArray();
+        Assert.Contains("Với model liên kết", Values("TopicLabel"));
+        Assert.Contains(" Nhãn & <MEP> ", Values("TopicLabel"));
+        Assert.Contains("Clash", Values("TopicType"));
+        Assert.Contains("Open", Values("TopicStatus"));
+        Assert.Contains("DHCB Tools", Values("UserIdType"));
+        Assert.Contains("Thi công & điều phối", Values("Stage"));
     }
 
     [Fact]
     public void Extensions_KhongLapGiaTri()
     {
-        var xml = XElement.Parse(BcfWriter.ExtensionsXml(new[] { Issue("a"), Issue("b") }));
-        var statuses = xml.Element("TopicStatuses")!.Elements().Select(e => e.Value).ToList();
+        var xml = XElement.Parse(BcfWriter.ExtensionsXsd(new[] { Issue("a"), Issue("b") }));
+        XNamespace xs = "http://www.w3.org/2001/XMLSchema";
+        var statuses = xml.Descendants(xs + "restriction").Single(e => (string?)e.Attribute("base") == "TopicStatus")
+            .Elements(xs + "enumeration").Select(e => (string?)e.Attribute("value")).ToList();
         Assert.Equal(statuses.Count, statuses.Distinct().Count());
     }
 
@@ -274,5 +285,17 @@ public class BcfTests
         using var zip = Zip();
         Assert.Contains("bcf.version", zip.Entries.Select(e => e.FullName));
         Assert.DoesNotContain(zip.Entries, e => e.FullName.EndsWith("markup.bcf", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void DefaultProjectPointsToBcf21ExtensionsEvenWithoutProjectMetadata()
+    {
+        using var stream = new MemoryStream();
+        BcfWriter.Write(stream, new[] { Issue() });
+        stream.Position = 0;
+        using var zip = new ZipArchive(stream, ZipArchiveMode.Read);
+        var project = Read(zip, "project.bcfp");
+        Assert.Equal("extensions.xsd", project.Element("ExtensionSchema")!.Value);
+        Assert.Equal("DHCB Tools", project.Element("Project")!.Element("Name")!.Value);
     }
 }

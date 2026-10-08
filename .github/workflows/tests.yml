@@ -60,6 +60,15 @@ jobs:
         run: |
           dotnet test tests/DhcbTools.BatchRunner.Tests/DhcbTools.BatchRunner.Tests.csproj -c Release             --logger "trx;LogFileName=batchrunner-cli-results.trx"
 
+      - name: Đối chiếu BCF 2.1 với schema và reader độc lập
+        run: |
+          python3 -m pip install --quiet bcf-client==0.9.0 lxml==6.1.3
+          git init --quiet "$RUNNER_TEMP/bcf-schema"
+          git -C "$RUNNER_TEMP/bcf-schema" fetch --quiet --depth 1 https://github.com/buildingSMART/BCF-XML.git 92fdcf4bfaa8f0576e7562730f341fc7781e2065
+          git -C "$RUNNER_TEMP/bcf-schema" checkout --quiet FETCH_HEAD -- Schemas
+          dotnet run --project tools/bcf-acceptance/DhcbTools.Bcf.Acceptance.csproj -c Release -- ./out/bcf-fixtures
+          python3 tools/bcf-acceptance/verify.py ./out/bcf-fixtures "$RUNNER_TEMP/bcf-schema/Schemas"
+
       # Bộ ca IDS chính thức của buildingSMART (334 cặp .ids/.ifc có sẵn kết quả đúng), ghim commit để kết quả
       # không trôi theo repo của họ. Đỏ khi một ca NGOÀI tests/ids-buildingsmart/known-gaps.txt lệch — tức hồi
       # quy so với chuẩn; ca trong danh sách mà nay khớp thì chỉ nhắc xoá dòng. Chạy sau bước trên vì cần
