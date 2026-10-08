@@ -60,11 +60,14 @@ DhcbTools.BatchRunner.exe --verify-log logs\2026-09-04\run-013000.jsonl
 DhcbTools.BatchRunner.exe --verify-ifc D:\xuat\toa-a.ifc --ifc-spec configs\ifc-check.json
 ```
 
-AutoCAD tự chọn cặp hoàn chỉnh theo thứ tự 2026 → 2025 → 2024, bỏ qua các phiên bản chưa hỗ trợ như 2022.
+AutoCAD tự chọn cặp host/DLL hoàn chỉnh theo thứ tự 2027 → 2026 → 2025 → 2024 → 2023 → 2022.
 Trong mỗi cặp, runner ưu tiên DLL phù hợp cạnh EXE, rồi tìm trong
 `%APPDATA%\Autodesk\ApplicationPlugins\DhcbTools.bundle\Contents\<năm>`;
-`DhcbTools.AutoCAD.Core.dll` được ưu tiên trước vỏ đầy đủ. Runner đọc metadata DLL để ghép đúng net48/2024,
-net8/2025, net10/2026; AutoCAD 2026 cần Update 1.2 trở lên và runtime `net10.0`.
+`DhcbTools.AutoCAD.Core.dll` được ưu tiên trước vỏ đầy đủ. Runner đọc metadata TFM và tham chiếu API
+Autodesk của DLL: 2022–2024 dùng net48; 2025/2026 dùng net8 hoặc net10 theo runtime host;
+2027 dùng net10. DLL có SDK mới hơn host hoặc sai major API bị từ chối dù cùng TFM.
+AutoCAD 2025.1.4+/2026.1.2+ dùng net10; các bản trước dùng net8.
+Xem [ma trận và giới hạn nghiệm thu](tuong-thich-2022-2027.md).
 `--accoreconsole`/`--plugin-dll` có ưu tiên, đường dẫn tương đối được tuyệt đối hóa; override không khớp runtime
 hoặc thiếu file trả mã 2 trước khi mở bản vẽ, kèm đường dẫn cần kiểm tra. Host đặt trong thư mục tùy chọn chỉ dùng
 DLL portable hoặc được chỉ định; runner kiểm runtime nếu có và báo rõ rằng runtime không chứng minh được năm AutoCAD.

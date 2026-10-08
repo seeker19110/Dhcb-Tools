@@ -218,11 +218,7 @@ public sealed class FamilyStarterCommand : ICoreCommand<FamilyStarterConfig>
     private static FamilyParameter AddLengthParameter(Document fam, string name, double defaultMm)
     {
         var fm = fam.FamilyManager;
-#if REVIT2023_OR_GREATER
         var p = fm.AddParameter(name, GroupTypeId.Geometry, SpecTypeId.Length, true);
-#else
-        var p = fm.AddParameter(name, BuiltInParameterGroup.PG_GEOMETRY, ParameterType.Length, true);
-#endif
         if (fm.CurrentType != null)
         {
             fm.Set(p, RevitCompat.MmToFt(defaultMm));

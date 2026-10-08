@@ -13,6 +13,7 @@ public class AutoCadInstallationResolverTests
         public string AppData => Path.Combine(_root, "appdata");
         public string Runner => Path.Combine(_root, "runner");
         public Dictionary<string, string?> Content { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, Version?> Api { get; } = new(StringComparer.OrdinalIgnoreCase);
         public string Host(int year, string? runtime = null)
         {
             var folder = Path.Combine(ProgramFiles, "Autodesk", "AutoCAD " + year);
@@ -20,7 +21,7 @@ public class AutoCadInstallationResolverTests
             Content[path] = "";
             if (runtime is not null || year >= 2025)
                 Content[Path.Combine(folder, "acdbmgd.runtimeconfig.json")] =
-                    "{\"runtimeOptions\":{\"tfm\":\"" + (runtime ?? (year == 2026 ? "net10.0" : "net8.0")) + "\"}}";
+                    "{\"runtimeOptions\":{\"tfm\":\"" + (runtime ?? (year >= 2026 ? "net10.0" : "net8.0")) + "\"}}";
             return path;
         }
         public string Bundle(int year, bool core = true)
@@ -28,30 +29,41 @@ public class AutoCadInstallationResolverTests
             var path = Path.Combine(AppData, "Autodesk", "ApplicationPlugins", "DhcbTools.bundle", "Contents",
                 year.ToString(), core ? "DhcbTools.AutoCAD.Core.dll" : "DhcbTools.AutoCAD.dll");
             Content[path] = Frame(year);
+            Api[path] = ApiVersion(year);
             return path;
         }
         public string Portable(int year, bool core = true)
         {
             var path = Path.Combine(Runner, core ? "DhcbTools.AutoCAD.Core.dll" : "DhcbTools.AutoCAD.dll");
             Content[path] = Frame(year);
+            Api[path] = ApiVersion(year);
             return path;
         }
         public AutoCadInstallationResolver.Resolution Resolve(string? console = null, string? plugin = null,
             Func<string, string?>? readFrame = null, Func<string, string>? readText = null) =>
             AutoCadInstallationResolver.Resolve(console, plugin, ProgramFiles, AppData, Runner,
-                Content.ContainsKey, readText ?? (p => Content[p]!), readFrame ?? (p => Content[p]));
+                Content.ContainsKey, readText ?? (p => Content[p]!), readFrame ?? (p => Content[p]), p => Api.GetValueOrDefault(p));
         public static string Frame(int year) => year switch
         {
-            2024 => ".NETFramework,Version=v4.8",
+            2022 or 2023 or 2024 => ".NETFramework,Version=v4.8",
             2025 => ".NETCoreApp,Version=v8.0",
             _ => ".NETCoreApp,Version=v10.0",
+        };
+        public static Version ApiVersion(int year) => year switch
+        {
+            2022 => new Version(24, 1), 2023 => new Version(24, 2),
+            2024 => new Version(24, 3), 2025 => new Version(25, 0),
+            2026 => new Version(25, 1), _ => new Version(26, 0),
         };
     }
 
     [Theory]
+    [InlineData(2022)]
+    [InlineData(2023)]
     [InlineData(2024)]
     [InlineData(2025)]
     [InlineData(2026)]
+    [InlineData(2027)]
     public void InstalledBundlePairsWithSupportedHost(int year)
     {
         var files = new Files(); var host = files.Host(year); var plugin = files.Bundle(year);
@@ -160,25 +172,78 @@ public class AutoCadInstallationResolverTests
     {
         var files = new Files(); var found = files.Resolve();
         Assert.False(found.Success);
-        Assert.Contains("2024/2025/2026", found.Error);
+        Assert.Contains("2022–2027", found.Error);
         Assert.Contains("--accoreconsole", found.Error);
     }
 
     [Fact]
     public void ExplicitUnsupportedHostIsRejected()
     {
-        var files = new Files(); var found = files.Resolve(files.Host(2022), files.Portable(2024));
+        var files = new Files(); var found = files.Resolve(files.Host(2021), files.Portable(2024));
         Assert.False(found.Success);
         Assert.Contains("chưa được hỗ trợ", found.Error);
     }
 
     [Fact]
-    public void AutoCad2026BeforeNet10IsSkippedOrExplainedForExplicitHost()
+    public void AutoCad2026Net8DoesNotLoadNet10Plugin()
     {
         var files = new Files(); var rtm = files.Host(2026, "net8.0"); files.Bundle(2026);
         var older = files.Host(2025); files.Bundle(2025);
         Assert.Equal(older, files.Resolve().ConsolePath);
-        Assert.Contains("Update 1.2", files.Resolve(rtm).Error);
+        Assert.Contains(".NETCoreApp,Version=v8.0", files.Resolve(rtm).Error);
+    }
+
+    [Theory]
+    [InlineData(2025, "net8.0")]
+    [InlineData(2025, "net10.0")]
+    [InlineData(2026, "net8.0")]
+    [InlineData(2026, "net10.0")]
+    public void UpdateRuntimeSelectsMatchingInstalledDll(int year, string runtime)
+    {
+        var files = new Files(); var host = files.Host(year, runtime); var plugin = files.Bundle(year);
+        files.Content[plugin] = runtime == "net8.0" ? ".NETCoreApp,Version=v8.0" : ".NETCoreApp,Version=v10.0";
+        var found = files.Resolve();
+        Assert.True(found.Success, found.Error);
+        Assert.Equal(host, found.ConsolePath);
+        Assert.Equal(plugin, found.PluginPath);
+    }
+
+    [Theory]
+    [InlineData(2022, 2024)]
+    [InlineData(2023, 2024)]
+    [InlineData(2025, 2026)]
+    [InlineData(2026, 2027)]
+    public void SameRuntimeDoesNotMakeNewerAutodeskApiCompatible(int hostYear, int pluginYear)
+    {
+        var files = new Files(); var host = files.Host(hostYear); var plugin = files.Portable(pluginYear);
+        files.Content[plugin] = Files.Frame(hostYear); // prove API check is independent of TFM
+        var found = files.Resolve(host, plugin);
+        Assert.False(found.Success);
+        Assert.Contains("API AutoCAD", found.Error);
+    }
+
+    [Fact]
+    public void SupportedOlderSdkCanLoadInNewerCompatibleHost()
+    {
+        var files = new Files(); var host = files.Host(2024); var plugin = files.Portable(2022);
+        Assert.True(files.Resolve(host, plugin).Success);
+    }
+
+    [Fact]
+    public void MissingRuntimeCannotClaimModernHostCompatibility()
+    {
+        var files = new Files(); var host = files.Host(2027); files.Bundle(2027);
+        files.Content.Remove(Path.Combine(Path.GetDirectoryName(host)!, "acdbmgd.runtimeconfig.json"));
+        Assert.Contains("Không xác định được runtime", files.Resolve(host).Error);
+    }
+
+    [Fact]
+    public void CustomHostRuntimeStillRejectsMismatchedFramework()
+    {
+        var files = new Files(); var directory = Path.Combine(files.Runner, "custom-host");
+        var host = Path.Combine(directory, "accoreconsole.exe"); files.Content[host] = "";
+        files.Content[Path.Combine(directory, "acdbmgd.runtimeconfig.json")] = "{\"runtimeOptions\":{\"tfm\":\"net8.0\"}}";
+        Assert.False(files.Resolve(host, files.Portable(2026)).Success);
     }
 
     [Fact]

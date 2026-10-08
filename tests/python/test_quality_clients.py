@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import http.client
 import json
 import sys
 import threading
@@ -31,6 +32,95 @@ class ClientQualityTests(unittest.TestCase):
         with mock.patch.object(dhcb_agent, "load_token", return_value="t" * 40), \
                 mock.patch.object(dhcb_agent.LOOPBACK, "open", side_effect=error):
             self.assertFalse(dhcb_agent.request("revit", "GET", "/tools")["success"])
+
+    def test_transport_timeouts_disconnects_and_partial_response_never_retry_writes(self):
+        for failure in (TimeoutError("private-secret"), ConnectionResetError("private-secret"),
+                        http.client.RemoteDisconnected("private-secret"),
+                        http.client.IncompleteRead(b"private-secret", 100)):
+            with self.subTest(failure=type(failure).__name__), \
+                    mock.patch.object(dhcb_agent, "load_token", return_value="t" * 40), \
+                    mock.patch.object(dhcb_agent.LOOPBACK, "open", side_effect=failure) as request:
+                result = dhcb_agent.request("revit", "POST", "/execute", {
+                    "command": "AutoNumbering", "documentId": "model", "config": {"dryRun": False}})
+                self.assertFalse(result["success"])
+                self.assertTrue(result["outcomeUnknown"])
+                self.assertIn("KHÔNG gửi lại", result["summary"])
+                self.assertNotIn("private-secret", json.dumps(result))
+                self.assertEqual(1, request.call_count)
+
+    def test_http_errors_never_accept_success_true_from_body(self):
+        error = urllib.error.HTTPError("http://127.0.0.1", 500, "error", None,
+                                       io.BytesIO(b'{"success":true,"summary":"unexpected"}'))
+        with mock.patch.object(dhcb_agent, "load_token", return_value="t" * 40), \
+                mock.patch.object(dhcb_agent.LOOPBACK, "open", side_effect=error):
+            self.assertFalse(dhcb_agent.request("revit", "GET", "/tools")["success"])
+
+    def test_malformed_execute_response_marks_unknown_outcome(self):
+        with mock.patch.object(dhcb_agent, "load_token", return_value="t" * 40), \
+                mock.patch.object(dhcb_agent.LOOPBACK, "open", return_value=io.BytesIO(b'[]')):
+            result = dhcb_agent.request("revit", "POST", "/execute", {"config": {"dryRun": True}})
+            self.assertTrue(result["outcomeUnknown"])
+            self.assertIn("KHÔNG gửi lại", result["summary"])
+
+    def test_invalid_auth_characters_are_rejected_before_network(self):
+        for token in ("t" * 40 + "\nsecret", "t" * 40 + "é", "t" * 40 + " secret"):
+            with mock.patch.object(dhcb_agent, "load_token", return_value=token), \
+                    mock.patch.object(dhcb_agent.LOOPBACK, "open") as request:
+                result = dhcb_agent.request("revit", "GET", "/tools")
+                self.assertFalse(result["success"])
+                self.assertNotIn("secret", json.dumps(result))
+                request.assert_not_called()
+
+    def test_error_response_disconnected_mid_read_still_reports_failure(self):
+        error = urllib.error.HTTPError("http://127.0.0.1", 504, "error", None, None)
+        with mock.patch.object(error, "read", side_effect=TimeoutError("secret")), \
+                mock.patch.object(dhcb_agent, "load_token", return_value="t" * 40), \
+                mock.patch.object(dhcb_agent.LOOPBACK, "open", side_effect=error):
+            result = dhcb_agent.request("revit", "POST", "/execute", {"config": {"dryRun": True}})
+            self.assertFalse(result["success"])
+            self.assertIn("KHÔNG gửi lại", result["summary"])
+            self.assertNotIn("secret", json.dumps(result))
+
+    def test_bad_execute_config_is_rejected_before_network(self):
+        for payload in (None, [], {"config": None}, {"config": "oops"}):
+            with mock.patch.object(dhcb_agent.LOOPBACK, "open") as request:
+                self.assertFalse(dhcb_agent.request("revit", "POST", "/execute", payload)["success"])
+                request.assert_not_called()
+
+    def test_corrupt_token_file_does_not_crash_or_send_auth(self):
+        with mock.patch.dict(dhcb_agent.os.environ, {}, clear=True), \
+                mock.patch("builtins.open", side_effect=UnicodeDecodeError("utf-8", b"x", 0, 1, "invalid")), \
+                mock.patch.object(dhcb_agent.LOOPBACK, "open") as request:
+            self.assertEqual("", dhcb_agent.load_token())
+            self.assertFalse(dhcb_agent.request("revit", "GET", "/tools")["success"])
+            request.assert_not_called()
+
+    def test_background_keeps_job_id_on_polling_disconnect_and_encodes_path(self):
+        with mock.patch.object(dhcb_agent, "request", side_effect=[
+            {"id": "job/a"}, {"success": False, "summary": "Disconnected"}]) as request:
+            result = dhcb_agent.send_background("revit", "AutoNumbering", {})
+        self.assertEqual("job/a", result["id"])
+        self.assertEqual("/progress/job%2Fa", result["progressUrl"])
+        self.assertEqual("/progress/job%2Fa", request.call_args.args[2])
+        self.assertEqual(2, request.call_count)
+
+    def test_background_explicit_progress_error_cannot_report_nested_success(self):
+        with mock.patch.object(dhcb_agent, "request", side_effect=[
+            {"id": "job"}, {"success": False, "status": "done", "result": {"success": True}}]) as request:
+            result = dhcb_agent.send_background("revit", "AutoNumbering", {})
+        self.assertFalse(result["success"])
+        self.assertEqual("job", result["id"])
+        self.assertEqual("/progress/job", result["progressUrl"])
+        self.assertEqual(2, request.call_count)
+
+    def test_background_malformed_completed_result_keeps_recovery_id(self):
+        for result in (None, "unexpected", []):
+            with mock.patch.object(dhcb_agent, "request", side_effect=[
+                {"id": "job"}, {"status": "done", "result": result}]):
+                response = dhcb_agent.send_background("revit", "AutoNumbering", {})
+                self.assertFalse(response["success"])
+                self.assertEqual("job", response["id"])
+                self.assertIn("KHÔNG gửi lại", response["summary"])
 
     def test_cli_progress_cancel_id_and_exit(self):
         for command in ("progress", "cancel"):

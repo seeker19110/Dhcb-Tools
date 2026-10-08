@@ -12,7 +12,7 @@ on:
     branches: [main]
   pull_request:
 
-# Đẩy commit mới lên cùng PR thì huỷ lượt CI cũ: 11 job × ~50 s của lượt cũ không còn giá trị gì
+# Đẩy commit mới lên cùng PR thì huỷ lượt CI cũ: các hàng ma trận của lượt cũ không còn giá trị gì
 # mà vẫn chiếm runner, lượt mới phải xếp hàng. Chỉ huỷ trên PR — trên main mỗi commit phải có
 # kết quả CI riêng (release.yml và bằng chứng kiểm thử tra theo commit).
 # Quan sát 2026-09-23: hai merge cách nhau 2 phút thì lượt của commit trước trên main bị HUỶ dù
@@ -93,14 +93,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 2023/2024 = net48 · 2025 = net8.0-windows · 2026 = Revit net8.0-windows nhưng AutoCAD net10.0-windows.
-        # Trước đây CI chỉ build 2025, nên lỗi chỉ xảy ra trên net48 (Dictionary.GetValueOrDefault)
-        # hoặc chỉ trên Revit ≤ 2023 (ElementId.Value) lọt tới tận bước phát hành.
-        # 2026/2027 thêm vào để đường .NET 10 có CI — trước đó nhánh TFM net10 trong Directory.Build.props
-        # chưa từng được build ở đâu ngoài máy có cài AutoCAD 2026. 2027 = cả Revit lẫn AutoCAD đều
-        # net10.0-windows (gói Nice3point.Revit.Api.RevitAPI 2027.2.0 đã có trên NuGet). Microsoft ngừng
-        # hỗ trợ .NET 8 ngày 10/11/2026. release.yml chưa đóng gói 2026/2027: chưa chạy thật trên phần mềm đó.
-        version: ['2027', '2026', '2025', '2024', '2023']
+        include:
+          - { version: '2022', acad-runtime: net48 }
+          - { version: '2023', acad-runtime: net48 }
+          - { version: '2024', acad-runtime: net48 }
+          - { version: '2025', acad-runtime: net8 }
+          - { version: '2025', acad-runtime: net10 }
+          - { version: '2026', acad-runtime: net10 }
+          - { version: '2026', acad-runtime: net8 }
+          - { version: '2027', acad-runtime: net10 }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -123,16 +124,16 @@ jobs:
                       src/DhcbTools.Revit/DhcbTools.Revit.csproj src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj \
                       src/DhcbTools.AutoCAD.Core/DhcbTools.AutoCAD.Core.csproj; do
             dotnet build "$proj" -p:EnableWindowsTargeting=true \
-              -p:RevitVersion=${{ matrix.version }} -p:AcadVersion=${{ matrix.version }} \
+              -p:RevitVersion=${{ matrix.version }} -p:AcadVersion=${{ matrix.version }} -p:AcadRuntime=${{ matrix.acad-runtime }} \
               -p:UseWPF=false -c Release
           done
 
       - name: Build fixture nghiệm thu AutoCAD (không cài vào bundle)
-        if: matrix.version == '2026'
+        if: matrix.version == '2026' && matrix.acad-runtime == 'net10'
         run: dotnet build tools/acceptance/DhcbTools.AutoCAD.Acceptance.csproj -c Release -p:AcadVersion=2026 -p:EnableWindowsTargeting=true
 
       - name: Kiểm tra script Python (ngưỡng phủ 100% câu lệnh)
-        if: matrix.version == '2025'   # không phụ thuộc TFM, chạy một lần là đủ
+        if: matrix.version == '2025' && matrix.acad-runtime == 'net8'   # không phụ thuộc TFM, chạy một lần là đủ
         run: |
           # test_panel_api.py nhập server.py để kiểm cổng xác nhận của MCP, mà server.py cần fastmcp.
           # Không cài thì bộ test không chạy nổi một ca nào (ImportError) — CI đỏ đúng vì lý do đó.
@@ -149,7 +150,7 @@ jobs:
           python3 -m coverage report
 
       - name: Kiểm tra JavaScript panel AutoCAD
-        if: matrix.version == '2025'   # không phụ thuộc TFM, chạy một lần là đủ
+        if: matrix.version == '2025' && matrix.acad-runtime == 'net8'   # không phụ thuộc TFM, chạy một lần là đủ
         run: |
           node -e "const fs=require('fs');const s=fs.readFileSync('tools/autocad-mcp-server/panel.html','utf8');const m=s.match(/<script>([\\s\\S]*?)<\\/script>/);if(!m)throw Error('script missing');new Function(m[1]);if(!s.includes('runCleanup(false)'))throw Error('real cleanup path missing');"
 
@@ -158,7 +159,7 @@ jobs:
       # nên cài task chạy đêm theo đúng README là hỏng ngay dòng lệnh đầu (audit 2026-10-01). Runner Linux có sẵn
       # pwsh 7; bộ đọc của nó gắn loại token riêng cho đúng các toán tử này nên kiểm được mà không cần Windows.
       - name: Kiểm script PowerShell (cú pháp, chạy được trên 5.1)
-        if: matrix.version == '2025'   # không phụ thuộc TFM, chạy một lần là đủ
+        if: matrix.version == '2025' && matrix.acad-runtime == 'net8'   # không phụ thuộc TFM, chạy một lần là đủ
         shell: pwsh
         run: |
           $ps7Only = 'QuestionDot', 'QuestionQuestion', 'QuestionQuestionEquals', 'QuestionLBracket', 'AndAnd', 'OrOr', 'QuestionMark'
@@ -189,7 +190,7 @@ jobs:
       fail-fast: false
       matrix:
         # 2027 là bản WPF đầu tiên trên net10.0-windows — đúng chỗ SDK đổi implicit usings khi bật WPF.
-        revit: ['2027', '2026', '2025', '2024', '2023']
+        revit: ['2027', '2026', '2025', '2024', '2023', '2022']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -214,3 +215,58 @@ jobs:
           $env:DHCB_ISCC = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           python -m unittest discover -s tests/python -p test_installer.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  # Ribbon AutoCAD dùng WPF: biên dịch đầy đủ như artifact phát hành, cho từng SDK/runtime.
+  build-autocad-windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { acad: '2022', runtime: net48 }
+          - { acad: '2023', runtime: net48 }
+          - { acad: '2024', runtime: net48 }
+          - { acad: '2025', runtime: net8 }
+          - { acad: '2025', runtime: net10 }
+          - { acad: '2026', runtime: net8 }
+          - { acad: '2026', runtime: net10 }
+          - { acad: '2027', runtime: net10 }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: Build AutoCAD WPF và Core Console
+        shell: pwsh
+        run: |
+          foreach ($project in 'AutoCAD', 'AutoCAD.Core') {
+            dotnet build "src/DhcbTools.$project/DhcbTools.$project.csproj" -c Release -p:AcadVersion=${{ matrix.acad }} -p:AcadRuntime=${{ matrix.runtime }}
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+  # Stable branch protection context; matrix row names can change without dropping a required check.
+  # Python, JavaScript and PowerShell checks run inside check-build (2025/net8).
+  quality-gate:
+    if: ${{ always() }}
+    needs: [logic-tests, check-build, build-wpf-windows, build-autocad-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every validation job to succeed
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          results = json.loads(os.environ['NEEDS_JSON'])
+          failed = {name: job['result'] for name, job in results.items() if job['result'] != 'success'}
+          if not results or failed:
+              print('Validation jobs did not all succeed:', failed, file=sys.stderr)
+              sys.exit(1)
+          print('All validation jobs passed.')
+          PY

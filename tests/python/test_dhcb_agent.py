@@ -266,18 +266,21 @@ class SendBackgroundTests(unittest.TestCase):
 
     def test_progress_404_tra_nguyen_phan_hoi(self) -> None:
         with mock.patch.object(dhcb_agent, "request", side_effect=[{"id": "job1"}, {"error": "404"}]):
-            self.assertEqual({"error": "404"}, dhcb_agent.send_background("revit", "KiemTra", {}))
+            self.assertEqual({"error": "404", "id": "job1", "progressUrl": "/progress/job1"},
+                             dhcb_agent.send_background("revit", "KiemTra", {}))
 
-    def test_cho_qua_han_noi_ro_lenh_van_dang_chay(self) -> None:
+    def test_cho_qua_han_giu_id_va_khong_khang_dinh_ket_qua(self) -> None:
         """Hết kiên nhẫn KHÔNG có nghĩa là lệnh dừng — thông báo phải nói rõ và đưa lại id."""
         with mock.patch.object(dhcb_agent, "request",
                                side_effect=[{"id": "job1"}, {"status": "running", "elapsedMs": 1}]), \
-                mock.patch.object(dhcb_agent.time, "time", side_effect=[0, 10_000]), \
+                mock.patch.object(dhcb_agent.time, "monotonic", side_effect=[0, 10_000]), \
                 mock.patch.object(dhcb_agent.time, "sleep"):
             result = dhcb_agent.send_background("revit", "KiemTra", {}, max_wait_seconds=1)
 
         self.assertFalse(result["success"])
-        self.assertIn("VẪN ĐANG CHẠY", result["summary"])
+        self.assertIn("Chưa xác định kết quả", result["summary"])
+        self.assertTrue(result["outcomeUnknown"])
+        self.assertIn("KHÔNG gửi lại", result["summary"])
         self.assertIn("/progress/job1", result["summary"])
 
 

@@ -91,7 +91,7 @@ Bốn việc này phải xong **trước** mọi hướng mới; bỏ qua thì h
 
 ---
 
-## Giai đoạn 10 — Agent khép vòng cho Revit 2023–2026 🟡 (tuần 5–8) — **hướng khác biệt lớn nhất**
+## Giai đoạn 10 — Agent khép vòng cho Revit 2022–2027 🟡 (tuần 5–8) — **hướng khác biệt lớn nhất**
 
 Autodesk Revit 2027 MCP Server chỉ **đọc** và chỉ chạy trên **2027**; các dự án revit-mcp mã mở có 100+ tool nhưng
 không có `dryRun`, token, batch, AutoCAD song hành hay tiếng Việt. DHCB đã có Bridge, token, `ExternalEvent`,
@@ -217,7 +217,7 @@ hành chứ không còn "preview".
 | `release.yml` không đóng gói nhầm thư mục | ✅ bỏ hai chỗ hardcode `-ge 2025 → net8`; TFM nay **hỏi MSBuild** (`-getProperty:TargetFramework`) — một nguồn sự thật trong `Directory.Build.props` |
 | Phát hành **AutoCAD 2026** (net10) | ✅ 2026-09-05: ma trận `build-autocad` thêm 2026, installer có component `acad2026` → bundle `Contents6`, `PackageContents.xml` thêm khối `SeriesMin/Max R25.1`. Làm được vì AutoCAD 2026.1 **đã chạy thật** (§24 batch 18/18 + 12/12, §25 snapshot) — khác Revit 2026/2027 vẫn chưa |
 | `Shared.*` (netstandard2.0) nạp được trong net10 | ✅ ở mức biên dịch/liên kết: `deps.json` của vỏ Revit net10 tham chiếu đủ `Shared.Logic`/`Shared.Hosting`; AutoCAD 2026.1 thật đã NETLOAD và chạy 18/18 + 12/12 qua accoreconsole ([`bang-chung-test.md`](bang-chung-test.md) §24) |
-| Chạy thật trên **Revit 2026/2027** | ✅ **Revit 2026 đã chạy thật 2026-09-06** (`smoke` 41/41+1, `plumbing` 8/8, `mep` 26/26 — [`bang-chung-test.md`](bang-chung-test.md) §51), nên `release.yml` + installer **đã đóng gói Revit 2026** từ cùng ngày. ⬜ Revit 2027 chưa có trên máy nên chỉ build, **chưa phát hành** — không phát hành thứ chưa chạy. Phía AutoCAD 2026 đã chạy thật và đã phát hành |
+| Chạy thật trên **Revit 2026/2027** | ✅ **Revit 2026 đã chạy thật 2026-09-06** (`smoke` 41/41+1, `plumbing` 8/8, `mep` 26/26 — [`bang-chung-test.md`](bang-chung-test.md) §51), nên `release.yml` + installer **đã đóng gói Revit 2026** từ cùng ngày. Ma trận build/gói nay gồm Revit 2022–2027; nghiệm thu Revit 2027 trên host vẫn còn mở, xem [ma trận](tuong-thich-2022-2027.md). Phía AutoCAD 2026 đã chạy thật và đã phát hành |
 
 Không đổi logic. Không chặn giai đoạn 9–11.
 

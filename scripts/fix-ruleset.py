@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sửa ruleset `main` của repo GitHub: chỉ áp lên nhánh mặc định + bắt buộc 11 check CI xanh.
+"""Sửa ruleset `main` của repo GitHub: chỉ áp lên nhánh mặc định + bắt buộc cổng quality-gate xanh.
 
 Vì sao có file này: ruleset tạo tay ngày 2026-09-06 include cả "~ALL" nên áp lên MỌI nhánh —
 không đẩy được commit lên nhánh PR, không xoá được nhánh sau merge. Và thiếu required_status_checks
@@ -17,12 +17,8 @@ import sys
 
 REPO = "seeker19110/Dhcb-Tools"
 
-# Tên check đúng như trong .github/workflows/tests.yml (job + ma trận).
-REQUIRED_CHECKS = ["logic-tests"] + [
-    f"{job} ({year})"
-    for job in ("check-build", "build-wpf-windows")
-    for year in (2023, 2024, 2025, 2026, 2027)
-]
+# Cổng ổn định gom toàn bộ job, gồm các hàng ma trận và kiểm script.
+REQUIRED_CHECKS = ["quality-gate"]
 
 
 def gh(*args: str, input_text: str | None = None) -> str:

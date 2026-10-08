@@ -2,7 +2,8 @@
 <!--
   Bundle tự nạp cho AutoCAD: đặt ở %APPDATA%\Autodesk\ApplicationPlugins\DhcbTools.bundle\
   thì AutoCAD nạp plugin khi khởi động, không cần NETLOAD thủ công mỗi phiên.
-  SeriesMin/Max theo internal version: AutoCAD 2024 = R24.3, 2025 = R25.0, 2026 = R25.1 (.NET 10).
+  SeriesMin/Max theo internal version: 2022 = R24.1, 2023 = R24.2, 2024 = R24.3, 2025 = R25.0, 2026 = R25.1, 2027 = R26.0.
+  Installer chọn DLL .NET 8/10 theo runtime thực tế cho AutoCAD 2025/2026.
   Version được installer thay bằng phiên bản thật lúc đóng gói (release.yml).
 -->
 <ApplicationPackage
@@ -18,6 +19,24 @@
   <CompanyDetails
       Name="DHCB"
       Url="https://github.com/seeker19110/Dhcb-Tools" />
+
+  <Components Description="AutoCAD 2022">
+    <RuntimeRequirements OS="Win64" Platform="AutoCAD*" SeriesMin="R24.1" SeriesMax="R24.1" />
+    <ComponentEntry
+        AppName="DhcbTools.AutoCAD"
+        ModuleName="./Contents/2022/DhcbTools.AutoCAD.dll"
+        AppDescription="DHCB Tools cho AutoCAD 2022"
+        LoadOnAutoCADStartup="True" />
+  </Components>
+
+  <Components Description="AutoCAD 2023">
+    <RuntimeRequirements OS="Win64" Platform="AutoCAD*" SeriesMin="R24.2" SeriesMax="R24.2" />
+    <ComponentEntry
+        AppName="DhcbTools.AutoCAD"
+        ModuleName="./Contents/2023/DhcbTools.AutoCAD.dll"
+        AppDescription="DHCB Tools cho AutoCAD 2023"
+        LoadOnAutoCADStartup="True" />
+  </Components>
 
   <Components Description="AutoCAD 2024">
     <RuntimeRequirements OS="Win64" Platform="AutoCAD*" SeriesMin="R24.3" SeriesMax="R24.3" />
@@ -37,12 +56,21 @@
         LoadOnAutoCADStartup="True" />
   </Components>
 
-  <Components Description="AutoCAD 2026 Update 1.2+ (.NET 10)">
+  <Components Description="AutoCAD 2026">
     <RuntimeRequirements OS="Win64" Platform="AutoCAD*" SeriesMin="R25.1" SeriesMax="R25.1" />
     <ComponentEntry
         AppName="DhcbTools.AutoCAD"
         ModuleName="./Contents/2026/DhcbTools.AutoCAD.dll"
         AppDescription="DHCB Tools cho AutoCAD 2026"
+        LoadOnAutoCADStartup="True" />
+  </Components>
+
+  <Components Description="AutoCAD 2027">
+    <RuntimeRequirements OS="Win64" Platform="AutoCAD*" SeriesMin="R26.0" SeriesMax="R26.0" />
+    <ComponentEntry
+        AppName="DhcbTools.AutoCAD"
+        ModuleName="./Contents/2027/DhcbTools.AutoCAD.dll"
+        AppDescription="DHCB Tools cho AutoCAD 2027"
         LoadOnAutoCADStartup="True" />
   </Components>
 

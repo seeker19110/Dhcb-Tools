@@ -16,8 +16,14 @@
 #>
 [CmdletBinding()]
 param(
-    # Phiên bản AutoCAD dùng để build và chạy. 2026.1+ là .NET 10.
+    # Phiên bản và runtime của đúng host đang chạy.
+    [ValidateSet(2022, 2023, 2024, 2025, 2026, 2027)]
     [int]$AcadVersion = 2026,
+
+    [ValidateSet('Auto', 'net8', 'net10')]
+    [string]$AcadRuntime = 'Auto',
+
+    [string]$AcadDirectory,
 
     # Bộ ca kiểm: "smoke" (mọi lệnh, chỉ xem trước) hoặc "write" (đường ghi thật — xem -AllowWrites).
     [ValidateSet('smoke', 'write')]
@@ -49,11 +55,31 @@ function Stop-WithMessage([string]$Message) {
 }
 
 # ── 1. accoreconsole ─────────────────────────────────────────────────────────
-$acadDir = "C:\Program Files\Autodesk\AutoCAD $AcadVersion"
+$acadDir = if ($AcadDirectory) { $AcadDirectory } else { "C:\Program Files\Autodesk\AutoCAD $AcadVersion" }
 $console = Join-Path $acadDir 'accoreconsole.exe'
 if (-not (Test-Path $console)) {
     Stop-WithMessage "Không tìm thấy accoreconsole: $console"
 }
+
+function Get-AcadRuntime([int]$Year, [string]$Folder, [string]$Requested) {
+    if ($Year -le 2024) {
+        if ($Requested -ne 'Auto') { throw 'AutoCAD 2022–2024 chỉ dùng .NET Framework 4.8.' }
+        return 'net48'
+    }
+    $configPath = Join-Path $Folder 'acdbmgd.runtimeconfig.json'
+    if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) { throw "Thiếu runtimeconfig: $configPath" }
+    $config = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $tfm = $config.runtimeOptions.tfm
+    if ($tfm -eq 'net8.0') { $detected = 'net8' }
+    elseif ($tfm -eq 'net10.0') { $detected = 'net10' }
+    else { throw "Runtime AutoCAD không được hỗ trợ: $tfm" }
+    if ($Year -eq 2027 -and $detected -ne 'net10') { throw 'AutoCAD 2027 cần .NET 10.' }
+    if ($Requested -ne 'Auto' -and $Requested -ne $detected) { throw "AcadRuntime=$Requested khác runtime host $detected." }
+    return $detected
+}
+
+try { $AcadRuntime = Get-AcadRuntime $AcadVersion $acadDir $AcadRuntime }
+catch { Stop-WithMessage $_.Exception.Message }
 
 # ── 2. Bản vẽ ────────────────────────────────────────────────────────────────
 if (-not $Drawing) {
@@ -81,7 +107,7 @@ Write-Host "Bản vẽ     : $Drawing"
 if (-not $SkipBuild) {
     Write-Host "`n== Build vỏ core-only AutoCAD $AcadVersion (Release)"
     dotnet build (Join-Path $repo 'src\DhcbTools.AutoCAD.Core\DhcbTools.AutoCAD.Core.csproj') `
-        -c Release -p:AcadVersion=$AcadVersion -nologo -v:q -clp:ErrorsOnly
+        -c Release -p:AcadVersion=$AcadVersion -p:AcadRuntime=$AcadRuntime -nologo -v:q -clp:ErrorsOnly
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     Write-Host "== Build BatchRunner"
@@ -90,18 +116,22 @@ if (-not $SkipBuild) {
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
-# TFM hỏi MSBuild theo bảng map trong Directory.Build.props (AutoCAD 2026.1+ là .NET 10). Trước đây lấy
+# TFM và TargetDir hỏi MSBuild theo đúng profile runtime đã build. Trước đây lấy
 # DLL MỚI NHẤT trong mọi thư mục TFM: máy vừa build 2024 (net48) rồi -SkipBuild với -AcadVersion 2026 là
 # NETLOAD nhầm DLL sai runtime vào accoreconsole.
 $coreProj = Join-Path $repo 'src\DhcbTools.AutoCAD.Core\DhcbTools.AutoCAD.Core.csproj'
-$acadTfm = & dotnet msbuild $coreProj -nologo -getProperty:TargetFramework -p:AcadVersion=$AcadVersion
+$acadTfm = & dotnet msbuild $coreProj -nologo -getProperty:TargetFramework -p:AcadVersion=$AcadVersion -p:AcadRuntime=$AcadRuntime
 if ($LASTEXITCODE -ne 0) { Stop-WithMessage "MSBuild không đọc được TargetFramework của vỏ AutoCAD.Core (mã $LASTEXITCODE)." }
 if ([string]::IsNullOrWhiteSpace($acadTfm)) { Stop-WithMessage "Không hỏi được TargetFramework của vỏ AutoCAD.Core cho AcadVersion=$AcadVersion" }
 $acadTfm = $acadTfm.Trim()
-$pluginPath = Join-Path $repo "src\DhcbTools.AutoCAD.Core\bin\Release\$acadTfm\DhcbTools.AutoCAD.Core.dll"
+$acadOut = & dotnet msbuild $coreProj -nologo -getProperty:TargetDir -p:Configuration=Release -p:AcadVersion=$AcadVersion -p:AcadRuntime=$AcadRuntime
+if ($LASTEXITCODE -ne 0) { Stop-WithMessage "MSBuild không đọc được TargetDir của AutoCAD.Core (mã $LASTEXITCODE)." }
+if ([string]::IsNullOrWhiteSpace($acadOut)) { Stop-WithMessage 'MSBuild không trả TargetDir của AutoCAD.Core.' }
+$acadOut = $acadOut.Trim()
+$pluginPath = Join-Path $acadOut 'DhcbTools.AutoCAD.Core.dll'
 $plugin = Get-Item $pluginPath -ErrorAction SilentlyContinue
 if (-not $plugin) {
-    Stop-WithMessage "Không tìm thấy $pluginPath (bỏ -SkipBuild hoặc build với -p:AcadVersion=$AcadVersion)"
+    Stop-WithMessage "Không tìm thấy $pluginPath (bỏ -SkipBuild hoặc build với -p:AcadVersion=$AcadVersion -p:AcadRuntime=$AcadRuntime)"
 }
 
 # ── 4. Dựng file job ─────────────────────────────────────────────────────────

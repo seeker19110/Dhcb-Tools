@@ -1,123 +1,81 @@
 <Project>
-
-  <!--
-    Multi-target cho nhiều phiên bản Revit trong cùng solution.
-    Quy ước: mỗi build cấu hình (Debug/Release) x (R21..R25) tương ứng một TargetFramework.
-    RevitVersion truyền vào qua biến môi trường hoặc -p:RevitVersion=2024 khi build.
-  -->
-  <!--
-    RevitVersion phải có mặc định: PackageReference của Core dùng Version="$(RevitVersion).*", nên khi
-    biến rỗng thì chuỗi phiên bản thành ".*" — NuGet trả về false mà KHÔNG log lỗi nào, và `dotnet build`
-    trần chỉ báo "error MSB4181: The RestoreTask task returned false but did not log an error". Mặc định
-    2024 trùng đúng nhánh TFM cũ dành cho biến rỗng (net48), nên không đổi kết quả build nào đang có.
-  -->
+  <!-- Each host year uses its own SDK. Older AutoCAD hosts cannot load a newer SDK. -->
   <PropertyGroup>
     <RevitVersion Condition="'$(RevitVersion)'==''">2024</RevitVersion>
-    <!-- API đã được restore/kiểm tại audit 2026-09-07; không tự trôi theo wildcard khi phát hành. -->
-    <RevitApiVersion Condition="'$(RevitVersion)'=='2023'">2023.1.90</RevitApiVersion>
-    <RevitApiVersion Condition="'$(RevitVersion)'=='2024'">2024.3.60</RevitApiVersion>
-    <RevitApiVersion Condition="'$(RevitVersion)'=='2025'">2025.4.60</RevitApiVersion>
-    <RevitApiVersion Condition="'$(RevitVersion)'=='2026'">2026.4.10</RevitApiVersion>
-    <RevitApiVersion Condition="'$(RevitVersion)'=='2027'">2027.2.0</RevitApiVersion>
-  </PropertyGroup>
-
-  <PropertyGroup>
+    <AcadVersion Condition="'$(AcadVersion)'==''">2024</AcadVersion>
+    <DhcbIsAcadProject Condition="$(MSBuildProjectName.Contains('AutoCAD'))">true</DhcbIsAcadProject>
+    <DhcbIsRevitProject Condition="'$(MSBuildProjectName)'=='DhcbTools.Core' Or '$(MSBuildProjectName)'=='DhcbTools.Revit'">true</DhcbIsRevitProject>
+    <AcadRuntime Condition="'$(AcadRuntime)'=='' And ('$(AcadVersion)'=='2022' Or '$(AcadVersion)'=='2023' Or '$(AcadVersion)'=='2024')">net48</AcadRuntime>
+    <AcadRuntime Condition="'$(AcadRuntime)'=='' And '$(AcadVersion)'=='2025'">net8</AcadRuntime>
+    <!-- Preserve the existing 2026 package default; RTM hosts select AcadRuntime=net8. -->
+    <AcadRuntime Condition="'$(AcadRuntime)'=='' And ('$(AcadVersion)'=='2026' Or '$(AcadVersion)'=='2027')">net10</AcadRuntime>
+    <RevitRuntime Condition="'$(RevitVersion)'=='2022' Or '$(RevitVersion)'=='2023' Or '$(RevitVersion)'=='2024'">net48</RevitRuntime>
+    <!-- The .NET 8 API baseline also serves updated 2025.5/2026.5 hosts; host smoke tests are required. -->
+    <RevitRuntime Condition="'$(RevitVersion)'=='2025' Or '$(RevitVersion)'=='2026'">net8</RevitRuntime>
+    <RevitRuntime Condition="'$(RevitVersion)'=='2027'">net10</RevitRuntime>
+    <RevitApiVersion Condition="'$(RevitApiVersion)'=='' And '$(RevitVersion)'=='2022'">2022.1.80</RevitApiVersion>
+    <RevitApiVersion Condition="'$(RevitApiVersion)'=='' And '$(RevitVersion)'=='2023'">2023.1.90</RevitApiVersion>
+    <RevitApiVersion Condition="'$(RevitApiVersion)'=='' And '$(RevitVersion)'=='2024'">2024.3.60</RevitApiVersion>
+    <RevitApiVersion Condition="'$(RevitApiVersion)'=='' And '$(RevitVersion)'=='2025'">2025.4.60</RevitApiVersion>
+    <RevitApiVersion Condition="'$(RevitApiVersion)'=='' And '$(RevitVersion)'=='2026'">2026.4.10</RevitApiVersion>
+    <RevitApiVersion Condition="'$(RevitApiVersion)'=='' And '$(RevitVersion)'=='2027'">2027.2.0</RevitApiVersion>
+    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And '$(AcadVersion)'=='2022'">24.1.51000</AcadNetVersion>
+    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And '$(AcadVersion)'=='2023'">24.2.0</AcadNetVersion>
+    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And '$(AcadVersion)'=='2024'">24.3.0</AcadNetVersion>
+    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And '$(AcadVersion)'=='2025' And '$(AcadRuntime)'=='net8'">25.0.1</AcadNetVersion>
+    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And '$(AcadVersion)'=='2025' And '$(AcadRuntime)'=='net10'">25.0.2</AcadNetVersion>
+    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And '$(AcadVersion)'=='2026' And '$(AcadRuntime)'=='net8'">25.1.0</AcadNetVersion>
+    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And '$(AcadVersion)'=='2026' And '$(AcadRuntime)'=='net10'">25.1.1</AcadNetVersion>
+    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And '$(AcadVersion)'=='2027'">26.0.0</AcadNetVersion>
+    <AcadCoreNetVersion Condition="'$(AcadCoreNetVersion)'=='' And '$(AcadNetVersion)'=='25.0.1'">25.0.0</AcadCoreNetVersion>
+    <AcadCoreNetVersion Condition="'$(AcadCoreNetVersion)'==''">$(AcadNetVersion)</AcadCoreNetVersion>
+    <AcadRoot Condition="'$(AcadRoot)'==''">$(ProgramFiles)\Autodesk\AutoCAD $(AcadVersion)</AcadRoot>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
-    <!--
-      Trước đây GenerateAssemblyInfo=false mà không có AssemblyInfo.cs nào trong repo, nên mọi DLL phát hành
-      đều mang phiên bản 0.0.0.0 — GET /health không cho biết đang chạy bản build nào (lỗi phát hiện ở R4).
-      Nay sinh attribute phiên bản từ property Version; release.yml truyền -p:Version=<tag> vào mọi dotnet build.
-    -->
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <Version Condition="'$(Version)'==''">0.9.0-dev</Version>
     <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
     <Company>DHCB</Company>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-    <Product>DHCB Revit Tools</Product>
+    <Product>DHCB Tools</Product>
     <Copyright>Copyright (c) DHCB</Copyright>
   </PropertyGroup>
-
-  <!--
-    Chọn TargetFramework theo ĐÚNG phần mềm chủ của từng project.
-    Trước đây TFM chỉ nhìn RevitVersion, nên vỏ AutoCAD luôn ra net48 kể cả khi build cho
-    AutoCAD 2025/2026 — mà AutoCAD 2025 chạy .NET 8 và AutoCAD 2026 chạy .NET 10, nên DLL net48
-    không NETLOAD được. Project AutoCAD nay theo AcadVersion, còn lại theo RevitVersion.
-  -->
-  <PropertyGroup>
-    <DhcbIsAcadProject Condition="$(MSBuildProjectName.Contains('AutoCAD'))">true</DhcbIsAcadProject>
-  </PropertyGroup>
-
-  <!-- Gói AutoCAD 2026 chỉ hỗ trợ Update 1.2+ (.NET 10); installer kiểm runtime.
-       AutoCAD 2026 RTM–Update 1.1 (.NET 8) không thuộc phạm vi gói 2026 này. -->
   <PropertyGroup Condition="'$(DhcbIsAcadProject)'=='true'">
-    <TargetFramework Condition="'$(AcadVersion)'=='' Or $(AcadVersion) &lt;= 2024">net48</TargetFramework>
-    <TargetFramework Condition="'$(AcadVersion)' != '' And $(AcadVersion) == 2025">net8.0-windows</TargetFramework>
-    <TargetFramework Condition="'$(AcadVersion)' != '' And $(AcadVersion) &gt;= 2026">net10.0-windows</TargetFramework>
+    <TargetFramework Condition="'$(AcadRuntime)'=='net48'">net48</TargetFramework>
+    <TargetFramework Condition="'$(AcadRuntime)'=='net8'">net8.0-windows</TargetFramework>
+    <TargetFramework Condition="'$(AcadRuntime)'=='net10'">net10.0-windows</TargetFramework>
+    <DhcbHostBuildPath>$(AcadVersion)/$(AcadRuntime)</DhcbHostBuildPath>
   </PropertyGroup>
-
-  <!--
-    Revit 2021-2024 chạy trên .NET Framework 4.8; 2025/2026 chạy .NET 8; 2027+ chạy .NET 10.
-    Điều kiện của nhánh net8 phải CÓ CẬN TRÊN: trước đây là "&gt;= 2025" không chặn trên, nên
-    -p:RevitVersion=2027 vẫn ra net8.0-windows — sai âm thầm, không lỗi biên dịch nào bắt được.
-    Microsoft ngừng hỗ trợ .NET 8 ngày 10/11/2026, nên nhánh này phải sẵn trước khi Revit 2027 ra.
-  -->
-  <PropertyGroup Condition="'$(DhcbIsAcadProject)' != 'true'">
-    <TargetFramework Condition="'$(RevitVersion)'=='' Or $(RevitVersion) &lt; 2025">net48</TargetFramework>
-    <TargetFramework Condition="'$(RevitVersion)' != '' And $(RevitVersion) &gt;= 2025 And $(RevitVersion) &lt; 2027">net8.0-windows</TargetFramework>
-    <TargetFramework Condition="'$(RevitVersion)' != '' And $(RevitVersion) &gt;= 2027">net10.0-windows</TargetFramework>
+  <PropertyGroup Condition="'$(DhcbIsRevitProject)'=='true'">
+    <TargetFramework Condition="'$(RevitRuntime)'=='net48'">net48</TargetFramework>
+    <TargetFramework Condition="'$(RevitRuntime)'=='net8'">net8.0-windows</TargetFramework>
+    <TargetFramework Condition="'$(RevitRuntime)'=='net10'">net10.0-windows</TargetFramework>
+    <DhcbHostBuildPath>$(RevitVersion)/$(RevitRuntime)</DhcbHostBuildPath>
   </PropertyGroup>
-
-  <!-- Hằng biên dịch theo phiên bản: CreateContainsRule bỏ tham số caseSensitive từ 2023. -->
-  <PropertyGroup Condition="'$(RevitVersion)' != '' And $(RevitVersion) &gt;= 2023">
+  <!-- A headless validation build must not replace DLLs needed by the WPF host or SkipBuild. -->
+  <PropertyGroup Condition="'$(DhcbHostBuildPath)'!='' And '$(UseWPF)'=='false'">
+    <DhcbHostBuildPath>$(DhcbHostBuildPath)/headless</DhcbHostBuildPath>
+  </PropertyGroup>
+  <!-- Isolate restore assets AND assemblies when compiling several SDK baselines in one checkout. -->
+  <PropertyGroup Condition="'$(DhcbHostBuildPath)'!=''">
+    <BaseOutputPath>bin/$(DhcbHostBuildPath)/</BaseOutputPath>
+    <BaseIntermediateOutputPath>obj/$(DhcbHostBuildPath)/</BaseIntermediateOutputPath>
+    <DefaultItemExcludes>$(DefaultItemExcludes);bin/**;obj/**</DefaultItemExcludes>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(DhcbIsRevitProject)'=='true' And ('$(RevitVersion)'=='2023' Or '$(RevitVersion)'=='2024' Or '$(RevitVersion)'=='2025' Or '$(RevitVersion)'=='2026' Or '$(RevitVersion)'=='2027')">
     <DefineConstants>$(DefineConstants);REVIT2023_OR_GREATER</DefineConstants>
   </PropertyGroup>
-
-  <!-- Hằng biên dịch theo phiên bản: ElementId.Value (long) thay IntegerValue từ 2024. -->
-  <PropertyGroup Condition="'$(RevitVersion)' != '' And $(RevitVersion) &gt;= 2024">
+  <PropertyGroup Condition="'$(DhcbIsRevitProject)'=='true' And ('$(RevitVersion)'=='2024' Or '$(RevitVersion)'=='2025' Or '$(RevitVersion)'=='2026' Or '$(RevitVersion)'=='2027')">
     <DefineConstants>$(DefineConstants);REVIT2024_OR_GREATER</DefineConstants>
   </PropertyGroup>
-
-  <!--
-    Build kiểm tra trên Linux/CI (không có WindowsDesktop SDK): dotnet build -p:EnableWindowsTargeting=true -p:UseWPF=false
-    → vỏ Revit bỏ thư mục UI (WPF) ra khỏi compile; xem scripts/check-build.sh.
-  -->
   <PropertyGroup Condition="'$(UseWPF)'=='false'">
     <DhcbSkipWpf>true</DhcbSkipWpf>
     <DefineConstants>$(DefineConstants);DHCB_SKIP_WPF</DefineConstants>
   </PropertyGroup>
-
-  <!--
-    AutoCAD: đường dẫn tới thư mục cài AutoCAD, dùng cho HintPath của AcMgd/AcDbMgd/AcCoreMgd.
-    Truyền vào khi build:  dotnet build -p:AcadVersion=2024
-    Hoặc đặt biến môi trường AcadRoot trỏ thẳng đến thư mục cài đặt.
-    AutoCAD 2024 trở về trước: net48 | AutoCAD 2025+: net8.0-windows (tương tự Revit).
-  -->
-  <PropertyGroup>
-    <AcadVersion Condition="'$(AcadVersion)'==''">2024</AcadVersion>
-    <AcadRoot Condition="'$(AcadRoot)'==''">$(ProgramFiles)\Autodesk\AutoCAD $(AcadVersion)</AcadRoot>
-    <!--
-      Phiên bản package AutoCAD.NET: ≤2024 → 24.* (net48), 2025 → 25.0.1 (net8),
-      2026+ → 25.1.* (AutoCAD 2026.1 đã chuyển sang .NET 10 — xem mục giới hạn công nghệ trong docs).
-      Riêng Core/Model 2025 chỉ có bản 25.0.0; meta-package 25.0.1 phụ thuộc đúng bản đó.
-    -->
-    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And $(AcadVersion) &lt;= 2024">24.3.0</AcadNetVersion>
-    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And $(AcadVersion) == 2025">25.0.1</AcadNetVersion>
-    <AcadNetVersion Condition="'$(AcadNetVersion)'==''">25.1.1</AcadNetVersion>
-    <AcadCoreNetVersion Condition="'$(AcadCoreNetVersion)'=='' And $(AcadVersion) == 2025">25.0.0</AcadCoreNetVersion>
-    <AcadCoreNetVersion Condition="'$(AcadCoreNetVersion)'==''">$(AcadNetVersion)</AcadCoreNetVersion>
-  </PropertyGroup>
-
-
-  <!--
-    Reference assemblies cho net48: cho phép build nhánh Revit/AutoCAD ≤ 2024 trên máy
-    không cài .NET Framework (CI Linux). Trên Windows có sẵn SDK thì package này vô hại.
-  -->
   <ItemGroup Condition="'$(TargetFramework)'=='net48'">
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
   </ItemGroup>
-
 </Project>

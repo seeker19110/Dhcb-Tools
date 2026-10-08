@@ -14,6 +14,12 @@ namespace DhcbTools.Shared.Logic.Geometry
     /// </summary>
     public sealed class BoxSpatialHash<T>
     {
+        // Cap work per box, including degenerate/extreme model bounds. Oversized boxes retain
+        // exact intersection behavior through the overflow list instead of expanding millions of cells.
+        private const long MaxCellsPerBox = 4096;
+        private const long MinCell = -(1L << 20);
+        private const long MaxCell = (1L << 20) - 1;
+        private readonly List<int> _overflow = new List<int>();
         private readonly Dictionary<long, List<int>> _cells = new Dictionary<long, List<int>>();
         private readonly List<(Box3 Box, T Item)> _items = new List<(Box3, T)>();
         private readonly double _cellSize;
@@ -73,7 +79,13 @@ namespace DhcbTools.Shared.Logic.Geometry
             if (box == null) throw new ArgumentNullException(nameof(box));
             var id = _items.Count;
             _items.Add((box, item));
-            ForEachCell(box, 0, key =>
+            if (!TryCellRange(box, 0, out var range))
+            {
+                _overflow.Add(id);
+                return;
+            }
+
+            ForEachCell(range, key =>
             {
                 if (!_cells.TryGetValue(key, out var bucket))
                 {
@@ -95,8 +107,26 @@ namespace DhcbTools.Shared.Logic.Geometry
         public List<T> Query(Box3 box, double tolerance = 0)
         {
             if (box == null) throw new ArgumentNullException(nameof(box));
+            if (!TryCellRange(box, tolerance, out var range))
+            {
+                // A broad query costs O(N), independent of its coordinate volume. Keep the exact
+                // predicate even for infinity, NaN or a tolerance which reverses the expanded bounds.
+                var linear = new List<T>();
+                foreach (var entry in _items)
+                {
+                    if (Intersects(entry.Box, box, tolerance)) linear.Add(entry.Item);
+                }
+
+                return linear;
+            }
+
             var hits = new SortedSet<int>();
-            ForEachCell(box, tolerance, key =>
+            foreach (var id in _overflow)
+            {
+                if (Intersects(_items[id].Box, box, tolerance)) hits.Add(id);
+            }
+
+            ForEachCell(range, key =>
             {
                 if (_cells.TryGetValue(key, out var bucket))
                 {
@@ -128,19 +158,39 @@ namespace DhcbTools.Shared.Logic.Geometry
             && a.MinY <= b.MaxY + tol && a.MaxY >= b.MinY - tol
             && a.MinZ <= b.MaxZ + tol && a.MaxZ >= b.MinZ - tol;
 
-        private void ForEachCell(Box3 box, double tolerance, Action<long> visit)
+        private bool TryCellRange(Box3 box, double tolerance,
+            out (long X0, long X1, long Y0, long Y1, long Z0, long Z1) range)
         {
-            var x0 = Cell(box.MinX - tolerance);
-            var x1 = Cell(box.MaxX + tolerance);
-            var y0 = Cell(box.MinY - tolerance);
-            var y1 = Cell(box.MaxY + tolerance);
-            var z0 = Cell(box.MinZ - tolerance);
-            var z1 = Cell(box.MaxZ + tolerance);
-            for (var x = x0; x <= x1; x++)
+            range = default;
+            if (!TryCell(box.MinX - tolerance, out var x0) || !TryCell(box.MaxX + tolerance, out var x1)
+                || !TryCell(box.MinY - tolerance, out var y0) || !TryCell(box.MaxY + tolerance, out var y1)
+                || !TryCell(box.MinZ - tolerance, out var z0) || !TryCell(box.MaxZ + tolerance, out var z1)
+                || x1 < x0 || y1 < y0 || z1 < z0)
             {
-                for (var y = y0; y <= y1; y++)
+                return false;
+            }
+
+            var nx = x1 - x0 + 1;
+            var ny = y1 - y0 + 1;
+            var nz = z1 - z0 + 1;
+            // Division avoids overflow in nx * ny * nz, and includes both boundary cells.
+            if (nx > MaxCellsPerBox / ny || nx * ny > MaxCellsPerBox / nz)
+            {
+                return false;
+            }
+
+            range = (x0, x1, y0, y1, z0, z1);
+            return true;
+        }
+
+        private static void ForEachCell((long X0, long X1, long Y0, long Y1, long Z0, long Z1) range,
+            Action<long> visit)
+        {
+            for (var x = range.X0; x <= range.X1; x++)
+            {
+                for (var y = range.Y0; y <= range.Y1; y++)
                 {
-                    for (var z = z0; z <= z1; z++)
+                    for (var z = range.Z0; z <= range.Z1; z++)
                     {
                         visit(Key(x, y, z));
                     }
@@ -148,11 +198,20 @@ namespace DhcbTools.Shared.Logic.Geometry
             }
         }
 
-        private long Cell(double v)
+        private bool TryCell(double value, out long cell)
         {
-            var c = Math.Floor(v / _cellSize);
-            // Kẹp trong ±2^20 ô: hộp vô hạn/NaN không được biến vòng lặp ô thành vô tận.
-            return double.IsNaN(c) ? 0 : (long)Math.Max(-(1L << 20), Math.Min(1L << 20, c));
+            var coordinate = Math.Floor(value / _cellSize);
+            cell = 0;
+            // Never clamp coordinates: unrepresentable/infinite boxes need the exact fallback.
+            // The range also prevents collisions when packing each signed coordinate into 21 bits.
+            if (double.IsNaN(coordinate) || double.IsInfinity(coordinate)
+                || coordinate < MinCell || coordinate > MaxCell)
+            {
+                return false;
+            }
+
+            cell = (long)coordinate;
+            return true;
         }
 
         private static long Key(long cx, long cy, long cz)

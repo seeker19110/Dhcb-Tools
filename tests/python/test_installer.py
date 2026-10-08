@@ -1,6 +1,7 @@
 """Chạy installer thật trên Windows, chỉ ghi vào thư mục tạm, không đăng ký uninstall."""
 
 import itertools
+import json
 import os
 from pathlib import Path
 import shutil
@@ -14,7 +15,8 @@ REVIT_FILES = (
     "DhcbTools.Revit.addin", "DhcbTools.Revit.dll", "DhcbTools.Core.dll",
     "DhcbTools.Shared.Logic.dll", "DhcbTools.Shared.Hosting.dll",
 )
-ACAD_YEARS = (2024, 2025, 2026)
+ACAD_YEARS = tuple(range(2022, 2028))
+REVIT_YEARS = tuple(range(2022, 2028))
 
 
 @unittest.skipUnless(os.name == "nt", "ISCC và installer cần Windows")
@@ -32,7 +34,7 @@ class InstallerTests(unittest.TestCase):
         stage = cls.work / "stage"
         cls.stage = stage
         cls.compiler = compiler
-        for year in (2023, 2024, 2025, 2026):
+        for year in REVIT_YEARS:
             folder = stage / f"revit-{year}"
             folder.mkdir(parents=True)
             for name in (*REVIT_FILES, "Newtonsoft.Json.dll"):
@@ -41,6 +43,14 @@ class InstallerTests(unittest.TestCase):
             folder = stage / f"autocad-{year}"
             folder.mkdir()
             (folder / "DhcbTools.AutoCAD.dll").write_text(f"fixture {year}", encoding="utf-8")
+            runtime = "net48" if year <= 2024 else "net8.0" if year == 2025 else "net10.0"
+            (folder / "dhcb-host-profile.json").write_text(json.dumps({"product": "autocad", "year": year, "runtime": runtime}), encoding="utf-8")
+        for profile in ("2025-net10", "2026-net8"):
+            folder = stage / f"autocad-{profile}"
+            folder.mkdir()
+            (folder / "DhcbTools.AutoCAD.dll").write_text(f"fixture {profile}", encoding="utf-8")
+            year, runtime = profile.split("-")
+            (folder / "dhcb-host-profile.json").write_text(json.dumps({"product": "autocad", "year": int(year), "runtime": runtime + ".0"}), encoding="utf-8")
         (stage / "batchrunner" / "scripts").mkdir(parents=True)
         (stage / "batchrunner" / "DhcbTools.BatchRunner.exe").write_text("fixture batch", encoding="utf-8")
         (stage / "batchrunner" / "scripts" / "dhcb_agent.py").write_text("# fixture", encoding="utf-8")
@@ -50,10 +60,20 @@ class InstallerTests(unittest.TestCase):
             (stage / "batchrunner" / folder / "fresh.sample.json").write_text("new sample", encoding="utf-8")
         shutil.copyfile(ROOT / "installer" / "PackageContents.xml", stage / "PackageContents.xml")
         cls.original = ET.parse(stage / "PackageContents.xml").getroot()
+        cls.acad2025 = cls.work / "fake-acad2025"
+        cls.acad2025.mkdir()
+        (cls.acad2025 / "acad.exe").touch()
+        (cls.acad2025 / "acdbmgd.runtimeconfig.json").write_text('{"runtimeOptions":{"tfm":"net8.0"}}', encoding="utf-8")
         cls.acad = cls.work / "fake-acad"
         cls.acad.mkdir()
         (cls.acad / "acad.exe").touch()
-        (cls.acad / "acdbmgd.runtimeconfig.json").write_text('{"tfm":"net10.0"}', encoding="utf-8")
+        (cls.acad / "acdbmgd.runtimeconfig.json").write_text('{"runtimeOptions":{"tfm":"net10.0"}}', encoding="utf-8")
+
+        cls.detected = cls.work / "detected-hosts"
+        for name, executable in (("AutoCAD 2026", "acad.exe"), ("Revit 2022", "Revit.exe")):
+            folder = cls.detected / name
+            folder.mkdir(parents=True)
+            (folder / executable).touch()
 
         # Chỉ chuyển các đích ghi của bộ cài vào sandbox; giữ nguyên [Code]/[InstallDelete].
         text = (ROOT / "installer" / "dhcb-tools.iss").read_text(encoding="utf-8")
@@ -61,6 +81,7 @@ class InstallerTests(unittest.TestCase):
         for constant, folder in (("userappdata", "roaming"), ("localappdata", "local"), ("group", "shortcuts")):
             text = text.replace("{" + constant + "}", str(cls.profile / folder))
         text = text.replace(r"..\LICENSE", str(ROOT / "LICENSE")).replace(r"..\NOTICE", str(ROOT / "NOTICE"))
+        text = text.replace(r"{autopf}\Autodesk", str(cls.detected))
         source = cls.work / "sandbox.iss"
         cls.source = source
         source.write_text(text, encoding="utf-8-sig")
@@ -72,7 +93,11 @@ class InstallerTests(unittest.TestCase):
     def run_process(args, expect_success=True):
         result = subprocess.run(args, capture_output=True, timeout=60)
         if expect_success and result.returncode:
-            raise AssertionError(f"Exit {result.returncode}: {args}\n{result.stdout!r}\n{result.stderr!r}")
+            log = ""
+            for arg in args:
+                if arg.upper().startswith("/LOG=") and Path(arg[5:]).is_file():
+                    log = Path(arg[5:]).read_text(encoding="utf-8-sig", errors="replace")[-8000:]
+            raise AssertionError(f"Exit {result.returncode}: {args}\n{result.stdout!r}\n{result.stderr!r}\n{log}")
         return result
 
     def setUp(self):
@@ -80,15 +105,25 @@ class InstallerTests(unittest.TestCase):
             shutil.rmtree(self.profile)
         self.bundle = self.profile / "roaming" / "Autodesk" / "ApplicationPlugins" / "DhcbTools.bundle"
         self.addins = self.profile / "roaming" / "Autodesk" / "Revit" / "Addins"
+        (self.acad2025 / "acdbmgd.runtimeconfig.json").write_text('{"runtimeOptions":{"tfm":"net8.0"}}', encoding="utf-8")
         (self.acad / "acad.exe").touch()
-        (self.acad / "acdbmgd.runtimeconfig.json").write_text('{"tfm":"net10.0"}', encoding="utf-8")
+        (self.acad / "acdbmgd.runtimeconfig.json").write_text('{"runtimeOptions":{"tfm":"net10.0"}}', encoding="utf-8")
 
     def install(self, components, expect_success=True, preserve_unselected=False):
         return self.run_process([str(self.setup), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
                           "/TYPE=custom", "/COMPONENTS=" + ",".join(components),
-                          f"/DIR={self.profile / 'app'}", f"/ACAD2026DIR={self.acad}",
+                          f"/DIR={self.profile / 'app'}", f"/ACAD2026DIR={self.acad}", f"/ACAD2025DIR={self.acad2025}",
                           f"/PRESERVEUNSELECTED={int(preserve_unselected)}",
                           f"/LOG={self.work / 'setup.log'}"], expect_success=expect_success)
+
+    def test_fresh_default_install_selects_only_detected_hosts(self):
+        self.run_process([str(self.setup), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
+                          f"/DIR={self.profile / 'app'}", f"/ACAD2026DIR={self.acad}", f"/LOG={self.work / 'default.log'}"])
+        self.assert_bundle([2026])
+        for year in REVIT_YEARS:
+            self.assertEqual(year == 2022, (self.addins / str(year) / "DhcbTools.Revit.addin").is_file())
+        self.assertTrue((self.profile / "app" / "DhcbTools.BatchRunner.exe").is_file())
+        self.assertTrue((self.profile / "app" / "scripts" / "dhcb_agent.py").is_file())
 
     def test_scripts_only_install(self):
         self.install(["scripts"])
@@ -96,6 +131,12 @@ class InstallerTests(unittest.TestCase):
         self.assert_bundle([])
         self.assertFalse(self.addins.exists())
         self.assertFalse((self.profile / "app" / "DhcbTools.BatchRunner.exe").exists())
+
+    def test_batch_only_install_respects_scripts_component(self):
+        self.install(["batch"])
+        self.assertTrue((self.profile / "app" / "DhcbTools.BatchRunner.exe").is_file())
+        self.assertTrue((self.profile / "app" / "jobs" / "custom.json").is_file())
+        self.assertFalse((self.profile / "app" / "scripts").exists())
 
     def test_missing_scripts_fail_compilation(self):
         scripts = self.stage / "batchrunner" / "scripts"
@@ -116,21 +157,60 @@ class InstallerTests(unittest.TestCase):
                   for path in self.profile.rglob("*") if path.is_file()}
         runtime = self.acad / "acdbmgd.runtimeconfig.json"
         exe = self.acad / "acad.exe"
-        for fault in ("missing-exe", "missing-runtime", "net8"):
+        for fault in ("missing-exe", "missing-runtime", "unsupported", "unrelated-net10", "duplicate-tfm", "root-tfm", "malformed-json"):
             with self.subTest(fault=fault):
                 exe.touch()
-                runtime.write_text('{"tfm":"net10.0"}', encoding="utf-8")
+                runtime.write_text('{"runtimeOptions":{"tfm":"net10.0"}}', encoding="utf-8")
                 if fault == "missing-exe":
                     exe.unlink()
                 elif fault == "missing-runtime":
                     runtime.unlink()
+                elif fault == "unsupported":
+                    runtime.write_text('{"runtimeOptions":{"tfm":"net9.0"}}', encoding="utf-8")
+                elif fault == "unrelated-net10":
+                    runtime.write_text('{"note":"net10.0","runtimeOptions":{"tfm":"net9.0"}}', encoding="utf-8")
+                elif fault == "duplicate-tfm":
+                    runtime.write_text('{"runtimeOptions":{"tfm":"net10.0","tfm":"net8.0"}}', encoding="utf-8")
+                elif fault == "root-tfm":
+                    runtime.write_text('{"tfm":"net10.0"}', encoding="utf-8")
                 else:
-                    runtime.write_text('{"tfm":"net8.0"}', encoding="utf-8")
+                    runtime.write_text('{"runtimeOptions":{"tfm":"net10.0"}', encoding="utf-8")
                 result = self.install(["revit2026", "acad2026"], expect_success=False)
                 self.assertNotEqual(0, result.returncode)
                 after = {path.relative_to(self.profile): path.read_bytes()
                          for path in self.profile.rglob("*") if path.is_file()}
                 self.assertEqual(before, after, "Runtime không đúng phải bị chặn trước khi ghi/xoá file")
+
+    def test_autocad_runtime_profiles_selected_without_stale_binary(self):
+        for year, folder in ((2025, self.acad2025), (2026, self.acad)):
+            for runtime in ("net8.0", "net10.0", "net8.0"):
+                with self.subTest(year=year, runtime=runtime):
+                    (folder / "acdbmgd.runtimeconfig.json").write_text(
+                        '{"runtimeOptions":{"tfm":"' + runtime + '"}}', encoding="utf-8")
+                    self.install([f"acad{year}"])
+                    default = (year == 2025 and runtime == "net8.0") or (year == 2026 and runtime == "net10.0")
+                    profile = str(year) if default else f"{year}-{'net8' if runtime == 'net8.0' else 'net10'}"
+                    self.assertEqual(f"fixture {profile}",
+                                     (self.bundle / "Contents" / str(year) / "DhcbTools.AutoCAD.dll").read_text(encoding="utf-8"))
+                    self.assert_bundle([year])
+                    metadata = json.loads((self.bundle / "Contents" / str(year) / "dhcb-host-profile.json").read_text(encoding="utf-8-sig"))
+                    self.assertEqual({"product": "autocad", "year": year, "runtime": runtime}, metadata)
+
+    def test_runtimeconfig_json_supports_bom_escapes_arrays_and_numbers(self):
+        config = {"runtimeOptions": {"tfm": "net10.0", "frameworks": [
+            {"name": "Microsoft.NETCore.App", "version": "10.0.0"},
+            {"name": "Microsoft.WindowsDesktop.App", "version": "10.0.0"}],
+            "configProperties": {"enabled": True, "nullable": None, "number": -1.25e-4}},
+            "note": "tiếng Việt \"quoted\""}
+        for bom, escaped in ((False, False), (True, False), (True, True)):
+            with self.subTest(bom=bom, escaped=escaped):
+                content = json.dumps(config, ensure_ascii=True)
+                if escaped:
+                    content = content.replace('"tfm"', '"' + chr(92) + 'u0074fm"')
+                (self.acad / "acdbmgd.runtimeconfig.json").write_text(
+                    content, encoding="utf-8-sig" if bom else "utf-8")
+                self.install(["acad2026"])
+                self.assert_bundle([2026])
 
     def assert_bundle(self, years):
         if not years:
@@ -148,19 +228,19 @@ class InstallerTests(unittest.TestCase):
             self.assertTrue((self.bundle / module).is_file(), module)
 
     def test_all_autocad_component_combinations(self):
-        for choices in itertools.product((False, True), repeat=3):
+        for choices in itertools.product((False, True), repeat=len(ACAD_YEARS)):
             years = [year for year, chosen in zip(ACAD_YEARS, choices) if chosen]
             with self.subTest(years=years):
                 self.install([f"acad{year}" for year in years])
                 self.assert_bundle(years)
 
     def test_upgrade_deselects_revit_and_preserves_other_files(self):
-        self.install([f"revit{year}" for year in (2023, 2024, 2025, 2026)] + ["acad2024", "acad2025", "acad2026"])
-        for year in (2023, 2024, 2025, 2026):
+        self.install([f"revit{year}" for year in REVIT_YEARS] + [f"acad{year}" for year in ACAD_YEARS])
+        for year in REVIT_YEARS:
             (self.addins / str(year) / "DhcbTools.Custom.addin").write_text("user file", encoding="utf-8")
         self.install(["revit2024", "acad2025"])
         self.assert_bundle([2025])
-        for year in (2023, 2024, 2025, 2026):
+        for year in REVIT_YEARS:
             folder = self.addins / str(year)
             for name in REVIT_FILES:
                 self.assertEqual(year == 2024, (folder / name).exists(), f"{year}/{name}")

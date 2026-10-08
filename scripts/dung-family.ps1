@@ -23,6 +23,7 @@
 [CmdletBinding()]
 param(
     # Các phiên bản Revit cần dựng. Máy phải có đúng bản đó và add-in build được cho nó.
+    [ValidateSet(2022, 2023, 2024, 2025, 2026, 2027)]
     [int[]]$RevitVersions = @(2024),
 
     # Starter = dựng family mẫu DHCB_Sleeve/DHCB_Hanger từ template kèm Revit (cách 1).
@@ -120,14 +121,23 @@ foreach ($version in $RevitVersions) {
         if ($LASTEXITCODE -ne 0) { $failures += "${version}: build lỗi"; continue }
     }
 
-    $tfm = if ($version -ge 2027) { 'net10.0-windows' } elseif ($version -ge 2025) { 'net8.0-windows' } else { 'net48' }
-    $binDir = Join-Path $repo "src\DhcbTools.Revit\bin\Release\$tfm"
+    $revitProj = Join-Path $repo 'src\DhcbTools.Revit\DhcbTools.Revit.csproj'
+    $tfm = & dotnet msbuild $revitProj -nologo -getProperty:TargetFramework -p:RevitVersion=$version
+    if ($LASTEXITCODE -ne 0) { Stop-WithMessage "MSBuild không đọc được TargetFramework của Revit (mã $LASTEXITCODE)." }
+    if ([string]::IsNullOrWhiteSpace($tfm)) { Stop-WithMessage 'MSBuild không trả TargetFramework của Revit.' }
+    $tfm = $tfm.Trim()
+    $binDir = & dotnet msbuild $revitProj -nologo -getProperty:TargetDir -p:Configuration=Release -p:RevitVersion=$version
+    if ($LASTEXITCODE -ne 0) { Stop-WithMessage "MSBuild không đọc được TargetDir của Revit (mã $LASTEXITCODE)." }
+    if ([string]::IsNullOrWhiteSpace($binDir)) { Stop-WithMessage 'MSBuild không trả TargetDir của Revit.' }
+    $binDir = $binDir.Trim()
     if (-not (Test-Path $binDir)) { Stop-WithMessage "Không thấy bin add-in: $binDir" }
     $addinDir = "$env:APPDATA\Autodesk\Revit\Addins\$version"
     New-Item -ItemType Directory -Force -Path $addinDir | Out-Null
     Get-ChildItem $binDir -Include *.dll, *.addin -Recurse -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -notlike '*RevitAPI*' } |
         ForEach-Object { Copy-Item $_.FullName $addinDir -Force }
+    @{ product = 'revit'; year = $version; runtime = ($tfm -replace '-windows$', '') } |
+        ConvertTo-Json | Set-Content (Join-Path $addinDir 'dhcb-host-profile.json') -Encoding UTF8
     Write-Host "== Đã cài add-in vào $addinDir"
 
     # ── Thư mục kết quả của phiên bản này ────────────────────────────────────

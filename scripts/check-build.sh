@@ -5,16 +5,19 @@
 #     UseWPF=false để bỏ thư mục UI (WPF) của vỏ Revit. Đây là lưới bắt lỗi biên dịch trước khi lên máy Windows;
 #     kiểm thử chức năng thật vẫn theo docs/dac-ta-kiem-thu.md §4.
 #   Phiên bản chọn bằng biến môi trường; TFM do Directory.Build.props quyết định:
-#     REVIT_VERSION=2024            → net48          ACAD_VERSION=2024 → net48
+#     REVIT_VERSION=2022..2024      → net48          ACAD_VERSION=2022..2024 → net48
 #     REVIT_VERSION=2025|2026       → net8.0-windows ACAD_VERSION=2025 → net8.0-windows
 #     REVIT_VERSION=2027            → net10.0-windows ACAD_VERSION=2026 → net10.0-windows (cần SDK 10)
-#   Ví dụ đường .NET 10 của AutoCAD:  ACAD_VERSION=2026 ./scripts/check-build.sh
+#   ACAD_RUNTIME=net8|net10 chọn đúng runtime cho AutoCAD 2025/2026; 2027 dùng net10.
+#   Ví dụ: ACAD_VERSION=2026 ACAD_RUNTIME=net8 ./scripts/check-build.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 REVIT=${REVIT_VERSION:-2025}
 ACAD=${ACAD_VERSION:-2025}
+ACAD_RUNTIME=${ACAD_RUNTIME:-}
 COMMON=(-p:EnableWindowsTargeting=true -p:RevitVersion=$REVIT -p:AcadVersion=$ACAD -p:UseWPF=false -nologo -v:q -clp:ErrorsOnly)
+if [[ -n "$ACAD_RUNTIME" ]]; then COMMON+=("-p:AcadRuntime=$ACAD_RUNTIME"); fi
 
 echo "== test Shared.Logic"
 dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj -nologo -v:q

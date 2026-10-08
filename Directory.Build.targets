@@ -1,0 +1,24 @@
+<Project>
+  <Target Name="ValidateDhcbHostProfile" BeforeTargets="CollectPackageReferences;PrepareForBuild">
+    <Error Condition="'$(DhcbIsRevitProject)'=='true' And '$(RevitRuntime)'==''" Text="Unsupported RevitVersion '$(RevitVersion)'. Supported years: 2022–2027." />
+    <Error Condition="'$(DhcbIsRevitProject)'=='true' And (('$(RevitVersion)'=='2022' Or '$(RevitVersion)'=='2023' Or '$(RevitVersion)'=='2024') And '$(RevitRuntime)'!='net48')" Text="Revit 2022–2024 require RevitRuntime=net48." />
+    <Error Condition="'$(DhcbIsRevitProject)'=='true' And ('$(RevitVersion)'=='2025' Or '$(RevitVersion)'=='2026') And '$(RevitRuntime)'!='net8'" Text="Revit 2025/2026 use the net8 API baseline; validate updated .NET 10 hosts separately." />
+    <Error Condition="'$(DhcbIsRevitProject)'=='true' And '$(RevitVersion)'=='2027' And '$(RevitRuntime)'!='net10'" Text="Revit 2027 requires RevitRuntime=net10." />
+    <Error Condition="'$(DhcbHostBuildPath)'!='' And ((('$(DhcbIsAcadProject)'=='true' And '$(AcadRuntime)'=='net48') Or ('$(DhcbIsRevitProject)'=='true' And '$(RevitRuntime)'=='net48')) And '$(TargetFramework)'!='net48')" Text="This host profile requires TargetFramework=net48." />
+    <Error Condition="'$(DhcbHostBuildPath)'!='' And ((('$(DhcbIsAcadProject)'=='true' And '$(AcadRuntime)'=='net8') Or ('$(DhcbIsRevitProject)'=='true' And '$(RevitRuntime)'=='net8')) And '$(TargetFramework)'!='net8.0-windows')" Text="This host profile requires TargetFramework=net8.0-windows." />
+    <Error Condition="'$(DhcbHostBuildPath)'!='' And ((('$(DhcbIsAcadProject)'=='true' And '$(AcadRuntime)'=='net10') Or ('$(DhcbIsRevitProject)'=='true' And '$(RevitRuntime)'=='net10')) And '$(TargetFramework)'!='net10.0-windows')" Text="This host profile requires TargetFramework=net10.0-windows." />
+    <Error Condition="'$(DhcbIsRevitProject)'=='true' And !$(RevitApiVersion.StartsWith('$(RevitVersion).'))" Text="RevitApiVersion must match RevitVersion $(RevitVersion)." />
+    <Error Condition="'$(DhcbIsAcadProject)'=='true' And '$(AcadVersion)'!='2022' And '$(AcadVersion)'!='2023' And '$(AcadVersion)'!='2024' And '$(AcadVersion)'!='2025' And '$(AcadVersion)'!='2026' And '$(AcadVersion)'!='2027'" Text="Unsupported AcadVersion '$(AcadVersion)'. Supported years: 2022–2027." />
+    <Error Condition="'$(DhcbIsAcadProject)'=='true' And ('$(AcadVersion)'=='2022' Or '$(AcadVersion)'=='2023' Or '$(AcadVersion)'=='2024') And '$(AcadRuntime)'!='net48'" Text="AutoCAD $(AcadVersion) requires AcadRuntime=net48." />
+    <Error Condition="'$(DhcbIsAcadProject)'=='true' And ('$(AcadVersion)'=='2025' Or '$(AcadVersion)'=='2026') And '$(AcadRuntime)'!='net8' And '$(AcadRuntime)'!='net10'" Text="AutoCAD $(AcadVersion) requires AcadRuntime=net8 or net10; choose the installed host runtime." />
+    <Error Condition="'$(DhcbIsAcadProject)'=='true' And '$(AcadVersion)'=='2027' And '$(AcadRuntime)'!='net10'" Text="AutoCAD 2027 requires AcadRuntime=net10." />
+    <Error Condition="'$(DhcbIsAcadProject)'=='true' And '$(AcadVersion)'=='2022' And '$(AcadNetVersion)'!='24.1.51000'" Text="AutoCAD 2022 requires SDK 24.1.51000; newer SDKs cannot run on this host." />
+    <Error Condition="'$(DhcbIsAcadProject)'=='true' And '$(AcadVersion)'=='2023' And '$(AcadNetVersion)'!='24.2.0'" Text="AutoCAD 2023 requires SDK 24.2.0." />
+    <Error Condition="'$(DhcbIsAcadProject)'=='true' And '$(AcadVersion)'=='2024' And '$(AcadNetVersion)'!='24.3.0'" Text="AutoCAD 2024 requires SDK 24.3.0." />
+    <Error Condition="'$(DhcbIsAcadProject)'=='true' And '$(AcadVersion)'=='2025' And (('$(AcadRuntime)'=='net8' And '$(AcadNetVersion)'!='25.0.1') Or ('$(AcadRuntime)'=='net10' And '$(AcadNetVersion)'!='25.0.2'))" Text="AutoCAD 2025 SDK mismatch: net8 uses 25.0.1; net10 uses 25.0.2 (2025.1.4+)." />
+    <Error Condition="'$(DhcbIsAcadProject)'=='true' And '$(AcadVersion)'=='2026' And (('$(AcadRuntime)'=='net8' And '$(AcadNetVersion)'!='25.1.0') Or ('$(AcadRuntime)'=='net10' And '$(AcadNetVersion)'!='25.1.1'))" Text="AutoCAD 2026 SDK mismatch: net8 uses 25.1.0; net10 uses 25.1.1 (2026.1.2+)." />
+    <Error Condition="'$(DhcbIsAcadProject)'=='true' And '$(AcadVersion)'=='2027' And '$(AcadNetVersion)'!='26.0.0'" Text="AutoCAD 2027 requires SDK 26.0.0." />
+    <Error Condition="'$(DhcbIsAcadProject)'=='true' And '$(AcadNetVersion)'=='25.0.1' And '$(AcadCoreNetVersion)'!='25.0.0'" Text="AutoCAD.NET 25.0.1 requires Core/Model 25.0.0." />
+    <Error Condition="'$(DhcbIsAcadProject)'=='true' And '$(AcadNetVersion)'!='25.0.1' And '$(AcadCoreNetVersion)'!='$(AcadNetVersion)'" Text="AutoCAD Core/Model SDK version must match the host API package." />
+  </Target>
+</Project>

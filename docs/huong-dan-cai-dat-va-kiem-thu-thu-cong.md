@@ -20,8 +20,8 @@ Các vòng Revit trước là bằng chứng lịch sử; máy triển khai hi�
 | Thành phần | Yêu cầu | Ghi chú |
 |---|---|---|
 | Windows | 10/11 x64 | Add-in chỉ chạy trên Windows |
-| Revit | 2023–2024 (net48), 2025–2026 (net8) | Build riêng từng năm; 2027 (net10) mới được kiểm biên dịch |
-| AutoCAD | 2024 (net48), 2025 (net8), 2026 Update 1.2+ (net10) | Bản 2026 dùng net8 không tương thích gói này; xem [doctor](chan-doan-windows.md) |
+| Revit | 2022–2024 (net48), 2025–2026 (net8), 2027 (net10) | Build riêng từng năm; kiểm host theo [ma trận](tuong-thich-2022-2027.md) |
+| AutoCAD | 2022–2024 (net48), 2025/2026 (net8 hoặc net10), 2027 (net10) | Installer chọn gói theo runtime host; ZIP thủ công phải chọn đúng profile; xem [doctor](chan-doan-windows.md) |
 | .NET SDK khi build | 8.0.x và 10.0.x | SDK 10 cho BatchRunner, AutoCAD 2026 và Revit 2027; máy chỉ cài gói cần runtime tương ứng |
 | Python | 3.9+ | Cho `scripts/dhcb_agent.py`, `dhcb_mcp_server.py`, `dhcb_ai.py` — không cần thư viện ngoài |
 | Ollama (tuỳ chọn) | bản mới, model `qwen3:8b` | Chỉ cho phần AI có model; mọi tính năng AI đều có đường heuristic không cần model |
@@ -59,7 +59,7 @@ dotnet build src\DhcbTools.Revit\DhcbTools.Revit.csproj -c Release -p:RevitVersi
 `RevitVersion` mặc định là **2024** (net48) khi không truyền gì, nên `dotnet build Dhcb-Tools.sln -c Release`
 trần cũng chạy được; truyền tham số khi cần bản khác.
 
-Kết quả nằm ở `src\DhcbTools.Revit\bin\Release\net48\` (2024) hoặc `...\net8.0-windows\` (2025). Phải có đủ:
+Kết quả nằm ở `src\DhcbTools.Revit\bin\2024\net48\Release\net48\` (2024) hoặc `bin\2025\net8\Release\net8.0-windows\` (2025). Phải có đủ:
 `DhcbTools.Revit.dll`, `DhcbTools.Core.dll`, `DhcbTools.Shared.Logic.dll`, `DhcbTools.Shared.Hosting.dll`,
 `Newtonsoft.Json.dll`, `DhcbTools.Revit.addin`.
 
@@ -72,8 +72,10 @@ dotnet build src\DhcbTools.AutoCAD\DhcbTools.AutoCAD.csproj -c Release -p:RevitV
 dotnet build src\DhcbTools.AutoCAD.Core\DhcbTools.AutoCAD.Core.csproj -c Release -p:RevitVersion=2024 -p:AcadVersion=2024
 ```
 
-TargetFramework của các project AutoCAD chọn theo **AcadVersion**: 2024 → net48, 2025 → net8.0-windows,
-2026 → net10.0-windows. `RevitVersion` không thay thế `AcadVersion`.
+TargetFramework của các project AutoCAD chọn theo **AcadVersion** và **AcadRuntime**:
+2022–2024 → net48; 2025/2026 → `net8` hoặc `net10`; 2027 → net10.
+Mặc định 2025 là net8, 2026 là net10. Host AutoCAD 2026 trước Update 1.2 dùng thêm
+`-p:AcadRuntime=net8`. `RevitVersion` không thay thế `AcadVersion`.
 
 ```powershell
 # AutoCAD 2026 Update 1.2+
@@ -144,7 +146,7 @@ Cách nhanh: trong AutoCAD gõ `NETLOAD`, chọn `DhcbTools.AutoCAD.dll` (kèm D
 Cách tự load: ưu tiên bộ cài hoặc chép nguyên bundle từ gói đúng phiên bản. Khi tự dựng bundle,
 dùng [manifest trong repo](../installer/PackageContents.xml), đặt DLL theo `Contents\<năm>\`
 và chỉ giữ khối `Components` của những năm đã chép đầy đủ DLL. Mỗi khối giới hạn một series:
-2024 = R24.3, 2025 = R25.0, 2026 = R25.1. Không dùng chung một DLL cho hai runtime khác nhau.
+2022 = R24.1, 2023 = R24.2, 2024 = R24.3, 2025 = R25.0, 2026 = R25.1, 2027 = R26.0. Không dùng chung một DLL cho hai runtime khác nhau.
 
 ```text
 %APPDATA%\Autodesk\ApplicationPlugins\DhcbTools.bundle\
@@ -415,7 +417,7 @@ Cấu hình theo [`ai-offline.md`](ai-offline.md) mục MCP, trỏ `command` t�
 | RouteFromLines/PipeKick báo fitting không dựng được | Routing preference của type thiếu elbow góc tương ứng | Sửa Routing Preferences của Pipe/Duct Type |
 | Batch: Revit mở nhưng không chạy job | Add-in cài cho bản Revit khác với bản được mở | Cài add-in đúng năm; xem `%APPDATA%\DHCB\batch-error.txt` |
 | accoreconsole: "Cannot load assembly" | Dùng vỏ đầy đủ (AcMgd) thay core-only | Copy `DhcbTools.AutoCAD.Core.dll` cạnh runner hoặc `--plugin-dll` |
-| AutoCAD 2026 không nạp plugin | Host chưa lên Update 1.2+ hoặc DLL sai runtime | Chạy doctor; gói net10 đã được kiểm Core Console, GUI còn nghiệm thu riêng |
+| AutoCAD không nạp plugin | DLL sai SDK/năm/runtime hoặc chọn ZIP sai profile | Chạy doctor với `--year`; installer chọn runtime theo host. Sau khi cập nhật host đổi runtime cần cài lại gói tương ứng |
 | Ollama không phản hồi | Endpoint không phải loopback hoặc model chưa pull | `dhcb_ai.py ollama-check`; giữ `endpoint` = `http://127.0.0.1:11434` |
 
 ---
