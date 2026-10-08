@@ -140,7 +140,7 @@ class PackageScriptsTests(unittest.TestCase):
         # Parse XML gốc
         root = ET.fromstring(xml_text)
         components_before = root.findall("Components")
-        self.assertEqual(len(components_before), 3)
+        self.assertEqual(len(components_before), 6)
 
         # Mô phỏng xoá block AutoCAD 2024
         marker = '<Components Description="AutoCAD 2024">'
@@ -153,7 +153,7 @@ class PackageScriptsTests(unittest.TestCase):
 
         root_after = ET.fromstring(filtered_xml)
         components_after = root_after.findall("Components")
-        self.assertEqual(len(components_after), 2)
+        self.assertEqual(len(components_after), 5)
         descriptions = [c.attrib.get("Description") for c in components_after]
         self.assertNotIn("AutoCAD 2024", descriptions)
         self.assertIn("AutoCAD 2025", descriptions)

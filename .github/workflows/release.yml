@@ -59,15 +59,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 2026 (net8.0-windows) thêm 2026-09-06 sau khi ba bộ ca kiểm chạy thật trên Revit 2026 — bang-chung-test.md §51.
-        revit: [2023, 2024, 2025, 2026]
+        revit: [2022, 2023, 2024, 2025, 2026, 2027]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
       - name: Build DhcbTools.Revit (Revit ${{ matrix.revit }})
         run: dotnet build src/DhcbTools.Revit/DhcbTools.Revit.csproj -c Release -p:RevitVersion=${{ matrix.revit }} -p:Version=${{ needs.version.outputs.version }}
@@ -78,17 +79,20 @@ jobs:
           # Hỏi MSBuild thay vì tự tính lại: Directory.Build.props là nơi duy nhất quyết định TFM
           # (net48 / net8.0-windows / net10.0-windows). Bản cũ hardcode "-ge 2025 → net8" nên thêm
           # 2027 vào ma trận là đóng gói NHẦM thư mục mà không có bước nào đỏ.
-          $tfm = (dotnet msbuild src/DhcbTools.Revit/DhcbTools.Revit.csproj -p:RevitVersion=${{ matrix.revit }} -getProperty:TargetFramework -nologo).Trim()
+          $tfm = (dotnet msbuild src/DhcbTools.Revit/DhcbTools.Revit.csproj -p:RevitVersion=${{ matrix.revit }} -getProperty:TargetFramework -nologo | Out-String).Trim()
           if ($LASTEXITCODE -ne 0) { throw "MSBuild không đọc được TargetFramework (mã $LASTEXITCODE)." }
-          if (-not $tfm) { throw "Không đọc được TargetFramework từ MSBuild." }
-          $out = "src/DhcbTools.Revit/bin/Release/$tfm"
+          if (-not $tfm) { throw "MSBuild không trả TargetFramework." }
+          $out = (dotnet msbuild src/DhcbTools.Revit/DhcbTools.Revit.csproj -p:RevitVersion=${{ matrix.revit }} -p:Configuration=Release -getProperty:TargetDir -nologo | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $out) { throw "MSBuild không đọc được TargetDir của Revit." }
           $pkg = "dist/DhcbTools.Revit-${{ matrix.revit }}-${{ needs.version.outputs.version }}"
           New-Item -ItemType Directory -Force -Path $pkg | Out-Null
           Copy-Item "$out/DhcbTools.Revit.addin" $pkg
           Copy-Item "$out/DhcbTools.Revit.dll", "$out/DhcbTools.Core.dll", "$out/DhcbTools.Shared.Logic.dll", `
                     "$out/DhcbTools.Shared.Hosting.dll", "$out/Newtonsoft.Json.dll" $pkg
+          @{ product = 'revit'; year = [int]'${{ matrix.revit }}'; runtime = ($tfm -replace '-windows$', '') } |
+            ConvertTo-Json | Set-Content "$pkg/dhcb-host-profile.json" -Encoding UTF8
           Copy-Item LICENSE, NOTICE $pkg
-          Copy-Item docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md $pkg
+          Copy-Item docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md, docs/tuong-thich-2022-2027.md, docs/chan-doan-windows.md $pkg
 
       # Tag yêu cầu chứng chỉ (DHCB_SIGN_PFX_BASE64/_PASSWORD); build thủ công không có thì bỏ qua, gói
       # vẫn phát hành như trước. Bước riêng để secret chỉ vào đúng bước này, không vào bước build/restore.
@@ -117,46 +121,60 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        acad: [2024, 2025, 2026]   # 2026 = R25.1, .NET 10 — đã chạy thật (bang-chung-test.md §24, §25)
+        include:
+          - { acad: 2022, runtime: net48, suffix: '' }
+          - { acad: 2023, runtime: net48, suffix: '' }
+          - { acad: 2024, runtime: net48, suffix: '' }
+          - { acad: 2025, runtime: net8, suffix: '' }
+          - { acad: 2025, runtime: net10, suffix: '-net10' }
+          - { acad: 2026, runtime: net10, suffix: '' }
+          - { acad: 2026, runtime: net8, suffix: '-net8' }
+          - { acad: 2027, runtime: net10, suffix: '' }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          # AutoCAD 2026 (net10.0-windows) cần SDK 10; 2024/2025 vẫn dùng SDK 8.
+          # SDK 10 build cả profile net48/net8/net10; cài SDK 8 cho các bước dùng nền tảng .NET 8.
           dotnet-version: |
             8.0.x
             10.0.x
 
       - name: Build vỏ đầy đủ (AutoCAD ${{ matrix.acad }})
-        run: dotnet build src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj -c Release -p:RevitVersion=${{ matrix.acad }} -p:AcadVersion=${{ matrix.acad }} -p:Version=${{ needs.version.outputs.version }}
+        run: dotnet build src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj -c Release -p:RevitVersion=${{ matrix.acad }} -p:AcadVersion=${{ matrix.acad }} -p:AcadRuntime=${{ matrix.runtime }} -p:Version=${{ needs.version.outputs.version }}
 
       - name: Build vỏ core-only cho accoreconsole (AutoCAD ${{ matrix.acad }})
-        run: dotnet build src/DhcbTools.AutoCAD.Core/DhcbTools.AutoCAD.Core.csproj -c Release -p:RevitVersion=${{ matrix.acad }} -p:AcadVersion=${{ matrix.acad }} -p:Version=${{ needs.version.outputs.version }}
+        run: dotnet build src/DhcbTools.AutoCAD.Core/DhcbTools.AutoCAD.Core.csproj -c Release -p:RevitVersion=${{ matrix.acad }} -p:AcadVersion=${{ matrix.acad }} -p:AcadRuntime=${{ matrix.runtime }} -p:Version=${{ needs.version.outputs.version }}
 
       - name: Đóng gói
         shell: pwsh
         run: |
-          # Cùng lý do với job Revit: AutoCAD 2026+ là net10.0-windows, hardcode "-ge 2025 → net8" đóng gói nhầm.
-          $tfm = (dotnet msbuild src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj -p:AcadVersion=${{ matrix.acad }} -getProperty:TargetFramework -nologo).Trim()
+          # TFM và thư mục đầu ra theo cùng năm/runtime đã build; mỗi profile có SDK riêng.
+          $tfm = (dotnet msbuild src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj -p:AcadVersion=${{ matrix.acad }} -p:AcadRuntime=${{ matrix.runtime }} -getProperty:TargetFramework -nologo | Out-String).Trim()
           if ($LASTEXITCODE -ne 0) { throw "MSBuild không đọc được TargetFramework (mã $LASTEXITCODE)." }
-          if (-not $tfm) { throw "Không đọc được TargetFramework từ MSBuild." }
-          $pkg = "dist/DhcbTools.AutoCAD-${{ matrix.acad }}-${{ needs.version.outputs.version }}"
+          if (-not $tfm) { throw "MSBuild không trả TargetFramework." }
+          $pkg = "dist/DhcbTools.AutoCAD-${{ matrix.acad }}${{ matrix.suffix }}-${{ needs.version.outputs.version }}"
           New-Item -ItemType Directory -Force -Path $pkg | Out-Null
-          $full = "src/DhcbTools.AutoCAD/bin/Release/$tfm"
+          $full = (dotnet msbuild src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj -p:AcadVersion=${{ matrix.acad }} -p:AcadRuntime=${{ matrix.runtime }} -p:Configuration=Release -getProperty:TargetDir -nologo | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $full) { throw "MSBuild không đọc được TargetDir của AutoCAD." }
           Copy-Item "$full/DhcbTools.AutoCAD.dll", "$full/DhcbTools.Core.AutoCAD.dll", "$full/DhcbTools.Shared.Logic.dll", `
                     "$full/DhcbTools.Shared.Hosting.dll", "$full/Newtonsoft.Json.dll" $pkg
-          $core = "src/DhcbTools.AutoCAD.Core/bin/Release/$tfm"
+          $core = (dotnet msbuild src/DhcbTools.AutoCAD.Core/DhcbTools.AutoCAD.Core.csproj -p:AcadVersion=${{ matrix.acad }} -p:AcadRuntime=${{ matrix.runtime }} -p:Configuration=Release -getProperty:TargetDir -nologo | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $core) { throw "MSBuild không đọc được TargetDir của AutoCAD.Core." }
           Copy-Item "$core/DhcbTools.AutoCAD.Core.dll" $pkg
           # AutoCAD 2025+ nạp assembly .NET Core qua AssemblyLoadContext riêng; bundle đã chứng minh
           # chạy được trên AutoCAD 2026.1 (bang-chung-test.md §25) có kèm deps.json. net48 không có file này.
-          if ($tfm -ne "net48") { Copy-Item "$full/DhcbTools.AutoCAD.deps.json" $pkg }
+          if ($tfm -ne "net48") {
+            Copy-Item "$full/DhcbTools.AutoCAD.deps.json", "$core/DhcbTools.AutoCAD.Core.deps.json" $pkg
+          }
           # KHÔNG đóng gói System.Drawing.Common.dll dù nó nằm trong bin của net8/net10: AcDbMgd tham chiếu
           # nó nên chính AutoCAD đã cấp — §25 chạy thật với bundle KHÔNG có file này. Chép thêm bản riêng
           # chỉ tạo nguy cơ lệch phiên bản với bản AutoCAD đang chạy.
+          @{ product = 'autocad'; year = [int]'${{ matrix.acad }}'; runtime = ($tfm -replace '-windows$', '') } |
+            ConvertTo-Json | Set-Content "$pkg/dhcb-host-profile.json" -Encoding UTF8
           Copy-Item LICENSE, NOTICE $pkg
-          Copy-Item docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md $pkg
+          Copy-Item docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md, docs/tuong-thich-2022-2027.md, docs/chan-doan-windows.md $pkg
 
       # Tag yêu cầu chứng chỉ (DHCB_SIGN_PFX_BASE64/_PASSWORD); build thủ công không có thì bỏ qua, gói
       # vẫn phát hành như trước. Bước riêng để secret chỉ vào đúng bước này, không vào bước build/restore.
@@ -170,12 +188,12 @@ jobs:
       - name: Nén
         shell: pwsh
         run: |
-          $pkg = "dist/DhcbTools.AutoCAD-${{ matrix.acad }}-${{ needs.version.outputs.version }}"
+          $pkg = "dist/DhcbTools.AutoCAD-${{ matrix.acad }}${{ matrix.suffix }}-${{ needs.version.outputs.version }}"
           Compress-Archive -Path "$pkg/*" -DestinationPath "$pkg.zip"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: DhcbTools.AutoCAD-${{ matrix.acad }}
+          name: DhcbTools.AutoCAD-${{ matrix.acad }}${{ matrix.suffix }}
           path: dist/*.zip
           if-no-files-found: error
 
@@ -200,10 +218,12 @@ jobs:
           New-Item -ItemType Directory -Force -Path "$pkg/jobs", "$pkg/configs", "$pkg/scripts" | Out-Null
           # TFM hỏi MSBuild, không viết tay: hardcode ở đây đúng là lỗi đã sửa cho build-revit/build-autocad,
           # và nó im lặng — Copy-Item vào thư mục không tồn tại thì gói ra thiếu đúng cái .exe.
-          $tfm = (dotnet msbuild src/DhcbTools.BatchRunner/DhcbTools.BatchRunner.csproj -getProperty:TargetFramework -nologo).Trim()
+          $tfm = (dotnet msbuild src/DhcbTools.BatchRunner/DhcbTools.BatchRunner.csproj -getProperty:TargetFramework -nologo | Out-String).Trim()
           if ($LASTEXITCODE -ne 0) { throw "MSBuild không đọc được TargetFramework (mã $LASTEXITCODE)." }
-          if (-not $tfm) { throw "Không đọc được TargetFramework từ MSBuild." }
-          Copy-Item "src/DhcbTools.BatchRunner/bin/Release/$tfm/*" $pkg -Recurse
+          if (-not $tfm) { throw "MSBuild không trả TargetFramework." }
+          $out = (dotnet msbuild src/DhcbTools.BatchRunner/DhcbTools.BatchRunner.csproj -p:Configuration=Release -getProperty:TargetDir -nologo | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $out) { throw "MSBuild không đọc được TargetDir của BatchRunner." }
+          Copy-Item "$out/*" $pkg -Recurse
           Copy-Item jobs/*.json "$pkg/jobs"
           Copy-Item configs/* "$pkg/configs"
           # Chỉ script người dùng — installer/batchrunner-scripts.txt. Trước đây scripts/*.py, *.ps1 kéo theo cả script
@@ -213,7 +233,7 @@ jobs:
             Where-Object { $_ -and -not $_.StartsWith('#') } |
             ForEach-Object { Copy-Item (Join-Path scripts $_) "$pkg/scripts" -ErrorAction Stop }
           Copy-Item LICENSE, NOTICE $pkg
-          Copy-Item docs/batch-runner.md, docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md $pkg
+          Copy-Item docs/batch-runner.md, docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md, docs/tuong-thich-2022-2027.md, docs/chan-doan-windows.md $pkg
 
       # Tag yêu cầu chứng chỉ (DHCB_SIGN_PFX_BASE64/_PASSWORD); build thủ công không có thì bỏ qua, gói
       # vẫn phát hành như trước. Bước riêng để secret chỉ vào đúng bước này, không vào bước build/restore.
@@ -258,11 +278,14 @@ jobs:
           $stage = "dist/stage"
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
 
-          foreach ($r in 2023, 2024, 2025, 2026) {
+          foreach ($r in 2022, 2023, 2024, 2025, 2026, 2027) {
             Expand-Archive "artifacts/DhcbTools.Revit-$r-$v.zip" -DestinationPath "$stage/revit-$r" -Force
           }
-          foreach ($a in 2024, 2025, 2026) {
+          foreach ($a in 2022, 2023, 2024, 2025, 2026, 2027) {
             Expand-Archive "artifacts/DhcbTools.AutoCAD-$a-$v.zip" -DestinationPath "$stage/autocad-$a" -Force
+          }
+          foreach ($profile in "2025-net10", "2026-net8") {
+            Expand-Archive "artifacts/DhcbTools.AutoCAD-$profile-$v.zip" -DestinationPath "$stage/autocad-$profile" -Force
           }
           Expand-Archive "artifacts/DhcbTools.BatchRunner-$v.zip" -DestinationPath "$stage/batchrunner" -Force
 

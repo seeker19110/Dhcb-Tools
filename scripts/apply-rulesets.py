@@ -26,8 +26,7 @@ OWNER = "seeker19110"
 
 # repo → check bắt buộc (tên đúng như check-run trên PR). [] = không có CI, chỉ bắt buộc PR.
 REQUIRED: dict[str, list[str]] = {
-    "Dhcb-Tools": ["logic-tests"]
-    + [f"{job} ({y})" for job in ("check-build", "build-wpf-windows") for y in (2023, 2024, 2025, 2026, 2027)],
+    "Dhcb-Tools": ["quality-gate"],
     "ai-gateway": ["audit", "lint", "test (20)", "test (22)"],
     "Claude-Agents": ["quality", "metadata"],          # quality needs: [mọi job]
     "X-Agents": ["quality", "metadata"],               # quality needs: [mọi job]

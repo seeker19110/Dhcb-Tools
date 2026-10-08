@@ -21,6 +21,7 @@
 #>
 [CmdletBinding()]
 param(
+    [ValidateSet(2022, 2023, 2024, 2025, 2026, 2027)]
     [int]$RevitVersion = 2024,
 
     # Thư mục chứa DLL cần ký; mặc định là thư mục add-in đã cài của người dùng.

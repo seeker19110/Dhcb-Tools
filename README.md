@@ -15,6 +15,7 @@ hiện trạng ở [`docs/progress.md`](docs/progress.md).
 Kế hoạch nâng chất lượng và kết quả kiểm chứng của lượt 2026-10-07:
 [`docs/ke-hoach-chat-luong-2026-10-07.md`](docs/ke-hoach-chat-luong-2026-10-07.md).
 [Bằng chứng triển khai và phần nghiệm thu còn lại](docs/bang-chung/2026-10-08/trien-khai.md).
+[Ma trận 2022–2027 và các điểm yếu đã sửa](docs/tuong-thich-2022-2027.md).
 Dùng thử trên công việc thật: [`docs/thi-diem-su-dung.md`](docs/thi-diem-su-dung.md) và bảng đo thời gian đi kèm.
 
 ## Bắt đầu cho kỹ sư: cài → bấm 3 lệnh → thấy kết quả
@@ -47,9 +48,9 @@ phải bước bắt buộc để bắt đầu dùng.
 | Thành phần | Bản | Bắt buộc khi |
 |---|---|---|
 | Windows | 10/11 x64 | Chạy add-in (chỉ để build/test thuần thì Linux/macOS cũng được) |
-| .NET SDK | 8.0.x **+ 10.0.x** | SDK 8 build net48/net8.0-windows; SDK 10 cho AutoCAD ≥ 2026 và Revit ≥ 2027 (net10.0-windows) |
-| Revit | 2023–2026 (2027 build được, chưa chạy thật) | Dùng add-in Revit |
-| AutoCAD | 2024–2026 | Gói 2026 yêu cầu **Update 1.2 trở lên (.NET 10)**; installer kiểm runtime. Các bản 2026 cũ dùng .NET 8 không thuộc phạm vi gói này |
+| .NET SDK | 8.0.x **+ 10.0.x** | SDK 10 cho BatchRunner và nhánh net10; SDK 8/10 build được nhánh net48/net8 |
+| Revit | 2022–2027 | Build và gói riêng từng năm; nghiệm thu trên host theo [ma trận tương thích](docs/tuong-thich-2022-2027.md) |
+| AutoCAD | 2022–2027 | 2022–2024: net48; 2025/2026: gói net8 hoặc net10 theo host; 2027: net10. Installer kiểm runtime trước khi chọn DLL |
 | Python | 3.9+ | Dùng `scripts/*.py` (client Bridge, MCP server, AI offline) |
 | Node/npx | bất kỳ LTS | **Chỉ** khi đóng gói `.mcpb` bằng `scripts/pack-mcpb.ps1` |
 | Hermes CLI | — | **Chỉ** cho panel web AutoCAD (`tools/autocad-mcp-server`) |
@@ -70,7 +71,7 @@ Cài để dùng thật: [Cài đặt](#cài-đặt) · quy trình kiểm thử 
 
 ```
 Dhcb-Tools.sln
-Directory.Build.props              # multi-target net48 (Revit/AutoCAD ≤2024) / net8.0-windows (2025+)
+Directory.Build.props + .targets   # SDK/TFM theo năm và runtime, thư mục build riêng từng profile
 src/
 ├── DhcbTools.Shared.Logic/        # Logic thuần, KHÔNG Revit/AutoCAD — có test xUnit
 │   ├── CsvText, NumericText, NumberingPlanner, MepLayout, FileNaming, HtmlText, BridgeAuth, CleanupDecider
@@ -268,16 +269,18 @@ Chi tiết: [`docs/kiem-thu-trong-revit.md`](docs/kiem-thu-trong-revit.md), bằ
 [`docs/bang-chung-test.md`](docs/bang-chung-test.md), [`docs/bang-chung-test-autocad-live.md`](docs/bang-chung-test-autocad-live.md).
 
 Packages: Revit `Nice3point.Revit.Api.RevitAPI/RevitAPIUI`, AutoCAD `AutoCAD.NET` (vỏ đầy đủ) và `AutoCAD.NET.Core/.Model`
-(Core + vỏ core-only). Revit 2021–2024 và AutoCAD ≤2024 dùng net48; Revit 2025–2026 và AutoCAD 2025 dùng net8.0-windows;
-Gói AutoCAD 2026 Update 1.2+ (package 25.1.1) và Revit ≥ 2027 dùng **net10.0-windows** — `Directory.Build.props` là nơi duy nhất quyết
-định TFM theo `-p:RevitVersion` / `-p:AcadVersion`; `release.yml` hỏi lại MSBuild thay vì tự tính.
+(Core + vỏ core-only). Revit/AutoCAD 2022–2024 dùng net48; Revit 2025–2026 dùng API baseline net8,
+Revit 2027 dùng net10. AutoCAD 2025/2026 có hai profile `-p:AcadRuntime=net8` hoặc `net10`;
+AutoCAD 2027 dùng net10. `Directory.Build.props` chọn SDK/TFM; `Directory.Build.targets` chặn
+yêu cầu sai năm/runtime/SDK. Mỗi host có output riêng `bin/<năm>/<profile>/Release/<TFM>/`,
+`release.yml` hỏi MSBuild để lấy đường dẫn. Xem [ma trận và giới hạn nghiệm thu](docs/tuong-thich-2022-2027.md).
 
 ## CI/CD
 
 - **CI** (`.github/workflows/tests.yml`, ubuntu-latest, mọi push/PR): test `Shared.Logic` + `dotnet build` toàn bộ
   Core/vỏ (kể cả vỏ core-only) bằng API package NuGet, `UseWPF=false` — bắt lỗi biên dịch không cần Windows.
 - **CD** (`.github/workflows/release.yml`, windows-latest, khi đẩy tag `vX.Y.Z` hoặc chạy tay): build **Release thật**
-  (đủ WPF) cho Revit 2023/2024/2025/2026 và AutoCAD 2024/2025/2026 + vỏ core-only, đóng gói zip kèm hướng dẫn cài đặt, và tạo
+  (đủ WPF) cho Revit/AutoCAD 2022–2027 + vỏ core-only, gồm hai runtime AutoCAD 2025/2026, đóng gói zip kèm hướng dẫn cài đặt, và tạo
   GitHub Release đính kèm toàn bộ gói.
 
 ```powershell
@@ -332,13 +335,13 @@ Tra không ra thì lệnh **báo lỗi `E-PARAM-MISSING` kèm danh sách tên đ
 Toàn bộ giai đoạn 0–6 của [`docs/dac-ta-tinh-nang.md`](docs/dac-ta-tinh-nang.md) và cả P1 lẫn P2 giai đoạn 7
 ([`docs/nghien-cuu-tool-thi-truong-va-ke-hoach.md`](docs/nghien-cuu-tool-thi-truong-va-ke-hoach.md) — khoảng trống so với
 pyRevit, DiRoots, Ideate, Colour Splasher, LAYTRANS, Drawing Compare, RevitBatchProcessor) đã có mã nguồn và biên dịch xanh
-với API Revit/AutoCAD 2023–2027 (ma trận CI, gồm cả đường .NET 10); số test thuần xem output CI (`tests.yml` → artifact `test-results`).
+với API Revit/AutoCAD 2022–2027 (ma trận CI, gồm cả đường .NET 10); số test thuần xem output CI (`tests.yml` → artifact `test-results`).
 
 **Đã chạy trên phần mềm thật:** 43/43 lệnh Revit *của vòng 2026-09-04* (nay 53 lệnh; `SuiteCoverageTests` khoá 53/53 có ca kiểm) có ít nhất một ca kiểm chạy bên trong Revit 2024.3
 và 15/15 lệnh AutoCAD có ca kiểm qua `accoreconsole`, cộng một đêm batch trên **dự án thật** — bằng chứng và số liệu từng vòng:
 [`docs/bang-chung-test.md`](docs/bang-chung-test.md), NETLOAD trên AutoCAD thật:
 [`docs/bang-chung-test-autocad-live.md`](docs/bang-chung-test-autocad-live.md). Phần **chưa** khép: `AutoRoute` mới đo chất lượng tuyến trên model mẫu (§55) và một tuyến dự án thật (§57, 7,9 m = 1,00× Manhattan), đối chiếu một điểm của `SetoutExport` bằng máy toàn đạc trên công trường thật,
-chạy thật trên Revit 2025/2027 (máy có 2024.3 và 2026), và 9.4 — đưa cho một nhóm kỹ sư dùng thật. Chi tiết và lỗi còn mở:
+chạy thật trên các phiên bản/profile chưa có bằng chứng ở [ma trận](docs/tuong-thich-2022-2027.md) (máy hiện tại không có Revit.exe), và 9.4 — đưa cho một nhóm kỹ sư dùng thật. Chi tiết và lỗi còn mở:
 [`docs/progress.md`](docs/progress.md) · lộ trình: [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Nâng cấp vận hành 2026-10-08

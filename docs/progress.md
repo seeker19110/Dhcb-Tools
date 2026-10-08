@@ -1,5 +1,9 @@
 # Hiện trạng dự án
 
+> Nâng cấp tương thích 2026-10-08: build/gói Revit và AutoCAD 2022–2027, hai runtime AutoCAD 2025/2026,
+> tách output/restore theo profile, kiểm SDK/runtime trước batch và bổ sung doctor Revit.
+> [Ma trận, lỗi đã sửa và giới hạn nghiệm thu](tuong-thich-2022-2027.md).
+
 > Tiếp nối sau merge PR #184: [BCF 2.1 theo schema/reader độc lập và bộ nghiệm thu Revit đã chuẩn bị](bang-chung/2026-10-08/nghiem-thu-tiep.md).
 > Gói dev có LICENSE/NOTICE đã được dựng từ main; việc chạy GUI/Revit và dữ liệu công ty vẫn theo điều kiện trong báo cáo.
 
@@ -276,7 +280,7 @@ Các lỗi #1–#11 trong bản trước **đã sửa**:
   prompt — kiểm B11 trước khi dùng thật.
 - .NET 10: AutoCAD 2026.1 (net10) **đã build và chạy thật** qua accoreconsole (§24); Revit 2027 (gói API 2027.2.0)
   **đã build** cả bản WPF trên net10 và có CI, nhưng **chưa chạy thật** (máy có Revit 2024.3 và 2026, không có 2027) — nên
-  `release.yml` chưa đóng gói 2027. **Revit 2026 (net8) đã chạy thật 2026-09-06** — §51. Xem "Nền tảng — .NET 10" trong [`roadmap.md`](roadmap.md).
+  `release.yml` nay có ma trận build/gói 2022–2027; nghiệm thu host xem [ma trận](tuong-thich-2022-2027.md). **Revit 2026 (net8) đã chạy thật 2026-09-06** — §51. Xem "Nền tảng — .NET 10" trong [`roadmap.md`](roadmap.md).
 - ~~`ParameterImport` vẫn đọc CSV theo dòng nên chưa đọc ô có xuống dòng bên trong nháy~~ — xong từ PR #55 (2026-09-04): dùng `CsvText.ReadRecords` (RFC 4180) như `ParameterExport` ghi ra; dòng này ở đây đã lỗi thời.
 - Batch Revit thoát bằng `Environment.Exit` sau khi ghi `batch-done.json` — đủ dùng cho Task Scheduler nhưng không "đẹp";
   Revit không có API thoát cho add-in.

@@ -7,20 +7,25 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $project = Join-Path $PSScriptRoot 'DhcbTools.AutoCAD.Acceptance.csproj'
-& "$env:ProgramFiles\dotnet\dotnet.exe" build $project -c Release -p:AcadVersion=2026 -nologo -v:q
+$dotnet = Join-Path $env:ProgramFiles 'dotnet\dotnet.exe'
+. (Join-Path $PSScriptRoot 'HostPreflight.ps1')
+$hostInputs = Get-AcceptanceHost $AcadDirectory $dotnet
+& $dotnet build $project -c Release -p:AcadVersion=2026 -p:AcadRuntime=net10 -nologo -v:q
 if ($LASTEXITCODE -ne 0) { throw 'Acceptance plugin build failed.' }
-$sample = Join-Path $AcadDirectory 'Sample\Mechanical Sample\Data Extraction and Multileaders Sample.dwg'
+$target = Get-AcceptanceTargetDir $project $dotnet
+$plugin = Join-Path $target 'DhcbTools.AutoCAD.Acceptance.dll'
+Assert-AcceptanceOutput $plugin
+$sample = $hostInputs.Sample
 $hash = (Get-FileHash -LiteralPath $sample -Algorithm SHA256).Hash
 $out = Join-Path $OutputRoot ('query-readiness-' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
 New-Item -ItemType Directory -Path $out | Out-Null
 $copy = Join-Path $out 'disposable.dwg'
 Copy-Item -LiteralPath $sample -Destination $copy
 $report = Join-Path $out 'queries.json'
-$plugin = Join-Path $PSScriptRoot 'bin\Release\net10.0-windows\DhcbTools.AutoCAD.Acceptance.dll'
 $scr = Join-Path $out 'query.scr'
 @('FILEDIA 0', 'SECURELOAD 0', '_.NETLOAD', ('"' + $plugin + '"'), 'DHCB_ACCEPTANCE', $report, '_.QUIT', '_Y') |
     Set-Content -LiteralPath $scr -Encoding ASCII
-$process = Start-Process -FilePath (Join-Path $AcadDirectory 'accoreconsole.exe') -ArgumentList ('/i "' + $copy + '" /s "' + $scr + '" /l en-US') `
+$process = Start-Process -FilePath $hostInputs.Console -ArgumentList ('/i "' + $copy + '" /s "' + $scr + '" /l en-US') `
     -RedirectStandardOutput (Join-Path $out 'console.log') -RedirectStandardError (Join-Path $out 'error.log') -PassThru -WindowStyle Hidden
 $null = $process.Handle
 if (-not $process.WaitForExit(180000)) { $process.Kill(); throw 'Acceptance timed out.' }

@@ -115,7 +115,7 @@ class FixRulesetTests(unittest.TestCase):
         body = json.loads(out[out.index("{"):])
         self.assertEqual(["~DEFAULT_BRANCH"], body["conditions"]["ref_name"]["include"])   # bỏ ~ALL
         checks = [r for r in body["rules"] if r["type"] == "required_status_checks"][0]
-        self.assertEqual(11, len(checks["parameters"]["required_status_checks"]))
+        self.assertEqual([{"context": "quality-gate"}], checks["parameters"]["required_status_checks"])
         self.assertIn("copilot_code_review", [r["type"] for r in body["rules"]])   # rule lạ giữ nguyên
         self.assertEqual(EXISTING["bypass_actors"], body["bypass_actors"])
 
@@ -129,7 +129,7 @@ class FixRulesetTests(unittest.TestCase):
         self.assertEqual(0, code)
         self.assertIn(("PUT", f"repos/{self.REPO}/rulesets/22338598"), [c[:2] for c in gh.calls])
         self.assertIn("Đã sửa.", out)
-        self.assertIn("logic-tests", out)
+        self.assertIn("quality-gate", out)
 
     def test_chua_co_ruleset_thi_tao_moi_bang_post_va_du_ba_rule_nen(self) -> None:
         gh = FakeGh({("GET", f"repos/{self.REPO}/rulesets"): [],
@@ -160,9 +160,9 @@ class FixRulesetTests(unittest.TestCase):
         self.assertEqual(0, code)
         self.assertIn("tạo mới", out)
 
-    def test_required_checks_dung_11_ten(self) -> None:
-        self.assertEqual(11, len(fix_ruleset.REQUIRED_CHECKS))
-        self.assertIn("build-wpf-windows (2027)", fix_ruleset.REQUIRED_CHECKS)
+    def test_required_checks_use_the_stable_aggregate_gate(self) -> None:
+        self.assertEqual(["quality-gate"], fix_ruleset.REQUIRED_CHECKS)
+        self.assertEqual(fix_ruleset.REQUIRED_CHECKS, apply_rulesets.REQUIRED["Dhcb-Tools"])
 
 
 class ApplyRulesetsTests(unittest.TestCase):

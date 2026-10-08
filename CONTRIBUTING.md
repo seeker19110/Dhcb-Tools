@@ -21,32 +21,42 @@ Bốn workflow trong [`.github/workflows/`](.github/workflows/) — `tests.yml`,
 lỗ hổng đã biết; chạy khi PR đổi dependency, trên `main` và hằng tuần). `.github/dependabot.yml` mở PR cập nhật
 GitHub Actions và pip mỗi tháng. Mô hình an toàn tổng thể: [`SECURITY.md`](SECURITY.md).
 
-**`tests.yml` — chạy mọi push vào `main` và **mọi pull request**.** Ba job:
+**`tests.yml` — chạy mọi push vào `main` và mọi pull request.** Bốn nhóm kiểm tra và một cổng tổng hợp:
 
-| Job | Máy | Làm gì |
+| Job | Máy/ma trận | Làm gì |
 |---|---|---|
-| `logic-tests` | ubuntu-latest | `dotnet restore/build/test` bộ `DhcbTools.Shared.Logic.Tests` (Release) **kèm cổng phủ 100% dòng** (`scripts/check-coverage.py`), test CLI BatchRunner, **bộ ca IDS chính thức của buildingSMART** (`scripts/ids-conformance.py`, đỏ khi một ca ngoài `tests/ids-buildingsmart/known-gaps.txt` lệch — sửa được ca nào thì xoá dòng đó), tải kết quả `.trx` lên artifact `test-results` |
-| `check-build` | ubuntu-latest, ma trận `2027` / `2026` / `2025` / `2024` / `2023` | Build `BatchRunner` + biên dịch Core và cả bốn vỏ (Revit, AutoCAD, AutoCAD core-only) bằng API package NuGet với `UseWPF=false`. `2026`/`2027` là đường **.NET 10** (AutoCAD ≥ 2026, Revit ≥ 2027), cần cả SDK 8 lẫn 10. Riêng nhánh `2025` còn chạy `py_compile` cho `scripts/*.py` + `tools/autocad-mcp-server/*.py`, `unittest discover` cho gateway panel **và cho `tests/python/`, kèm cổng phủ 100% câu lệnh**, một bước kiểm cú pháp JavaScript trong `panel.html`, và một bước kiểm mọi `scripts/*.ps1` đọc được bằng cú pháp chung của PowerShell 5.1 và 7 |
-| `build-wpf-windows` | windows-latest, ma trận Revit `2027` / `2026` / `2025` / `2024` / `2023` | Build **thật có WPF** vỏ Revit — bật WPF thì SDK bỏ `System.IO` khỏi implicit usings, nên job Linux ở trên không bắt được lỗi đó. `2027` là bản WPF đầu tiên trên net10.0-windows. Nhánh `2025` còn biên dịch và chạy installer Inno Setup 6.7.1 trên thư mục tạm: cả 8 tổ hợp AutoCAD, nâng cấp/bỏ chọn/chọn lại và giữ file add-in khác |
+| `logic-tests` | ubuntu-latest | Restore/build/test C# Release; cổng phủ 100% dòng; CLI BatchRunner; đối chiếu BCF và IDS với dữ liệu chuẩn; tải `.trx` lên artifact `test-results` |
+| `check-build` | ubuntu-latest; 2022–2027, hai runtime AutoCAD 2025/2026 | Build BatchRunner và Core/vỏ bằng SDK NuGet với `UseWPF=false`; output `headless` tách khỏi build giao diện. Hàng 2025/net8 kiểm Python với phủ 100% câu lệnh, pyflakes, JavaScript panel và cú pháp PowerShell 5.1/7 |
+| `build-wpf-windows` | windows-latest; Revit 2022–2027 | Build đầy đủ vỏ Revit có WPF. Hàng 2025 biên dịch/chạy installer Inno Setup 6.7.1 trong thư mục tạm: 64 tổ hợp lựa chọn AutoCAD, runtime, nâng cấp/bỏ chọn/chọn lại và bảo toàn add-in khác |
+| `build-autocad-windows` | windows-latest; 8 profile năm/runtime | Build đầy đủ AutoCAD UI có WPF và vỏ Core Console cho mỗi SDK/runtime |
+| `quality-gate` | ubuntu-latest | Luôn chạy sau cả bốn nhóm; chỉ xanh khi mọi nhóm xanh. Job lỗi, bị hủy hoặc bị bỏ qua đều chặn cổng |
 
-Ma trận ba phiên bản là cố ý: lỗi chỉ xảy ra trên net48 (`Dictionary.GetValueOrDefault`) hoặc chỉ trên
-Revit ≤ 2023 (`ElementId.Value`) từng lọt tới tận bước phát hành khi CI chỉ build 2025.
+Revit/AutoCAD 2022–2024 dùng net48; Revit 2025/2026 giữ API baseline net8; Revit 2027 dùng net10.
+AutoCAD 2025/2026 có hai profile net8/net10 tùy mức cập nhật host; AutoCAD 2027 dùng net10.
+Xem [ma trận và giới hạn nghiệm thu](docs/tuong-thich-2022-2027.md). CI kiểm biên dịch; kiểm host thật
+vẫn cần DWG/RVT mẫu và bằng chứng đầu ra.
 
-**`release.yml` — CD, chỉ chạy khi đẩy tag `vX.Y.Z` hoặc bấm tay (`workflow_dispatch`).** Trên
-windows-latest: build Release thật (có WPF) cho Revit 2023/2024/2025/2026 và AutoCAD 2024/2025/**2026** + vỏ core-only,
-đóng gói zip kèm `jobs/`, `configs/`, `scripts/`, dựng installer Inno Setup rồi tạo GitHub Release.
-Không chạy trên PR nên **không phải chờ nó** khi merge.
+**`release.yml` — CD, chạy khi đẩy tag `vX.Y.Z` hoặc gọi `workflow_dispatch`.** Nó gọi lại
+`tests.yml`, build Windows Release đầy đủ cho 6 năm Revit và 8 profile AutoCAD UI/Core Console,
+đóng gói ZIP cùng BatchRunner, dựng installer. Gói có metadata năm/runtime; đường DLL được hỏi MSBuild.
+Tag yêu cầu chữ ký hợp lệ và chỉ publish sau khi mọi kiểm tra đạt; chạy tay có thể dựng gói dev.
+Workflow này không chạy trên PR nên không phải chờ CD khi merge.
+
+`secret-scan.yml` và `dependency-audit.yml` là các workflow riêng: `quality-gate` tổng hợp `tests.yml`,
+không thay chúng. Audit dependency quét cả 8 profile AutoCAD và Revit tương ứng, dùng cùng property
+MSBuild cho restore và đọc package để tránh quét nhầm thư mục assets.
 
 ## Merge PR — chờ check xanh; auto-merge khi được yêu cầu
 
 Mặc định merge tay sau khi kiểm tra toàn bộ CI. Trước đây `main` chưa có required checks nên
 `gh pr merge --auto` từng merge ngay khi CI còn chạy (PR #64, 2026-09-05).
 
-Đã đối chiếu GitHub ngày 2026-10-08: ruleset `main` đang **active**, áp dụng nhánh mặc định,
-không có bypass actor; yêu cầu PR và đủ **11 job `tests.yml`** (logic, năm build API, năm build WPF),
-cấm xóa nhánh và force-push. Không thấy classic branch protection không có nghĩa nhánh không được bảo vệ:
-cần kiểm cả `GET /repos/{owner}/{repo}/rulesets` và nội dung ruleset.
-`gitleaks` cũng chạy trên PR; quy trình vẫn chờ mọi check xanh rồi merge tay:
+Ruleset của nhánh mặc định phải active, không bypass, yêu cầu PR và cổng ổn định `quality-gate`,
+cấm xóa nhánh và force-push. Cổng này gom mọi hàng ma trận của `tests.yml`; đổi ma trận không cần
+liệt kê lại từng tên check. Không thấy classic branch protection không có nghĩa nhánh không được bảo vệ:
+kiểm cả `GET /repos/{owner}/{repo}/rulesets` và nội dung ruleset. Khi triển khai cổng mới, chỉ cập nhật
+required status contexts; giữ các điều kiện nhánh, review, bypass và rule khác.
+`gitleaks` vẫn phải xanh trên đúng head SHA. Quy trình merge tay:
 
 1. **Tạo PR ở trạng thái sẵn sàng** (không để nháp).
 2. **Chờ check xanh** bằng `gh pr checks <n> --watch --fail-fast` (hoặc poll mỗi ~2,5 phút).
@@ -60,9 +70,9 @@ cần kiểm cả `GET /repos/{owner}/{repo}/rulesets` và nội dung ruleset.
 Mặc định dùng quy trình merge tay trên. Khi chủ dự án yêu cầu auto-merge rõ ràng, có thể dùng
 `gh pr merge <n> --auto --squash --match-head-commit <SHA>` sau khi:
 
-- Đối chiếu ruleset đang active, không bypass, yêu cầu đủ 11 job `tests.yml` cho nhánh đích.
-- `gitleaks` xanh trên đúng head SHA; job này hiện chưa nằm trong required checks nên phải kiểm trước khi bật.
-- Rà diff và xác nhận không có check thất bại; các job required còn chạy sẽ do GitHub chờ hoàn tất.
+- Đối chiếu ruleset đang active, không bypass, yêu cầu `quality-gate` cho nhánh đích.
+- `gitleaks` xanh trên đúng head SHA trước khi bật; không dựa vào check của commit cũ.
+- Rà diff và xác nhận không có check thất bại; nếu dependency-audit chạy thì chờ nó xanh. Các job required còn chạy sẽ do GitHub chờ hoàn tất.
 
 Không dùng `--admin` hoặc bỏ required checks để merge. Push head mới thì rà lại check không bắt buộc
 trước khi bật lại auto-merge. Nếu mọi check đã xanh, GitHub có thể merge ngay khi nhận lệnh.

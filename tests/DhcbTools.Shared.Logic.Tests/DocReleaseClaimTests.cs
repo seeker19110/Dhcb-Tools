@@ -31,8 +31,12 @@ public class DocReleaseClaimTests
     {
         var yml = Doc(".github/workflows/release.yml");
         var m = Regex.Match(yml, @"^\s*" + key + @":\s*\[([0-9,\s]+)\]", RegexOptions.Multiline);
-        Assert.True(m.Success, $"release.yml không còn `{key}: [...]` — đổi ma trận thì sửa test này theo.");
-        return m.Groups[1].Value.Split(',').Select(v => int.Parse(v.Trim())).OrderBy(v => v).ToList();
+        if (m.Success)
+            return m.Groups[1].Value.Split(',').Select(v => int.Parse(v.Trim())).Distinct().OrderBy(v => v).ToList();
+        // Runtime variants use explicit matrix entries so each year can appear twice.
+        var entries = Regex.Matches(yml, @"^\s*-\s*(?:\{\s*)?" + key + @":\s*(20\d{2})(?:\s*$|\s*,)", RegexOptions.Multiline);
+        Assert.True(entries.Count > 0, $"release.yml không có ma trận `{key}`.");
+        return entries.Select(e => int.Parse(e.Groups[1].Value)).Distinct().OrderBy(v => v).ToList();
     }
 
     private static readonly string[] ClaimDocs =

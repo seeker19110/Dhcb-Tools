@@ -95,7 +95,7 @@ public class BoxSpatialHashTests
         Assert.Throws<ArgumentNullException>(() => index.Query(null!));
     }
 
-    /// <summary>Hộp vô hạn/NaN không được biến vòng lặp ô thành vô tận — kẹp ở ±2^20 ô.</summary>
+    /// <summary>Hộp vô hạn/NaN dùng đường dự phòng chính xác, không mở hàng triệu ô lưới.</summary>
     [Fact]
     public void HopVoHan_KhongTreo()
     {
@@ -104,6 +104,92 @@ public class BoxSpatialHashTests
         index.Insert(new Box3(double.NaN, 0, 0, double.NaN, 1, 1), 2);
         Assert.Contains(1, index.Query(new Box3(-1e9, 0, 0, 1e9, 1, 1)));
         Assert.Equal(2, index.Count);
+    }
+
+    [Fact]
+    public void HopLonBaChieu_VaTruyVanLon_KhopDuyetTuyenTinh()
+    {
+        var boxes = new[]
+        {
+            Box(20, 20, 20, 2),
+            new Box3(-1e12, -1e12, -1e12, 1e12, 1e12, 1e12),
+            Box(-10, -10, -10, 1),
+            new Box3(double.NegativeInfinity, double.NegativeInfinity, double.NegativeInfinity,
+                     double.PositiveInfinity, double.PositiveInfinity, double.PositiveInfinity),
+            Box(1e15, 1e15, 1e15, 1),
+            new Box3(double.NaN, 0, 0, double.NaN, 1, 1),
+            Box(20, 20, 20, 2),
+        };
+        var index = BoxSpatialHash<int>.Build(Enumerable.Range(0, boxes.Length), i => boxes[i], 1);
+        var queries = new[]
+        {
+            Box(20, 20, 20, 0),
+            new Box3(-1e14, -1e14, -1e14, 1e14, 1e14, 1e14),
+            boxes[3],
+            new Box3(-double.MaxValue, -double.MaxValue, -double.MaxValue,
+                     double.MaxValue, double.MaxValue, double.MaxValue),
+            boxes[4],
+            boxes[5],
+        };
+        foreach (var query in queries)
+        {
+            foreach (var tolerance in new[] { 0.0, 2.0, 1e15, -100.0, double.PositiveInfinity, double.NaN })
+            {
+                var expected = Enumerable.Range(0, boxes.Length)
+                    .Where(i => BoxSpatialHash<int>.Intersects(boxes[i], query, tolerance));
+                Assert.Equal(expected, index.Query(query, tolerance));
+            }
+        }
+
+        Assert.Equal(new[] { 0, 1, 3, 6 }, index.Query(queries[0]));
+        Assert.Equal(boxes.Length, index.Count);
+    }
+
+    [Fact]
+    public void HopVuotNganSachTrongPhamViKey_VanTimDuocVaGiuThuTuChen()
+    {
+        // These bounds fit the packed key but span over 1e15 cells. Clamping coordinates alone
+        // cannot make either the insert or the query bounded.
+        var index = new BoxSpatialHash<string>(1);
+        index.InsertPoint(0, 0, 0, "điểm đầu");
+        index.Insert(new Box3(-100000, -100000, -100000, 100000, 100000, 100000), "hộp lớn");
+        index.InsertPoint(0, 0, 0, "điểm cuối");
+        Assert.Equal(new[] { "điểm đầu", "hộp lớn", "điểm cuối" }, index.QueryPoint(0, 0, 0, 0));
+        Assert.Equal(new[] { "điểm đầu", "hộp lớn", "điểm cuối" },
+            index.Query(new Box3(-200000, -200000, -200000, 200000, 200000, 200000)));
+        Assert.Empty(index.QueryPoint(500000, 500000, 500000, 0));
+    }
+
+    [Fact]
+    public void NganSachO_BienNhoVaTichBaTruc_GiuChinhXac()
+    {
+        var boxes = new[]
+        {
+            new Box3(0, 0, 0, 4095, 0, 0), // Exactly 4096 cells: keep normal grid indexing.
+            new Box3(0, 0, 0, 4096, 0, 0), // One beyond the budget: overflow list.
+            new Box3(0, 0, 0, 15, 15, 16), // Each axis small, but the 3D product exceeds the budget.
+        };
+        var index = BoxSpatialHash<int>.Build(Enumerable.Range(0, boxes.Length), i => boxes[i], 1);
+        var queries = new[] { Box(4095, 0, 0, 0), Box(4096, 0, 0, 0), Box(14, 14, 15, 0), boxes[2] };
+        foreach (var query in queries)
+        {
+            Assert.Equal(Enumerable.Range(0, boxes.Length).Where(i => BoxSpatialHash<int>.Intersects(boxes[i], query, 0)),
+                         index.Query(query));
+        }
+    }
+
+    [Fact]
+    public void TiLeOTranSo_VaToaDoNgoaiKey_KhongMatKetQua()
+    {
+        var boxes = new[] { Box(-double.MaxValue, 0, 0, 0), Box(double.MaxValue, 0, 0, 0), Box(0, 0, 0, 0) };
+        var index = BoxSpatialHash<int>.Build(Enumerable.Range(0, boxes.Length), i => boxes[i], double.Epsilon);
+        foreach (var query in boxes)
+        {
+            Assert.Equal(Enumerable.Range(0, boxes.Length).Where(i => BoxSpatialHash<int>.Intersects(boxes[i], query, 0)),
+                         index.Query(query));
+        }
+
+        Assert.Equal(new[] { 0, 1, 2 }, index.Query(new Box3(-double.MaxValue, 0, 0, double.MaxValue, 0, 0)));
     }
 
     // ── RunLog: cắt Messages/Errors khi ghi ─────────────────────────────

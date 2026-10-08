@@ -315,7 +315,8 @@ public class HttpBridgeServerGapTests : IDisposable
         var (status, body) = await PostAsync("/execute", "{\"command\":\"KiemTra\",\"async\":true}");
 
         Assert.Equal(HttpStatusCode.Accepted, status);
-        Assert.Equal("running", (string?)body["status"]);
+        // Immediate commands may finish before the accepted response is serialized.
+        Assert.Contains((string?)body["status"], new[] { "running", "done" });
 
         await Task.Delay(200);
         var progress = JObject.Parse(await _client.GetStringAsync("/progress/" + (string?)body["id"]));

@@ -19,8 +19,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="AutoCAD.NET.Core" Version="$(AcadCoreNetVersion)" />
-    <PackageReference Include="AutoCAD.NET.Model" Version="$(AcadCoreNetVersion)" />
+    <PackageReference Include="AutoCAD.NET.Core" Version="$(AcadCoreNetVersion)" ExcludeAssets="runtime" PrivateAssets="all" />
+    <PackageReference Include="AutoCAD.NET.Model" Version="$(AcadCoreNetVersion)" ExcludeAssets="runtime" PrivateAssets="all" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Globalization;
 using Autodesk.Revit.DB;
 using DhcbTools.Shared.Logic.Mep;
 using DhcbTools.Shared.Logic;
@@ -29,7 +28,7 @@ public static class RevitCompat
 #if REVIT2024_OR_GREATER
         return new ElementId(value);
 #else
-        return new ElementId((int)value);
+        return new ElementId(RevitElementIdValue.ToLegacyValue(value));
 #endif
     }
 
@@ -37,7 +36,12 @@ public static class RevitCompat
     public static bool TryParseId(string? text, out ElementId id)
     {
         id = ElementId.InvalidElementId;
-        if (string.IsNullOrWhiteSpace(text) || !long.TryParse(text!.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var v))
+#if REVIT2024_OR_GREATER
+        const bool supports64Bit = true;
+#else
+        const bool supports64Bit = false;
+#endif
+        if (!RevitElementIdValue.TryParse(text, supports64Bit, out var v))
         {
             return false;
         }

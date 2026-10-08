@@ -24,6 +24,7 @@ không lấy ID mới để vượt qua E-DOCUMENT-CHANGED. --background cũng g
 """
 
 import argparse
+import http.client
 import json
 import time
 import os
@@ -66,11 +67,13 @@ def load_token() -> str:
     try:
         with open(path, "r", encoding="utf-8") as f:
             return f.read().strip()
-    except OSError:
+    except (OSError, UnicodeError):
         return ""
 
 
 def request(app: str, method: str, path: str, payload=None, timeout: int = 35) -> dict:
+    if path == "/execute" and (not isinstance(payload, dict) or not isinstance(payload.get("config", {}), dict)):
+        return {"success": False, "summary": "Payload /execute và config phải là JSON object; chưa gửi lệnh."}
     # Chốt model ngay trước khi gửi; server kiểm lại trên luồng UI, không tự đổi đích khi xếp hàng.
     if path == "/execute" and payload and payload.get("config", {}).get("dryRun") is False and not payload.get("documentId"):
         context = request(app, "POST", "/query", {"query": "document_context"}, timeout=timeout)
@@ -86,6 +89,8 @@ def request(app: str, method: str, path: str, payload=None, timeout: int = 35) -
         return {"success": False,
                 "summary": "Không tìm thấy token Bridge: chưa có %APPDATA%\\DHCB\\bridge-token.txt và không đặt DHCB_BRIDGE_TOKEN. "
                            "Khởi động Revit/AutoCAD có add-in DHCB (Bridge tự sinh token) rồi chạy lại."}
+    if not token.isascii() or any(ord(char) < 33 or ord(char) > 126 for char in token):
+        return {"success": False, "summary": "Token Bridge không hợp lệ; đọc lại bridge-token.txt, không gửi thử token lỗi."}
     headers = {"Authorization": "Bearer " + token}
     if data is not None:
         headers["Content-Type"] = "application/json; charset=utf-8"
@@ -93,9 +98,16 @@ def request(app: str, method: str, path: str, payload=None, timeout: int = 35) -
     try:
         with LOOPBACK.open(req, timeout=timeout) as resp:
             parsed = json.loads(resp.read().decode("utf-8"))
-            return parsed if isinstance(parsed, dict) else {"success": False, "summary": "Bridge trả JSON không phải object."}
+            if not isinstance(parsed, dict):
+                raise ValueError("Bridge response must be an object")
+            return parsed
     except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
+        try:
+            body = e.read().decode("utf-8", errors="replace")
+        except (OSError, http.client.HTTPException):
+            body = "Không đọc được phản hồi HTTP."
+        finally:
+            e.close()
         try:
             parsed = json.loads(body)
         except Exception:
@@ -109,13 +121,19 @@ def request(app: str, method: str, path: str, payload=None, timeout: int = 35) -
                               if parsed.get("error") == "locked" else "429 — " + str(parsed.get("error", "Bridge quá tải hoặc hàng đợi đầy; hỏi progress rồi thử lại.")))
         elif e.code == 504:
             parsed.setdefault("summary", "504 — chưa xác định kết quả; hỏi progressUrl/id nếu có và KHÔNG gửi lại lệnh ghi.")
-        parsed.setdefault("success", False)
+        parsed["success"] = False
         parsed.setdefault("summary", f"HTTP {e.code}: {body}")
         return parsed
     except (ValueError, UnicodeError):
-        return {"success": False, "summary": "Bridge trả dữ liệu không phải JSON UTF-8 hợp lệ. Kiểm cổng và phiên bản add-in."}
-    except urllib.error.URLError as e:
-        return {"success": False, "summary": f"Không kết nối được ({e.reason}). {app.capitalize()} có đang mở và plugin đã load chưa?"}
+        summary = "Bridge trả dữ liệu không phải JSON UTF-8 hợp lệ. Kiểm cổng và phiên bản add-in."
+        if path == "/execute":
+            summary += " Chưa xác định kết quả; KHÔNG gửi lại lệnh ghi."
+        return {"success": False, "outcomeUnknown": path == "/execute", "summary": summary}
+    except (urllib.error.URLError, OSError, http.client.HTTPException):
+        summary = f"Không kết nối được hoặc kết nối bị ngắt. {app.capitalize()} có đang mở và plugin đã load chưa?"
+        if path == "/execute":
+            summary += " Chưa xác định kết quả; KHÔNG gửi lại lệnh ghi. Hỏi progress/id nếu đã nhận được."
+        return {"success": False, "outcomeUnknown": path == "/execute", "summary": summary}
 
 
 def send(app: str, command: str, config: dict, timeout_seconds: int = 0, *, document_id=None, preview_token=None) -> dict:
@@ -152,12 +170,18 @@ def send_background(app: str, command: str, config: dict,
     if not job_id:
         return accepted  # lỗi (401, 400…) — trả nguyên để print_result hiện ra
 
-    deadline = time.time() + max_wait_seconds
+    deadline = time.monotonic() + max_wait_seconds
+    progress_url = "/progress/" + urllib.parse.quote(str(job_id), safe="")
     while True:
-        state = request(app, "GET", f"/progress/{job_id}", timeout=35)
+        state = request(app, "GET", progress_url, timeout=35)
+        if state.get("success") is False:
+            return {**state, "id": job_id, "progressUrl": progress_url}
         status = state.get("status")
         if status == "done":
-            return state.get("result", state)
+            result = state.get("result")
+            return result if isinstance(result, dict) else {
+                "success": False, "id": job_id, "progressUrl": progress_url,
+                "summary": "Lệnh đã kết thúc nhưng thiếu kết quả hợp lệ. Kiểm log; KHÔNG gửi lại lệnh ghi."}
         if status == "error":
             return {"success": False, "summary": state.get("error", "Lệnh nền lỗi.")}
         if status == "abandoned":
@@ -166,13 +190,15 @@ def send_background(app: str, command: str, config: dict,
             return {"success": False, "abandoned": True,
                     "summary": state.get("error") or f"{app.capitalize()} không nhận lệnh kịp hạn — lệnh KHÔNG chạy, gửi lại được."}
         if status is None:
-            return state  # 404 hoặc lỗi khác
+            # Giữ id khi mất kết nối lúc polling; không nộp lại lệnh đã được chấp nhận.
+            return {**state, "id": job_id, "progressUrl": progress_url}
         if on_tick:
             on_tick(state.get("elapsedMs", 0))
-        if time.time() > deadline:
-            return {"success": False,
-                    "summary": f"Đã chờ quá {max_wait_seconds} s. Lệnh VẪN ĐANG CHẠY trong {app}; "
-                               f"hỏi lại bằng: GET /progress/{job_id}"}
+        if time.monotonic() > deadline:
+            return {"success": False, "id": job_id, "progressUrl": progress_url,
+                    "outcomeUnknown": True,
+                    "summary": f"Đã chờ quá {max_wait_seconds} s. Chưa xác định kết quả cuối trong {app}; "
+                               f"KHÔNG gửi lại lệnh ghi; hỏi lại bằng: GET {progress_url}"}
         time.sleep(poll_seconds)
 
 
