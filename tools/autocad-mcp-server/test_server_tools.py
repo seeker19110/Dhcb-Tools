@@ -193,6 +193,25 @@ class OpenPanelToolTests(unittest.TestCase):
 
 
 class QueryToolTests(unittest.TestCase):
+    def test_pagination_preserves_complete_json_and_next_offset(self) -> None:
+        result = {"entities": [{"handle": str(i), "text": "x" * 100} for i in range(50)],
+                  "count": 50, "hasMore": True, "nextOffset": 100}
+        with mock.patch.object(server, "_fetch", return_value=result) as fetch:
+            text = server.autocad_query("entities", limit=50, offset=50)
+        self.assertEqual(result, json.loads(text))
+        self.assertEqual({"limit": 50, "offset": 50}, fetch.call_args[0][1]["config"])
+
+    def test_offset_invalid_types_or_range_are_rejected(self) -> None:
+        for offset in (-1, True, 0.5, "1", 2147483648):
+            with self.subTest(offset=offset), mock.patch.object(server, "_fetch") as fetch:
+                self.assertIn("offset", server.autocad_query("text", offset=offset))
+                fetch.assert_not_called()
+
+    def test_layer_summary_advertises_next_page(self) -> None:
+        with mock.patch.object(server, "_fetch", return_value={"layers": [], "count": 0,
+                                                             "hasMore": True, "nextOffset": 50}):
+            self.assertIn("offset=50", server.autocad_query("layers"))
+
     def test_query_type_la_bi_tu_choi_truoc_khi_goi_bridge(self) -> None:
         with mock.patch.object(server, "_fetch") as fetch:
             text = server.autocad_query("rm -rf")

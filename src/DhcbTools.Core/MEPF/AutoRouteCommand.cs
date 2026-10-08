@@ -78,6 +78,9 @@ public sealed class AutoRouteConfig
     /// <summary>Coi cửa đi/cửa sổ cũng là lỗ mở (mặc định tắt — duct không đi qua cửa).</summary>
     public bool IncludeDoorsWindows { get; init; } = false;
 
+    /// <summary>Sinh tối đa ba phương án; preview ghi OPT-id và điểm để kỹ sư chọn.</summary>
+    public bool GenerateOptions { get; init; } = false;
+    public string? SelectedOptionId { get; init; }
     public bool DryRun { get; init; } = true;
 }
 
@@ -192,6 +195,20 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
 
     public CommandResult Execute(Document document, AutoRouteConfig config)
     {
+        try { return ExecuteCore(document, config); }
+        catch (OperationCanceledException)
+        {
+            return CommandResult.Fail("Đã hủy AutoRoute theo yêu cầu; không giữ thay đổi trong mô hình.");
+        }
+    }
+
+    private CommandResult ExecuteCore(Document document, AutoRouteConfig config)
+    {
+        var control = CommandExecution.Current;
+        control?.EnableCancellation();
+        control?.Report("collecting-obstacles");
+        var cancellation = control?.CancellationToken ?? default;
+        cancellation.ThrowIfCancellationRequested();
         var start = new Point3(config.StartMm.X, config.StartMm.Y, config.StartMm.Z);
         var goal = new Point3(config.EndMm.X, config.EndMm.Y, config.EndMm.Z);
         var bounds = AutoRoutePlanner.SearchBounds(start, goal, config.SearchMarginMm, config.SearchMarginZMm);
@@ -216,6 +233,7 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
                      .WherePasses(new ElementMulticategoryFilter(catIds.ToList()))
                      .WherePasses(new BoundingBoxIntersectsFilter(outline)).ToElements())
         {
+            cancellation.ThrowIfCancellationRequested();
             if (AddObstacle(e, null, config, obstacles, openingLog)) inDocument++;
         }
 
@@ -265,6 +283,7 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
                              .WherePasses(new ElementMulticategoryFilter(idsLink.ToList()))
                              .WherePasses(new BoundingBoxIntersectsFilter(inLinkCoords)).ToElements())
                 {
+                    cancellation.ThrowIfCancellationRequested();
                     if (AddObstacle(e, transform, config, obstacles, openingLog)) added++;
                 }
                 linkSummary.Add(AutoRoutePlanner.LinkCountLine(linkInstance.Name, added));
@@ -272,11 +291,28 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
             }
         }
 
-        var path = PathFinder3D.FindPath(start, goal, obstacles, bounds, new PathFinderOptions
+        var pathOptions = new PathFinderOptions
         {
             StepMm = config.StepMm, ClearanceMm = config.ClearanceMm, TurnPenalty = config.TurnPenalty, AllowVertical = config.AllowVertical,
             NearObstaclePenalty = config.NearObstaclePenalty, MaxExpandedNodes = config.MaxExpandedNodes,
-        });
+            CancellationToken = cancellation,
+            ReportExpandedNodes = count => control?.Report("finding-route", count),
+        };
+        control?.Report("finding-route");
+        IReadOnlyList<RouteCandidateOption> candidates = Array.Empty<RouteCandidateOption>();
+        PathResult path;
+        if (config.GenerateOptions || !string.IsNullOrWhiteSpace(config.SelectedOptionId))
+        {
+            candidates = RouteOptionGenerator.GenerateCandidates(start, goal, obstacles, pathOptions, config.SearchMarginMm, config.SearchMarginZMm);
+            var selected = string.IsNullOrWhiteSpace(config.SelectedOptionId) ? candidates.FirstOrDefault()
+                : candidates.FirstOrDefault(c => c.OptionId.Equals(config.SelectedOptionId, StringComparison.OrdinalIgnoreCase));
+            if (selected == null)
+                return CommandResult.Fail("Không có phương án tuyến đã chọn. Hãy xem trước lại; OPT-id phải thuộc danh sách trả về.");
+            path = new PathResult { Found = true };
+            path.Polyline.AddRange(selected.Points);
+            path.ComputeQuality();
+        }
+        else path = PathFinder3D.FindPath(start, goal, obstacles, bounds, pathOptions);
         var elements = inDocument + inLinks;
         var source = AutoRoutePlanner.SourceText(inDocument, inLinks, config.RespectOpenings, openingLog.Count);
         if (!path.Found)
@@ -292,6 +328,7 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
 
         var segments = PolylineSimplifier.ToSegments(path.Polyline);
         var result = CommandResult.Ok(string.Empty);
+        result.Messages.AddRange(candidates.Select(c => c.OptionId + " — " + c.Summary));
         result.Messages.Add(AutoRoutePlanner.FoundMessage(path, elements, source, segments.Count));
         AppendObstacleDetails(result, linkSummary, openingLog);
 
@@ -326,12 +363,18 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
             return result;
         }
 
+        cancellation.ThrowIfCancellationRequested();
+        control?.Report("creating-lines", 0, segments.Count);
+        using var group = new TransactionGroup(document, "DHCB - Tuyến tự động");
+        group.Start();
+        var createdIds = new List<ElementId>();
         var created = 0;
         using (var tx = RevitCompat.StartTransaction(document, "DHCB - Vẽ tuyến tự động"))
         {
             var style = FindOrCreateLineStyle(document, config.LineStyleName);
             foreach (var (s, e) in segments)
             {
+                cancellation.ThrowIfCancellationRequested();
                 var a = new XYZ(RevitCompat.MmToFt(s.X), RevitCompat.MmToFt(s.Y), RevitCompat.MmToFt(s.Z));
                 var b = new XYZ(RevitCompat.MmToFt(e.X), RevitCompat.MmToFt(e.Y), RevitCompat.MmToFt(e.Z));
                 if (a.DistanceTo(b) < document.Application.ShortCurveTolerance) continue;
@@ -346,9 +389,14 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
                 {
                     try { mc.LineStyle = style; } catch { /* style không áp được */ }
                 }
+                createdIds.Add(mc.Id);
+                result.WithChanged(RevitCompat.IdValue(mc.Id));
                 created++;
+                control?.Report("creating-lines", created, segments.Count);
             }
-            tx.Commit();
+            cancellation.ThrowIfCancellationRequested();
+            if (tx.Commit() != TransactionStatus.Committed)
+                return CommandResult.Fail("Revit không commit model line; nhóm tuyến sẽ rollback.");
         }
 
         result.Summary = AutoRoutePlanner.WrittenSummary(created, config.LineStyleName, path, elements, source);
@@ -363,12 +411,26 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
                 LevelName = rc.LevelName, SizeMm = rc.SizeMm, OffsetMm = null, JoinToleranceMm = rc.JoinToleranceMm,
                 ConnectToNearestMm = rc.ConnectToNearestMm, DeleteLines = rc.DeleteLines, DryRun = false,
             };
-            var routed = new RouteFromLinesCommand().Execute(document, routeCfg);
+            // Dựng đúng các line của lượt này, không gom tuyến đã có cùng line style.
+            control?.Seal();
+            control?.Report("building-mep");
+            var routed = new RouteFromLinesCommand().ExecuteCreated(document, routeCfg, createdIds);
+            if (!routed.IsComplete)
+            {
+                group.RollBack();
+                return CommandResult.Fail("Không dựng trọn vẹn tuyến MEP; đã rollback cả model line và MEP.", routed.Errors)
+                    .WithMessage(routed.Summary);
+            }
+            result.WithChanged(routed.ChangedIds);
             result.Summary += " " + routed.Summary;
             result.Messages.AddRange(routed.Messages);
             result.Errors.AddRange(routed.Errors);
         }
 
+        control?.Seal();
+        if (group.Assimilate() != TransactionStatus.Committed)
+            return CommandResult.Fail("Revit không commit nhóm tuyến.");
+        control?.Report("done", created, created);
         return result;
     }
 

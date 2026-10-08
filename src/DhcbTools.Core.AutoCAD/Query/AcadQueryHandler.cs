@@ -23,6 +23,8 @@ public static class AcadQueryHandler
 
     public static object Handle(Database db, QueryRequest req)
     {
+        if (req.Params.Limit < 0 || req.Params.Limit > QueryPage.MaxLimit || req.Params.Offset < 0)
+            return new { error = "limit phải từ 0 đến 10000; offset phải không âm. 0 dùng giới hạn mặc định 2000." };
         return req.Query.ToUpperInvariant() switch
         {
             "DRAWING_INFO" => GetDrawingInfo(db),
@@ -90,12 +92,19 @@ public static class AcadQueryHandler
         var layerTable = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
 
         var list = new List<object>();
+        var page = new QueryPage(p.Limit, p.Offset);
         foreach (ObjectId id in layerTable)
         {
             var l = (LayerTableRecord)tr.GetObject(id, OpenMode.ForRead);
             if (p.LayerContains is { Length: > 0 } &&
                 l.Name.IndexOf(p.LayerContains, StringComparison.OrdinalIgnoreCase) < 0)
                 continue;
+
+            if (!page.IncludeMatch())
+            {
+                if (page.HasMore) break;
+                continue;
+            }
 
             list.Add(new
             {
@@ -113,8 +122,7 @@ public static class AcadQueryHandler
         }
 
         tr.Abort();
-        if (p.Limit > 0) list = list.Take(p.Limit).ToList();
-        return new { count = list.Count, layers = list };
+        return new { count = list.Count, limit = page.Limit, offset = page.Offset, hasMore = page.HasMore, nextOffset = page.NextOffset, layers = list };
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -126,6 +134,7 @@ public static class AcadQueryHandler
         var blockTable = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
 
         var list = new List<object>();
+        var page = new QueryPage(p.Limit, p.Offset);
         foreach (ObjectId id in blockTable)
         {
             var btr = (BlockTableRecord)tr.GetObject(id, OpenMode.ForRead);
@@ -134,6 +143,12 @@ public static class AcadQueryHandler
             if (p.BlockNameContains is { Length: > 0 } &&
                 btr.Name.IndexOf(p.BlockNameContains, StringComparison.OrdinalIgnoreCase) < 0)
                 continue;
+
+            if (!page.IncludeMatch())
+            {
+                if (page.HasMore) break;
+                continue;
+            }
 
             // Đếm số entity trong block definition (net48: enumerate ObjectIds)
             var entityCount = 0;
@@ -150,8 +165,7 @@ public static class AcadQueryHandler
         }
 
         tr.Abort();
-        if (p.Limit > 0) list = list.Take(p.Limit).ToList();
-        return new { count = list.Count, blocks = list };
+        return new { count = list.Count, limit = page.Limit, offset = page.Offset, hasMore = page.HasMore, nextOffset = page.NextOffset, blocks = list };
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -164,6 +178,7 @@ public static class AcadQueryHandler
             SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
 
         var list = new List<object>();
+        var page = new QueryPage(p.Limit, p.Offset);
         foreach (ObjectId entId in ms)
         {
             if (tr.GetObject(entId, OpenMode.ForRead) is not BlockReference br) continue;
@@ -179,6 +194,12 @@ public static class AcadQueryHandler
             if (p.LayerContains is { Length: > 0 } &&
                 br.Layer.IndexOf(p.LayerContains, StringComparison.OrdinalIgnoreCase) < 0)
                 continue;
+
+            if (!page.IncludeMatch())
+            {
+                if (page.HasMore) break;
+                continue;
+            }
 
             var attrs = new Dictionary<string, string?>();
             foreach (ObjectId attId in br.AttributeCollection)
@@ -205,8 +226,7 @@ public static class AcadQueryHandler
         }
 
         tr.Abort();
-        if (p.Limit > 0) list = list.Take(p.Limit).ToList();
-        return new { count = list.Count, inserts = list };
+        return new { count = list.Count, limit = page.Limit, offset = page.Offset, hasMore = page.HasMore, nextOffset = page.NextOffset, inserts = list };
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -219,6 +239,7 @@ public static class AcadQueryHandler
             SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
 
         var list = new List<object>();
+        var page = new QueryPage(p.Limit, p.Offset);
         foreach (ObjectId entId in ms)
         {
             var entity = tr.GetObject(entId, OpenMode.ForRead) as Entity;
@@ -232,6 +253,12 @@ public static class AcadQueryHandler
             if (p.LayerContains is { Length: > 0 } &&
                 entity.Layer.IndexOf(p.LayerContains, StringComparison.OrdinalIgnoreCase) < 0)
                 continue;
+
+            if (!page.IncludeMatch())
+            {
+                if (page.HasMore) break;
+                continue;
+            }
 
             var row = new Dictionary<string, object?>
             {
@@ -282,8 +309,7 @@ public static class AcadQueryHandler
         }
 
         tr.Abort();
-        if (p.Limit > 0) list = list.Take(p.Limit).ToList();
-        return new { count = list.Count, entities = list };
+        return new { count = list.Count, limit = page.Limit, offset = page.Offset, hasMore = page.HasMore, nextOffset = page.NextOffset, entities = list };
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -296,6 +322,7 @@ public static class AcadQueryHandler
             SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
 
         var list = new List<object>();
+        var page = new QueryPage(p.Limit, p.Offset);
         foreach (ObjectId entId in ms)
         {
             var entity = tr.GetObject(entId, OpenMode.ForRead);
@@ -303,6 +330,13 @@ public static class AcadQueryHandler
             if (p.TextLayer is { Length: > 0 } && entity is Entity e &&
                 e.Layer.IndexOf(p.TextLayer, StringComparison.OrdinalIgnoreCase) < 0)
                 continue;
+
+            if (entity is not DBText && entity is not MText) continue;
+            if (!page.IncludeMatch())
+            {
+                if (page.HasMore) break;
+                continue;
+            }
 
             switch (entity)
             {
@@ -318,8 +352,7 @@ public static class AcadQueryHandler
         }
 
         tr.Abort();
-        if (p.Limit > 0) list = list.Take(p.Limit).ToList();
-        return new { count = list.Count, texts = list };
+        return new { count = list.Count, limit = page.Limit, offset = page.Offset, hasMore = page.HasMore, nextOffset = page.NextOffset, texts = list };
     }
 
     // ──────────────────────────────────────────────────────────────

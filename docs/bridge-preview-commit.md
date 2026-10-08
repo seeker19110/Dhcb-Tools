@@ -49,10 +49,11 @@ python scripts/dhcb_agent.py revit cancel ID_JOB
 
 `cancel` gửi `POST /cancel/<id>` với Bearer token và `Content-Type: application/json`.
 Job chưa được nhận chuyển sang `abandoned`, không chạy về sau; hủy lại trả cùng trạng thái.
-Job đã được nhận trả `409`: tiếp tục hỏi `progress`, không gửi lại lệnh để tránh ghi hai lần.
+Job đã được nhận thường trả `409`; AutoRoute/ClashDetection có thể nhận hủy hợp tác (`202`) khi
+`canCancel=true`, xem mục tiến độ bên dưới. Tiếp tục hỏi `progress`, không gửi lại lệnh để tránh ghi hai lần.
 Job `done`/`error` giữ kết quả, còn ID không tồn tại hoặc đã hết thời hạn giữ trả `404`.
 Dừng Bridge cũng hủy các việc chưa được nhận; việc đã nhận được phép kết thúc.
-Đây là hủy hàng đợi. Lệnh dài đang chạy chưa hỗ trợ hủy hợp tác và rollback theo yêu cầu người dùng.
+Hủy hàng đợi giữ hành vi cũ; hủy lệnh đã nhận chỉ được thực hiện tại điểm kiểm token do lệnh hỗ trợ.
 
 Sau timeout `504`, xem `id` và trạng thái trước khi thao tác tiếp. Khi phản hồi không có bằng chứng
 việc chưa chạy, client báo kết quả chưa xác định; không diễn giải timeout thành “chắc chắn không chạy”.
@@ -97,3 +98,17 @@ Vì vậy quy trình này chưa bảo đảm snapshot bất biến cho mọi ngu
 
 Test tự động kiểm guard độc lập với Autodesk, lưu/đọc ledger thật trong thư mục tạm và HTTP mô phỏng host.
 Kết quả build/coverage xem CI của PR; không dùng CI thay bằng chứng nghiệm thu host.
+
+## Tiến độ và hủy hợp tác
+
+`GET /progress/<id>` có `progress:{stage,completed,total}`, `canCancel`, `cancellationRequested`.
+`total:0` nghĩa là chưa biết tổng; không suy số phần trăm. Job chưa nhận vẫn hủy theo cơ chế cũ.
+Với AutoRoute/ClashDetection đang ở giai đoạn hỗ trợ, `POST /cancel/<id>` trả 202 nghĩa là **đã nhận yêu cầu**,
+chưa có nghĩa đã rollback. Phải chờ kết quả cuối ở progress; không gửi lại thao tác ghi.
+
+AutoRoute kiểm token trong thu thập vật cản, raster hóa, A*, flood-fill và dựng model line.
+Nếu hủy trước điểm đóng, transaction group rollback các thay đổi của lượt đó. Bước dựng MEP khóa quyền hủy
+trước khi gọi RouteFromLines; nếu dựng không trọn vẹn, rollback cả line/MEP. Một nhóm Undo cho lượt AutoRoute.
+ClashDetection kiểm token khi quét; khóa quyền hủy trước xuất báo cáo/tạo view để không công bố báo cáo bị bỏ dở.
+Lệnh khác hoặc giai đoạn đã đóng vẫn trả 409 khi đang chạy. Không hủy cưỡng bức luồng UI/transaction của host.
+Hành vi rollback Revit mới cần nghiệm thu bằng host thật trước khi công bố đã hỗ trợ vận hành.

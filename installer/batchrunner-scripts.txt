@@ -16,3 +16,4 @@ dhcb_ai.py
 doi-chieu-setout-ifc.py
 install-nightly-task.ps1
 don-ket-qua.ps1
+dhcb_pilot.py

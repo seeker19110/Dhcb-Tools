@@ -340,3 +340,16 @@ và 15/15 lệnh AutoCAD có ca kiểm qua `accoreconsole`, cộng một đêm b
 [`docs/bang-chung-test-autocad-live.md`](docs/bang-chung-test-autocad-live.md). Phần **chưa** khép: `AutoRoute` mới đo chất lượng tuyến trên model mẫu (§55) và một tuyến dự án thật (§57, 7,9 m = 1,00× Manhattan), đối chiếu một điểm của `SetoutExport` bằng máy toàn đạc trên công trường thật,
 chạy thật trên Revit 2025/2027 (máy có 2024.3 và 2026), và 9.4 — đưa cho một nhóm kỹ sư dùng thật. Chi tiết và lỗi còn mở:
 [`docs/progress.md`](docs/progress.md) · lộ trình: [`docs/roadmap.md`](docs/roadmap.md).
+
+## Nâng cấp vận hành 2026-10-08
+
+Xuất PDF có `plotScale` và `pageSetupName`; paper layout mặc định in 1:1. Truy vấn danh sách AutoCAD
+mặc định tối đa 2.000 record, nhận `offset` và trả `hasMore`/`nextOffset`. AutoRoute có thể so sánh phương án;
+AutoRoute và ClashDetection hỗ trợ hủy hợp tác qua Bridge ở giai đoạn được công bố `canCancel=true`.
+Hướng dẫn và giới hạn nghiệm thu: [nâng cấp sản xuất](docs/nang-cap-san-xuat-2026-10-08.md).
+Tổng hợp số liệu thí điểm tại máy: `python scripts/dhcb_pilot.py docs/mau-do-hieu-qua.csv --output out/pilot.html`.
+
+## Giấy phép
+
+Mã nguồn DHCB Tools được cấp phép theo [Apache-2.0](LICENSE); [NOTICE](NOTICE) ghi thông tin đóng góp.
+Các thành phần bên thứ ba giữ giấy phép riêng. Revit/AutoCAD được cài và cấp phép riêng bởi Autodesk.

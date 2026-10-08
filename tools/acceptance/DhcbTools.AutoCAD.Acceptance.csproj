@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType><UseWPF>false</UseWPF><CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/DhcbTools.Core.AutoCAD/DhcbTools.Core.AutoCAD.csproj" />
+    <PackageReference Include="AutoCAD.NET.Core" Version="$(AcadCoreNetVersion)" />
+    <PackageReference Include="AutoCAD.NET.Model" Version="$(AcadCoreNetVersion)" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+</Project>

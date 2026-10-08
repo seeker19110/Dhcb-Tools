@@ -115,6 +115,9 @@ namespace DhcbTools.Shared.Logic.Mep
                 var opt = new PathFinderOptions
                 {
                     StepMm = baseOptions.StepMm,
+                    CancellationToken = baseOptions.CancellationToken,
+                    ReportExpandedNodes = baseOptions.ReportExpandedNodes,
+                    MaxCells = baseOptions.MaxCells,
                     ClearanceMm = baseOptions.ClearanceMm,
                     AllowVertical = baseOptions.AllowVertical,
                     MaxExpandedNodes = baseOptions.MaxExpandedNodes,

@@ -31,6 +31,8 @@ namespace DhcbTools.Shared.Hosting
 
         public TRequest Request { get; }
 
+        public CommandExecution Execution { get; } = new CommandExecution();
+
         public TaskCompletionSource<TResult> Completion { get; }
 
         /// <summary>Client đã bỏ đi (timeout hoặc ngắt kết nối) trước khi phía thực thi nhận việc.</summary>
@@ -44,14 +46,14 @@ namespace DhcbTools.Shared.Hosting
 
         /// <summary>
         /// Đánh dấu bỏ. Trả <c>true</c> nếu việc còn chưa ai nhận (chắc chắn không chạy); <c>false</c> nếu
-        /// phía thực thi đã nhận rồi — khi đó lệnh vẫn chạy nốt và kết quả phải giữ lại cho client hỏi sau.
+        /// phía thực thi đã nhận rồi — kết quả phải giữ lại; hủy hợp tác đi qua Execution riêng.
         /// </summary>
         public bool MarkAbandoned() => Interlocked.CompareExchange(ref _state, AbandonedState, Pending) == Pending;
 
         /// <summary>
         /// Phía thực thi gọi ngay trước khi chạy: trả <c>true</c> nếu được phép chạy (client còn chờ),
         /// <c>false</c> nếu việc đã bị bỏ. Không có cửa sổ đua: sau khi TryClaim trả true, MarkAbandoned
-        /// không đặt được cờ nữa — lệnh đã mở transaction thì chạy nốt, huỷ giữa chừng nguy hiểm hơn.
+        /// không đặt được cờ nữa — không ngắt cưỡng bức transaction; chỉ lệnh hỗ trợ Execution mới nhận hủy hợp tác.
         /// </summary>
         public bool TryClaim()
         {

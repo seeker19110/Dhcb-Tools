@@ -169,6 +169,10 @@ def validate_proxy_payload(path: str, payload: dict[str, Any]) -> None:
             limit = config["limit"]
             if type(limit) is not int or not 1 <= limit <= 200:
                 raise ValueError("limit phải là số nguyên từ 1 đến 200")
+        if isinstance(config, dict) and "offset" in config:
+            offset = config["offset"]
+            if type(offset) is not int or not 0 <= offset <= 2147483647:
+                raise ValueError("offset phải là số nguyên từ 0 đến 2147483647")
         return
 
     if path != "/execute":

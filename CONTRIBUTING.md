@@ -165,3 +165,12 @@ Thêm lệnh Core mới = thêm class + một dòng trong `Shared.Logic/Ai/Comma
 - [`docs/roadmap.md`](docs/roadmap.md) — lộ trình theo giai đoạn.
 - [`docs/progress.md`](docs/progress.md) — hiện trạng và danh sách lỗi đã biết.
 - [`docs/nghien-cuu-dhcb-revit-tools.md`](docs/nghien-cuu-dhcb-revit-tools.md) — khảo sát kỹ thuật.
+
+## Giấy phép và gói chính thức
+
+Chủ dự án đã chọn Apache-2.0 ngày 2026-10-08. Giữ LICENSE/NOTICE trong các gói ZIP, MCPB và installer.
+Phát hành từ tag yêu cầu chữ ký xác minh `Valid`; nếu chưa có chứng chỉ, `sign-release.ps1 -RequireSignature`
+sẽ chặn thay vì phát hành gói chưa ký. Build thủ công không dùng tag vẫn có thể tạo gói dev chưa ký.
+Không commit PFX, mật khẩu hoặc thay kho chứng chỉ của máy để vượt điều kiện này.
+
+Fixture truy vấn/PDF trong `tools/acceptance/` chỉ dùng cho nghiệm thu trên bản sao, không cài vào bundle.

@@ -10,19 +10,31 @@ public sealed class AutoCadPlot
     public string Target { get; }
     public string? Staging { get; }
     public string? Script { get; }
+    public string SettingsSummary { get; }
 
     public AutoCadPlot(JObject config, string defaultTarget, bool dryRun)
     {
         Target = Path.GetFullPath((string?)config["outputPath"] ?? defaultTarget);
         if (!Path.GetExtension(Target).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("PlotPdf yêu cầu outputPath có đuôi .pdf.");
+        var pageSetupName = (string?)config["pageSetupName"];
+        if (pageSetupName != null && new[] { "paperSize", "orientation", "plotArea", "plotStyle", "plotScale" }.Any(k => config[k] != null))
+            throw new ArgumentException("pageSetupName dùng cấu hình in đã lưu; bỏ paperSize/orientation/plotArea/plotStyle/plotScale để tránh ghi đè ngầm.");
+        // Kiểm cấu hình cả khi preview, trước khi tạo thư mục/file.
+        _ = AcadScriptGen.PlotPdf(Target,
+            (string?)config["layout"] ?? "Model", (string?)config["paperSize"] ?? "ISO A3 (420.00 x 297.00 MM)",
+            (string?)config["orientation"] ?? "Landscape", (string?)config["plotArea"] ?? "Extents",
+            (string?)config["plotStyle"] ?? "monochrome.ctb", plotScale: (string?)config["plotScale"], pageSetupName: pageSetupName);
+        var layout = (string?)config["layout"] ?? "Model";
+        SettingsSummary = pageSetupName != null ? "layout " + layout + ", page setup " + pageSetupName
+            : "layout " + layout + ", tỷ lệ " + AcadScriptGen.NormalizePlotScale((string?)config["plotScale"], layout.Equals("Model", StringComparison.OrdinalIgnoreCase));
         if (dryRun) return;
         Directory.CreateDirectory(Path.GetDirectoryName(Target)!);
         Staging = Path.Combine(Path.GetDirectoryName(Target)!, ".dhcb-plot-" + Guid.NewGuid().ToString("N") + ".pdf");
         Script = AcadScriptGen.PlotPdf(Staging,
             (string?)config["layout"] ?? "Model", (string?)config["paperSize"] ?? "ISO A3 (420.00 x 297.00 MM)",
             (string?)config["orientation"] ?? "Landscape", (string?)config["plotArea"] ?? "Extents",
-            (string?)config["plotStyle"] ?? "monochrome.ctb");
+            (string?)config["plotStyle"] ?? "monochrome.ctb", plotScale: (string?)config["plotScale"], pageSetupName: pageSetupName);
     }
 
     public RunLogEntry Complete(string source, string? blocker, Action<string, string>? publish = null)
@@ -31,7 +43,7 @@ public sealed class AutoCadPlot
         if (Staging is null)
         {
             result.Success = true;
-            result.Summary = "Xem trước: sẽ xuất PDF → " + Target + "; chưa ghi file.";
+            result.Summary = "Xem trước: sẽ xuất PDF (" + SettingsSummary + ") → " + Target + "; chưa ghi file.";
             return result;
         }
         try
@@ -68,7 +80,7 @@ public sealed class AutoCadPlot
                 }
             }
             result.Success = true;
-            result.Summary = "Đã xuất PDF: " + Target;
+            result.Summary = "Đã xuất PDF: " + Target + " (" + SettingsSummary + ").";
         }
         catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
         {

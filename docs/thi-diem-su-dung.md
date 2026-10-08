@@ -46,8 +46,22 @@ không chứng minh kết quả đúng và không tự thu thập dữ liệu t�
 - Dừng thao tác ghi khi xem trước có lỗi/xung đột; sửa dữ liệu đầu vào rồi xem trước lại.
 - Gửi tên lệnh, phiên bản host/add-in, bước tái hiện, báo cáo doctor và phần log liên quan sau khi rà dữ liệu nhạy cảm.
 - Với Bridge timeout có `id`, chạy `python scripts/dhcb_agent.py revit progress ID` (hoặc `autocad`) để hỏi kết quả.
-- Muốn bỏ job còn xếp hàng: `python scripts/dhcb_agent.py revit cancel ID`. Job đã được nhận trả `409`; không gửi
-  lại lệnh ghi và không kết thúc tiến trình host để cố hủy.
+- Muốn bỏ job còn xếp hàng: `python scripts/dhcb_agent.py revit cancel ID`. AutoRoute/ClashDetection đang chạy
+  có thể nhận yêu cầu hủy hợp tác (`202`) khi `canCancel=true`; hỏi progress để xác nhận kết quả cuối.
+  Lệnh khác hoặc đã qua điểm commit trả `409`; không gửi lại lệnh ghi và không kết thúc tiến trình host để cố hủy.
 - Phần hoàn công/biểu mẫu cần người có chuyên môn duyệt trước khi dùng trong hồ sơ chính thức.
 
 Quy trình kỹ thuật và tiêu chí tiếp theo: [kế hoạch chất lượng](ke-hoach-chat-luong-2026-10-07.md).
+
+## Tổng hợp số liệu bằng công cụ đi kèm
+
+```bash
+python scripts/dhcb_pilot.py du-lieu-thi-diem.csv --output out/pilot.html
+python scripts/dhcb_pilot.py du-lieu-thi-diem.csv --output out/pilot.json
+```
+
+Ngày theo `YYYY-MM-DD`, `HoanThanh` theo `true/false`, `1/0` hoặc `có/không`. Thời gian/số lỗi không âm.
+Báo cáo nhóm theo ứng dụng/lệnh, tính cả thời gian của tác vụ bỏ cuộc và giữ giá trị tiết kiệm âm.
+Các dòng mẫu chưa nhập được đếm riêng, không tạo số liệu giả. CSV lỗi được chỉ ra theo dòng và mã thoát 1;
+đầu vào/lệnh hỏng trả 2. `status:no-data` nghĩa là cần người dùng nhập tác vụ thật.
+Báo cáo chỉ chứa tổng hợp; không đưa mã người/mã dự án vào đầu ra. Mốc 2/4 tuần cần phản hồi thật.

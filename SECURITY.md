@@ -34,8 +34,9 @@ Không sửa Bridge để bind `0.0.0.0`; agent ở máy khác dùng SSH tunnel.
 | `tests.yml` | test + cổng phủ 100 % (C# dòng, Python câu lệnh), pyflakes, build năm phiên bản, bộ ca IDS chính thức của buildingSMART (đỏ khi hồi quy) |
 | `.github/dependabot.yml` | PR cập nhật GitHub Actions và pip hằng tháng |
 
-Release: `scripts/sign-release.ps1` ký Authenticode các file `DhcbTools*` khi repo có secret chứng chỉ; chưa có thì gói
-phát hành **chưa ký**.
+Release: `scripts/sign-release.ps1` ký Authenticode các file `DhcbTools*` bằng secret chứng chỉ.
+Từ 2026-10-08, tag release yêu cầu chữ ký được xác minh `Valid`; thiếu cert sẽ dừng phát hành.
+Build thủ công không dùng tag vẫn có thể tạo gói dev **chưa ký**.
 
 Mọi action ghim theo **commit SHA**; mọi workflow mặc định `contents: read`, chỉ job `publish` của
 `release.yml` có quyền ghi; `actions/checkout` không lưu lại `GITHUB_TOKEN` (`persist-credentials: false`).

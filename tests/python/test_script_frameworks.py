@@ -1,6 +1,7 @@
 """Chạy các cổng MSBuild thật của script, chặn DLL cũ khi truy vấn framework lỗi."""
 
 from pathlib import Path
+import os
 import re
 import shutil
 import subprocess
@@ -21,6 +22,20 @@ LOOKUPS = (
 
 @unittest.skipUnless(PWSH, "Cần pwsh để thực thi script PowerShell")
 class ScriptFrameworkTests(unittest.TestCase):
+    def test_tag_signing_requires_certificate_but_dev_can_skip(self):
+        env = {key: value for key, value in os.environ.items()
+               if key not in {"DHCB_SIGN_PFX_BASE64", "DHCB_SIGN_PFX_PASSWORD"}}
+        with tempfile.TemporaryDirectory(prefix="dhcb-sign-") as tmp:
+            for required in (False, True):
+                with self.subTest(required=required):
+                    args = [PWSH, "-NoProfile", "-File", str(ROOT / "scripts" / "sign-release.ps1"), "-Path", tmp]
+                    if required:
+                        args.append("-RequireSignature")
+                    result = subprocess.run(args, env=env, capture_output=True, text=True, timeout=30)
+                    self.assertEqual(required, result.returncode != 0, result.stdout + result.stderr)
+                    self.assertIn("DHCB_SIGN_PFX_BASE64", result.stdout + result.stderr)
+                    self.assertEqual([], list(Path(tmp).iterdir()))
+
     def probe(self, name, variable, output, exit_code):
         text = (ROOT / "scripts" / name).read_text(encoding="utf-8-sig")
         stop = re.search(r"(?m)^function Stop-WithMessage\b[^\n]*\n.*?^}", text, re.S).group()

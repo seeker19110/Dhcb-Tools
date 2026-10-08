@@ -397,9 +397,10 @@ namespace DhcbTools.Shared.Hosting
 
             if (timedOut && item.Claimed)
             {
-                // Luồng UI đã nhận việc: không huỷ được nữa. Biến thành job nền để kết quả còn chỗ về —
+                // Luồng UI đã nhận: không bỏ hàng đợi được nữa. Chuyển job nền giữ kết quả/quyền hủy hợp tác —
                 // client hỏi /progress/<id> thay vì gửi lại lệnh (gửi lại là chạy hai lần trên model thật).
                 var job = _jobs.Add(request.Command, startedUtc, null, timeout);
+                job.Execution = item.Execution;
                 job.MarkStarted();
                 AttachCompletion(job, item);
                 Log?.Invoke("[DHCB Bridge] 504 " + request.Command + " sau " + seconds + " s nhưng đã chạy — giữ kết quả ở /progress/" + job.Id);
@@ -435,6 +436,7 @@ namespace DhcbTools.Shared.Hosting
                 return;
             }
 
+            job.Execution = item.Execution;
             item.OnClaimed = job.MarkStarted;
             AttachCompletion(job, item);
 
@@ -516,6 +518,9 @@ namespace DhcbTools.Shared.Hosting
                 status = StatusName(job.Status),
                 started = job.Started,
                 elapsedMs = job.ElapsedMs(now),
+                canCancel = job.Status == BridgeJobStatus.Running && (job.Execution?.CanCancel ?? false),
+                cancellationRequested = job.Execution?.CancellationRequested ?? false,
+                progress = job.Execution?.Progress,
                 result = job.Result,
                 error = job.Error,
             });
@@ -531,16 +536,19 @@ namespace DhcbTools.Shared.Hosting
             }
 
             job.Abandon("Đã hủy theo yêu cầu trước khi nhận việc — lệnh KHÔNG chạy.", DateTime.UtcNow);
+            var cooperative = job.Status == BridgeJobStatus.Running && job.Started
+                && (job.Execution?.RequestCancellation() ?? false);
             var status = job.Status;
             var stillRunning = status == BridgeJobStatus.Running;
-            WriteJson(res, stillRunning ? 409 : 200, new
+            WriteJson(res, cooperative ? 202 : stillRunning ? 409 : 200, new
             {
                 id = job.Id,
                 status = StatusName(status),
                 started = job.Started,
                 cancelled = status == BridgeJobStatus.Abandoned,
+                cancellationRequested = cooperative || (job.Execution?.CancellationRequested ?? false),
                 progressUrl = "/progress/" + job.Id,
-                error = stillRunning ? "Lệnh đã được nhận: không hủy cưỡng bức transaction. Hỏi progress để lấy kết quả; KHÔNG gửi lại lệnh." : null,
+                error = stillRunning && !cooperative ? "Lệnh đã được nhận: không hủy cưỡng bức transaction. Hỏi progress để lấy kết quả; KHÔNG gửi lại lệnh." : null,
             });
         }
 

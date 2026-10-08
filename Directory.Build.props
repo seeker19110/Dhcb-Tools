@@ -36,6 +36,7 @@
     <Version Condition="'$(Version)'==''">0.9.0-dev</Version>
     <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
     <Company>DHCB</Company>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <Product>DHCB Revit Tools</Product>
     <Copyright>Copyright (c) DHCB</Copyright>
   </PropertyGroup>

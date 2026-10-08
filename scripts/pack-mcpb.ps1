@@ -40,6 +40,8 @@ $manifest.server.mcp_config.args = @("`${__dirname}/scripts/dhcb_mcp_server.py",
 # Bỏ khoá chú thích "_comment" — hợp lệ trong repo nhưng không thuộc schema manifest.
 $manifest.PSObject.Properties.Remove('_comment')
 
+Copy-Item (Join-Path $repo 'LICENSE'), (Join-Path $repo 'NOTICE') $stage -Force
+
 # Set-Content -Encoding UTF8 của Windows PowerShell 5.1 ghi kèm BOM, mà trình đóng gói .mcpb từ chối
 # JSON có BOM ("Unexpected token '\ufeff'"). Ghi bằng .NET với UTF8Encoding($false) để chắc chắn không BOM.
 [System.IO.File]::WriteAllText(

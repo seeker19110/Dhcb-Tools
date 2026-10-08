@@ -35,7 +35,8 @@ Nút Ribbon của các lệnh còn lại (bậc **thử nghiệm**) có ghi chú
 
 - **Chưa có người dùng thật.** Mọi con số kiểm thử (bộ ca kiểm, vòng đóng vai kỹ sư) đều do tác giả tự tạo
   trên máy của mình — xem [`danh-gia-va-tam-nhin-2026-09-06.md`](danh-gia-va-tam-nhin-2026-09-06.md) §4.1.
-- **Chưa có giấy phép (`LICENSE`); chữ ký gói phụ thuộc chứng chỉ của tổ chức** — SmartScreen/chính sách IT có thể chặn ở máy công ty.
+- **Apache-2.0 (`LICENSE`/`NOTICE`); chữ ký gói phụ thuộc chứng chỉ của tổ chức** — tag release yêu cầu chữ ký Valid;
+  build dev chưa ký có thể bị SmartScreen/chính sách IT chặn. [Báo cáo nâng cấp](nang-cap-san-xuat-2026-10-08.md).
   Đây là quyết định đang chờ chốt, không phải việc quên làm.
 - **Nhóm MEPF (`SleeveAuto`, `HangerAuto`…) cần family/tham số đúng tên dự án** để hết báo lỗi "không tìm
   thấy" — `DictionaryLearn` giúp dò tên nhưng chưa phải một nút.

@@ -1,4 +1,4 @@
-using Autodesk.Revit.DB;
+﻿using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Electrical;
 using Autodesk.Revit.DB.Mechanical;
 using Autodesk.Revit.DB.Plumbing;
@@ -59,9 +59,15 @@ public sealed class RouteFromLinesCommand : ICoreCommand<RouteFromLinesConfig>
 {
     public string CommandName => "RouteFromLines";
 
-    public CommandResult Execute(Document document, RouteFromLinesConfig config)
+    public CommandResult Execute(Document document, RouteFromLinesConfig config) => ExecuteCore(document, config, null);
+
+    internal CommandResult ExecuteCreated(Document document, RouteFromLinesConfig config, ICollection<ElementId> lineIds)
+        => ExecuteCore(document, config, lineIds);
+
+    private CommandResult ExecuteCore(Document document, RouteFromLinesConfig config, ICollection<ElementId>? lineIds)
     {
         var lines = CollectLines(document, config.LineStyleName);
+        if (lineIds != null) lines = lines.Where(l => lineIds.Contains(l.Id)).ToList();
         if (lines.Count == 0)
         {
             return CommandResult.Fail(RouteBuildPlanner.NoLinesMessage(config.LineStyleName));

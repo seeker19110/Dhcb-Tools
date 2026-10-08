@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Đăng ký Windows Task Scheduler chạy DhcbTools.BatchRunner mỗi đêm (mục 1.5).
 

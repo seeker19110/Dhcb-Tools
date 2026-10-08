@@ -191,19 +191,21 @@ def autocad_open_panel() -> str:
 def autocad_query(
     query_type: str,
     limit: int = 50,
+    offset: int = 0,
 ) -> str:
     """
     Truy vấn thông tin từ bản vẽ AutoCAD đang mở.
 
     query_type: một trong: drawing_info, layers, blocks, inserts, entities,
                 text, xrefs, layouts, stats
-    limit: số lượng kết quả tối đa (áp dụng cho entities/inserts/text/blocks)
+    limit: số lượng kết quả mỗi trang, 1–200 (entities/inserts/text/blocks/layers)
+    offset: số kết quả phù hợp bỏ qua; dùng nextOffset của trang trước
     """
     valid = panel_api.ALLOWED_QUERIES
     if query_type not in valid:
         return f"❌ query_type không hợp lệ. Chọn một trong: {', '.join(sorted(valid))}"
 
-    config = {"limit": limit} if query_type in {"entities", "inserts", "text", "blocks"} else None
+    config = {"limit": limit, "offset": offset} if query_type in {"entities", "inserts", "text", "blocks", "layers"} else None
     body: dict[str, Any] = {"query": query_type}
     if config:
         body["config"] = config
@@ -245,6 +247,8 @@ def autocad_query(
             lines.append(f"  {l.get('name', ''):<35} color={l.get('colorIndex'):>3}  {status}")
         if count > 5:
             lines.append(f"  ... và {count-5} layer khác")
+        if result.get("hasMore"):
+            lines.append(f"  Trang tiếp theo: offset={result.get('nextOffset')}")
         return "\n".join(lines)
 
     if query_type == "layouts":
@@ -254,7 +258,7 @@ def autocad_query(
         return f"📋 {count} layouts: {', '.join(names)}"
 
     # Generic fallback — trả JSON
-    return json.dumps(result, ensure_ascii=False, indent=2)[:2000]
+    return json.dumps(result, ensure_ascii=False, indent=2)
 
 
 # ── Tool 4: Execute ───────────────────────────────────────────────────────────

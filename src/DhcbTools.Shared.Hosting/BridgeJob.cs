@@ -33,8 +33,8 @@ namespace DhcbTools.Shared.Hosting
     /// <para>
     /// Job xếp hàng cũng có hạn (<see cref="TimeoutUtc"/>): quá hạn mà luồng UI chưa nhận thì
     /// <see cref="Abandon"/> — nếu không, một Revit đang treo hộp thoại gom cả trăm lệnh rồi chạy dồn
-    /// một lượt khi kỹ sư bấm OK, trong khi người gửi đã bỏ đi từ lâu. Job ĐÃ bắt đầu chạy thì không
-    /// bao giờ bị huỷ — cắt giữa transaction nguy hiểm hơn để nó chạy nốt.
+    /// một lượt khi kỹ sư bấm OK, trong khi người gửi đã bỏ đi từ lâu. Job ĐÃ bắt đầu không bị Abandon;
+    /// lệnh hỗ trợ hủy hợp tác qua Execution vẫn trả kết quả cuối, không ngắt cưỡng bức transaction.
     /// </para>
     /// </summary>
     public sealed class BridgeJob
@@ -56,6 +56,8 @@ namespace DhcbTools.Shared.Hosting
         public string Id { get; }
 
         public string Command { get; }
+
+        public CommandExecution? Execution { get; set; }
 
         /// <summary>Lúc nhận lệnh (vào hàng đợi).</summary>
         public DateTime StartedUtc { get; }
