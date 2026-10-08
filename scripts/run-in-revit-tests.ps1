@@ -18,8 +18,8 @@ param(
     # "write" (đường ghi thật trên model kiến trúc — xem -AllowWrites), "write-asbuilt" (hồi quy nhanh
     # ba đường vẽ/bỏ qua/ghi đè dấu hoàn công), "write-mep" (đường ghi cho nhóm lệnh tạo phần tử MEP,
     # chạy trên model HVAC), "write-plumbing" (PipeKick/SlopePipes ghi thật trên model cấp thoát nước),
-    # hoặc "autoroute" (tuyến duct thật, model HVAC).
-    [ValidateSet('smoke', 'mep', 'plumbing', 'write', 'write-asbuilt', 'write-mep', 'write-plumbing', 'autoroute')]
+    # hoặc "autoroute" / "readiness" (preview các nâng cấp, model HVAC).
+    [ValidateSet('smoke', 'mep', 'plumbing', 'write', 'write-asbuilt', 'write-mep', 'write-plumbing', 'autoroute', 'readiness')]
     [string]$Suite = 'smoke',
 
     # Cho phép ca khai báo "allowWrite" ghi THẬT vào model. Script sẽ chép model mẫu sang thư mục kết
@@ -80,6 +80,7 @@ if (-not $Model) {
         'mep'      { Join-Path $samples 'Snowdon Towers Sample HVAC.rvt' }
         'write-mep' { Join-Path $samples 'Snowdon Towers Sample HVAC.rvt' }
         'autoroute' { Join-Path $samples 'Snowdon Towers Sample HVAC.rvt' }
+        'readiness' { Join-Path $samples 'Snowdon Towers Sample HVAC.rvt' }
         'plumbing' { Join-Path $samples 'Snowdon Towers Sample Plumbing.rvt' }
         'write-plumbing' { Join-Path $samples 'Snowdon Towers Sample Plumbing.rvt' }
         default    { Join-Path $samples 'Snowdon Towers Sample Architectural.rvt' }
@@ -172,7 +173,7 @@ New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 # nằm trơ trọi, mà link của Snowdon lưu theo đường dẫn tương đối — cạnh bản chép không có file kiến trúc
 # nên Revit không giải được link. Hệ quả: SleeveAuto không thấy tường nào (tường nằm ở model liên kết),
 # ca kiểm "xanh" với 0 sleeve và không chứng minh được gì.
-if ($AllowWrites) {
+if ($AllowWrites -or $Suite -eq 'readiness') {
     $copyDir = Join-Path $outDir 'ban-chep'
     New-Item -ItemType Directory -Force -Path $copyDir | Out-Null
 

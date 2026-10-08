@@ -1,5 +1,8 @@
 # Hiện trạng dự án
 
+> Tiếp nối sau merge PR #184: [BCF 2.1 theo schema/reader độc lập và bộ nghiệm thu Revit đã chuẩn bị](bang-chung/2026-10-08/nghiem-thu-tiep.md).
+> Gói dev có LICENSE/NOTICE đã được dựng từ main; việc chạy GUI/Revit và dữ liệu công ty vẫn theo điều kiện trong báo cáo.
+
 > Nâng cấp source 2026-10-08: [PDF tỷ lệ/page setup, query phân trang, tiến độ/hủy hợp tác,
 > phương án tuyến, clash ước lượng, tổng hợp thí điểm và Apache-2.0](nang-cap-san-xuat-2026-10-08.md).
 > AutoCAD Core Console đã có bằng chứng mới; bản cài PR #182 vẫn là mốc triển khai riêng.
