@@ -85,7 +85,8 @@ namespace DhcbTools.Shared.Logic.Batch
 
             try
             {
-                return JsonConvert.DeserializeObject<RunLogEntry>(line);
+                var entry = JsonConvert.DeserializeObject<RunLogEntry>(line);
+                return entry == null || entry.Errors == null || entry.Messages == null ? null : entry;
             }
             catch (JsonException)
             {
@@ -171,8 +172,8 @@ namespace DhcbTools.Shared.Logic.Batch
             return HashChain.Verify(lines, line => Deserialize(line)?.PrevHash);
         }
 
-        /// <summary>Đọc toàn bộ file, bỏ qua dòng hỏng (ghi dở khi crash) thay vì ném lỗi.</summary>
-        public static List<RunLogEntry> ReadAll(string path)
+        /// <summary>Đọc file; khi reportInvalid=true, mỗi dòng hỏng trở thành một bước lỗi trong báo cáo.</summary>
+        public static List<RunLogEntry> ReadAll(string path, bool reportInvalid = false)
         {
             var entries = new List<RunLogEntry>();
             if (!File.Exists(path))
@@ -180,12 +181,22 @@ namespace DhcbTools.Shared.Logic.Batch
                 return entries;
             }
 
-            foreach (var line in File.ReadAllLines(path))
+            var lineNumber = 0;
+            foreach (var line in File.ReadLines(path))
             {
+                lineNumber++;
                 var entry = Deserialize(line);
                 if (entry != null)
                 {
                     entries.Add(entry);
+                }
+                else if (reportInvalid && !StringGuard.IsBlank(line))
+                {
+                    entries.Add(new RunLogEntry
+                    {
+                        File = path, Command = "Nhật ký", Success = false,
+                        Summary = "Dòng " + lineNumber + " không phải kết quả hợp lệ hoặc bị ghi dở; kiểm nhật ký trước khi chạy lại lệnh ghi.",
+                    });
                 }
             }
 

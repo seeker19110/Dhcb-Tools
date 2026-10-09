@@ -149,7 +149,7 @@ public class HandoverCliTests
 
         var (code, _) = cli.Run("--job", job, "--log-dir", cli.Path_("logs"), "--report-only");
 
-        Assert.Equal(0, code);
+        Assert.Equal(1, code);
         Assert.Contains(Checks(outFolder),
             c => c["Name"]!.ToString().Contains("Chuỗi băm") && !c["Ok"]!.ToObject<bool>());
     }

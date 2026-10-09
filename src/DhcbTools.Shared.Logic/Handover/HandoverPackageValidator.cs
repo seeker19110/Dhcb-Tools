@@ -53,7 +53,7 @@ namespace DhcbTools.Shared.Logic.Handover
             {
                 if (IsPassed)
                 {
-                    return $"ĐẠT CHUẨN NĐ 207: Đã xác minh {VerifiedHashes}/{TotalFiles} file, đầy đủ hồ sơ pháp lý.";
+                    return $"ĐẠT KIỂM TRA GÓI: Đã xác minh {VerifiedHashes}/{TotalFiles} file và các loại file yêu cầu của bộ kiểm; cần xác nhận hồ sơ theo yêu cầu dự án.";
                 }
 
                 var parts = new List<string>();
@@ -183,9 +183,7 @@ namespace DhcbTools.Shared.Logic.Handover
                     }
 
                     var sanitized = FileNaming.Sanitize(number);
-                    var bound = drawingNames.Any(n =>
-                        n.IndexOf(number, StringComparison.OrdinalIgnoreCase) >= 0
-                        || n.IndexOf(sanitized, StringComparison.OrdinalIgnoreCase) >= 0);
+                    var bound = drawingNames.Any(n => ContainsNumber(n, number) || ContainsNumber(n, sanitized));
                     if (!bound)
                     {
                         unboundSheets.Add(number);
@@ -248,6 +246,18 @@ namespace DhcbTools.Shared.Logic.Handover
             }
 
             return hash!.Length > 8 ? hash.Substring(0, 8) : hash;
+        }
+
+        private static bool ContainsNumber(string name, string number)
+        {
+            for (var start = 0; start <= name.Length - number.Length; start++)
+            {
+                if (string.Compare(name, start, number, 0, number.Length, StringComparison.OrdinalIgnoreCase) != 0) continue;
+                var end = start + number.Length;
+                if ((start == 0 || !char.IsLetterOrDigit(name[start - 1]))
+                    && (end == name.Length || !char.IsLetterOrDigit(name[end]))) return true;
+            }
+            return false;
         }
     }
 }

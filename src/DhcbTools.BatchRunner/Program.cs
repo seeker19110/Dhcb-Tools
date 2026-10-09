@@ -119,7 +119,15 @@ public static partial class Program
             }
         }
 
-        var entries = RunLog.ReadAll(runLog);
+        var entries = RunLog.ReadAll(runLog, reportInvalid: true);
+        if (entries.Count == 0)
+            entries.Add(new RunLogEntry { File = runLog, Command = "Nhật ký", Success = false, Summary = "Nhật ký rỗng: chưa có bằng chứng bước nào hoàn tất." });
+        if (entries.Any(e => e.Hash != null || e.PrevHash != null))
+        {
+            var verification = RunLog.VerifyFile(runLog);
+            if (!verification.Ok)
+                entries.Add(new RunLogEntry { File = runLog, Command = "Nhật ký", Success = false, Summary = verification.Message });
+        }
         var runReport = Path.ChangeExtension(runLog, ".html");
         File.WriteAllText(runReport, BatchReport.Render(job.Name, entries, DateTime.Now), new UTF8Encoding(false));
         File.Copy(runReport, report, overwrite: true);

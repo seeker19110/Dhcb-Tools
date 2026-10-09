@@ -95,6 +95,12 @@ namespace DhcbTools.Shared.Logic.AsBuilt
 
             // Danh mục không có mục nào thì mọi thư mục đều "đủ hồ sơ" — đúng loại no-op im lặng mà
             // E-PRECOND sinh ra để chặn, nên từ chối ngay thay vì in ra một tờ giấy trắng.
+            if (spec.Groups == null || spec.Groups.Any(g => g == null || g.Items == null
+                || g.Items.Any(i => i == null || i.Note == null || i.Patterns == null || i.Patterns.Any(p => p == null))))
+            {
+                throw new ArgumentException("File danh mục có nhóm, mục hoặc mẫu tên file null; cần dùng danh sách hợp lệ.");
+            }
+
             if (spec.Groups.Sum(g => g.Items.Count) == 0)
             {
                 throw new ArgumentException("File danh mục không có mục nào — không có gì để đối chiếu.");
