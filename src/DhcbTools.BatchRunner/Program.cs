@@ -25,6 +25,17 @@ public static partial class Program
 {
     public static int Main(string[] args)
     {
+        try { return Run(args); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            Console.Error.WriteLine("Lỗi I/O hoặc đường dẫn: " + ex.Message
+                + " Nếu host đã khởi động, kiểm log và file đầu ra trước khi chạy lại job ghi.");
+            return 2;
+        }
+    }
+
+    private static int Run(string[] args)
+    {
         Console.OutputEncoding = Encoding.UTF8;
         var opts = Options.Parse(args);
         if (opts is null)
@@ -69,7 +80,7 @@ public static partial class Program
         Directory.CreateDirectory(logDir);
         var report = Path.Combine(logDir, "report.html");
 
-        // Mỗi lần chạy một file log riêng (run-HHmmss.jsonl). Bản cũ append vào run.jsonl chung của ngày:
+        // Mỗi lần chạy một file log riêng. Bản cũ append vào run.jsonl chung của ngày:
         // chạy lại lần hai cùng ngày thừa hưởng nguyên dòng lỗi của lần đầu — mã thoát 1 mãi dù đã sửa xong,
         // và report.html trộn hai lần chạy thành một bảng không ai đọc nổi.
         string? runLog;
@@ -87,19 +98,32 @@ public static partial class Program
         }
         else
         {
-            runLog = Path.Combine(logDir, "run-" + runTime.ToString("HHmmss") + ".jsonl");
-            launched = job.App.Equals("autocad", StringComparison.OrdinalIgnoreCase)
-                ? RunAutoCad(job, opts, runLog, runTime)
-                : RunRevit(job, opts, runLog);
-            if (launched != 0 && !File.Exists(runLog))
+            runLog = RunArtifacts.CreateLog(logDir, runTime);
+            try
             {
+                launched = job.App.Equals("autocad", StringComparison.OrdinalIgnoreCase)
+                    ? RunAutoCad(job, opts, runLog, runTime)
+                    : RunRevit(job, opts, runLog);
+            }
+            catch
+            {
+                // Keep useful failure evidence, but never publish an empty reservation as a run.
+                if (File.Exists(runLog) && new FileInfo(runLog).Length == 0) TryDelete(runLog);
+                throw;
+            }
+            if (launched != 0 && (!File.Exists(runLog) || new FileInfo(runLog).Length == 0))
+            {
+                // Reservation must not become a misleading empty "latest run" after preflight fails.
+                File.Delete(runLog);
                 return launched;
             }
         }
 
         var entries = RunLog.ReadAll(runLog);
-        File.WriteAllText(report, BatchReport.Render(job.Name, entries, DateTime.Now), new UTF8Encoding(false));
-        Console.WriteLine($"Báo cáo: {report}");
+        var runReport = Path.ChangeExtension(runLog, ".html");
+        File.WriteAllText(runReport, BatchReport.Render(job.Name, entries, DateTime.Now), new UTF8Encoding(false));
+        File.Copy(runReport, report, overwrite: true);
+        Console.WriteLine($"Báo cáo: {runReport}");
 
         if (opts.Analyze)
         {

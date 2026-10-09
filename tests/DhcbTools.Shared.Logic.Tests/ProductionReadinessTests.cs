@@ -77,7 +77,7 @@ public class ProductionReadinessTests
         Assert.Equal("1=1", AcadScriptGen.NormalizePlotScale(null, false));
         Assert.Contains("\n1=1\n", AcadScriptGen.PlotPdf("out.pdf", layout: "Sheet A3", plotArea: "Layout"));
         Assert.Contains("\n1=100\n", AcadScriptGen.PlotPdf("out.pdf", plotScale: "1:100"));
-        Assert.Equal("-PLOT\nN\nSheet A3\nA3-project\nDWG To PDF.pc3\nout.pdf\nN\nY\n",
+        Assert.Equal("-PLOT\nN\n\"Sheet A3\"\nA3-project\nDWG To PDF.pc3\nout.pdf\nN\nY\n",
             AcadScriptGen.PlotPdf("out.pdf", layout: "Sheet A3", pageSetupName: "A3-project"));
         Assert.Contains("\nN\nModel\n", AcadScriptGen.PlotPdf("out.pdf", pageSetupName: "A3-project"));
         Assert.Throws<ArgumentException>(() => AcadScriptGen.PlotPdf("out.pdf", pageSetupName: ""));

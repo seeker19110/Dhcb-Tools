@@ -169,7 +169,9 @@ public class Audit20261001Tests : IDisposable
 
         var staging = StagedSave.StagingPath(target, new DateTime(2026, 10, 1, 23, 5, 9));
 
-        Assert.Equal(Path.Combine(_dir, "ban-ve.dhcb-luu-20261001-230509.dwg"), staging);
+        Assert.Equal(_dir, Path.GetDirectoryName(staging));
+        Assert.StartsWith("ban-ve.dhcb-luu-20261001-230509-", Path.GetFileName(staging));
+        Assert.EndsWith(".dwg", staging);
         Assert.Throws<ArgumentException>(() => StagedSave.StagingPath(" ", DateTime.Now));
     }
 

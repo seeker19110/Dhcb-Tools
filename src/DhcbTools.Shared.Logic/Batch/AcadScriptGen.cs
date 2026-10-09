@@ -47,8 +47,9 @@ namespace DhcbTools.Shared.Logic.Batch
         /// <param name="dwgVersion">Từ khoá phiên bản DWG cho SAVEAS (2000/2004/2007/2010/2013/2018), mặc định 2018.</param>
         /// <param name="saveTargetExists">File đích đã tồn tại → AutoCAD hỏi "replace it?"; thêm dòng <c>Y</c> để trả lời.
         /// Không có dòng này thì prompt nuốt luôn lệnh kế tiếp và bản vẽ không được lưu. Với saveMode=Save luôn là true.</param>
+        /// <param name="guardedBatch">Yêu cầu DHCB_BATCH để áp dụng stopOnError/skipIfPreviousFailed trước dispatch.</param>
         public static string Build(string pluginDllPath, IReadOnlyList<string> stepJsonPaths, string? saveAsPath, string runLogPath, string sourceFile,
-            string? plotScript = null, string? dwgVersion = null, bool saveTargetExists = false)
+            string? plotScript = null, string? dwgVersion = null, bool saveTargetExists = false, bool guardedBatch = false)
         {
             if (string.IsNullOrWhiteSpace(pluginDllPath))
             {
@@ -73,7 +74,7 @@ namespace DhcbTools.Shared.Logic.Batch
                 // và batch AutoCAD chưa từng chạy trọn một lần nào. Lộ ra khi chạy thật trên AutoCAD 2026
                 // ngày 2026-09-03 — cùng họ với lỗi journal của Revit ở giai đoạn 8.4.
                 // Không bọc nháy: GetString(AllowSpaces = true) nhận nguyên dòng, nháy sẽ thành ký tự thật.
-                sb.Append("DHCB_RUN\n");
+                sb.Append(guardedBatch ? "DHCB_BATCH\n" : "DHCB_RUN\n");
                 sb.Append(Escape(stepPath)).Append('\n');
                 sb.Append(Escape(runLogPath)).Append('\n');
                 sb.Append(Escape(sourceFile)).Append('\n');
@@ -128,13 +129,13 @@ namespace DhcbTools.Shared.Logic.Batch
             sb.Append("-PLOT\n");
             if (pageSetupName != null)
             {
-                sb.Append("N\n").Append(isModel ? "Model" : Escape(layout)).Append('\n');
+                sb.Append("N\n").Append(isModel ? "Model" : ScriptValue(layout)).Append('\n');
                 sb.Append(Escape(pageSetupName)).Append('\n').Append(Escape(device)).Append('\n');
-                sb.Append(Escape(outputPdfPath)).Append("\nN\nY\n");
+                sb.Append(ScriptValue(outputPdfPath)).Append("\nN\nY\n");
                 return sb.ToString();
             }
             sb.Append("Y\n");                                   // Detailed plot configuration? Yes
-            sb.Append(isModel ? "Model\n" : Escape(layout) + "\n"); // layout name
+            sb.Append(isModel ? "Model\n" : ScriptValue(layout) + "\n"); // layout name
             sb.Append(Escape(device)).Append("\n");              // output device
             sb.Append(Escape(paperSize)).Append("\n");           // paper size
             sb.Append("M\n");                                   // paper units: Millimeters
@@ -156,7 +157,7 @@ namespace DhcbTools.Shared.Logic.Batch
             {
                 sb.Append("A\n");                               // shade plot: As displayed
             }
-            sb.Append(Escape(outputPdfPath)).Append("\n");       // file name
+            sb.Append(ScriptValue(outputPdfPath)).Append("\n");       // file name
             sb.Append("N\n");                                   // save changes to page setup? No
             sb.Append("Y\n");                                   // proceed with plot
             return sb.ToString();
@@ -249,9 +250,13 @@ namespace DhcbTools.Shared.Logic.Batch
         }
 
         /// <summary>Nội dung file JSON mô tả một step cho DHCB_RUN: {"command":..., "config":{...}}.</summary>
-        public static string StepJson(string command, string configJson)
+        public static string StepJson(string command, string configJson, string? batchId = null,
+            bool stopOnError = false, bool skipIfPreviousFailed = false)
         {
-            return "{\"command\":" + JsonConvert.ToString(command) + ",\"config\":" + (string.IsNullOrWhiteSpace(configJson) ? "{}" : configJson) + "}";
+            var policy = batchId == null ? string.Empty : ",\"batchId\":" + JsonConvert.ToString(batchId)
+                + ",\"stopOnError\":" + (stopOnError ? "true" : "false")
+                + ",\"skipIfPreviousFailed\":" + (skipIfPreviousFailed ? "true" : "false");
+            return "{\"command\":" + JsonConvert.ToString(command) + ",\"config\":" + (string.IsNullOrWhiteSpace(configJson) ? "{}" : configJson) + policy + "}";
         }
 
         /// <summary>
@@ -260,5 +265,11 @@ namespace DhcbTools.Shared.Logic.Batch
         /// </summary>
         private static string Escape(string value) =>
             (value ?? string.Empty).Replace("\"", string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
+
+        private static string ScriptValue(string value)
+        {
+            var clean = Escape(value);
+            return clean.IndexOfAny(new[] { ' ', '\t' }) >= 0 ? "\"" + clean + "\"" : clean;
+        }
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -157,30 +158,70 @@ namespace DhcbTools.Shared.Logic.Batch
         public List<string> Validate()
         {
             var errors = new List<string>();
-            if (Files.Count == 0)
+            if (Files == null || Files.Count == 0)
             {
                 errors.Add("'files' rỗng");
             }
 
-            if (Steps.Count == 0)
+            if (Steps == null || Steps.Count == 0)
             {
                 errors.Add("'steps' rỗng");
             }
 
-            for (var i = 0; i < Files.Count; i++)
+            if (Tokens == null || Tokens.Values.Any(value => value == null))
             {
-                if (string.IsNullOrWhiteSpace(Files[i].Path))
+                errors.Add("'tokens' phải là object chứa giá trị chuỗi, không được null");
+            }
+
+            for (var i = 0; i < (Files?.Count ?? 0); i++)
+            {
+                var file = Files![i];
+                if (file == null)
+                {
+                    errors.Add("files[" + i + "] phải là object, không được null");
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(file.Path))
                 {
                     errors.Add("files[" + i + "] thiếu 'path'");
                 }
+
+                if (file.Worksets == null || file.Worksets.Any(string.IsNullOrWhiteSpace))
+                {
+                    errors.Add("files[" + i + "].worksets phải là mảng tên không rỗng");
+                }
+
+                if (file.OnlySteps == null || file.OnlySteps.Any(only => string.IsNullOrWhiteSpace(only)
+                    || !(Steps?.Any(step => step != null && string.Equals(step.Command, only, StringComparison.OrdinalIgnoreCase)) ?? false)))
+                {
+                    errors.Add("files[" + i + "].onlySteps phải là mảng tên thuộc steps, không được null hoặc sai tên");
+                }
             }
 
-            for (var i = 0; i < Steps.Count; i++)
+            for (var i = 0; i < (Steps?.Count ?? 0); i++)
             {
-                if (string.IsNullOrWhiteSpace(Steps[i].Command))
+                var step = Steps![i];
+                if (step == null)
+                {
+                    errors.Add("steps[" + i + "] phải là object, không được null");
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(step.Command))
                 {
                     errors.Add("steps[" + i + "] thiếu 'command'");
                 }
+
+                if (step.Config == null)
+                {
+                    errors.Add("steps[" + i + "].config phải là JSON object, không được null");
+                }
+            }
+
+            if (!Enum.IsDefined(typeof(SaveMode), SaveMode))
+            {
+                errors.Add("'saveMode' phải là None, Save hoặc SaveAs");
             }
 
             if (SaveMode == SaveMode.SaveAs && string.IsNullOrWhiteSpace(OutputFolder))
@@ -188,14 +229,40 @@ namespace DhcbTools.Shared.Logic.Batch
                 errors.Add("saveMode=SaveAs cần 'outputFolder'");
             }
 
+            if (SaveMode == SaveMode.SaveAs && Files != null && Files.All(file => file != null && !string.IsNullOrWhiteSpace(file.Path))
+                && Files.GroupBy(file => System.IO.Path.GetFileName(file.Path.Replace('\\', '/')), StringComparer.OrdinalIgnoreCase)
+                    .Any(group => group.Count() > 1))
+            {
+                errors.Add("saveMode=SaveAs: files có tên file trùng; tách job/outputFolder để không ghi đè bản sao của file khác");
+            }
+
             if (Handover != null && Handover.Enabled && string.IsNullOrWhiteSpace(OutputFolder))
             {
                 errors.Add("'handover' cần 'outputFolder' — gói bàn giao gom file từ đó");
             }
 
-            if (!App.Equals("revit", StringComparison.OrdinalIgnoreCase) && !App.Equals("autocad", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(App, "revit", StringComparison.OrdinalIgnoreCase) && !string.Equals(App, "autocad", StringComparison.OrdinalIgnoreCase))
             {
                 errors.Add("'app' phải là revit hoặc autocad");
+            }
+
+            // Core Console appends native plots after DHCB commands. Refuse jobs whose declared
+            // ordering would otherwise be changed silently, considering each file's own filter.
+            if (errors.Count == 0 && string.Equals(App, "autocad", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var file in Files!)
+                {
+                    var plotSeen = false;
+                    foreach (var step in StepsFor(file))
+                    {
+                        if (step.Command.Equals("PlotPdf", StringComparison.OrdinalIgnoreCase)) plotSeen = true;
+                        else if (plotSeen)
+                        {
+                            errors.Add("PlotPdf phải nằm sau các lệnh Core trong steps của file " + file.Path);
+                            break;
+                        }
+                    }
+                }
             }
 
             return errors;

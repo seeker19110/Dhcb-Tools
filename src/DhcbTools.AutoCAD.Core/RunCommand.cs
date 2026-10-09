@@ -17,8 +17,18 @@ namespace DhcbTools.AutoCAD.Core;
 /// </summary>
 public sealed class RunCommand
 {
+    private static string? _batchId;
+    private static BatchStepState _batchState = new();
+
     [CommandMethod("DHCB_RUN", CommandFlags.Modal)]
-    public void RunStep()
+    public void RunStep() => RunStepCore(guarded: false);
+
+    // A distinct entry point makes old plugins fail before dispatch instead of silently
+    // ignoring the newly required failure policy in step JSON.
+    [CommandMethod("DHCB_BATCH", CommandFlags.Modal)]
+    public void RunBatchStep() => RunStepCore(guarded: true);
+
+    private static void RunStepCore(bool guarded)
     {
         var doc = Application.DocumentManager.MdiActiveDocument;
         if (doc is null) return;
@@ -31,10 +41,32 @@ public sealed class RunCommand
 
         var sw = Stopwatch.StartNew();
         var entry = new RunLogEntry { File = source };
+        BatchStepState? state = null;
+        var stopOnError = false;
         try
         {
             var step = JObject.Parse(File.ReadAllText(stepPath!));
             entry.Command = step["command"]?.ToString() ?? string.Empty;
+            if (guarded)
+            {
+                var batchId = (string?)step["batchId"];
+                if (string.IsNullOrWhiteSpace(batchId)) throw new InvalidDataException("DHCB_BATCH cần batchId.");
+                if (_batchId != batchId)
+                {
+                    _batchId = batchId;
+                    _batchState = new BatchStepState();
+                }
+                state = _batchState;
+                stopOnError = (bool?)step["stopOnError"] ?? false;
+                var skip = state.SkipReason((bool?)step["skipIfPreviousFailed"] ?? false);
+                if (skip != null)
+                {
+                    entry.Skipped = true;
+                    entry.Summary = skip;
+                    ed.WriteMessage("\n" + skip + "\n");
+                    return;
+                }
+            }
             using var lock_ = doc.LockDocument();
             var result = AcadCommandTable.Dispatch(doc.Database, entry.Command, step["config"]?.ToString(Newtonsoft.Json.Formatting.None) ?? "{}");
             entry.Success = result.Success;
@@ -53,6 +85,7 @@ public sealed class RunCommand
         }
         finally
         {
+            if (!entry.Skipped) state?.Observe(entry.IsComplete, stopOnError);
             entry.ElapsedMs = sw.ElapsedMilliseconds;
             RunLog.Append(logPath!, entry);
         }

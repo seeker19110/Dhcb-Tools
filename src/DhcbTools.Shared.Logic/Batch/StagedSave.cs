@@ -32,7 +32,8 @@ namespace DhcbTools.Shared.Logic.Batch
 
             var folder = Path.GetDirectoryName(target) ?? string.Empty;
             var name = Path.GetFileNameWithoutExtension(target)
-                       + ".dhcb-luu-" + runTime.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".dwg";
+                       + ".dhcb-luu-" + runTime.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture)
+                       + "-" + Guid.NewGuid().ToString("N") + ".dwg";
             return Path.Combine(folder, name);
         }
 
