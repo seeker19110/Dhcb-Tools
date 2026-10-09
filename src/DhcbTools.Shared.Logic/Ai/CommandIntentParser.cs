@@ -49,18 +49,20 @@ namespace DhcbTools.Shared.Logic.Ai
     /// </summary>
     public static class CommandIntentParser
     {
+        public const int MaxTextChars = 4096;
+        private static readonly TimeSpan MatchTimeout = TimeSpan.FromMilliseconds(250);
         /// <summary>
         /// Số kèm đơn vị tuỳ chọn. Nhận cả "2.000"/"2,000" (nghìn kiểu Việt/Âu) lẫn "2,5"/"2.5" (thập phân) —
         /// phân định ở <see cref="TryParseNumber"/>. Đơn vị phải là từ trọn vẹn: "2 max" không được đọc thành "2 m".
         /// </summary>
-        private static readonly Regex Number = new Regex(@"(?<![\w.,])(?<v>\d+(?:[.,]\d+)*)\s*(?<u>mm|cm|mét|met|m)?(?![\p{L}\d])", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex Number = new Regex(@"(?<![\w.,])(?<v>\d+(?:[.,]\d+)*)\s*(?<u>mm|cm|mét|met|m)?(?![\p{L}\d])", RegexOptions.Compiled | RegexOptions.IgnoreCase, MatchTimeout);
 
         /// <summary>Từ đứng ngay trước một số khiến số đó KHÔNG phải kích thước: "tầng 2", "level 3", "số 5".</summary>
-        private static readonly Regex OrdinalWord = new Regex(@"(?:^|[^\p{L}])(?:tang|lau|level|floor|so|no)$", RegexOptions.Compiled);
+        private static readonly Regex OrdinalWord = new Regex(@"(?:^|[^\p{L}])(?:tang|lau|level|floor|so|no)$", RegexOptions.Compiled, MatchTimeout);
 
-        private static readonly Regex Quoted = new Regex("[\"“”'‘’]([^\"“”'‘’]{1,80})[\"“”'‘’]", RegexOptions.Compiled);
+        private static readonly Regex Quoted = new Regex("[\"“”'‘’]([^\"“”'‘’]{1,80})[\"“”'‘’]", RegexOptions.Compiled, MatchTimeout);
 
-        private static readonly Regex PathLike = new Regex(@"(?<p>[A-Za-z]:[\\/][^\s\""']+|/[^\s\""']+|[\w\-. ]+\.(?:csv|json|html|txt|rvt|rte|dwg|pdf))", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex PathLike = new Regex(@"(?<p>[A-Za-z]:[\\/][^\s\""']+|/[^\s\""']+|[\w\-. ]+\.(?:csv|json|html|txt|rvt|rte|dwg|pdf))", RegexOptions.Compiled | RegexOptions.IgnoreCase, MatchTimeout);
 
         /// <summary>
         /// Danh sách ≤ <paramref name="max"/> lệnh ứng viên theo điểm từ khoá — đầu vào cho model local (giới hạn ~8 tool
@@ -68,6 +70,7 @@ namespace DhcbTools.Shared.Logic.Ai
         /// </summary>
         public static List<CommandDescriptor> Candidates(string text, string app, int max = 8)
         {
+            if (text?.Length > MaxTextChars) text = text.Substring(0, MaxTextChars);
             var normalized = LayerMappingSuggester.RemoveDiacritics(text ?? string.Empty).ToLowerInvariant();
             var scored = new List<(CommandDescriptor Cmd, double Score)>();
             foreach (var cmd in CommandCatalog.For(app))
@@ -105,6 +108,8 @@ namespace DhcbTools.Shared.Logic.Ai
             {
                 return new CommandIntent(null, new JObject(), 0, "Câu lệnh rỗng.", Array.Empty<string>());
             }
+            if (text.Length > MaxTextChars)
+                return new CommandIntent(null, new JObject(), 0, "Câu lệnh vượt " + MaxTextChars + " ký tự. Rút gọn yêu cầu rồi thử lại.", Array.Empty<string>());
 
             var normalized = LayerMappingSuggester.RemoveDiacritics(text).ToLowerInvariant();
             var scored = new List<(CommandDescriptor Cmd, double Score, string Hit)>();
@@ -204,14 +209,14 @@ namespace DhcbTools.Shared.Logic.Ai
                         }
                         break;
                     case "padWidth":
-                        var pad = Regex.Match(normalized, @"(\d)\s*(?:chu so|ch[uữ] s[oố]|digits?)");
+                        var pad = Regex.Match(normalized, @"(\d)\s*(?:chu so|ch[uữ] s[oố]|digits?)", RegexOptions.None, MatchTimeout);
                         if (pad.Success)
                         {
                             cfg[field] = int.Parse(pad.Groups[1].Value, CultureInfo.InvariantCulture);
                         }
                         break;
                     case "prefix":
-                        var pre = Regex.Match(original, @"(?:tiền tố|tien to|prefix)\s*[:=]?\s*[\""']?([A-Za-z0-9\-_.]{1,10})", RegexOptions.IgnoreCase);
+                        var pre = Regex.Match(original, @"(?:tiền tố|tien to|prefix)\s*[:=]?\s*[\""']?([A-Za-z0-9\-_.]{1,10})", RegexOptions.IgnoreCase, MatchTimeout);
                         if (pre.Success)
                         {
                             cfg[field] = pre.Groups[1].Value;
@@ -240,7 +245,7 @@ namespace DhcbTools.Shared.Logic.Ai
                         break;
                     case "parameterName":
                     case "attributeTag":
-                        var par = Regex.Match(original, @"(?:tham số|tham so|parameter|attribute|tag)\s*[:=]?\s*[\""']?([A-Za-z][A-Za-z0-9 _\-]{0,30})", RegexOptions.IgnoreCase);
+                        var par = Regex.Match(original, @"(?:tham số|tham so|parameter|attribute|tag)\s*[:=]?\s*[\""']?([A-Za-z][A-Za-z0-9 _\-]{0,30})", RegexOptions.IgnoreCase, MatchTimeout);
                         if (par.Success)
                         {
                             cfg[field] = par.Groups[1].Value.Trim();
@@ -279,7 +284,7 @@ namespace DhcbTools.Shared.Logic.Ai
         public static List<double> ExtractLengthsMm(string text)
         {
             var result = new List<double>();
-            if (string.IsNullOrEmpty(text))
+            if (string.IsNullOrEmpty(text) || text.Length > MaxTextChars)
             {
                 return result;
             }
@@ -381,7 +386,8 @@ namespace DhcbTools.Shared.Logic.Ai
                 normalized = sb.ToString();
             }
 
-            return double.TryParse(normalized, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+            return double.TryParse(normalized, NumberStyles.Float, CultureInfo.InvariantCulture, out value)
+                && !double.IsNaN(value) && !double.IsInfinity(value);
         }
 
         private static string FieldExtension(string field)

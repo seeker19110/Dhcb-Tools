@@ -105,7 +105,7 @@ public sealed class AutoNumberingCommand : ICoreCommand<AutoNumberingConfig>
         }
 
         var updated = 0;
-        using var transaction = new Transaction(document, $"DHCB - Đánh số {config.Category}");
+        using var transaction = new RevitTransaction(document, $"DHCB - Đánh số {config.Category}");
         transaction.Start();
         RevitCompat.ApplyFailurePolicy(transaction);
 

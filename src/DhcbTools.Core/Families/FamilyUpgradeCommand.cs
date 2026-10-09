@@ -110,7 +110,7 @@ public sealed class FamilyUpgradeCommand : ICoreCommand<FamilyUpgradeConfig>
                 }
 
                 Directory.CreateDirectory(Path.GetDirectoryName(item.Target)!);
-                family.SaveAs(item.Target, new SaveAsOptions { OverwriteExistingFile = true });
+                family.SaveAs(item.Target, new SaveAsOptions { OverwriteExistingFile = config.Overwrite });
                 upgraded++;
                 result.Messages.Add($"{item.Name}: đã nâng cấp sang Revit {version} → {item.Target}");
             }

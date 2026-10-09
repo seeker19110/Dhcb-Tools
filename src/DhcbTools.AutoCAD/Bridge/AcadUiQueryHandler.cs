@@ -159,7 +159,7 @@ internal static class AcadUiQueryHandler
             paperY = layout.PlotPaperSize.Y;
         }
 
-        var view = document.Editor.GetCurrentView();
+        using var view = document.Editor.GetCurrentView();
         var result = new
         {
             layoutName = name,
@@ -293,7 +293,7 @@ internal static class AcadUiQueryHandler
         }
 
         // Chưa có extents đáng tin: ôm theo khung nhìn kỹ sư đang mở.
-        var v = document.Editor.GetCurrentView();
+        using var v = document.Editor.GetCurrentView();
         var hw = v.Width / 2;
         var hh = v.Height / 2;
         return (new Point3d(v.CenterPoint.X - hw, v.CenterPoint.Y - hh, 0),
@@ -361,7 +361,7 @@ internal static class AcadUiQueryHandler
         if (width < 1e-6) width = 1;
         if (height < 1e-6) height = 1;
 
-        var view = editor.GetCurrentView();
+        using var view = editor.GetCurrentView();
         view.CenterPoint = new Point2d(
             (box.MinPoint.X + box.MaxPoint.X) / 2,
             (box.MinPoint.Y + box.MaxPoint.Y) / 2);

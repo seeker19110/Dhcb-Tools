@@ -36,7 +36,8 @@ class ScriptFrameworkTests(unittest.TestCase):
                     args = [PWSH, "-NoProfile", "-File", str(ROOT / "scripts" / "sign-release.ps1"), "-Path", tmp]
                     if required:
                         args.append("-RequireSignature")
-                    result = subprocess.run(args, env=env, capture_output=True, text=True, timeout=30)
+                    result = subprocess.run(args, env=env, capture_output=True, text=True,
+                                            encoding="utf-8", errors="replace", timeout=30)
                     self.assertEqual(required, result.returncode != 0, result.stdout + result.stderr)
                     self.assertIn("DHCB_SIGN_PFX_BASE64", result.stdout + result.stderr)
                     self.assertEqual([], list(Path(tmp).iterdir()))
@@ -60,11 +61,13 @@ class ScriptFrameworkTests(unittest.TestCase):
             marker = folder / "existing-addin.dll"
             marker.write_bytes(b"previous installation")
             script = folder / "probe.ps1"
-            script.write_text("$ErrorActionPreference = 'Stop'\n" + stop + "\n" + stub + block
+            script.write_text("$ErrorActionPreference = 'Stop'\n"
+                              "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()\n"
+                              + stop + "\n" + stub + block
                               + "Set-Content existing-addin.dll overwritten\n"
                               + f"Write-Output ('FRAMEWORK=' + ${variable})\n", encoding="utf-8")
             result = subprocess.run([PWSH, "-NoProfile", "-File", str(script)], cwd=tmp,
-                                    capture_output=True, text=True, timeout=30)
+                                    capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
             return result, marker.read_bytes()
 
     def runtime_probe(self, year, requested, config):
@@ -75,10 +78,12 @@ class ScriptFrameworkTests(unittest.TestCase):
             if config is not None:
                 (folder / "acdbmgd.runtimeconfig.json").write_text(config, encoding="utf-8")
             source = folder / "runtime.ps1"
-            source.write_text("$ErrorActionPreference = 'Stop'\n" + function + "\n"
+            source.write_text("$ErrorActionPreference = 'Stop'\n"
+                              "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()\n"
+                              + function + "\n"
                               + f"Get-AcadRuntime {year} $PSScriptRoot '{requested}'\n", encoding="utf-8")
             return subprocess.run([PWSH, "-NoProfile", "-File", str(source)],
-                                  capture_output=True, text=True, timeout=30)
+                                  capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
 
     def test_autocad_detects_host_runtime_and_rejects_mismatches(self):
         for year in (2025, 2026):

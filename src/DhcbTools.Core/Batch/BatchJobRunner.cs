@@ -125,6 +125,16 @@ public sealed class BatchJobRunner
                     Log?.Invoke($"  {(result.IsComplete ? "OK " : "ERR")} {step.Command}: {result.Summary}");
                     previousFailed = !result.IsComplete;
                     anyStepFailed |= !result.IsComplete;
+                    try
+                    {
+                        RevitTransaction.EnsureReady();
+                    }
+                    catch (RevitTransactionException)
+                    {
+                        // Failure processing chưa xong: không mở/ghi document khác trong phiên này.
+                        stop = true;
+                        break;
+                    }
                     if (!result.IsComplete && job.StopOnError)
                     {
                         stop = true;
@@ -150,7 +160,12 @@ public sealed class BatchJobRunner
             {
                 if (doc != null)
                 {
-                    try { doc.Close(false); } catch (Exception ex) { Log?.Invoke("  Không đóng được " + file.Path + ": " + ex.Message); }
+                    try
+                    {
+                        RevitTransaction.EnsureReady();
+                        doc.Close(false);
+                    }
+                    catch (Exception ex) { Log?.Invoke("  Không đóng được " + file.Path + ": " + ex.Message); }
                 }
             }
         }
@@ -305,6 +320,7 @@ public sealed class BatchJobRunner
         var entry = new RunLogEntry { File = file.Path, Command = "Save:" + job.SaveMode };
         try
         {
+            RevitTransaction.EnsureReady();
             if (job.SaveMode == SaveMode.Save)
             {
                 if (doc.IsWorkshared)

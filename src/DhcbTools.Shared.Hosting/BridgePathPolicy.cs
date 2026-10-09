@@ -69,6 +69,13 @@ namespace DhcbTools.Shared.Hosting
                 return null;
             }
 
+            var normalized = path.Replace('/', '\\');
+            if (normalized.StartsWith(@"\\?\", StringComparison.Ordinal)
+                || normalized.StartsWith(@"\\.\", StringComparison.Ordinal))
+            {
+                return "đường dẫn thiết bị / namespace mở rộng không được dùng qua Bridge.";
+            }
+
             // ':' ngoài "C:" là alternate data stream ("a.exe:x.csv") hoặc đường dẫn thiết bị ("\\?\", "\\.\") —
             // không lệnh nào cần, và nó lách được phép so đuôi ở dưới.
             var colon = path.IndexOf(':');

@@ -140,7 +140,7 @@ public sealed class CadLinkCommand : ICoreCommand<CadLinkConfig>
         };
 
         // Link (không Import): bản vẽ đổi thì Reload là xong, và không đẻ ra hàng nghìn phần tử trong mô hình.
-        using (var tx = new Transaction(document, "DHCB — Link bản vẽ CAD"))
+        using (var tx = new RevitTransaction(document, "DHCB — Link bản vẽ CAD"))
         {
             tx.Start();
             if (!document.Link(config.CadPath, options, view, out var linkedId))

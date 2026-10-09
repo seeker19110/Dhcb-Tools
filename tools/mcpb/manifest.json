@@ -4,7 +4,7 @@
   "display_name": "DHCB Tools — Revit",
   "version": "0.9.0",
   "description": "Điều khiển Revit đang mở từ Claude: đọc mô hình, chạy lệnh tự động hoá có xem trước, chỉ và chụp lại kết quả.",
-  "long_description": "Nối Claude vào Revit desktop qua HTTP Bridge của add-in DHCB Tools (127.0.0.1:8765, có token). Hỗ trợ phát hành Revit 2023–2026; bản 2027 mới được kiểm biên dịch. Mọi lệnh sửa mô hình mặc định xem trước; chạy thật cần giữ documentId và previewToken của lần xem trước đã duyệt.\n\nAgent đọc hình học, tham số, ảnh view và kiểm lại changedIds của phần tử vừa đổi. Giấy phép sử dụng toàn dự án đang chờ chủ dự án quyết định.",
+  "long_description": "Nối Claude vào Revit desktop qua HTTP Bridge của add-in DHCB Tools (127.0.0.1:8765, có token). Gói add-in có profile Revit 2022–2027; kiểm biên dịch không thay thế nghiệm thu trên host thật. Mọi lệnh sửa mô hình mặc định xem trước; chạy thật cần giữ documentId và previewToken của lần xem trước đã duyệt.\n\nAgent đọc hình học, tham số, ảnh view và kiểm lại changedIds của phần tử vừa đổi. Dự án dùng giấy phép Apache-2.0.",
   "author": {
     "name": "DHCB",
     "url": "https://github.com/seeker19110/Dhcb-Tools"

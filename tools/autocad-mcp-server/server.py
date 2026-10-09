@@ -10,6 +10,7 @@ import json
 import subprocess
 import sys
 import tempfile
+import urllib.parse
 from pathlib import Path
 from typing import Any
 
@@ -106,27 +107,8 @@ mcp = FastMCP(
 
 
 def _fetch(path: str, body: dict | None = None) -> dict:
-    """Gọi HTTP bridge."""
-    if path == "/execute" and body and body.get("config", {}).get("dryRun") is False:
-        return panel_api.fetch_autocad(path, body)
-    try:
-        import urllib.request
-        import urllib.error
-
-        if body is None:
-            req = urllib.request.Request(BRIDGE_URL + path, headers=panel_api.bridge_headers(False))
-        else:
-            data = json.dumps(body).encode()
-            req = urllib.request.Request(
-                BRIDGE_URL + path,
-                data=data,
-                headers=panel_api.bridge_headers(True),
-                method="POST",
-            )
-        with panel_api.LOOPBACK.open(req, timeout=10) as resp:
-            return json.loads(resp.read().decode())
-    except Exception as e:
-        return {"error": str(e), "connected": False}
+    """Dùng chung transport: giữ kết quả một phần và id recovery trên mọi đường gọi."""
+    return panel_api.fetch_autocad(path, body)
 
 
 # ── Tool 1: Health ────────────────────────────────────────────────────────────
@@ -147,6 +129,15 @@ def autocad_health() -> str:
             "  và chọn <repo>\\src\\DhcbTools.AutoCAD\\bin\\<Cấu hình>\\<TFM>\\DhcbTools.AutoCAD.dll"
         )
     return f"⚠️ Phản hồi lạ: {result}"
+
+
+@mcp.tool()
+def autocad_progress(job_id: str) -> str:
+    """Đọc lại kết quả job từ id của phản hồi timeout. Không gửi lại lệnh ghi."""
+    if not isinstance(job_id, str) or not job_id.strip() or len(job_id) > 128:
+        return "❌ job_id phải là chuỗi không rỗng, tối đa 128 ký tự."
+    result = _fetch("/progress/" + urllib.parse.quote(job_id, safe=""))
+    return json.dumps(result, ensure_ascii=False, indent=2)
 
 
 # ── Tool 2: Open Panel ────────────────────────────────────────────────────────
@@ -380,6 +371,10 @@ def autocad_execute(
     dry_note = " [DRY RUN — chưa ghi thật]" if dry_run and command != "LayerExport" else ""
 
     lines = [f"{icon} {summary}{dry_note}", f"   Affected: {count}"]
+    if result.get("id"):
+        lines.append(f"   job_id: {result['id']} — dùng autocad_progress để đọc kết quả; giữ nguyên preview_token.")
+    if result.get("changedIds"):
+        lines.append("   Changed: " + ", ".join(str(value) for value in result["changedIds"][:20]))
     if result.get("previewToken"):
         lines.append(f"   document_id: {result['documentId']} · preview_token: {result['previewToken']}")
     if messages:

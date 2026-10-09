@@ -257,7 +257,7 @@ namespace DhcbTools.Shared.Logic.Tests
             Assert.True(res.IsPassed, res.Summary);
             Assert.Equal(4, res.VerifiedHashes);
             Assert.Empty(res.UnboundSheets);
-            Assert.Contains("ĐẠT CHUẨN", res.Summary);
+            Assert.Contains("ĐẠT KIỂM TRA GÓI", res.Summary);
             Assert.Contains("tất cả đều có file", res.AuditNotes[0]);
         }
 

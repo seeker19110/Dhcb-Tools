@@ -81,7 +81,7 @@ public sealed class PipeSplitterCommand : ICoreCommand<PipeSplitterConfig>
         int totalSplitsDone = 0;
         var failures = new List<string>();
 
-        using var tx = new Transaction(document, "DHCB - Cắt đoạn MEP dài");
+        using var tx = new RevitTransaction(document, "DHCB - Cắt đoạn MEP dài");
         tx.Start();
         RevitCompat.ApplyFailurePolicy(tx);
 

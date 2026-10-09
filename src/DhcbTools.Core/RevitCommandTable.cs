@@ -38,6 +38,7 @@ public static class RevitCommandTable
         CommandResult result;
         try
         {
+            RevitTransaction.EnsureReady();
             result = name switch
             {
                 "PARAMETEREXPORT" => new ParameterExportCommand().Execute(doc, Deserialize<ParameterExportConfig>(configJson)),
@@ -106,6 +107,10 @@ public static class RevitCommandTable
             };
         }
         catch (ConfigException ex)
+        {
+            result = CommandResult.Fail(ex.Message);
+        }
+        catch (RevitTransactionException ex)
         {
             result = CommandResult.Fail(ex.Message);
         }

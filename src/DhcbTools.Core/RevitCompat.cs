@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using Autodesk.Revit.DB;
 using DhcbTools.Shared.Logic.Mep;
@@ -347,9 +347,9 @@ public static class RevitCompat
     }
 
     /// <summary>Mở transaction theo chính sách cảnh báo của vỏ — khuôn chung cho mọi lệnh Core.</summary>
-    public static Transaction StartTransaction(Document doc, string name)
+    public static RevitTransaction StartTransaction(Document doc, string name)
     {
-        var tx = new Transaction(doc, name);
+        var tx = new RevitTransaction(doc, name);
         tx.Start();
         ApplyFailurePolicy(tx);
         return tx;
@@ -359,7 +359,7 @@ public static class RevitCompat
     /// Gắn <see cref="SilentFailuresPreprocessor"/> theo <see cref="CoreContext.FailurePolicy"/>. Ribbon (Interactive)
     /// không gắn gì để Revit hiện hộp thoại cho kỹ sư; Bridge/batch mới tự xử lý. Gọi được trước hoặc sau <c>Start()</c>.
     /// </summary>
-    public static void ApplyFailurePolicy(Transaction tx)
+    public static void ApplyFailurePolicy(RevitTransaction tx)
     {
         var policy = CoreContext.FailurePolicy;
         if (policy == FailurePolicy.Interactive)

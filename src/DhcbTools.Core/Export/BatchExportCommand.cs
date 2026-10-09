@@ -224,7 +224,7 @@ public sealed class BatchExportCommand : ICoreCommand<ExportConfig>
         // Lỗi này nằm im từ ngày viết lệnh: `catch` ở vòng lặp định dạng gom ngoại lệ vào danh sách
         // Errors nhưng vẫn trả CommandResult.Ok, nên summary báo "Xuất xong 0 file(s) … 1 lỗi" và
         // không ca kiểm nào nhìn vào Errors. Vòng chạy thật 2026-09-05 mới lộ ra (bang-chung-test §27).
-        using (var tx = new Transaction(doc, "DHCB — Xuất IFC"))
+        using (var tx = new RevitTransaction(doc, "DHCB — Xuất IFC"))
         {
             tx.Start();
             doc.Export(config.OutputFolder, fileName, opts);

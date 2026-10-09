@@ -258,7 +258,7 @@ namespace DhcbTools.Shared.Logic.Handover
                 var relative = path.Substring(root.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Replace('\\', '/');
                 input.Files.Add(new HandoverFile(relative, kind, new FileInfo(path).Length, Sha256Of(path)));
 
-                if (kind == "CSV" && input.Sheets.Count == 0)
+                if (kind == "CSV")
                 {
                     var rows = SheetIndexRow.FromCsv(File.ReadAllText(path, Encoding.UTF8));
                     if (rows.Count > 0)
@@ -299,7 +299,7 @@ namespace DhcbTools.Shared.Logic.Handover
             checks = input.Checks.Select(c => new { c.Name, c.Ok, c.Detail }),
             files = input.Files.Select(f => new { f.RelativePath, f.Kind, f.SizeBytes, f.Sha256 }),
             sheets = input.Sheets.Select(s => new { s.Number, s.Name, s.Revision, s.RevisionDate, s.IssueDate, s.DrawnBy, s.CheckedBy, s.ViewCount }),
-            steps = input.Entries.Select(e => new { file = Path.GetFileName(e.File), e.Command, e.Success, e.Skipped, e.Summary, e.Hash }),
+            steps = input.Entries.Select(e => new { file = Path.GetFileName(e.File), e.Command, e.Success, e.IsComplete, e.PartialSuccess, e.Errors, e.Skipped, e.Summary, e.Hash }),
         }, Formatting.Indented);
 
         /// <summary>Trang HTML in được (A4, có ô ký).</summary>
@@ -342,7 +342,7 @@ namespace DhcbTools.Shared.Logic.Handover
             foreach (var e in input.Entries)
             {
                 sb.Append("<tr><td>").Append(HtmlText.Escape(Path.GetFileName(e.File))).Append("</td><td>").Append(HtmlText.Escape(e.Command))
-                  .Append("</td><td class=\"").Append(e.Skipped ? "\">Bỏ qua" : e.Success ? "ok\">Thành công" : "fail\">Lỗi")
+                  .Append("</td><td class=\"").Append(e.Skipped ? "\">Bỏ qua" : e.IsComplete ? "ok\">Thành công" : e.PartialSuccess ? "fail\">Một phần" : "fail\">Lỗi")
                   .Append("</td><td>").Append(HtmlText.Escape(e.Summary)).Append("</td></tr>");
             }
 

@@ -94,8 +94,11 @@ public static partial class Program
                     var model = IfcIdsModel.From(parsed);
 
                     var check = IdsEvaluator.Check(specs, model.Elements(specs), model.Model.Schema);
-                    var reportName = Path.GetFileNameWithoutExtension(ifc.RelativePath) + "-ids.html";
+                    // Keep the IFC's relative directory so equal basenames from different models
+                    // cannot overwrite each other's report or manifest hash.
+                    var reportName = Path.ChangeExtension(ifc.RelativePath, null) + "-ids.html";
                     var reportPath = Path.Combine(outputFolder, reportName);
+                    Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
                     File.WriteAllText(reportPath, IdsReport.Html(Path.GetFileName(ifcPath), options.IdsPath!, IdsReport.IfcScopeNote, check, warnings), new UTF8Encoding(true));
                     input.Checks.Add(new HandoverCheck("Kiểm IDS " + ifc.RelativePath, check.AllPassed, IdsReport.Summary(check, warnings) + " → " + reportName));
                     // Chạy lại (--report-only) thì Collect đã thấy báo cáo của lần trước — không liệt kê hai lần.

@@ -32,7 +32,8 @@ Chỉ điền khi Revit chạy trên máy khác và bạn nối qua SSH tunnel.
 | Add-in DHCB đã nạp | Bridge nghe ở `127.0.0.1:8765` |
 | Python 3.9+ | Server không có dependency ngoài, chỉ dùng thư viện chuẩn |
 
-Chưa mở Revit thì `tools/list` báo lỗi kết nối — đó là hành vi đúng, không phải hỏng gói.
+Chưa mở Revit thì `tools/list` dùng danh mục đã lưu từ lần kết nối trước và đánh dấu chưa kết nối.
+Nếu chưa có cache hợp lệ, vẫn có tool `query`/`chat`; mở Revit với add-in rồi lấy lại danh mục.
 
 ## Vì sao không đóng gói kèm add-in
 

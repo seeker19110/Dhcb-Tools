@@ -63,7 +63,7 @@ public sealed class QueryParams
     public const int DefaultLimit = 2000;
 
     /// <summary>Giới hạn thực áp dụng.</summary>
-    public int EffectiveLimit => Limit > 0 ? Limit : DefaultLimit;
+    public int EffectiveLimit => new DhcbTools.Shared.Logic.Cad.QueryPage(Limit).Limit;
 
     // ── Giai đoạn 10.1 ────────────────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
 # AutoCAD Tools — MCP Server cho Hermes
 
-Cung cấp 5 tools điều khiển AutoCAD từ Hermes Agent, kết nối qua HTTP Bridge `127.0.0.1:8766`.
+Cung cấp 6 tools điều khiển AutoCAD từ Hermes Agent, kết nối qua HTTP Bridge `127.0.0.1:8766`.
 
 ## Cài đặt
 
@@ -18,7 +18,7 @@ pip install -r <repo>/tools/autocad-mcp-server/requirements.txt
 hermes mcp add autocad-tools \
   --command python \
   --args "<repo>/tools/autocad-mcp-server/server.py"
-# → Bấm Y để bật tất cả 5 tools
+# → Bấm Y để bật tất cả 6 tools
 ```
 
 ### 3. Nạp plugin vào AutoCAD
@@ -30,11 +30,12 @@ Cài bằng [installer](../../installer/dhcb-tools.iss) thì plugin tự nạp k
 
 ## Sử dụng (trong chat Hermes)
 
-Sau khi mở session mới, agent có thêm 5 tools:
+Sau khi mở session mới, agent có thêm 6 tools:
 
 | Tool | Mô tả |
 |------|-------|
 | `autocad_health` | Kiểm tra bridge có sống không |
+| `autocad_progress` | Đọc lại kết quả theo job ID sau timeout, giữ changedIds và kết quả một phần |
 | `autocad_open_panel` | Mở bảng điều khiển ngay trong chat |
 | `autocad_query` | Đọc thông tin bản vẽ (layers, stats, text...) |
 | `autocad_execute` | Chạy lệnh (AutoNumbering, Cleanup...) |
@@ -145,3 +146,9 @@ Với bản vẽ thuộc diện bảo mật, dùng `DHCB_AI` trong AutoCAD thay 
 | `GET /health` | Status check |
 | `POST /query` | Đọc dữ liệu bản vẽ |
 | `POST /execute` | Thực thi lệnh |
+| `GET /progress/<id>` | Kết quả job đã được nhận; gọi qua `autocad_progress` |
+
+HTTP 500/504 vẫn có thể mang `changedIds`, kết quả một phần hoặc `id` job. MCP và gateway giữ các trường
+này; panel hiển thị “chưa xác định” khi kết nối bị ngắt hoặc job còn chạy. Dùng `autocad_progress` với
+job ID để xác minh kết quả, giữ nguyên token preview của lần ghi. Không tự tạo preview mới để gửi lại
+một lệnh chưa biết đã ghi hay chưa.

@@ -31,6 +31,7 @@ public sealed class SilentFailuresPreprocessor : IFailuresPreprocessor
         }
 
         var resolvedError = false;
+        var unresolvedError = false;
         foreach (var failure in failures)
         {
             var severity = failure.GetSeverity();
@@ -43,15 +44,26 @@ public sealed class SilentFailuresPreprocessor : IFailuresPreprocessor
                 continue;
             }
 
-            if (severity == FailureSeverity.Error && _policy == FailurePolicy.Silent && failure.HasResolutions())
+            if (severity == FailureSeverity.Error && _policy == FailurePolicy.Silent
+                && failure.HasResolutions() && failuresAccessor.GetAttemptedResolutionTypes(failure).Count == 0)
             {
                 CoreContext.SuppressedWarnings.Add("[Lỗi tự giải quyết] " + text);
                 failuresAccessor.ResolveFailure(failure);
                 resolvedError = true;
+                continue;
             }
+
+            unresolvedError = true;
+            CoreContext.SuppressedWarnings.Add("[Lỗi Revit, rollback] " + text);
         }
 
-        // Có Error chưa giải quyết → để Revit xử lý tiếp (rollback); chỉ ép commit khi đã resolve.
+        // Continue để lại Error cho UI mặc định của Revit, có thể treo Bridge/batch chờ người bấm.
+        // Rollback và clear theo API Autodesk; giữ mô tả trong log. Không thử resolution mãi.
+        if (unresolvedError)
+        {
+            failuresAccessor.SetFailureHandlingOptions(failuresAccessor.GetFailureHandlingOptions().SetClearAfterRollback(true));
+            return FailureProcessingResult.ProceedWithRollBack;
+        }
         return resolvedError ? FailureProcessingResult.ProceedWithCommit : FailureProcessingResult.Continue;
     }
 

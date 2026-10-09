@@ -38,9 +38,11 @@ class ReleaseWorkflowTests(unittest.TestCase):
             if prepare is not None:
                 prepare(Path(tmp))
             source = Path(tmp) / "step.ps1"
-            source.write_text("$ErrorActionPreference = 'Stop'\n" + script, encoding="utf-8")
+            source.write_text("$ErrorActionPreference = 'Stop'\n"
+                              "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()\n"
+                              + script, encoding="utf-8")
             return subprocess.run([PWSH, "-NoProfile", "-File", str(source)], cwd=tmp,
-                                  capture_output=True, text=True, timeout=30)
+                                  capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
 
     def test_failed_msbuild_stops_before_packaging_even_with_tfm_on_stdout(self):
         # Native command trả cả TFM hợp lệ lẫn exit != 0. PowerShell vẫn nhận stdout;

@@ -37,11 +37,7 @@ public sealed class AttributeImportCommand : ICoreCommand<AttributeImportConfig>
         var skipped = 0;
         var unchanged = 0;
         var result = CommandResult.Ok(string.Empty);
-
-        using var transaction = database.TransactionManager.StartTransaction();
-        var lockedLayers = AcadHelpers.LockedLayerIds(database, transaction);
-        var lockedSkips = new LockedLayerSkips();
-
+        var rows = new List<(int Row, string Handle, string Tag, string Value)>();
         for (var i = 1; i < lines.Count; i++)
         {
             var cells = lines[i];
@@ -52,18 +48,25 @@ public sealed class AttributeImportCommand : ICoreCommand<AttributeImportConfig>
 
             if (cells.Length < 4)
             {
+                result.Messages.Add($"Bỏ qua dòng {i + 1}: cần đủ BlockName,Handle,AttributeTag,AttributeValue.");
                 skipped++;
                 continue;
             }
-
-            var handleText = cells[1];
-            var tag = cells[2];
-            var value = cells[3];
+            rows.Add((i + 1, cells[1], cells[2], cells[3]));
+        }
+        var plan = AttributeImportPlanner.Plan(rows);
+        result.Messages.AddRange(plan.Notes);
+        result.Errors.AddRange(plan.Conflicts);
+        using var transaction = database.TransactionManager.StartTransaction();
+        var lockedLayers = AcadHelpers.LockedLayerIds(database, transaction);
+        var lockedSkips = new LockedLayerSkips();
+        foreach (var (rowNumber, handleText, tag, value) in plan.Rows)
+        {
 
             if (!TryParseHandle(handleText, out var handle)
                 || !database.TryGetObjectId(handle, out var objectId))
             {
-                result.Messages.Add($"Bỏ qua dòng {i + 1}: không tìm thấy Handle \"{handleText}\".");
+                result.Messages.Add($"Bỏ qua dòng {rowNumber}: không tìm thấy Handle \"{handleText}\".");
                 skipped++;
                 continue;
             }
@@ -72,14 +75,14 @@ public sealed class AttributeImportCommand : ICoreCommand<AttributeImportConfig>
             // mở lại), và GetObject ném eWasErased — bản cũ vì thế sập cả lệnh thay vì bỏ qua một dòng.
             if (objectId.IsErased)
             {
-                result.Messages.Add($"Bỏ qua dòng {i + 1}: Block Handle \"{handleText}\" đã bị xoá khỏi bản vẽ.");
+                result.Messages.Add($"Bỏ qua dòng {rowNumber}: Block Handle \"{handleText}\" đã bị xoá khỏi bản vẽ.");
                 skipped++;
                 continue;
             }
 
             if (transaction.GetObject(objectId, OpenMode.ForRead) is not BlockReference blockRef)
             {
-                result.Messages.Add($"Bỏ qua dòng {i + 1}: Handle \"{handleText}\" không phải Block Reference.");
+                result.Messages.Add($"Bỏ qua dòng {rowNumber}: Handle \"{handleText}\" không phải Block Reference.");
                 skipped++;
                 continue;
             }
@@ -96,7 +99,7 @@ public sealed class AttributeImportCommand : ICoreCommand<AttributeImportConfig>
 
             if (matches.Count == 0)
             {
-                result.Messages.Add($"Bỏ qua dòng {i + 1}: Block Handle \"{handleText}\" không có attribute tag \"{tag}\".");
+                result.Messages.Add($"Bỏ qua dòng {rowNumber}: Block Handle \"{handleText}\" không có attribute tag \"{tag}\".");
                 skipped++;
                 continue;
             }
@@ -107,7 +110,7 @@ public sealed class AttributeImportCommand : ICoreCommand<AttributeImportConfig>
                 // (Handle, Tag). Bản cũ ghi mọi dòng vào attribute ĐẦU TIÊN: nhập lại nguyên file vừa xuất là đủ để
                 // attribute đầu nhận giá trị của attribute sau, im lặng. Không đoán dòng nào ứng với attribute nào.
                 result.Messages.Add(
-                    $"Bỏ qua dòng {i + 1}: Block Handle \"{handleText}\" có {matches.Count} attribute cùng tag \"{tag}\" — "
+                    $"Bỏ qua dòng {rowNumber}: Block Handle \"{handleText}\" có {matches.Count} attribute cùng tag \"{tag}\" — "
                     + "không biết dòng này ứng với attribute nào; sửa trực tiếp trong AutoCAD.");
                 skipped++;
                 continue;
@@ -164,14 +167,16 @@ public sealed class AttributeImportCommand : ICoreCommand<AttributeImportConfig>
                 $"[Xem trước] Sẽ cập nhật {updated} attribute, bỏ qua {skipped} dòng (chưa ghi vào drawing).",
                 updated);
             preview.Messages.AddRange(result.Messages);
-            return preview.WithIncompleteWork(skipped > 0);
+            preview.Errors.AddRange(result.Errors);
+            return preview.WithIncompleteWork(skipped > 0 || plan.Conflicts.Count > 0);
         }
 
         transaction.Commit();
 
         var final = CommandResult.Ok($"Đã cập nhật {updated} attribute từ \"{config.InputPath}\", bỏ qua {skipped} dòng.", updated);
         final.Messages.AddRange(result.Messages);
-        return final.WithIncompleteWork(skipped > 0);
+        final.Errors.AddRange(result.Errors);
+        return final.WithIncompleteWork(skipped > 0 || plan.Conflicts.Count > 0);
     }
 
     /// <summary>Handle đọc bằng <see cref="HandleText"/> (nhận cả "0x1A3", "(1A3)"); trước đây Convert.ToInt64 từ chối các dạng đó và nuốt lỗi.</summary>

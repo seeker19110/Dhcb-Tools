@@ -162,21 +162,7 @@ public sealed class ElevationUpdater : IUpdater
     /// <summary>Ghi qua từ điển tên tham số (giai đoạn 9.2); paramName là tên người dùng chỉ định, có thể null.</summary>
     private static void SetIfPossible(Element el, string key, string? paramName, double mm)
     {
-        var p = RevitCompat.Lookup(el, key, paramName);
-        if (p == null || p.IsReadOnly)
-        {
-            return;
-        }
-
-        switch (p.StorageType)
-        {
-            case StorageType.Double:
-                p.Set(MepLayout.MmToFeet(mm));
-                break;
-            case StorageType.String:
-                p.Set(NumericText.Format(mm, 1));
-                break;
-        }
+        ElevationParameterWriter.TrySet(el, key, paramName, mm);
     }
 
     public string GetAdditionalInformation() => "Điền cao độ đáy/đỉnh/tim MEP theo thời gian thực (DHCB Tools).";

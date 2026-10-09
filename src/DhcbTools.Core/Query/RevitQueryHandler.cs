@@ -150,10 +150,10 @@ public static class RevitQueryHandler
     // ──────────────────────────────────────────────────────────────
     private static object GetViews(Document doc, QueryParams p)
     {
-        var placedViewIds = new FilteredElementCollector(doc)
+        var placedViewIds = ViewPlacementIndex.Build(new FilteredElementCollector(doc)
             .OfClass(typeof(Viewport))
             .Cast<Viewport>()
-            .ToDictionary(vp => vp.ViewId, vp => vp.SheetId);
+            .Select(vp => new KeyValuePair<long, long>(RevitCompat.IdValue(vp.ViewId), RevitCompat.IdValue(vp.SheetId))));
 
         var views = new FilteredElementCollector(doc)
             .OfClass(typeof(View))
@@ -172,9 +172,9 @@ public static class RevitQueryHandler
                 views = views.Where(v => v.ViewType == vt);
         }
 
-        var list = views.Select(v =>
+        var list = views.Take(p.EffectiveLimit).Select(v =>
         {
-            placedViewIds.TryGetValue(v.Id, out var sheetId);
+            placedViewIds.TryGetValue(RevitCompat.IdValue(v.Id), out var sheetIds);
             return new
             {
                 id           = RevitCompat.IdValue(v.Id),
@@ -184,12 +184,11 @@ public static class RevitQueryHandler
                 templateName = v.ViewTemplateId != ElementId.InvalidElementId
                                ? SafeGet(() => doc.GetElement(v.ViewTemplateId)?.Name)
                                : null,
-                onSheet      = sheetId is not null && sheetId != ElementId.InvalidElementId,
-                sheetId      = sheetId is null ? (long?)null : RevitCompat.IdValue(sheetId),
+                onSheet      = sheetIds is { Count: > 0 },
+                sheetId      = sheetIds is { Count: > 0 } ? (long?)sheetIds[0] : null,
+                sheetIds     = sheetIds ?? new List<long>(),
             };
         }).ToList();
-
-        list = list.Take(p.EffectiveLimit).ToList();
 
         return new { count = list.Count, views = list };
     }
@@ -240,7 +239,7 @@ public static class RevitQueryHandler
                 string.Equals(r.Level.Name, p.Level, StringComparison.OrdinalIgnoreCase));
         }
 
-        var list = rooms.Select(r => new
+        var list = rooms.Take(p.EffectiveLimit).Select(r => new
         {
             id           = RevitCompat.IdValue(r.Id),
             name         = r.Name,
@@ -252,8 +251,6 @@ public static class RevitQueryHandler
             occupancy    = SafeGet(() => RevitCompat.Lookup(r, "occupancy")?.AsString()),
             locationMm   = (r.Location as LocationPoint)?.Point is { } pt ? new { x = Mm(pt.X), y = Mm(pt.Y), z = Mm(pt.Z) } : null,
         }).ToList();
-
-        list = list.Take(p.EffectiveLimit).ToList();
 
         return new { count = list.Count, rooms = list };
     }
@@ -273,7 +270,7 @@ public static class RevitQueryHandler
                 f.Name.IndexOf(p.FamilyNameContains, StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
-        var list = query.Select(f =>
+        var list = query.OrderBy(f => f.Name).Take(p.EffectiveLimit).Select(f =>
         {
             var typeNames = f.GetFamilySymbolIds()
                 .Select(id => doc.GetElement(id) as FamilySymbol)
@@ -294,8 +291,6 @@ public static class RevitQueryHandler
         .OrderBy(f => f.name)
         .ToList();
 
-        list = list.Take(p.EffectiveLimit).ToList();
-
         return new { count = list.Count, families = list };
     }
 
@@ -307,7 +302,7 @@ public static class RevitQueryHandler
         var warnings = doc.GetWarnings();
         // Cắt TRƯỚC khi gọi GetDescriptionText/GetFailingElements (mỗi cái ~0,1–1 ms): model liên hợp
         // 100.000 cảnh báo mà xin 50 dòng từng mất hàng phút. `count` = số dòng trả, `total` = tổng thật.
-        var page = p.Limit > 0 ? warnings.Take(p.Limit) : warnings;
+        var page = warnings.Take(p.EffectiveLimit);
         var list = page.Select(w => new
         {
             description  = w.GetDescriptionText(),

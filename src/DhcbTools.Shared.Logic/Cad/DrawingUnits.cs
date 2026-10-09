@@ -39,5 +39,9 @@ namespace DhcbTools.Shared.Logic.Cad
         /// </summary>
         public static double FromMillimeters(double millimeters, int insunits) =>
             millimeters / (MillimetersPerUnit(insunits) ?? 1.0);
+
+        /// <summary>Đổi tọa độ bản vẽ sang mm cho CSV nhập vào Revit. Không khai đơn vị thì giữ giả định mm.</summary>
+        public static double ToMillimeters(double drawingValue, int insunits) =>
+            drawingValue * (MillimetersPerUnit(insunits) ?? 1.0);
     }
 }

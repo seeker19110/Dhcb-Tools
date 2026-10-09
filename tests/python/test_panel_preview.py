@@ -45,6 +45,8 @@ vm.runInContext(source.slice(start, end), context);
     assert.ok(context.outcomeBadge(incomplete,true,'ĐÃ GHI').includes('MỘT PHẦN'));
   }
   assert.ok(context.outcomeBadge({success:false},true,'ĐÃ GHI').includes('THẤT BẠI'));
+  assert.ok(context.outcomeBadge({success:false,outcomeUnknown:true},false,'ĐÃ GHI').includes('CHƯA XÁC ĐỊNH'));
+  assert.ok(context.outcomeBadge({id:'job',status:'running'},false,'ĐÃ GHI').includes('KHÔNG GỬI LẠI'));
   assert.ok(context.outcomeBadge({success:true},true,'ĐÃ GHI').includes('DRY RUN'));
   assert.ok(context.outcomeBadge({success:true},false,'ĐÃ GHI').includes('ĐÃ GHI'));
   reply = {success:false};

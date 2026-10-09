@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import contextlib
 import hmac
+import http.client
 import json
 import os
 import secrets
@@ -86,7 +87,7 @@ def _require_safe_csv_path(config: dict[str, Any], name: str) -> None:
         raise ValueError(f"{name} phải là đường dẫn CSV")
     path = Path(value)
     if path.name == value:
-        return
+        path = Path(tempfile.gettempdir()) / path
     target = path.expanduser().resolve()
     temp_root = Path(tempfile.gettempdir()).resolve()
     if not target.is_relative_to(temp_root):
@@ -162,17 +163,19 @@ def validate_proxy_payload(path: str, payload: dict[str, Any]) -> None:
         query = payload.get("query")
         if query not in ALLOWED_QUERIES:
             raise ValueError("query không hợp lệ")
-        config = payload.get("config")
-        if config is not None and not isinstance(config, dict):
-            raise ValueError("config phải là JSON object")
-        if isinstance(config, dict) and "limit" in config:
-            limit = config["limit"]
-            if type(limit) is not int or not 1 <= limit <= 200:
-                raise ValueError("limit phải là số nguyên từ 1 đến 200")
-        if isinstance(config, dict) and "offset" in config:
-            offset = config["offset"]
-            if type(offset) is not int or not 0 <= offset <= 2147483647:
-                raise ValueError("offset phải là số nguyên từ 0 đến 2147483647")
+        # Bridge ưu tiên params hơn config. Kiểm cả hai bí danh để raw JSON không vượt trần phân trang.
+        for key in ("config", "params"):
+            config = payload.get(key)
+            if config is not None and not isinstance(config, dict):
+                raise ValueError(f"{key} phải là JSON object")
+            if isinstance(config, dict) and "limit" in config:
+                limit = config["limit"]
+                if type(limit) is not int or not 1 <= limit <= 200:
+                    raise ValueError("limit phải là số nguyên từ 1 đến 200")
+            if isinstance(config, dict) and "offset" in config:
+                offset = config["offset"]
+                if type(offset) is not int or not 0 <= offset <= 2147483647:
+                    raise ValueError("offset phải là số nguyên từ 0 đến 2147483647")
         return
 
     if path != "/execute":
@@ -238,31 +241,63 @@ def bridge_headers(has_body: bool) -> dict[str, str]:
         token_path = base / "DHCB" / "bridge-token.txt"
         try:
             token = token_path.read_text(encoding="utf-8").strip()
-        except OSError:
+        except (OSError, UnicodeError):
             token = ""
     if token:
+        if not token.isascii() or any(ord(char) < 33 or ord(char) > 126 for char in token):
+            raise ValueError("Token Bridge không hợp lệ; đọc lại bridge-token.txt, không gửi thử token lỗi.")
         headers["Authorization"] = f"Bearer {token}"
     return headers
 
 
 def fetch_autocad(path: str, body: dict[str, Any] | None = None, timeout: int = 35) -> dict[str, Any]:
+    if path == "/execute" and (not isinstance(body, dict) or not isinstance(body.get("config", {}), dict)):
+        return {"success": False, "error": "Payload /execute và config phải là JSON object; chưa gửi lệnh."}
     if path == "/execute" and body and body.get("config", {}).get("dryRun") is False and not body.get("documentId"):
         context = fetch_autocad("/query", {"query": "document_context"}, timeout)
         if not context.get("documentId"):
             return {"success": False, "error": "Không xác minh được phiên bản vẽ; chưa gửi lệnh ghi. Hãy cập nhật Bridge."}
         body = {**body, "documentId": context["documentId"]}
     data = None if body is None else json.dumps(body).encode("utf-8")
-    request = urllib.request.Request(
-        AUTOCAD_URL + path,
-        data=data,
-        headers=bridge_headers(data is not None),
-        method="POST" if data else "GET",
-    )
+    try:
+        headers = bridge_headers(data is not None)
+    except ValueError as exc:
+        return {"success": False, "error": str(exc), "summary": str(exc)}
+    request = urllib.request.Request(AUTOCAD_URL + path, data=data, headers=headers,
+                                     method="POST" if data is not None else "GET")
     try:
         with LOOPBACK.open(request, timeout=timeout) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
-        return {"connected": False, "error": str(exc)}
+            parsed = json.loads(response.read().decode("utf-8"))
+            if not isinstance(parsed, dict):
+                raise ValueError("Bridge response must be an object")
+            return parsed
+    except urllib.error.HTTPError as exc:
+        # HTTP 500 có thể mang kết quả một phần; 504 có id để hỏi tiếp. Giữ body thay vì báo mất kết nối.
+        try:
+            parsed = json.loads(exc.read().decode("utf-8", errors="replace"))
+        except (ValueError, OSError, http.client.HTTPException):
+            parsed = {"error": f"HTTP {exc.code}: không đọc được kết quả JSON từ Bridge."}
+        finally:
+            exc.close()
+        if not isinstance(parsed, dict):
+            parsed = {"error": f"HTTP {exc.code}: Bridge trả JSON không phải object."}
+        parsed["success"] = False
+        parsed.setdefault("summary", f"HTTP {exc.code}: " + str(parsed.get("error", "Bridge từ chối yêu cầu.")))
+        if exc.code == 504 and path == "/execute":
+            parsed.setdefault("outcomeUnknown", True)
+            parsed["summary"] += " Hỏi progressUrl/id nếu có; KHÔNG gửi lại lệnh ghi khi chưa xác minh kết quả."
+        return parsed
+    except (ValueError, UnicodeError):
+        return _transport_failure(path, "Bridge trả dữ liệu không phải JSON UTF-8 object hợp lệ.")
+    except (urllib.error.URLError, OSError, http.client.HTTPException):
+        return _transport_failure(path, "Không kết nối được hoặc kết nối Bridge bị ngắt.")
+
+
+def _transport_failure(path: str, summary: str) -> dict[str, Any]:
+    unknown = path == "/execute"
+    if unknown:
+        summary += " Chưa xác định kết quả; KHÔNG gửi lại lệnh ghi. Hỏi progress/id nếu đã nhận được."
+    return {"connected": False, "success": False, "outcomeUnknown": unknown, "error": summary, "summary": summary}
 
 
 def run_hermes(prompt: str, timeout: int = 150) -> str:

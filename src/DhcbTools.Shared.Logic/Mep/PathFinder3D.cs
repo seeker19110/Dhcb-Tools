@@ -78,7 +78,7 @@ namespace DhcbTools.Shared.Logic.Mep
 
         /// <summary>Ngân sách thật sự dùng cho một lưới <paramref name="gridCells"/> ô.</summary>
         public int EffectiveMaxExpandedNodes(long gridCells)
-            => MaxExpandedNodes ?? (int)Math.Max(AutoBudgetMin, Math.Min(AutoBudgetMax, gridCells * StatesPerCell));
+            => MaxExpandedNodes ?? (int)Math.Max(AutoBudgetMin, Math.Min(AutoBudgetMax, gridCells * (double)StatesPerCell));
 
         /// <summary>
         /// Trần số ô của lưới (không phải số ô mở rộng). Lưới được raster hoá trước nên bộ nhớ tỉ lệ với số
@@ -190,32 +190,45 @@ namespace DhcbTools.Shared.Logic.Mep
 
             options = options ?? new PathFinderOptions();
             options.CancellationToken.ThrowIfCancellationRequested();
-            if (options.StepMm <= 0)
+            if (!Finite(options.StepMm) || options.StepMm <= 0)
             {
-                throw new ArgumentOutOfRangeException(nameof(options), "Bước lưới phải > 0.");
+                throw new ArgumentOutOfRangeException(nameof(options), "Bước lưới phải là số dương hữu hạn.");
             }
+            if (!Finite(options.ClearanceMm) || options.ClearanceMm < 0 || !Finite(options.TurnPenalty) || options.TurnPenalty < 0
+                || !Finite(options.NearObstaclePenalty) || options.NearObstaclePenalty < 0)
+                throw new ArgumentOutOfRangeException(nameof(options), "Khoảng hở và chi phí phạt phải là số không âm hữu hạn.");
+            if (options.MaxCells <= 0 || options.MaxExpandedNodes <= 0)
+                throw new ArgumentOutOfRangeException(nameof(options), "Ngân sách ô/node phải là số dương.");
+            if (searchBounds == null) throw new ArgumentNullException(nameof(searchBounds));
+            if (!Finite(start.X) || !Finite(start.Y) || !Finite(start.Z) || !Finite(goal.X) || !Finite(goal.Y) || !Finite(goal.Z) || !Finite(searchBounds))
+                throw new ArgumentOutOfRangeException(nameof(searchBounds), "Tọa độ đầu/cuối và hộp tìm kiếm phải hữu hạn.");
+            foreach (var obstacle in obstacles)
+                if (obstacle == null || !Finite(obstacle)) throw new ArgumentOutOfRangeException(nameof(obstacles), "Hộp vật cản phải có tọa độ hữu hạn.");
 
             var result = new PathResult();
             var step = options.StepMm;
-
-            var s = ToCell(start, searchBounds, step);
-            var g = ToCell(goal, searchBounds, step);
-            var size = new[]
+            // Check dimensions and volume as doubles BEFORE int casts. A user-supplied MaxCells must
+            // not bypass the int indices used by OccupancyGrid, and huge model bounds must not wrap.
+            var dimensions = new[]
             {
-                (int)Math.Ceiling((searchBounds.MaxX - searchBounds.MinX) / step) + 1,
-                (int)Math.Ceiling((searchBounds.MaxY - searchBounds.MinY) / step) + 1,
-                (int)Math.Ceiling((searchBounds.MaxZ - searchBounds.MinZ) / step) + 1,
+                Math.Ceiling((searchBounds.MaxX - searchBounds.MinX) / step) + 1,
+                Math.Ceiling((searchBounds.MaxY - searchBounds.MinY) / step) + 1,
+                Math.Ceiling((searchBounds.MaxZ - searchBounds.MinZ) / step) + 1,
             };
-
-            var cells = (long)size[0] * size[1] * size[2];
+            var volume = dimensions[0] * dimensions[1] * dimensions[2];
+            var cells = volume >= long.MaxValue ? long.MaxValue : (long)volume;
             result.GridCells = cells;
             var budget = options.EffectiveMaxExpandedNodes(cells);
             result.MaxExpandedNodes = budget;
-            if (cells > options.MaxCells)
+            if (volume > options.MaxCells || volume > int.MaxValue)
             {
                 result.Reason = $"Hộp tìm kiếm quá lớn so với bước lưới: {cells:N0} ô (trần {options.MaxCells:N0}) — tăng bước lưới hoặc thu hẹp hộp.";
                 return result;
             }
+
+            var size = new[] { (int)dimensions[0], (int)dimensions[1], (int)dimensions[2] };
+            var s = ToCell(start, searchBounds, step);
+            var g = ToCell(goal, searchBounds, step);
 
             if (!InBounds(s, size) || !InBounds(g, size))
             {
@@ -452,6 +465,9 @@ namespace DhcbTools.Shared.Logic.Mep
 
         private static bool InBounds(int[] c, int[] size) => c[0] >= 0 && c[1] >= 0 && c[2] >= 0 && c[0] < size[0] && c[1] < size[1] && c[2] < size[2];
 
+        private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
+        private static bool Finite(Box3 box) => Finite(box.MinX) && Finite(box.MinY) && Finite(box.MinZ) && Finite(box.MaxX) && Finite(box.MaxY) && Finite(box.MaxZ);
+
         private static int[] ToCell(Point3 p, Box3 b, double step) => new[]
         {
             (int)Math.Round((p.X - b.MinX) / step),
@@ -544,10 +560,10 @@ namespace DhcbTools.Shared.Logic.Mep
 
             // Nới 1e-9 để biên đúng bằng tâm ô không rơi ra ngoài vì sai số dấu phẩy động.
             private static int Lower(double value, double origin, double step)
-                => Math.Max(0, (int)Math.Ceiling(((value - origin) / step) - 1e-9));
+                => (int)Math.Max(0, Math.Min(int.MaxValue, Math.Ceiling(((value - origin) / step) - 1e-9)));
 
             private static int Upper(double value, double origin, double step, int count)
-                => Math.Min(count - 1, (int)Math.Floor(((value - origin) / step) + 1e-9));
+                => (int)Math.Max(-1, Math.Min(count - 1, Math.Floor(((value - origin) / step) + 1e-9)));
         }
 
         /// <summary>Hàng đợi ưu tiên tối thiểu (netstandard2.0 không có System.Collections.Generic.PriorityQueue).</summary>

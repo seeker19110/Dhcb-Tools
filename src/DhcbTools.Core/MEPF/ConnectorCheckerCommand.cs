@@ -67,7 +67,7 @@ public sealed class ConnectorCheckerCommand : ICoreCommand<ConnectorCheckerConfi
         {
             try
             {
-                using var tx = new Transaction(document, "DHCB - View connector hở");
+                using var tx = new RevitTransaction(document, "DHCB - View connector hở");
                 tx.Start();
                 RevitCompat.ApplyFailurePolicy(tx);
 

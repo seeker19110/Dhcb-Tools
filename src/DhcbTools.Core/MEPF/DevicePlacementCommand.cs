@@ -135,6 +135,7 @@ public sealed class DevicePlacementCommand : ICoreCommand<DevicePlacementConfig>
 
         var plans = new List<(Room Room, DevicePlacementPlan Plan, double ZFt, Level HostLevel)>();
         var result = CommandResult.Ok(string.Empty);
+        var skippedRooms = 0;
 
         // Level của file chủ, dùng để gắn thiết bị và để đối chiếu cao độ phòng ở model liên kết.
         var hostLevels = new FilteredElementCollector(document).OfClass(typeof(Level)).Cast<Level>().ToList();
@@ -152,6 +153,7 @@ public sealed class DevicePlacementCommand : ICoreCommand<DevicePlacementConfig>
             var boundary = OuterBoundaryMm(room, source.Transform);
             if (boundary == null || boundary.Count < 3)
             {
+                skippedRooms++;
                 result.Messages.Add($"Phòng {room.Name} ({room.Id}): không lấy được biên — bỏ qua.");
                 continue;
             }
@@ -164,6 +166,7 @@ public sealed class DevicePlacementCommand : ICoreCommand<DevicePlacementConfig>
             }
             catch (Exception ex)
             {
+                skippedRooms++;
                 result.Messages.Add($"Phòng {room.Name}: {ex.Message}");
                 continue;
             }
@@ -185,12 +188,14 @@ public sealed class DevicePlacementCommand : ICoreCommand<DevicePlacementConfig>
                 hostLevel = linkLevelZ.HasValue ? NearestLevel(hostLevels, linkLevelZ.Value, out deltaFt) : null;
                 if (hostLevel == null)
                 {
+                    skippedRooms++;
                     result.Messages.Add($"Phòng {room.Name} ({room.Id}, link \"{source.LinkName}\"): không có Level nào trong file chủ để đối chiếu cao độ — bỏ qua.");
                     continue;
                 }
 
                 if (Math.Abs(deltaFt) > LevelMatchToleranceFt)
                 {
+                    skippedRooms++;
                     result.Messages.Add($"Phòng {room.Name} ({room.Id}, link \"{source.LinkName}\"): cao độ tầng {RevitCompat.FtToMm(linkLevelZ!.Value):F0} mm "
                                         + $"không khớp Level nào của file chủ (gần nhất \"{hostLevel.Name}\" lệch {RevitCompat.FtToMm(Math.Abs(deltaFt)):F0} mm) — bỏ qua.");
                     continue;
@@ -199,6 +204,7 @@ public sealed class DevicePlacementCommand : ICoreCommand<DevicePlacementConfig>
 
             if (hostLevel == null)
             {
+                skippedRooms++;
                 result.Messages.Add($"Phòng {room.Name} ({room.Id}): không có Level — bỏ qua.");
                 continue;
             }
@@ -210,11 +216,12 @@ public sealed class DevicePlacementCommand : ICoreCommand<DevicePlacementConfig>
         }
 
         var total = plans.Sum(p => p.Plan.Points.Count);
+        var incomplete = skippedRooms > 0 || plans.Any(p => p.Plan.Uncovered.Count > 0);
         if (config.DryRun)
         {
             result.Summary = $"[Xem trước] Sẽ đặt {total} \"{symbol.FamilyName}: {symbol.Name}\" trong {plans.Count} phòng.";
             result.AffectedCount = total;
-            return result;
+            return result.WithIncompleteWork(incomplete);
         }
 
         var placed = 0;
@@ -245,7 +252,7 @@ public sealed class DevicePlacementCommand : ICoreCommand<DevicePlacementConfig>
         tx.Commit();
         result.Summary = $"Đã đặt {placed}/{total} thiết bị trong {plans.Count} phòng.";
         result.AffectedCount = placed;
-        return result;
+        return result.WithIncompleteWork(incomplete || placed < total);
     }
 
     /// <summary>Sai số cao độ tối đa (ft) để coi Level file chủ "khớp" Level của link — 500 mm.</summary>
