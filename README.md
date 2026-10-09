@@ -16,6 +16,7 @@ Kế hoạch nâng chất lượng và kết quả kiểm chứng của lượt 
 [`docs/ke-hoach-chat-luong-2026-10-07.md`](docs/ke-hoach-chat-luong-2026-10-07.md).
 [Bằng chứng triển khai và phần nghiệm thu còn lại](docs/bang-chung/2026-10-08/trien-khai.md).
 [Ma trận 2022–2027 và các điểm yếu đã sửa](docs/tuong-thich-2022-2027.md).
+[Audit 2026-10-09: chính sách batch, bảo toàn đầu ra, PDF có dấu cách và bằng chứng kiểm thử](docs/audit-2026-10-09.md).
 Dùng thử trên công việc thật: [`docs/thi-diem-su-dung.md`](docs/thi-diem-su-dung.md) và bảng đo thời gian đi kèm.
 
 ## Bắt đầu cho kỹ sư: cài → bấm 3 lệnh → thấy kết quả

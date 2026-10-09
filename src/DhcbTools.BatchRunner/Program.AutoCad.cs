@@ -32,7 +32,7 @@ public static partial class Program
 
         var outputFolder = job.ResolveOutputFolder(runTime);
         if (!string.IsNullOrEmpty(outputFolder)) Directory.CreateDirectory(outputFolder);
-        // Thư mục step/script riêng cho từng lần chạy, cùng dấu giờ với run-HHmmss.jsonl.
+        // Thư mục step/script riêng cho từng lần chạy, lấy tên riêng của log.
         var work = Path.Combine(Path.GetDirectoryName(runLog)!, "acad-steps-" + Path.GetFileNameWithoutExtension(runLog).Replace("run-", string.Empty));
         Directory.CreateDirectory(work);
 
@@ -66,6 +66,8 @@ public static partial class Program
             }
 
             var stepPaths = new List<string>();
+            var guardedBatch = job.StopOnError || job.StepsFor(file).Any(st => st.SkipIfPreviousFailed);
+            var batchId = Guid.NewGuid().ToString("N");
             var s = 0;
             foreach (var step in job.StepsFor(file).Where(st => !st.Command.Equals("PlotPdf", StringComparison.OrdinalIgnoreCase)))
             {
@@ -77,8 +79,9 @@ public static partial class Program
                     cfg = o.ToString(Newtonsoft.Json.Formatting.None);
                 }
 
-                var stepPath = Path.Combine(work, $"{index:D3}-{s++:D2}-{step.Command}.json");
-                File.WriteAllText(stepPath, AcadScriptGen.StepJson(step.Command, cfg), new UTF8Encoding(false));
+                var stepPath = Path.Combine(work, $"{index:D3}-{s++:D2}.json");
+                File.WriteAllText(stepPath, AcadScriptGen.StepJson(step.Command, cfg,
+                    guardedBatch ? batchId : null, job.StopOnError, step.SkipIfPreviousFailed), new UTF8Encoding(false));
                 stepPaths.Add(stepPath);
             }
 
@@ -116,7 +119,8 @@ public static partial class Program
             }
 
             var script = Path.Combine(work, $"{index:D3}.scr");
-            File.WriteAllText(script, AcadScriptGen.Build(plugin, stepPaths, saveAs, Path.GetFullPath(runLog), file.Path, plotScript, job.DwgVersion, saveTargetExists), new UTF8Encoding(false));
+            File.WriteAllText(script, AcadScriptGen.Build(plugin, stepPaths, saveAs, Path.GetFullPath(runLog), file.Path,
+                plotScript, job.DwgVersion, saveTargetExists, guardedBatch), new UTF8Encoding(false));
 
             Console.WriteLine($"[{index}/{job.Files.Count}] {file.Path}");
             var psi = new ProcessStartInfo(console, AcadScriptGen.Arguments(file.Path, script))
@@ -195,7 +199,9 @@ public static partial class Program
                     File = file.Path,
                     Command = "NETLOAD",
                     Success = false,
-                    Summary = (netload ?? $"Không ca nào ghi vào run.jsonl dù script có {stepPaths.Count} step — NETLOAD thất bại?")
+                    Summary = (netload ?? (guardedBatch
+                        ? "Không bước nào ghi log. DLL cần hỗ trợ DHCB_BATCH; cập nhật BatchRunner và AutoCAD.Core cùng nhau hoặc kiểm NETLOAD."
+                        : $"Không ca nào ghi vào run.jsonl dù script có {stepPaths.Count} step — NETLOAD thất bại?"))
                               + " DLL: " + plugin + " (xem " + Path.Combine(work, $"{index:D3}.log") + ").",
                 });
                 anyFailed = true;

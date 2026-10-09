@@ -10,7 +10,7 @@ một task hẹn giờ là đủ để sáng hôm sau có PDF, health report, lo
 | `DhcbTools.BatchRunner.exe` | `src/DhcbTools.BatchRunner` (net10.0, không tham chiếu Revit/AutoCAD) | Đọc job, mở Revit / accoreconsole, gom log, xuất báo cáo HTML, trả mã thoát |
 | `BatchJobRunner` | `src/DhcbTools.Core/Batch` | Bên trong Revit: mở → chạy step qua `RevitCommandTable` → lưu → đóng, ghi log JSONL của lượt chạy |
 | Hook trong `App.cs` | `src/DhcbTools.Revit` | Khi Revit khởi động, thấy `%APPDATA%\DHCB\pending-job.json` thì chạy job rồi thoát |
-| `DHCB_RUN` | `src/DhcbTools.AutoCAD.Core` (vỏ core-only) | Lệnh không hỏi gì, đọc step JSON, ghi log JSONL — dùng trong script accoreconsole |
+| `DHCB_RUN` / `DHCB_BATCH` | `src/DhcbTools.AutoCAD.Core` (vỏ core-only) | Đọc step JSON, ghi log JSONL; `DHCB_BATCH` kiểm chính sách dừng/bỏ qua trước khi chạy lệnh |
 | `JobTokens`, `BatchJob`, `RunLog`, `BatchReport`, `AcadScriptGen` | `Shared.Logic/Batch` | Phần thuần, có test |
 
 ## File job
@@ -26,15 +26,21 @@ Xem [`jobs/nightly.sample.json`](../jobs/nightly.sample.json) (Revit) và
   lại phần đã làm được của file lỗi.
   Bên AutoCAD (từ audit 2026-10-01): script không tự bỏ được dòng `SAVEAS` khi một `DHCB_RUN` lỗi, nên khi
   `saveOnError: false` script lưu vào file tạm **cạnh** file đích (`<tên>.dhcb-luu-<dấu giờ>.dwg`, cùng thư mục để đường dẫn
-  xref tương đối không đổi nghĩa), runner đọc log của file đó rồi mới thay đích; có bước lỗi, quá giờ hay accoreconsole
+  xref tương đối không đổi nghĩa; từ audit 2026-10-09 có thêm GUID tránh trùng khi chạy đồng thời), runner đọc log của file đó rồi mới thay đích; có bước lỗi, quá giờ hay accoreconsole
   thoát khác 0 thì bỏ file tạm và ghi `Save:<mode>` *bỏ qua* kèm lý do. `Save` (ghi đè gốc) giữ bản trước ở `<tên>.bak`
   như `SAVEAS` của AutoCAD vẫn làm. Trước bản sửa này, file AutoCAD có bước lỗi vẫn bị lưu đè.
 - `dwgVersion` (chuỗi, mặc định `"2018"`): phiên bản DWG cho `SAVEAS` bên AutoCAD.
 - `files[]`: `path`, `detachFromCentral`, `worksets` (chỉ mở các workset này), `onlySteps` (lọc step cho riêng file).
+  `onlySteps` phải khớp tên trong `steps` (không phân biệt hoa/thường); tên sai trả mã 2 thay vì âm thầm chạy 0 bước.
+  `SaveAs` từ chối hai file cùng tên dù nằm ở hai thư mục khác nhau: tách job hoặc đổi tên trước để tránh ghi đè bản sao.
 - `steps[]`: `command` = đúng `CommandName` của Core (xem `dhcb_agent.py revit tools`), `config` = config của lệnh,
   `skipIfPreviousFailed`.
   `stopOnError` và `skipIfPreviousFailed` cũng coi kết quả một phần/có lỗi là chưa hoàn tất, dù `success:true`.
   Mã thoát và kiểm tra bàn giao chỉ đạt khi mọi bước cần chạy đều hoàn tất; `saveOnError:true` không đổi tiêu chí này.
+  Từ audit 2026-10-09, AutoCAD kiểm hai cờ này **trước dispatch từng lệnh Core**. Bước bỏ qua không xoá trạng thái lỗi;
+  với `stopOnError:false`, một bước độc lập chạy thành công cho phép chuỗi phụ thuộc tiếp tục.
+  Job có một trong hai cờ cần **cập nhật BatchRunner và AutoCAD.Core cùng nhau** (`DHCB_BATCH`);
+  DLL cũ thiếu lệnh này sẽ không chạy các bước Core và runner báo lỗi. `DHCB_RUN` cũ vẫn dùng được cho job không có cờ.
 - Token trong chuỗi config: `{outputFolder}`, `{fileName}`, `{yyyy-MM-dd}`, `{HH-mm}`, và token tự khai báo trong `tokens`.
 
 ## Chạy
@@ -72,13 +78,15 @@ Xem [ma trận và giới hạn nghiệm thu](tuong-thich-2022-2027.md).
 hoặc thiếu file trả mã 2 trước khi mở bản vẽ, kèm đường dẫn cần kiểm tra. Host đặt trong thư mục tùy chọn chỉ dùng
 DLL portable hoặc được chỉ định; runner kiểm runtime nếu có và báo rõ rằng runtime không chứng minh được năm AutoCAD.
 
-Kết quả trong `logs/{yyyy-MM-dd}/`: **`run-HHmmss.jsonl`** (mỗi dòng một step; **mỗi lần chạy một file riêng**, không
-gộp chung theo ngày như bản `run.jsonl` cũ), `report.html` (bảng file × step, xanh/đỏ, bấm xem chi tiết),
+Kết quả trong `logs/{yyyy-MM-dd}/`: **`run-HHmmss-fffffff-<GUID>.jsonl`** (mỗi dòng một step; tên được giữ chỗ riêng
+cho mỗi lượt, kể cả hai lượt bắt đầu trong cùng giây), **file `.html` cùng tên log** (bảng file × step, bấm xem chi tiết),
+`report.html` (bản sao báo cáo vừa hoàn tất để giữ tương thích công cụ cũ),
 `warnings-summary.md` (khi `--analyze`, xem [`ai-offline.md`](ai-offline.md)).
 
 `--report-only` lấy **file log mới nhất** trong thư mục ngày, và vẫn đọc được `run.jsonl` cũ nên log của các đêm trước
-không mất giá trị. Bước AutoCAD dựng script trong thư mục làm việc `acad-steps-HHmmss` (trước là `acad-steps`) nên hai
-lượt chạy trong cùng một ngày không giẫm lên nhau.
+không mất giá trị; tên `run-HHmmss.jsonl` trước đây vẫn được đọc. Bước AutoCAD dựng script trong thư mục làm việc
+`acad-steps-<phần tên riêng của log>`, nên các lượt không dùng chung JSON/script.
+Tên file log/report riêng không khoá DWG đích; tránh chạy đồng thời hai job ghi vào cùng file.
 
 Mã thoát: `0` mọi step thành công · `1` có step lỗi/bỏ qua · `2` lỗi cấu hình (không đọc được job, không tìm thấy Revit).
 Mã cuối là mã **nặng hơn** giữa log và chính lượt chạy: Revit sập/bị kill giữa đêm thì log chỉ có dòng xanh của các file
@@ -104,7 +112,7 @@ mục/danh mục. Danh mục nằm ở file cấu hình (Phụ lục VII là vă
 
 ## Chuỗi băm của nhật ký (`--verify-log`)
 
-Mỗi dòng trong `run-HHmmss.jsonl` mang thêm hai trường ở cuối:
+Mỗi dòng trong log JSONL của lượt chạy mang thêm hai trường ở cuối:
 
 | Trường | Nghĩa |
 |---|---|
@@ -175,6 +183,9 @@ Cũng có nút **AI offline & Batch → Chạy job batch** trên Ribbon để ch
   (`outputPath`, `layout`, `paperSize`, `orientation`, `plotArea`, `plotStyle`). `--dry-run` chỉ ghi kế hoạch vào log,
   không chạy `-PLOT`. Khi chạy thật, PDF được in vào file tạm cạnh đích và chỉ thay PDF đích sau khi có header PDF
   và các bước CAD hoàn tất; lỗi in hoặc lỗi xử lý giữ nguyên PDF cũ và trả mã thoát 1. Xem `jobs/autocad-nightly.sample.json`.
+  `PlotPdf` phải ở cuối các step được chọn cho từng file, sau mọi lệnh Core; job sai thứ tự trả mã 2.
+  Chính sách dừng/bỏ qua áp dụng trước từng lệnh Core. Script `-PLOT` có thể vẫn chạy sau lỗi Core, nhưng PDF tạm
+  bị loại bỏ và PDF đích được giữ nguyên; hiện chưa có cơ chế dừng prompt native giữa các lượt in.
 
 - **Vỏ core-only cho accoreconsole (P2):** `DhcbTools.AutoCAD.Core.dll` chỉ tham chiếu AcDbMgd/AcCoreMgd nên NETLOAD được
   trong Core Console phiên bản phù hợp (vỏ đầy đủ tham chiếu AcMgd có thể bị từ chối). Runner tự tìm DLL này trong

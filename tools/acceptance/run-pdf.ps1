@@ -33,7 +33,7 @@ $script = Join-Path $out 'fixture.scr'
     '(command "_.-LAYER" "_UNLOCK" "*" "")', '(command "_.ERASE" "_ALL" "")', '(setvar "INSUNITS" 4)',
     '(entmake ''((0 . "LWPOLYLINE") (100 . "AcDbEntity") (100 . "AcDbPolyline") (90 . 4) (70 . 1) (10 0.0 0.0) (10 10000.0 0.0) (10 10000.0 5000.0) (10 0.0 5000.0)))',
     '(entmake ''((0 . "TEXT") (10 1000.0 2500.0 0.0) (40 . 250.0) (1 . "QA-SCALE-1-100") (7 . "Standard")))',
-    '_.NETLOAD', ('"' + $plugin + '"'), 'DHCB_PDF_SETUP', '_.SAVEAS', '2018', $fixture, '_.QUIT', '_Y'
+    '_.NETLOAD', ('"' + $plugin + '"'), 'DHCB_PDF_SETUP', '_.SAVEAS', '2018', ('"' + $fixture + '"'), '_.QUIT', '_Y'
 ) | Set-Content -LiteralPath $script -Encoding ASCII
 $process = Start-Process -FilePath $hostInputs.Console -ArgumentList ('/i "' + $copy + '" /s "' + $script + '" /l en-US') `
     -RedirectStandardOutput (Join-Path $out 'fixture.log') -RedirectStandardError (Join-Path $out 'error.log') -PassThru -WindowStyle Hidden
@@ -44,8 +44,8 @@ if ($process.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $fixture)) { throw 
 $fixtureHash = (Get-FileHash -LiteralPath $fixture -Algorithm SHA256).Hash
 $cases = @(
     @{ name='scale'; config=@{ plotScale='1=100' } },
-    @{ name='setup'; config=@{ pageSetupName='QA-Model-1-100' } },
-    @{ name='layout'; config=@{ layout='QA-A3'; plotArea='Layout' } }
+    @{ name='setup'; config=@{ pageSetupName='QA Model 1 100' } },
+    @{ name='layout'; config=@{ layout='QA A3'; plotArea='Layout' } }
 )
 foreach ($case in $cases) {
     $pdf = Join-Path $out ($case.name + '.pdf')
@@ -54,7 +54,7 @@ foreach ($case in $cases) {
         files=@(@{ path=$fixture }); steps=@(@{ command='PlotPdf'; config=$case.config }) }
     $jobPath = Join-Path $out ($case.name + '.json')
     $job | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $jobPath -Encoding UTF8
-    & $runner --job $jobPath --plugin-dll $core --accoreconsole $hostInputs.Console --log-dir (Join-Path $out ($case.name + '-logs'))
+    & $runner --job $jobPath --plugin-dll $core --accoreconsole $hostInputs.Console --log-dir (Join-Path $out ($case.name + '-logs')) --max-minutes 3
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $pdf)) { throw ('PDF failed: ' + $case.name) }
 }
 if ((Get-FileHash -LiteralPath $sample -Algorithm SHA256).Hash -ne $hash -or

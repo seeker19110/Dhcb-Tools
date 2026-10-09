@@ -1,6 +1,15 @@
 # Shared preflight for the AutoCAD 2026 .NET 10 acceptance fixtures.
+function Initialize-AcceptanceNativeTools {
+    # Some terminal environments retain only .CPL. Restore executable recognition for
+    # this process; do not edit user/machine environment variables.
+    if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT -and
+        @($env:PATHEXT -split ';') -notcontains '.EXE') {
+        $env:PATHEXT = '.COM;.EXE;.BAT;.CMD;' + $env:PATHEXT
+    }
+}
+
 function Get-AcceptanceHost([string]$AcadDirectory, [string]$DotNet) {
-    if (-not $env:PATHEXT) { $env:PATHEXT = '.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC' }
+    Initialize-AcceptanceNativeTools
     $console = Join-Path $AcadDirectory 'accoreconsole.exe'
     $sample = Join-Path $AcadDirectory 'Sample\Mechanical Sample\Data Extraction and Multileaders Sample.dwg'
     $runtimePath = Join-Path $AcadDirectory 'acdbmgd.runtimeconfig.json'
@@ -16,6 +25,7 @@ function Get-AcceptanceHost([string]$AcadDirectory, [string]$DotNet) {
 }
 
 function Get-AcceptanceTargetDir([string]$Project, [string]$DotNet) {
+    Initialize-AcceptanceNativeTools
     $target = & $DotNet msbuild $Project -nologo -p:Configuration=Release -p:AcadVersion=2026 -p:AcadRuntime=net10 -getProperty:TargetDir
     if ($LASTEXITCODE -ne 0 -or -not $target) { throw "MSBuild failed to evaluate TargetDir: $Project" }
     $target = ([string]($target -join "`n")).Trim()

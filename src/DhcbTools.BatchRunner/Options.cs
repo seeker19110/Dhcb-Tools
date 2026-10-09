@@ -88,6 +88,12 @@ internal sealed class Options
             }
         }
 
+        if (o.MaxMinutes <= 0)
+        {
+            Console.Error.WriteLine("--max-minutes phải là số phút lớn hơn 0.");
+            return null;
+        }
+
         // --verify-log, --verify-ifc và --dossier đứng một mình được: chúng không chạy job nào cả.
         return string.IsNullOrEmpty(o.JobPath)
                && string.IsNullOrEmpty(o.VerifyLog)

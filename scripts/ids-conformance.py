@@ -31,7 +31,7 @@ def matches(expected: str, got: str) -> bool:
 def run_case(runner: str, ids: Path) -> str:
     completed = subprocess.run(
         ["dotnet", runner, "--verify-ifc", str(ids.with_suffix(".ifc")), "--verify-ids", str(ids)],
-        capture_output=True, text=True, timeout=120, check=False)
+        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120, check=False)
     return OUTCOME.get(completed.returncode, "invalid")
 
 
@@ -62,6 +62,10 @@ def check(testcases: Path, runner: str, known: set) -> tuple:
 
 
 def main(argv=None) -> int:
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("testcases", type=Path)
     parser.add_argument("--runner", required=True, help="đường dẫn DhcbTools.BatchRunner.dll")

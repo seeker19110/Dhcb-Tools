@@ -225,7 +225,7 @@ public static partial class Program
         }
 
         var latest = Directory.GetFiles(logDir, "run-*.jsonl")
-            .OrderByDescending(Path.GetFileName, StringComparer.Ordinal)
+            .OrderByDescending(Path.GetFileNameWithoutExtension, StringComparer.Ordinal)
             .FirstOrDefault();
         if (latest is not null)
         {
