@@ -65,10 +65,14 @@ namespace DhcbTools.Shared.Logic.Mep
                 throw new ArgumentException("Biên phòng cần ít nhất 3 đỉnh.", nameof(boundary));
             }
 
-            if (options.SpacingX <= 0 || options.SpacingY <= 0)
+            if (options == null) throw new ArgumentNullException(nameof(options));
+            if (!Finite(options.SpacingX) || !Finite(options.SpacingY) || options.SpacingX <= 0 || options.SpacingY <= 0
+                || !Finite(options.Margin) || options.Margin < 0 || !Finite(options.CoverageRadius) || !Finite(options.CoverageCheckStep))
             {
-                throw new ArgumentOutOfRangeException(nameof(options), "Khoảng cách lưới phải > 0.");
+                throw new ArgumentOutOfRangeException(nameof(options), "Tham số lưới phải hữu hạn; khoảng cách > 0 và margin không âm.");
             }
+            if (boundary.Any(p => !Finite(p.X) || !Finite(p.Y)))
+                throw new ArgumentException("Tọa độ biên phòng phải hữu hạn.", nameof(boundary));
 
             var holeList = holes?.ToList() ?? new List<IReadOnlyList<Point2>>();
             var plan = new DevicePlacementPlan();
@@ -194,6 +198,15 @@ namespace DhcbTools.Shared.Logic.Mep
                     if (d < nearest[i]) nearest[i] = d;
                 }
             }
+            // Exhausting the 500-addition budget is not proof of coverage. Preserve the remaining
+            // samples just as the early failure branch does, so preview cannot report zero gaps.
+            if (plan.Uncovered.Count == 0)
+            {
+                for (var i = 0; i < samples.Count; i++)
+                    if (nearest[i] > o.CoverageRadius) plan.Uncovered.Add(samples[i]);
+                if (plan.Uncovered.Count > 0)
+                    plan.Messages.Add("Đã chạm giới hạn 500 thiết bị chèn thêm; còn " + plan.Uncovered.Count + " điểm chưa phủ — kiểm tra tay hoặc điều chỉnh lưới/bán kính phủ.");
+            }
         }
 
         private static Point2 PullInside(IReadOnlyList<Point2> boundary, Point2 p, double margin)
@@ -219,6 +232,7 @@ namespace DhcbTools.Shared.Logic.Mep
         }
 
         private static bool InAnyHole(List<IReadOnlyList<Point2>> holes, Point2 p) => holes.Any(h => h.Count >= 3 && Contains(h, p));
+        private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
 
         /// <summary>Điểm nằm trong đa giác (ray casting; điểm trên biên coi là trong).</summary>
         public static bool Contains(IReadOnlyList<Point2> polygon, Point2 p)
