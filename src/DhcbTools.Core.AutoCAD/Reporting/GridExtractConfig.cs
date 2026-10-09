@@ -6,6 +6,6 @@ public sealed class GridExtractConfig
     /// <summary>Layer chứa các đường trục (Line).</summary>
     public string GridLayer { get; init; } = "AXIS";
 
-    /// <summary>Đường dẫn file CSV đầu ra.</summary>
+    /// <summary>Đường dẫn CSV đầu ra; tọa độ đổi sang mm theo INSUNITS để nhập GridFromCsv.</summary>
     public required string OutputPath { get; init; }
 }

@@ -78,6 +78,19 @@ public sealed class LayerTranslateCommand : ICoreCommand<LayerTranslateConfig>
             return fail;
         }
 
+        // One source cannot have two destinations. Choosing the first CSV row silently changes the drawing
+        // according to file order and also creates the unused destination layers before dispatching entities.
+        var conflicts = rows.GroupBy(r => r.Source, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Select(r => r.Target).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1)
+            .Select(g => $"Layer nguồn \"{g.Key}\" có nhiều đích khác nhau (dòng {string.Join(", ", g.Select(r => r.Line))}).")
+            .ToList();
+        if (conflicts.Count > 0)
+        {
+            var fail = CommandResult.Fail("Map CSV mâu thuẫn — sửa mỗi layer nguồn về một đích rồi chạy lại; chưa thay đổi bản vẽ.");
+            fail.Errors.AddRange(conflicts);
+            return fail;
+        }
+
         var changedCount = 0;
 
         using var transaction = database.TransactionManager.StartTransaction();

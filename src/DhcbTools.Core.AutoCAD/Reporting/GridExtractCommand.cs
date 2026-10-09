@@ -2,6 +2,7 @@ using System.Text;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.Geometry;
 using DhcbTools.Shared.Logic;
+using DhcbTools.Shared.Logic.Cad;
 
 namespace DhcbTools.Core.AutoCAD.Reporting;
 
@@ -30,8 +31,9 @@ public sealed class GridExtractCommand : ICoreCommand<GridExtractConfig>
         var gridLayer = string.IsNullOrWhiteSpace(config.GridLayer) ? "AXIS" : config.GridLayer;
 
         var axes = new List<Axis>();
-        var infinite = new List<(Point3d Base, Vector3d Direction)>();
+        var infinite = new List<(Point3d Base, Vector3d Direction, bool IsRay)>();
         var labels = new List<(string Text, Point3d Position)>();
+        var insunits = (int)database.Insunits;
 
         using (var transaction = database.TransactionManager.StartTransaction())
         {
@@ -72,11 +74,11 @@ public sealed class GridExtractCommand : ICoreCommand<GridExtractConfig>
                         break;
 
                     case Xline xline:
-                        infinite.Add((xline.BasePoint, xline.UnitDir));
+                        infinite.Add((xline.BasePoint, xline.UnitDir, false));
                         break;
 
                     case Ray ray:
-                        infinite.Add((ray.BasePoint, ray.UnitDir));
+                        infinite.Add((ray.BasePoint, ray.UnitDir, true));
                         break;
 
                     case DBText text:
@@ -95,8 +97,8 @@ public sealed class GridExtractCommand : ICoreCommand<GridExtractConfig>
         // Xline/Ray vô hạn: cắt theo phạm vi các trục hữu hạn đã có (hoặc ±10 000 quanh điểm gốc).
         if (infinite.Count > 0)
         {
-            var half = axes.Count > 0 ? SpanOf(axes) : 10000.0;
-            foreach (var (basePoint, direction) in infinite)
+            var half = axes.Count > 0 ? SpanOf(axes, DrawingUnits.FromMillimeters(1000.0, insunits)) : DrawingUnits.FromMillimeters(10000.0, insunits);
+            foreach (var (basePoint, direction, isRay) in infinite)
             {
                 if (direction.Length < 1e-9)
                 {
@@ -104,7 +106,7 @@ public sealed class GridExtractCommand : ICoreCommand<GridExtractConfig>
                 }
 
                 var unit = direction.GetNormal();
-                axes.Add(new Axis(basePoint - unit * half, basePoint + unit * half));
+                axes.Add(new Axis(isRay ? basePoint : basePoint - unit * half, basePoint + unit * half));
             }
         }
 
@@ -123,25 +125,34 @@ public sealed class GridExtractCommand : ICoreCommand<GridExtractConfig>
         foreach (var axis in axes)
         {
             count++;
-            var name = NameFor(axis, labels, used) ?? "AXIS-" + count;
+            var name = NameFor(axis, labels, used, DrawingUnits.FromMillimeters(1000.0, insunits));
+            if (name is null)
+            {
+                var suffix = count;
+                do { name = "AXIS-" + suffix++; } while (used.Contains(name));
+            }
             used.Add(name);
 
             sb.Append(CsvText.JoinLine(new[]
             {
                 name,
-                NumericText.Format(axis.Start.X),
-                NumericText.Format(axis.Start.Y),
-                NumericText.Format(axis.End.X),
-                NumericText.Format(axis.End.Y),
+                NumericText.Format(DrawingUnits.ToMillimeters(axis.Start.X, insunits)),
+                NumericText.Format(DrawingUnits.ToMillimeters(axis.Start.Y, insunits)),
+                NumericText.Format(DrawingUnits.ToMillimeters(axis.End.X, insunits)),
+                NumericText.Format(DrawingUnits.ToMillimeters(axis.End.Y, insunits)),
             })).Append('\n');
         }
 
         AcadHelpers.EnsureParentDirectory(config.OutputPath);
         File.WriteAllText(config.OutputPath, sb.ToString(), CsvText.Utf8WithBom);
 
-        return CommandResult.Ok(
+        var result = CommandResult.Ok(
             $"Đã trích {count} trục từ layer \"{gridLayer}\" ra \"{config.OutputPath}\".",
             count);
+        result.Messages.Add("Tọa độ CSV theo mm để nhập GridFromCsv; INSUNITS=" + insunits + ".");
+        if (!DrawingUnits.MillimetersPerUnit(insunits).HasValue)
+            result.Messages.Add("Bản vẽ không khai đơn vị được hỗ trợ — giả định một đơn vị bằng 1 mm. Kiểm INSUNITS trước khi nhập Revit.");
+        return result;
     }
 
     private static void AddIfNotDegenerate(List<Axis> axes, Point3d start, Point3d end)
@@ -152,13 +163,13 @@ public sealed class GridExtractCommand : ICoreCommand<GridExtractConfig>
         }
     }
 
-    private static double SpanOf(List<Axis> axes)
+    private static double SpanOf(List<Axis> axes, double minimum)
     {
         var minX = axes.Min(a => Math.Min(a.Start.X, a.End.X));
         var maxX = axes.Max(a => Math.Max(a.Start.X, a.End.X));
         var minY = axes.Min(a => Math.Min(a.Start.Y, a.End.Y));
         var maxY = axes.Max(a => Math.Max(a.Start.Y, a.End.Y));
-        return Math.Max(1000.0, Math.Max(maxX - minX, maxY - minY));
+        return Math.Max(minimum, Math.Max(maxX - minX, maxY - minY));
     }
 
     /// <summary>
@@ -166,7 +177,7 @@ public sealed class GridExtractCommand : ICoreCommand<GridExtractConfig>
     /// Text đã dùng cho trục khác thì không dùng lại — bubble hai đầu cùng tên là bình thường nhưng hai trục
     /// cùng tên thì Revit sẽ từ chối.
     /// </summary>
-    private static string? NameFor(Axis axis, List<(string Text, Point3d Position)> labels, HashSet<string> used)
+    private static string? NameFor(Axis axis, List<(string Text, Point3d Position)> labels, HashSet<string> used, double minimumRadius)
     {
         if (labels.Count == 0)
         {
@@ -174,7 +185,7 @@ public sealed class GridExtractCommand : ICoreCommand<GridExtractConfig>
         }
 
         var length = axis.Start.DistanceTo(axis.End);
-        var radius = Math.Max(1000.0, length * 0.1);
+        var radius = Math.Max(minimumRadius, length * 0.1);
 
         string? best = null;
         var bestDistance = double.MaxValue;
