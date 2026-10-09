@@ -273,15 +273,15 @@ def diagnose(app: str = "all", offline: bool = False, config_dir=None, acad_dir=
             checks.append(_check("Bridge " + target, "warning", reason + " Không gửi request."))
             continue
         health = dhcb_agent.request(target, "GET", "/health", timeout=5)
-        host = health.get("app")
-        if health.get("success") is False or not isinstance(host, str) or host.lower() != target.lower() or not isinstance(health.get("version"), str) or not health["version"].strip():
+        host = health.get("app") if isinstance(health, dict) else None
+        if not isinstance(health, dict) or health.get("success") is False or not isinstance(host, str) or host.lower() != target.lower() or not isinstance(health.get("version"), str) or not health["version"].strip():
             checks.append(_check("Bridge " + target, "error",
                                  "Không xác minh được đúng host và phiên bản tại cổng chuẩn. Mở host, kiểm add-in và log."))
             continue
         checks.append(_check("Bridge " + target, "ok", "Đúng ứng dụng; health phản hồi có phiên bản add-in. Endpoint này chưa xác nhận năm host hay nghiệm thu lệnh."))
         catalog = dhcb_agent.request(target, "GET", "/tools", timeout=5)
-        tools = catalog.get("tools")
-        valid = catalog.get("success") is not False and isinstance(tools, list) and bool(tools) and all(
+        tools = catalog.get("tools") if isinstance(catalog, dict) else None
+        valid = isinstance(catalog, dict) and catalog.get("success") is not False and isinstance(tools, list) and bool(tools) and all(
             isinstance(t, dict) and isinstance(t.get("name"), str) and bool(t["name"].strip()) for t in tools)
         if valid:
             valid = len({t["name"].strip().casefold() for t in tools}) == len(tools)

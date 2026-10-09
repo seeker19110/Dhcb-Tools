@@ -295,6 +295,29 @@ class DoctorTests(unittest.TestCase):
                         {"app": "Revit", "version": "1"}, catalog]):
                 self.assertEqual(1, dhcb_doctor.diagnose("revit", config_dir=self.base)["errors"])
 
+    def test_non_object_health_is_diagnostic_error_without_echoing_content(self):
+        for health in (None, [], ["project-secret"], "project-secret", 7, True):
+            with self.subTest(health=health), \
+                    mock.patch.object(dhcb_doctor.dhcb_agent, "load_token", return_value="t" * 40), \
+                    mock.patch.object(dhcb_doctor.dhcb_agent, "request", return_value=health) as request:
+                report = dhcb_doctor.diagnose("revit", config_dir=self.base)
+                self.assertEqual(1, report["errors"])
+                self.assertEqual(1, request.call_count)
+                self.assertEqual("error", report["checks"][-1]["status"])
+                self.assertNotIn("project-secret", json.dumps(report))
+
+    def test_non_object_catalog_is_diagnostic_error_without_echoing_content(self):
+        for catalog in (None, [], ["project-secret"], "project-secret", 7, True):
+            with self.subTest(catalog=catalog), \
+                    mock.patch.object(dhcb_doctor.dhcb_agent, "load_token", return_value="t" * 40), \
+                    mock.patch.object(dhcb_doctor.dhcb_agent, "request", side_effect=[
+                        {"app": "Revit", "version": "1"}, catalog]) as request:
+                report = dhcb_doctor.diagnose("revit", config_dir=self.base)
+                self.assertEqual(1, report["errors"])
+                self.assertEqual(2, request.call_count)
+                self.assertEqual("error", report["checks"][-1]["status"])
+                self.assertNotIn("project-secret", json.dumps(report))
+
     def test_disabled_or_broken_settings_does_not_connect(self):
         for config in ('{"bridge":{"enabled":false}}', '{"bridge":[]}'):
             (self.base / "settings.json").write_text(config, encoding="utf-8")
@@ -309,6 +332,7 @@ class DoctorTests(unittest.TestCase):
                 mock.patch.object(dhcb_doctor.sys, "version_info", (3, 8)):
             self.assertEqual(1, dhcb_doctor.diagnose(offline=True)["errors"])
         with mock.patch.dict(dhcb_doctor.os.environ, {}, clear=True), \
+                mock.patch.object(dhcb_doctor.Path, "home", return_value=self.base), \
                 mock.patch.object(dhcb_doctor.dhcb_agent, "load_token", return_value=""):
             self.assertEqual(0, dhcb_doctor.diagnose(offline=True)["errors"])
 

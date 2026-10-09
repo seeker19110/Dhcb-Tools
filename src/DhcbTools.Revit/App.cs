@@ -209,7 +209,7 @@ public sealed class App : IExternalApplication
         return Result.Succeeded;
     }
 
-    private static void OnIdling(object sender, Autodesk.Revit.UI.Events.IdlingEventArgs e)
+    private static void OnIdling(object? sender, Autodesk.Revit.UI.Events.IdlingEventArgs e)
     {
         // Revit gọi lại sau khi failure UI kết thúc; Pending tuyệt đối không Dispose trước đó.
         try { RevitTransaction.ReleaseFinishedTransactions(); }
