@@ -31,6 +31,16 @@ def fake_runner(results):
 
 
 class IdsConformanceTests(unittest.TestCase):
+    def test_windows_output_and_native_diagnostics_use_utf8(self):
+        with mock.patch.object(conf.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as run:
+            self.assertEqual("pass", conf.run_case("r.dll", Path("x/pass-a.ids")))
+        self.assertEqual("utf-8", run.call_args.kwargs["encoding"])
+        stream = mock.Mock()
+        with tempfile.TemporaryDirectory() as folder, mock.patch.object(conf.sys, "stdout", stream), \
+                redirect_stderr(io.StringIO()):
+            self.assertEqual(1, conf.main([folder, "--runner", "r.dll"]))
+        stream.reconfigure.assert_called_once_with(encoding="utf-8", errors="replace")
+
     def test_ket_qua_va_ma_thoat(self):
         self.assertEqual("pass", conf.expected_of(Path("pass-a.ids")))
         self.assertTrue(conf.matches("invalid", "fail"))

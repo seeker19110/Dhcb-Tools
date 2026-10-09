@@ -21,7 +21,7 @@ public sealed class QueryAcceptance
         var db = Application.DocumentManager.MdiActiveDocument.Database;
         using var tx = db.TransactionManager.StartTransaction();
         var validator = PlotSettingsValidator.Current;
-        var setup = new PlotSettings(true) { PlotSettingsName = "QA-Model-1-100" };
+        var setup = new PlotSettings(true) { PlotSettingsName = "QA Model 1 100" };
         validator.SetPlotConfigurationName(setup, "DWG To PDF.pc3", null);
         validator.RefreshLists(setup);
         var paper = validator.GetCanonicalMediaNameList(setup).Cast<string>()
@@ -35,7 +35,7 @@ public sealed class QueryAcceptance
         validator.SetCustomPrintScale(setup, new CustomScale(1, 100));
         setup.AddToPlotSettingsDictionary(db);
         tx.AddNewlyCreatedDBObject(setup, true);
-        var layoutId = LayoutManager.Current.CreateLayout("QA-A3");
+        var layoutId = LayoutManager.Current.CreateLayout("QA A3");
         var layout = (Layout)tx.GetObject(layoutId, OpenMode.ForWrite);
         var paperSpace = (BlockTableRecord)tx.GetObject(layout.BlockTableRecordId, OpenMode.ForWrite);
         foreach (ObjectId id in paperSpace)

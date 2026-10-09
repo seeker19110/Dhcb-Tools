@@ -1,6 +1,7 @@
 """Exercise acceptance preflight against native failures without starting AutoCAD."""
 from pathlib import Path
 import shutil
+import os
 import subprocess
 import sys
 import tempfile
@@ -23,6 +24,18 @@ class AcceptanceScriptTests(unittest.TestCase):
                           + "\n" + code, encoding="utf-8")
         return subprocess.run([PWSH, "-NoProfile", "-File", str(script)],
                               capture_output=True, text=True, timeout=30)
+
+    @unittest.skipUnless(os.name == "nt", "Windows PATHEXT behavior")
+    def test_incomplete_pathext_is_fixed_only_in_child_process(self):
+        with tempfile.TemporaryDirectory(prefix="dhcb-acceptance-") as tmp:
+            before = os.environ.get("PATHEXT")
+            code = ("$env:PATHEXT = '.CPL'\nInitialize-AcceptanceNativeTools\n"
+                    "& " + quote(sys.executable) + " -c 'print(123)'\n"
+                    "if ($LASTEXITCODE -ne 0) { throw 'native invocation failed' }\n")
+            result = self.execute(code, Path(tmp))
+            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+            self.assertIn("123", result.stdout)
+            self.assertEqual(before, os.environ.get("PATHEXT"))
 
     def test_target_lookup_rejects_native_errors_empty_and_missing_outputs(self):
         with tempfile.TemporaryDirectory(prefix="dhcb-acceptance-") as tmp:
@@ -58,7 +71,7 @@ class AcceptanceScriptTests(unittest.TestCase):
             self.assertIn("acceptance input missing", result.stderr)
 
     def test_every_fixture_uses_evaluated_2026_net10_outputs_before_writing(self):
-        for name in ("run-query.ps1", "run-pdf.ps1"):
+        for name in ("run-query.ps1", "run-pdf.ps1", "run-batch.ps1"):
             with self.subTest(name=name):
                 text = (ROOT / "tools/acceptance" / name).read_text(encoding="utf-8-sig")
                 self.assertNotRegex(text, r"bin[\\/]Release[\\/]")
