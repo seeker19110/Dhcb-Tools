@@ -1010,6 +1010,9 @@ function isComplete(result) {
 }
 
 function outcomeBadge(result, isDry, doneText, dryText = 'DRY RUN') {
+  if (result.outcomeUnknown || (result.id && result.status === 'running')) {
+    return '<span class="badge badge-dry">⚠ CHƯA XÁC ĐỊNH — KHÔNG GỬI LẠI</span>';
+  }
   if (!result.success) return '<span class="badge badge-err">✗ THẤT BẠI</span>';
   if (!isComplete(result)) return '<span class="badge badge-dry">⚠ MỘT PHẦN — XEM LỖI</span>';
   return isDry

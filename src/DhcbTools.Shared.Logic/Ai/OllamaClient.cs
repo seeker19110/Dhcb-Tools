@@ -20,7 +20,7 @@ namespace DhcbTools.Shared.Logic.Ai
         [JsonProperty("endpoint")]
         public string Endpoint { get; set; } = "http://127.0.0.1:11434";
 
-        /// <summary>Tên model đã pull sẵn. Mặc định qwen3 — dòng ổn nhất cho tool-calling/JSON trong benchmark 2026 (gemma3 không hỗ trợ tool).</summary>
+        /// <summary>Tên model đã pull sẵn. Mặc định qwen3:8b, khớp configs/ai.sample.json.</summary>
         [JsonProperty("model")]
         public string Model { get; set; } = "qwen3:8b";
 
@@ -61,7 +61,7 @@ namespace DhcbTools.Shared.Logic.Ai
                 return false;
             }
 
-            return uri.IsLoopback;
+            return (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps) && uri.IsLoopback;
         }
     }
 
@@ -140,7 +140,8 @@ namespace DhcbTools.Shared.Logic.Ai
             request.ContentType = "application/json";
             request.Proxy = null;
             request.AllowAutoRedirect = false;
-            request.Timeout = Math.Max(5, timeoutSeconds) * 1000;
+            // ai.json có thể chứa int.MaxValue: nhân trước khi chặn trần sẽ tràn âm và làm hỏng lệnh.
+            request.Timeout = Math.Min(600, Math.Max(5, timeoutSeconds)) * 1000;
             request.ReadWriteTimeout = request.Timeout;
             return request;
         }

@@ -263,7 +263,7 @@ namespace DhcbTools.Shared.Hosting
                         HandleExecute(res, body, sessionToken);
                         return;
                     case "/query":
-                        HandleQuery(res, body);
+                        HandleQuery(res, body, sessionToken);
                         return;
                     case "/chat":
                         HandleChat(res, body);
@@ -293,7 +293,7 @@ namespace DhcbTools.Shared.Hosting
         /// <summary>Content-Type là JSON? Tách ra để bảo vệ được bằng test không cần HTTP.</summary>
         public static bool IsJsonContentType(string? contentType) =>
             !string.IsNullOrWhiteSpace(contentType)
-            && contentType!.TrimStart().StartsWith("application/json", StringComparison.OrdinalIgnoreCase);
+            && string.Equals(contentType!.Split(';')[0].Trim(), "application/json", StringComparison.OrdinalIgnoreCase);
 
         /// <summary>Đọc body có trần; trả <c>null</c> nếu vượt (kể cả khi client không khai Content-Length).</summary>
         private static string? ReadBody(HttpListenerRequest req, long maxBytes)
@@ -393,7 +393,9 @@ namespace DhcbTools.Shared.Hosting
                     : "Timeout: " + AppName + " chưa trả lời sau " + seconds
                       + " giây. Lệnh có thể đã chạy hoặc đang chạy — kiểm tra /progress/<id> hoặc changedIds;"
                       + " KHÔNG gửi lại."),
-                ex => CommandResult.Fail("Lỗi thực thi: " + ex.Message), out var timedOut, timeout);
+                ex => CommandResult.Fail("Lỗi thực thi: " + ex.Message
+                    + (item.Claimed ? " Lệnh đã được nhận; kiểm tra mô hình và giữ previewToken. KHÔNG gửi lại lệnh ghi khi chưa xác minh kết quả."
+                                    : " Lệnh chưa được nhận và đã bị hủy.")), out var timedOut, timeout, sessionToken);
 
             if (timedOut && item.Claimed)
             {
@@ -458,14 +460,19 @@ namespace DhcbTools.Shared.Hosting
             {
                 // Vỏ ném SAU await đầu tiên thì không rơi vào catch bên dưới mà thành Task lỗi; không bắt thì
                 // job đứng "running" mãi (đã claim nên đồng hồ huỷ không đụng tới). Nối tiếp để ghi Fail.
-                ExecuteAsync!(item).ContinueWith(
-                    t => job.Fail("Lỗi thực thi: " + (t.Exception?.GetBaseException().Message ?? "không rõ"), DateTime.UtcNow),
+                ExecuteAsync!(item).ContinueWith(t =>
+                    {
+                        item.MarkAbandoned();
+                        job.Fail(t.IsCanceled ? "Task thực thi bị hủy; kiểm tra mô hình trước khi gửi lại lệnh ghi."
+                            : "Lỗi thực thi: " + (t.Exception?.GetBaseException().Message ?? "không rõ"), DateTime.UtcNow);
+                    },
                     CancellationToken.None,
-                    TaskContinuationOptions.OnlyOnFaulted,
+                    TaskContinuationOptions.NotOnRanToCompletion,
                     TaskScheduler.Default);
             }
             catch (Exception ex)
             {
+                item.MarkAbandoned();
                 job.Fail("Lỗi thực thi: " + ex.Message, DateTime.UtcNow);
             }
 
@@ -597,7 +604,7 @@ namespace DhcbTools.Shared.Hosting
             progressUrl = "/progress/" + job.Id,
         };
 
-        private void HandleQuery(HttpListenerResponse res, string body)
+        private void HandleQuery(HttpListenerResponse res, string body, CancellationToken sessionToken)
         {
             BridgeQuery? query;
             try
@@ -629,7 +636,7 @@ namespace DhcbTools.Shared.Hosting
                     error = "Timeout: " + AppName + " không xử lý trong " + (int)Timeout.TotalSeconds + " giây."
                             + (notRun ? " Truy vấn đã bị huỷ, không chạy." : " Truy vấn đang chạy, kết quả bị bỏ (chỉ đọc, gửi lại được)."),
                 },
-                ex => new { error = "Lỗi truy vấn: " + ex.Message }, out var timedOut);
+                ex => new { error = "Lỗi truy vấn: " + ex.Message }, out var timedOut, sessionToken: sessionToken);
 
             WriteJson(res, timedOut ? 504 : 200, result);
         }
@@ -710,12 +717,30 @@ namespace DhcbTools.Shared.Hosting
             Func<bool, TResult> onTimeout,
             Func<Exception, TResult> onError,
             out bool timedOut,
-            TimeSpan? timeout = null)
+            TimeSpan? timeout = null,
+            CancellationToken sessionToken = default)
         {
             timedOut = false;
+            // Stop phải hủy cả item đồng bộ đang chờ UI, kể cả request vừa được nhận từ phiên cũ.
+            using var shutdown = sessionToken.Register(() => item.MarkAbandoned());
             try
             {
                 var dispatchTask = dispatch();
+                // Delegate vỏ thường trả Task khi mới enqueue. Chỉ fault/cancel kết thúc việc chờ;
+                // Task thành công chưa có nghĩa Core đã chạy. Giữ kết quả đã ghi nếu cleanup lỗi sau Completion.
+                _ = dispatchTask.ContinueWith(t =>
+                {
+                    if (t.IsFaulted)
+                    {
+                        item.MarkAbandoned();
+                        item.Completion.TrySetException(t.Exception!.GetBaseException());
+                    }
+                    else if (t.IsCanceled)
+                    {
+                        item.MarkAbandoned();
+                        item.Completion.TrySetCanceled();
+                    }
+                }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
                 if (task.Wait(timeout ?? Timeout))
                 {
                     return task.Result;
@@ -729,10 +754,12 @@ namespace DhcbTools.Shared.Hosting
             }
             catch (AggregateException ex) when (ex.InnerException != null)
             {
+                item.MarkAbandoned();
                 return onError(ex.InnerException);
             }
             catch (Exception ex)
             {
+                item.MarkAbandoned();
                 return onError(ex);
             }
         }

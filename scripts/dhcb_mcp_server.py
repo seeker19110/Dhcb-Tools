@@ -60,7 +60,7 @@ CATALOG_CACHE = os.path.join(
 def _load_catalog() -> tuple:
     """Trả (catalog, còn sống). Bridge chạy thì lấy mới và ghi cache; không thì đọc cache."""
     catalog = dhcb_agent.request(APP, "GET", "/tools")
-    if catalog.get("tools"):
+    if _valid_catalog(catalog) and catalog.get("tools"):
         try:
             os.makedirs(os.path.dirname(CATALOG_CACHE), exist_ok=True)
             with open(CATALOG_CACHE, "w", encoding="utf-8") as f:
@@ -71,9 +71,28 @@ def _load_catalog() -> tuple:
 
     try:
         with open(CATALOG_CACHE, encoding="utf-8") as f:
-            return json.load(f), False
+            cached = json.load(f)
+        if _valid_catalog(cached):
+            return cached, False
     except (OSError, ValueError):
-        return catalog, False
+        pass
+    return ({**catalog, "tools": []} if "tools" in catalog else catalog) if isinstance(catalog, dict) else {"tools": []}, False
+
+
+def _valid_catalog(catalog) -> bool:
+    """Cache lỗi/cũ không được làm mất tools/list hoặc đoán lệnh ghi là lệnh đọc."""
+    if not isinstance(catalog, dict) or not isinstance(catalog.get("tools"), list):
+        return False
+    for tool in catalog["tools"]:
+        if not isinstance(tool, dict) or not isinstance(tool.get("name"), str) \
+                or not isinstance(tool.get("description", ""), str) \
+                or type(tool.get("writesModel", False)) is not bool:
+            return False
+        schema = tool.get("inputSchema", {})
+        if not isinstance(schema, dict) or not isinstance(schema.get("properties", {}), dict) \
+                or not all(isinstance(field, dict) for field in schema.get("properties", {}).values()):
+            return False
+    return True
 
 
 def tool_list() -> list:
@@ -213,9 +232,15 @@ def main():
             msg = json.loads(line)
         except json.JSONDecodeError:
             continue
+        if not isinstance(msg, dict) or not isinstance(msg.get("method"), str):
+            respond(None, error={"code": -32600, "message": "JSON-RPC request phải là object có method dạng chuỗi."})
+            continue
         method = msg.get("method")
         msg_id = msg.get("id")
-        params = msg.get("params") or {}
+        params = msg.get("params", {})
+        if not isinstance(params, dict):
+            respond(msg_id, error={"code": -32602, "message": "params phải là JSON object."})
+            continue
 
         if method == "initialize":
             respond(msg_id, {
@@ -231,6 +256,12 @@ def main():
             except Exception as ex:  # noqa: BLE001
                 respond(msg_id, error={"code": -32000, "message": str(ex)})
         elif method == "tools/call":
+            # tools/call là request cần kết quả. Notification không có id không được khởi chạy lệnh ghi.
+            if "id" not in msg:
+                continue
+            if not isinstance(params.get("arguments", {}), dict):
+                respond(msg_id, error={"code": -32602, "message": "arguments phải là JSON object."})
+                continue
             try:
                 result = call_tool(params.get("name", ""), params.get("arguments") or {})
                 is_error = ("success" in result and (
