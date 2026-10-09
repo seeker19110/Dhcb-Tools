@@ -1,5 +1,9 @@
 # Hiện trạng dự án
 
+> Audit 2026-10-09: chặn job lỗi trước khi mở host; AutoCAD kiểm `stopOnError`/`skipIfPreviousFailed` trước từng lệnh Core;
+> tách log/report/file tạm giữa các lượt; sửa prompt PDF có dấu cách và mã hoá IDS trên Windows.
+> [Phát hiện, kết quả kiểm chứng và phần nghiệm thu còn lại](audit-2026-10-09.md).
+
 > Nâng cấp tương thích 2026-10-08: build/gói Revit và AutoCAD 2022–2027, hai runtime AutoCAD 2025/2026,
 > tách output/restore theo profile, kiểm SDK/runtime trước batch và bổ sung doctor Revit.
 > [Ma trận, lỗi đã sửa và giới hạn nghiệm thu](tuong-thich-2022-2027.md).
