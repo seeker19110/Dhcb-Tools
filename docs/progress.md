@@ -1,5 +1,9 @@
 # Hiện trạng dự án
 
+> Audit toàn bộ 2026-10-10: sửa trạng thái commit và giao dịch nguyên tử Revit, ghi cao độ instance,
+> đơn vị trục CAD/CSV mâu thuẫn, ngân sách MEP, fault/cancel Bridge, recovery MCP và log/bàn giao nhiều model.
+> [Phát hiện, kiểm chứng và đề xuất nâng cấp](audit-toan-bo-2026-10-10.md).
+
 > Audit 2026-10-09: chặn job lỗi trước khi mở host; AutoCAD kiểm `stopOnError`/`skipIfPreviousFailed` trước từng lệnh Core;
 > tách log/report/file tạm giữa các lượt; sửa prompt PDF có dấu cách và mã hoá IDS trên Windows.
 > [Phát hiện, kết quả kiểm chứng và phần nghiệm thu còn lại](audit-2026-10-09.md).
