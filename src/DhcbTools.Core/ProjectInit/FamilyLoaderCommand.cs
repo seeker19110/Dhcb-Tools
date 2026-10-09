@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -40,7 +40,8 @@ namespace DhcbTools.Core.ProjectInit
             if (!Directory.Exists(config.FamilyFolder))
                 return CommandResult.Fail($"E-PATH-MISSING: không tìm thấy thư mục family \"{config.FamilyFolder}\".");
 
-            string[] allRfa = Directory.GetFiles(config.FamilyFolder, "*.rfa", SearchOption.AllDirectories);
+            string[] allRfa = Directory.GetFiles(config.FamilyFolder, "*.rfa", SearchOption.AllDirectories)
+                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToArray();
             IEnumerable<string> rfaFiles = allRfa;
             if (config.FamilyNames.Count > 0)
             {
@@ -53,36 +54,45 @@ namespace DhcbTools.Core.ProjectInit
                          .OfClass(typeof(Family)).ToElements().Cast<Family>())
                 existingFamilies.Add(fam.Name);
 
-            var messages = new StringBuilder();
-            int loaded = 0;
-
-            foreach (string rfaPath in rfaFiles)
+            var messages = new List<string>();
+            var loaded = 0;
+            // Cùng vòng quyết định cho preview và chạy thật; nạp thử rồi rollback kiểm được RFA hỏng
+            // hoặc host từ chối nạp. Một transaction cho cả lệnh để lỗi không để lại nửa bộ family.
+            using var tx = RevitCompat.StartTransaction(doc, "DHCB - Nạp family hàng loạt");
+            try
             {
-                string famName = Path.GetFileNameWithoutExtension(rfaPath);
-                if (!config.OverwriteExisting && existingFamilies.Contains(famName))
-                { messages.AppendLine("[Bỏ qua, đã có] " + famName); continue; }
-
-                if (config.DryRun)
-                { messages.AppendLine("[Xem trước] Sẽ nạp: " + famName); loaded++; continue; }
-
-                using (var tx = new Transaction(doc, "DHCB - Nạp family: " + famName))
+                foreach (string rfaPath in rfaFiles)
                 {
-                    RevitCompat.ApplyFailurePolicy(tx);
-                    tx.Start();
-                    try
+                    var famName = Path.GetFileNameWithoutExtension(rfaPath);
+                    if (!config.OverwriteExisting && existingFamilies.Contains(famName))
                     {
-                        Family outFam;
-                        bool ok = doc.LoadFamily(rfaPath, new LoadOptions(config.OverwriteExisting), out outFam);
-                        if (ok || outFam != null) { loaded++; existingFamilies.Add(famName); messages.AppendLine("[OK] " + famName); }
-                        else { messages.AppendLine("[Cảnh báo] Revit trả về false khi nạp: " + famName); }
-                        tx.Commit();
+                        messages.Add("[Bỏ qua, đã có] " + famName);
+                        continue;
                     }
-                    catch (System.Exception ex) { tx.RollBack(); messages.AppendLine("[Lỗi] " + famName + ": " + ex.Message); }
+
+                    var ok = doc.LoadFamily(rfaPath, new LoadOptions(config.OverwriteExisting), out var family);
+                    if (!ok && family == null)
+                        throw new InvalidOperationException("Revit từ chối nạp family: " + rfaPath);
+                    loaded++;
+                    existingFamilies.Add(family?.Name ?? famName);
+                    messages.Add((config.DryRun ? "[Xem trước] Sẽ nạp: " : "[OK] ") + famName);
                 }
+
+                if (config.DryRun) tx.RollBack();
+                else tx.Commit();
+            }
+            catch (Exception ex)
+            {
+                var status = tx.RollBack();
+                var state = status == TransactionStatus.RolledBack
+                    ? "đã hoàn tác toàn bộ"
+                    : "trạng thái transaction " + status + ", cần kiểm tra mô hình";
+                return CommandResult.Fail("Không nạp trọn vẹn bộ family; " + state + ": " + ex.Message)
+                    .WithMessages(messages);
             }
 
             string prefix = config.DryRun ? "[Xem trước] " : string.Empty;
-            return CommandResult.Ok(prefix + "Nạp " + loaded + " family." + Environment.NewLine + messages, loaded);
+            return CommandResult.Ok(prefix + "Nạp " + loaded + " family.", loaded).WithMessages(messages);
         }
     }
 }

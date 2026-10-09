@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
@@ -113,7 +113,7 @@ public sealed class HangerCommand : ICoreCommand<HangerConfig>
         // 4. Place hangers in single transaction
         int placed = 0;
         var placedIds = new List<long>();   // giai đoạn 10.2
-        using var tx = new Transaction(document, "DHCB - Đặt hanger");
+        using var tx = new RevitTransaction(document, "DHCB - Đặt hanger");
         tx.Start();
         RevitCompat.ApplyFailurePolicy(tx);
 

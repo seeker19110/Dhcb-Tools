@@ -37,6 +37,7 @@ thêm mã mà quên ghi vào đây (hoặc ngược lại) là test đỏ.
 | `E-PREVIEW-CHANGED` | Model/file đã thay đổi trong hoặc sau preview | Preview lại và yêu cầu duyệt kết quả mới |
 | `E-PREVIEW-CAPACITY` | Đạt giới hạn preview còn hiệu lực | Đợi token hết hạn, không gửi dồn preview |
 | `E-COMMIT-UNKNOWN` | Không xác minh được trạng thái lưu/ghi; có thể đã thực thi | Giữ token, kiểm model và nhật ký. Không tự tạo token mới để thử lại |
+| `E-TRANSACTION-COMMIT` | Revit trả rollback hoặc giao dịch vẫn đang xử lý lỗi | Kiểm cảnh báo/model; chờ Revit kết thúc xử lý trước thao tác tiếp. Lệnh chưa được xác nhận commit, không dùng số phần tử dự kiến làm kết quả đã ghi |
 
 Mã lỗi chỉ đặt cho tình trạng **người dùng xử lý được và lặp lại nhiều lệnh**. Lỗi chỉ xảy ra ở một
 lệnh, hoặc lỗi mà người dùng không làm gì được (Revit từ chối dịch điểm cuối ống đã nối hai đầu), thì

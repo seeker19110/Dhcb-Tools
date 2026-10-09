@@ -43,18 +43,9 @@ public sealed class ElevationTagCommand : ICoreCommand<ElevationTagConfig>
             plan.Add((elem, elevations.BottomMm, elevations.TopMm, elevations.CentreMm));
         }
 
-        if (config.DryRun)
-        {
-            var preview = CommandResult.Ok(ElevationTagPlanner.PreviewSummary(plan.Count), plan.Count);
-            foreach (var (elem, bottom, top, centre) in plan)
-            {
-                preview.Messages.Add(ElevationTagPlanner.PreviewLine(RevitCompat.IdValue(elem.Id), bottom, top, centre));
-            }
-            return preview;
-        }
-
         int updated = 0;
-        using var tx = new Transaction(document, "DHCB - Gán cao độ MEP");
+        int unchanged = 0;
+        using var tx = new RevitTransaction(document, "DHCB - Gán cao độ MEP");
         tx.Start();
         RevitCompat.ApplyFailurePolicy(tx);
 
@@ -62,25 +53,31 @@ public sealed class ElevationTagCommand : ICoreCommand<ElevationTagConfig>
         foreach (var (elem, bottom, top, centre) in plan)
         {
             bool anySet = false;
-            anySet |= TrySetDoubleParam(elem, "bottomElevation", config.BottomElevParamName, bottom, result);
-            anySet |= TrySetDoubleParam(elem, "topElevation", config.TopElevParamName, top, result);
-            anySet |= TrySetDoubleParam(elem, "centreElevation", config.CenterElevParamName, centre, result);
+            anySet |= TrySetDoubleParam(elem, "bottomElevation", config.BottomElevParamName, bottom, result, out var bottomUnchanged);
+            anySet |= TrySetDoubleParam(elem, "topElevation", config.TopElevParamName, top, result, out var topUnchanged);
+            anySet |= TrySetDoubleParam(elem, "centreElevation", config.CenterElevParamName, centre, result, out var centreUnchanged);
             if (anySet)
             {
                 updated++;
-                result.WithChanged(RevitCompat.IdValue(elem.Id));
+                if (!config.DryRun) result.WithChanged(RevitCompat.IdValue(elem.Id));
+                else result.Messages.Add(ElevationTagPlanner.PreviewLine(RevitCompat.IdValue(elem.Id), bottom, top, centre));
             }
+            else if (bottomUnchanged || topUnchanged || centreUnchanged) unchanged++;
         }
 
-        tx.Commit();
+        if (config.DryRun) tx.RollBack();
+        else tx.Commit();
 
-        var final = CommandResult.Ok(ElevationTagPlanner.WriteSummary(updated, plan.Count), updated)
+        var final = CommandResult.Ok(config.DryRun
+                ? ElevationTagPlanner.PreviewSummary(updated)
+                : ElevationTagPlanner.WriteSummary(updated, plan.Count), updated)
             .WithChanged(result.ChangedIds);
         final.Messages.AddRange(result.Messages);
+        if (unchanged > 0) final.Messages.Add($"{unchanged} phần tử đã đúng cao độ, không ghi lại.");
 
         // Không phần tử nào ghi được nghĩa là dự án không có tham số cao độ nào trong từ điển —
         // trước đây lệnh vẫn báo "Đã gán cao độ cho 0/N" như thể mọi thứ bình thường.
-        if (ElevationTagPlanner.NothingWritten(updated, plan.Count))
+        if (ElevationTagPlanner.NothingWritten(updated + unchanged, plan.Count))
         {
             final.Success = false;
             final.Summary = ElevationTagPlanner.NothingWrittenSummary(plan.Count);
@@ -126,20 +123,12 @@ public sealed class ElevationTagCommand : ICoreCommand<ElevationTagConfig>
     /// <paramref name="paramName"/> là tên người dùng chỉ định trong config (ưu tiên hơn từ điển).
     /// Trả false khi không có tham số nào ghi được — người gọi phải báo, không được im lặng.
     /// </summary>
-    private static bool TrySetDoubleParam(Element elem, string key, string? paramName, double valueMm, CommandResult log)
+    private static bool TrySetDoubleParam(Element elem, string key, string? paramName, double valueMm, CommandResult log, out bool unchanged)
     {
-        var param = RevitCompat.Lookup(elem, key, paramName);
-        if (param == null || param.IsReadOnly) return false;
-
+        unchanged = false;
         try
         {
-            if (param.StorageType == StorageType.Double)
-                param.Set(RevitCompat.MmToFt(valueMm)); // internal units = feet
-            else if (param.StorageType == StorageType.String)
-                param.Set(NumericText.Format(valueMm, 1)); // Invariant: máy tiếng Việt không được ghi "3200,0"
-            else
-                return false;
-            return true;
+            return ElevationParameterWriter.TrySet(elem, key, paramName, valueMm, out unchanged);
         }
         catch (System.Exception ex)
         {

@@ -67,7 +67,7 @@ public sealed class RemoveUnusedViewsCommand : ICoreCommand<CleanupConfig>
             return preview;
         }
 
-        using var transaction = new Transaction(document, "DHCB - Dọn dẹp view/sheet thừa");
+        using var transaction = new RevitTransaction(document, "DHCB - Dọn dẹp view/sheet thừa");
         transaction.Start();
         RevitCompat.ApplyFailurePolicy(transaction);
 

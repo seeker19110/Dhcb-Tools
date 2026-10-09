@@ -113,7 +113,7 @@ public sealed class ParameterImportCommand : ICoreCommand<ParameterImportConfig>
         // Lượt 2 — ghi đúng các ô kế hoạch chọn, mỗi (phần tử, tham số) tối đa một lần. Xem trước cũng ghi thật trong
         // transaction rồi rollback, để "sẽ cập nhật N" chỉ đếm những giá trị Revit nhận.
         var updated = 0;
-        using var transaction = new Transaction(document, "DHCB - Nhập tham số từ CSV");
+        using var transaction = new RevitTransaction(document, "DHCB - Nhập tham số từ CSV");
         transaction.Start();
         RevitCompat.ApplyFailurePolicy(transaction);
 

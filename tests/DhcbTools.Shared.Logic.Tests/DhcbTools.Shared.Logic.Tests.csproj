@@ -27,4 +27,18 @@
     <ProjectReference Include="..\..\src\DhcbTools.Shared.Hosting\DhcbTools.Shared.Hosting.csproj" />
   </ItemGroup>
 
+  <!-- Execute the exact Revit adapters with an API double; host acceptance still requires Revit. -->
+  <ItemGroup>
+    <Compile Include="..\..\src\DhcbTools.Core\RevitTransaction.cs" Link="RevitAudit\RevitTransaction.cs" />
+    <Compile Include="..\..\src\DhcbTools.Core\RevitTransactionGroup.cs" Link="RevitAudit\RevitTransactionGroup.cs" />
+    <Compile Include="..\..\src\DhcbTools.Core\SilentFailuresPreprocessor.cs" Link="RevitAudit\SilentFailuresPreprocessor.cs" />
+    <Compile Include="..\..\src\DhcbTools.Core\FailurePolicy.cs" Link="RevitAudit\FailurePolicy.cs" />
+    <Compile Include="..\..\src\DhcbTools.Core\ProjectInit\FamilyLoaderCommand.cs" Link="RevitAudit\FamilyLoaderCommand.cs" />
+    <Compile Include="..\..\src\DhcbTools.Core\ProjectInit\FamilyLoaderConfig.cs" Link="RevitAudit\FamilyLoaderConfig.cs" />
+    <Compile Include="..\..\src\DhcbTools.Core\Query\ViewPlacementIndex.cs" Link="RevitAudit\ViewPlacementIndex.cs" />
+    <Compile Include="..\..\src\DhcbTools.Core\Query\QueryRequest.cs" Link="RevitAudit\QueryRequest.cs" />
+    <Compile Include="..\..\src\DhcbTools.Core\MEPF\ElevationParameterWriter.cs" Link="RevitAudit\ElevationParameterWriter.cs" />
+    <Using Include="DhcbTools.Shared.Hosting" />
+  </ItemGroup>
+
 </Project>

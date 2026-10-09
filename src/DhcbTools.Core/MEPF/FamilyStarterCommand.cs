@@ -162,7 +162,7 @@ public sealed class FamilyStarterCommand : ICoreCommand<FamilyStarterConfig>
         var fam = app.NewFamilyDocument(template);
         try
         {
-            using (var tx = new Transaction(fam, "DHCB - Dựng family mẫu"))
+            using (var tx = new RevitTransaction(fam, "DHCB - Dựng family mẫu"))
             {
                 tx.Start();
                 // Work-plane-based: đặt được lên mặt tường/sàn (SleeveAuto dùng NewFamilyInstance(face, …)).

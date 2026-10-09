@@ -1,6 +1,7 @@
 ﻿using System.Reflection;
 using Autodesk.Revit.ApplicationServices;
 using Autodesk.Revit.UI;
+using DhcbTools.Core;
 using DhcbTools.Core.Updaters;
 using DhcbTools.Revit.Batch;
 using DhcbTools.Revit.Bridge;
@@ -29,6 +30,7 @@ public sealed class App : IExternalApplication
     public Result OnStartup(UIControlledApplication application)
     {
         application.ControlledApplication.DocumentChanged += OnDocumentChanged;
+        application.Idling += OnIdling;
         DhcbLog.Prune("Revit");
         DhcbLog.Write("Revit", $"Add-in khởi động — phiên bản {DhcbVersion.Of(Assembly.GetExecutingAssembly())}, "
                              + $"Revit {application.ControlledApplication.VersionNumber}.");
@@ -194,6 +196,7 @@ public sealed class App : IExternalApplication
 
     public Result OnShutdown(UIControlledApplication application)
     {
+        application.Idling -= OnIdling;
         application.ControlledApplication.DocumentChanged -= OnDocumentChanged;
         if (_onInitialized != null)
         {
@@ -204,6 +207,13 @@ public sealed class App : IExternalApplication
         _bridge?.Stop();
         _bridge?.Dispose();
         return Result.Succeeded;
+    }
+
+    private static void OnIdling(object sender, Autodesk.Revit.UI.Events.IdlingEventArgs e)
+    {
+        // Revit gọi lại sau khi failure UI kết thúc; Pending tuyệt đối không Dispose trước đó.
+        try { RevitTransaction.ReleaseFinishedTransactions(); }
+        catch (Exception ex) { DhcbLog.Error("Revit", "Giải phóng transaction sau failure processing", ex); }
     }
 
     private static void OnDocumentChanged(object? sender, Autodesk.Revit.DB.Events.DocumentChangedEventArgs e) =>

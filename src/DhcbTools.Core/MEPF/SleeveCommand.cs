@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.Revit.DB;
@@ -235,7 +235,7 @@ public sealed class SleeveCommand : ICoreCommand<SleeveConfig>
         // 5. Execute placements in a single transaction
         int placed = 0;
         var placedIds = new List<long>();   // giai đoạn 10.2: agent zoom/kiểm được đúng sleeve vừa đặt
-        using var tx = new Transaction(document, "DHCB - Sleeve tự động");
+        using var tx = new RevitTransaction(document, "DHCB - Sleeve tự động");
         tx.Start();
         RevitCompat.ApplyFailurePolicy(tx);
 

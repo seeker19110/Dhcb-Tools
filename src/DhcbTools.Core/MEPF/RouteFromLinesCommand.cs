@@ -1,4 +1,4 @@
-﻿using Autodesk.Revit.DB;
+using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.Electrical;
 using Autodesk.Revit.DB.Mechanical;
 using Autodesk.Revit.DB.Plumbing;
@@ -208,7 +208,7 @@ public sealed class RouteFromLinesCommand : ICoreCommand<RouteFromLinesConfig>
                         result.Errors.Add(RouteBuildPlanner.NoFittingForDegreeMessage(node.Position, node.Degree));
                         continue;
                 }
-                sub.Commit();
+                RevitTransaction.CommitSubTransaction(sub);
                 fittingsOk++;
             }
             catch (Exception ex)

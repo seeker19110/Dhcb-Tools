@@ -365,7 +365,7 @@ public sealed class AutoRouteCommand : ICoreCommand<AutoRouteConfig>
 
         cancellation.ThrowIfCancellationRequested();
         control?.Report("creating-lines", 0, segments.Count);
-        using var group = new TransactionGroup(document, "DHCB - Tuyến tự động");
+        using var group = new RevitTransactionGroup(document, "DHCB - Tuyến tự động");
         group.Start();
         var createdIds = new List<ElementId>();
         var created = 0;

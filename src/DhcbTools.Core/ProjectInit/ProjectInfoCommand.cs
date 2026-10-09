@@ -12,7 +12,7 @@ namespace DhcbTools.Core.ProjectInit
             var planned = new List<string>();
             var skipped = new List<string>();
 
-            using (var tx = new Transaction(doc, "DHCB - Gán thông tin dự án"))
+            using (var tx = new RevitTransaction(doc, "DHCB - Gán thông tin dự án"))
             {
                 RevitCompat.ApplyFailurePolicy(tx);
                 tx.Start();
