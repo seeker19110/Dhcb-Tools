@@ -81,8 +81,29 @@ Dòng cuối script in: số đốt chuẩn, đoạn bù, box, co, mét ống, m
 ### 4. Giao kết quả
 
 Nói tổng mét ống và m² (có và không hao hụt), số đốt chuẩn / đoạn bù / box / co, và **mét chưa xác định** kèm
-lý do có thể. File Excel có 7 trang: Tổng hợp (công thức sống theo hệ + kích thước, ô hao hụt S3), Chi tiết
-(STT, mã đốt `SEAD-001`, tuyến, nẹp, loại), Đoạn bù & box, Co, Phụ kiện, Chưa xác định, Ghi chú.
+lý do có thể. File Excel có 8 trang: Tổng hợp (công thức sống theo hệ + kích thước, ô hao hụt S3), **Theo mẫu**
+(đúng cột Sheet1 của bản bóc tay: theo trục/cụm, TT chạy liên tục từ đầu gần van chặn lửa — cửa trục — ra ngoài,
+xuyên qua co, giảm và gót giày, mỗi cụm đánh lại từ 1, mục giống nhau liền nhau gộp `12~19`), Chi tiết (STT, mã đốt `SEAD-001`, tuyến, nẹp, loại), Đoạn bù & box, Co, Phụ kiện, Chưa xác
+định, Ghi chú.
+
+### 5. Số TT + DIM lên bản vẽ (khi kỹ sư muốn kiểm trên CAD)
+
+Thêm `--lsp KL.lsp` khi chạy script: cùng lần chạy sinh file AutoLISP ghi **số TT** (cùng số với trang Theo mẫu)
+và **DIM chiều dài từng đốt** (chữ DIM ghi đè đúng chiều dài trong Excel) lên hai layer riêng `DHCB-KL-STT`
+(chữ cao 150, `--text-height`) và `DHCB-KL-DIM` (dimstyle dùng nhiều nhất trong bản vẽ). Đây là bước **ghi vào
+bản vẽ**, nên:
+
+1. Nói cho kỹ sư số TT và số DIM sẽ ghi (dòng cuối script), và layer.
+2. Kỹ sư tự `APPLOAD` file rồi gõ `DHCB_KL_GHI`; lệnh hỏi `[Yes/No]` trước khi ghi, gói trong một lần UNDO.
+3. Ghi xong mở trang Theo mẫu cạnh bản vẽ để kiểm. Chạy lại sau khi sửa: `DHCB_KL_XOA` (chỉ xoá hai layer đó) rồi
+   ghi lại.
+
+Muốn thử trước mà không đụng bản vẽ đang mở: chép DWG ra thư mục tạm, chạy `accoreconsole /i copy.dwg /s x.scr`
+với script `(load "…/KL.lsp")` → `DHCB_KL_GHI` → `Yes`, rồi đếm đối tượng trên hai layer. File LISP không dùng
+ActiveX nên chạy được trong Core Console.
+
+Số TT tự động sẽ lệch số tay ở chỗ bản vẽ không có block: co/cổ vẽ bằng nét thường, gót giày vẽ tay, đốt bị mối
+nối chia khác cách bóc tay. Báo kỹ sư chỗ lệch thay vì sửa số cho khớp.
 
 File khối lượng của dự án thật **chỉ lưu ở máy** — repo Dhcb-Tools là public, không commit file Excel bóc từ
 hồ sơ dự án vào đó.
@@ -97,6 +118,7 @@ hồ sơ dự án vào đó.
 
 - Không chạy không có `--bbox` trên file nhiều khung (mặt cắt, chi tiết) — sẽ cộng trùng.
 - Không báo số khi chưa so ít nhất một tuyến với dim trên bản vẽ và chưa đọc dòng "chưa xác định".
-- Không sửa hay xoá entity trong bản vẽ để "làm sạch" cho script — chỉ đọc.
+- Không sửa hay xoá entity trong bản vẽ để "làm sạch" cho script — chỉ đọc; số TT + DIM chỉ ghi qua file LISP lên
+  hai layer `DHCB-KL-*`, do kỹ sư chạy sau khi đồng ý, không ghi vào layer của bản vẽ gốc.
 - Không đổi R×C, loại nẹp hay loại đốt trong Excel theo phỏng đoán; nghi ngờ thì đánh dấu và hỏi kỹ sư.
 - Không commit file khối lượng của dự án thật vào repo public.
