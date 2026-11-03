@@ -25,7 +25,12 @@ hơn đốt tối đa là **box gió bít đầu** (sản xuất riêng). Script
 7. ghi .xlsx: Tổng hợp (theo hệ + kích thước: đốt chuẩn, đoạn bù, box, co, m² có công thức, ô hao hụt),
    Chi tiết (STT, mã đốt `SEAD-001`, tuyến, loại), Đoạn bù & box, Co, Phụ kiện, Chưa xác định, Ghi chú.
 
-Chỉ ĐỌC bản vẽ. Kết quả là ước lượng có kiểm được: mỗi dòng chi tiết mang toạ độ tâm và handle để tra lại.
+8. trang **Theo mẫu** (đúng cột Sheet1 bản bóc tay): chia trục/cụm, số TT chạy liên tục từ đầu gần van chặn lửa
+   (cửa trục) ra ngoài, xuyên qua co, giảm (block côn) và gót giày (block chân rẽ); `--lsp` ghi thêm file AutoLISP
+   vẽ đúng các số TT đó + DIM chiều dài đốt lên hai layer riêng `DHCB-KL-STT` / `DHCB-KL-DIM`.
+
+Chỉ ĐỌC bản vẽ; file LISP do kỹ sư tự chạy (lệnh DHCB_KL_GHI hỏi xác nhận, một lần UNDO). Kết quả là ước lượng có
+kiểm được: mỗi dòng chi tiết mang toạ độ tâm và handle để tra lại.
 
 Cách dùng (bản vẽ đang mở trong AutoCAD, Bridge 8766 đang bật):
     python scripts/boc-khoi-luong-ong-gio.py --bbox=-170000,300000,-40000,340000 -o KL-ong-gio.xlsx
@@ -481,12 +486,332 @@ def find_elbows(boxes: list, runs: list, diag_max: float = 400) -> list:
         out.append({"sys": size[0], "W": size[1], "H": size[2], "angle": angle,
                     "R": round_len(max(r["t1"] - r["t0"] for r in necks)) if necks else None, "halves": len(members),
                     "joint": collections.Counter(r["joint"] for r in src).most_common(1)[0][0] if src else "?",
-                    "x": cx, "y": cy, "family": family})
+                    "x": cx, "y": cy, "family": family, "links": [r for r in src if not r.get("elbow_part")],
+                    "boxes": [eb[i]["box"] for i in sorted(members)]})
     out.sort(key=lambda e: (ORDER.index(e["sys"]) if e["sys"] in ORDER else len(ORDER), -(e["W"] or 0) * (e["H"] or 0),
                             e["angle"], -round(e["y"] / 2000), e["x"]))
     for n, e in enumerate(out, 1):
         e["stt"], e["code"] = n, f"CO-{n:03d}"
     return out
+
+
+# ── Chia trục / cụm và đánh số TT như bản bóc tay ───────────────────────────
+
+SHAFT_LABEL = re.compile(r"HÚT KHÓI|ĐIỀU ÁP|BÙ GIÓ|HÚT RÁC|FAF|FCU|AHU|PAU", re.I)
+SYS_LABEL = {"SEAD": "HÚT KHÓI", "FAD": "FAF", "RAD": "FCU", "SAD": "FCU", "PAD": "ĐIỀU ÁP", "EAD": "HÚT"}
+SYS_TITLE = {"RAD": "GIÓ HỒI (RAD)", "SAD": "GIÓ CẤP (SAD)", "FAD": "GIÓ TƯƠI (FAD)", "EAD": "GIÓ THẢI (EAD)",
+             "PAD": "TẠO ÁP (PAD)", "SEAD": "HÚT KHÓI (SEAD)"}
+
+
+def _run_ends(r: dict) -> list:
+    return [point(r["u"], t, r["off"]) for t in (r["t0"], r["t1"])]
+
+
+def shaft_labels(texts: list, bbox=None) -> list:
+    """(x, y, chữ) của nhãn trục/thiết bị (HÚT KHÓI 700x1300 T/A, FAF-2F-01…) trong khung."""
+    out = []
+    for t in texts:
+        s = clean_mtext(t.get("text", ""))
+        if in_box(t["x"], t["y"], bbox) and SHAFT_LABEL.search(s):
+            out.append((t["x"], t["y"], s))
+    return out
+
+
+def _dist(p: tuple, q: tuple) -> float:
+    return math.hypot(p[0] - q[0], p[1] - q[1])
+
+
+def _elbow_item(e: dict) -> dict:
+    return {"ma": "C", "elbow": e, "sys": e["sys"], "W": e["W"], "H": e["H"], "R": e["R"], "angle": e["angle"],
+            "joint": e["joint"], "x": e["x"], "y": e["y"]}
+
+
+def _fitting_item(c: dict, enter: dict) -> dict:
+    """Giảm (côn) / gót giày (chân rẽ) như bản bóc tay: W×H theo tuyến đi vào, W'×H' theo tuyến còn lại (nếu khác),
+    L = bề dài hộp bao block dọc tuyến đi vào."""
+    b, u = c["box"], enter["u"]
+    ts = [axis(u, x, y)[0] for x in (b["box"][0], b["box"][2]) for y in (b["box"][1], b["box"][3])]
+    other = next((o for o in c["runs"] if o is not enter and o["size"][1:] != enter["size"][1:]), None)
+    return {"ma": "G", "kind": b["kind"], "sys": enter["size"][0], "W": enter["size"][1], "H": enter["size"][2],
+            "W2": other["size"][1] if other else None, "H2": other["size"][2] if other else None,
+            "len": round_len(max(ts) - min(ts)), "joint": enter["joint"], "x": c["x"], "y": c["y"]}
+
+
+def build_sections(runs: list, pieces: list, elbows: list, boxes: list, labels: list) -> list:
+    """Chia trục/cụm và đánh số TT **như bản bóc tay**: số chạy liên tục dọc chuỗi ống từ đầu gần nhãn trục ra
+    ngoài, xuyên qua co, giảm (block côn) và gót giày (block chân rẽ) — mỗi thứ một số. Cụm = các tuyến nối nhau
+    (đầu chạm đầu, cùng chạm một co/côn/chân rẽ); đặt tên theo nhãn trục gần nhất cùng loại hệ; các cụm cùng tên
+    gộp một mục, mỗi cụm đánh lại từ 1. Trả [(tên, [cụm, …])], cụm = list mục {"ma": T/B/C/G, …, "tt": số}."""
+    sized = [r for r in runs if r["size"] and not r.get("elbow_part")]
+    ids = {id(r) for r in sized}
+    conns = [{"ma": "C", "runs": [r for r in e["links"] if id(r) in ids], "x": e["x"], "y": e["y"], "elbow": e,
+              "boxes": e["boxes"]} for e in elbows if e["W"]]
+    for b in boxes:
+        if b["duct"] and b["kind"] in ("TRANS", "TAP"):
+            rs = [r for r in sized if any(_near(b["box"], *p, 60) for p in _run_ends(r))]
+            conns.append({"ma": "G", "runs": rs, "x": (b["box"][0] + b["box"][2]) / 2,
+                          "y": (b["box"][1] + b["box"][3]) / 2, "box": b, "boxes": [b["box"]]})
+
+    def touching(p, q, pad=60):
+        return p[0] - pad <= q[2] and q[0] - pad <= p[2] and p[1] - pad <= q[3] and q[1] - pad <= p[3]
+
+    # phụ kiện đặt sát nhau (giảm ngay sau co…) là một chuỗi: nối chúng và dồn tuyến của nhau
+    adj = collections.defaultdict(list)
+    for i, a in enumerate(conns):
+        for b in conns[i + 1:]:
+            if any(touching(p, q) for p in a["boxes"] for q in b["boxes"]):
+                adj[id(a)].append(b)
+                adj[id(b)].append(a)
+    loose = [c for c in conns if c["ma"] == "C" and not c["runs"] and not adj[id(c)]]  # co không nối gì
+    conns = [c for c in conns if c["runs"] or adj[id(c)]]
+    run_conns, direct = collections.defaultdict(list), collections.defaultdict(list)
+    for c in conns:
+        for r in c["runs"]:
+            run_conns[id(r)].append(c)
+
+    def chain(c, seen=None):
+        seen = seen if seen is not None else []
+        seen.append(c)
+        for o in adj[id(c)]:
+            if all(o is not s for s in seen):
+                chain(o, seen)
+        return seen
+
+    dampers = [b for b in boxes if b["kind"] == "DAMPER"]
+    for i, a in enumerate(sized):
+        for b in sized[i + 1:]:
+            if any(_dist(p, q) <= max(a["w"], b["w"]) for p in _run_ends(a) for q in _run_ends(b)):
+                direct[id(a)].append(b)
+                direct[id(b)].append(a)
+
+    parent = {id(r): id(r) for r in sized}
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    for r in sized:
+        for o in direct[id(r)] + [o for c in run_conns[id(r)] for x in chain(c) for o in x["runs"]]:
+            parent[find(id(o))] = find(id(r))
+    groups = collections.defaultdict(list)
+    for r in sized:
+        groups[find(id(r))].append(r)
+    by_run = collections.defaultdict(list)
+    for p in pieces:
+        by_run[id(p["run"])].append(p)
+
+    emitted, clusters = set(), []
+    for rs in groups.values():
+        sys_ = collections.Counter(r["size"][0] for r in rs).most_common(1)[0][0]
+        pts = [p for r in rs for p in _run_ends(r)]
+        cand = [lb for lb in labels if SYS_LABEL.get(sys_, "\0") in lb[2].upper()]
+        best = min(cand, key=lambda lb: min(_dist(lb, p) for p in pts)) if cand else None
+        title = ("TRỤC " + best[2]) if best and sys_ == "SEAD" else \
+            SYS_TITLE.get(sys_, sys_) + (f" — gần {best[2]}" if best else "")
+        anchor = (best[0], best[1]) if best else pts[0]
+        # bản tay đánh số từ trục: đầu tuyến gần van chặn lửa nhất (cửa trục, ≤ 2 m — đoạn nối vào trục hay vẽ
+        # bằng nét thường nên không chạm hẳn); không có van thì theo nhãn
+        def to_damper(p):
+            return min((math.hypot(max(dm["box"][0] - p[0], 0, p[0] - dm["box"][2]),
+                                   max(dm["box"][1] - p[1], 0, p[1] - dm["box"][3])) for dm in dampers), default=math.inf)
+
+        near_damper = min(pts, key=to_damper)
+        start_pt = near_damper if to_damper(near_damper) <= 2000 else anchor
+        items, visited = [], set()
+
+        def emit(c, enter):
+            """Phát co/giảm/gót và cả chuỗi phụ kiện sát nó; trả các (tuyến, điểm vào) đi tiếp qua chuỗi."""
+            out = []
+            for x in chain(c):
+                if id(x) not in emitted:
+                    emitted.add(id(x))
+                    items.append(_elbow_item(x["elbow"]) if x["ma"] == "C" else _fitting_item(x, enter))
+                out += [(o, (x["x"], x["y"])) for o in x["runs"]]
+            return out
+
+        def walk(r, entry):
+            visited.add(id(r))
+            e0, e1 = _run_ends(r)
+            near, far = (e0, e1) if _dist(entry, e0) <= _dist(entry, e1) else (e1, e0)
+            cs = sorted((c for c in run_conns[id(r)] if id(c) not in emitted), key=lambda c: _dist((c["x"], c["y"]), near))
+            before = [c for c in cs if _dist((c["x"], c["y"]), near) < _dist((c["x"], c["y"]), far)]
+            after = [c for c in cs if c not in before]
+            nexts = []
+            for c in before:
+                nexts += emit(c, r)
+            forward = near is e0
+            for p in sorted(by_run[id(r)], key=lambda p: axis(r["u"], p["x"], p["y"])[0], reverse=not forward):
+                items.append({"ma": "B" if p["kind"] == BOX_LABEL else "T", "piece": p, "sys": p["sys"], "W": p["W"],
+                              "H": p["H"], "len": p["len"], "joint": p["joint"], "x": p["x"], "y": p["y"]})
+            tail = []
+            for c in after:
+                tail += emit(c, r)
+            for o, p in tail + [(o, far) for o in direct[id(r)]] + nexts:
+                if id(o) not in visited:
+                    walk(o, p)
+            return far
+
+        pos = start_pt
+        while len(visited) < len(rs):
+            start = min((r for r in rs if id(r) not in visited), key=lambda r: min(_dist(pos, p) for p in _run_ends(r)))
+            pos = walk(start, pos)
+        clusters.append((_sys_key(sys_), title, min(_dist(anchor, p) for p in pts), items))
+    rest = [_elbow_item(c["elbow"]) for c in conns + loose if id(c) not in emitted and c["ma"] == "C"]
+    if rest:
+        clusters.append((len(ORDER) + 1, "CO CHƯA GẮN ĐƯỢC VÀO TUYẾN", 0, rest))
+    sections = collections.OrderedDict()
+    for _, title, _, items in sorted(clusters, key=lambda c: (c[0], c[1], c[2])):
+        for n, it in enumerate(items, 1):
+            it["tt"] = n
+        sections.setdefault(title, []).append(items)
+    return list(sections.items())
+
+
+def _item_key(it: dict) -> tuple:
+    return (it["ma"], it["W"], it["H"], it.get("W2"), it.get("H2"), it.get("kind"), it.get("len"), it.get("R"),
+            it.get("angle"), it["joint"], it["sys"])
+
+
+def sample_rows(sections: list) -> tuple:
+    """Sheet theo mẫu bóc tay (Sheet1): TT · MÃ · QUY CÁCH · W · H · W' · H' · W'' · H'' · L · R · Z · Đơn vị · SL · DT
+    · Độ dày · Kiểu mối ghép · Ghi chú. Mục liền nhau giống hệt gộp một dòng, TT dạng 'a~b' — cùng số ghi lên bản vẽ."""
+    rows = [["TT", "MÃ", "QUY CÁCH ỐNG", "W", "H", "W'", "H'", "W''", "H''", "L", "R", "Z", "Đơn vị", "SL", "DT (m2)",
+             "Độ dày tole", "Kiểu mối ghép", "Ghi chú"]]
+    styles = {1: HEAD}
+    for title, clusters in sections:
+        rows.append([None, None, title])
+        styles[len(rows)] = BOLD
+        for ci, items in enumerate(clusters):
+            if ci:
+                rows.append([])
+            k = 0
+            while k < len(items):
+                j = k
+                while j + 1 < len(items) and _item_key(items[j + 1]) == _item_key(items[k]):
+                    j += 1
+                it, cnt, r = items[k], j - k + 1, len(rows) + 1
+                tt = str(it["tt"]) if cnt == 1 else f"{it['tt']}~{items[j]['tt']}"
+                w, h = it["W"], it["H"]
+                if it["ma"] == "C":
+                    qc = (f"Co vuông 90 độ {w}x{h}" if it["angle"] == 90 else f"Co {it['angle']} độ {w}x{h}") + \
+                        (f"xR{it['R']}" if it["R"] else "")
+                    row = [tt, "C", qc, w, h, None, None, None, None, None, it["R"], it["angle"], "cái", cnt, None]
+                    note = "DT co theo công thức của đơn vị bóc"
+                elif it["ma"] == "G":
+                    to = f"/{it['W2']}x{it['H2']}" if it["W2"] else ""
+                    qc = (f"Giảm {w}x{h}{to} L{it['len']}" if it["kind"] == "TRANS" else
+                          f"Gót giày {w}x{h}{to} L{it['len']}")
+                    row = [tt, "G", qc, w, h, it["W2"], it["H2"], None, None, it["len"], None, None, "cái", cnt, None]
+                    note = "DT giảm/gót theo công thức của đơn vị bóc"
+                else:
+                    box = it["ma"] == "B"
+                    qc = f"Ống bịt đầu {w}x{h}xL{it['len']}" if box else f"Ống {w}x{h}xL{it['len']}"
+                    cap = f"+D{r}*E{r}" if box else ""
+                    row = [tt, it["ma"], qc, w, h, None, None, None, None, it["len"], None, None, "ống", cnt,
+                           F(f"ROUND((2*(D{r}+E{r})*J{r}{cap})*N{r}/10^6,3)")]
+                    note = it["piece"]["note"]
+                rows.append(row + [0.75, it["joint"] + ("/ bít đầu" if it["ma"] == "B" else ""),
+                                   "; ".join(x for x in ("ỐNG EI30" if it["sys"] == "SEAD" else "", note) if x) or None])
+                k = j + 1
+        rows.append([])
+    last = len(rows)
+    rows.append([None, None, "TỔNG DT ống thẳng + bịt đầu (m2)", None, None, None, None, None, None, None, None,
+                 None, None, None, F(f"SUM(O2:O{last})")])
+    styles[len(rows)] = TOTAL
+    return rows, [9, 5, 40, 7, 7, 6, 6, 6, 6, 7, 6, 6, 8, 6, 10, 9, 15, 28], styles
+
+
+# ── File LISP ghi số TT + DIM lên bản vẽ ─────────────────────────────────────
+
+LSP_STT, LSP_DIM = "DHCB-KL-STT", "DHCB-KL-DIM"
+LSP_HEAD = r'''; DHCB Tools - ghi so TT va DIM chieu dai dot ong gio len ban ve (sinh boi boc-khoi-luong-ong-gio.py).
+; APPLOAD file nay roi go DHCB_KL_GHI. Xoa de chay lai: DHCB_KL_XOA. Tat ca nam tren 2 layer rieng:
+;   {stt} (so TT, cao {h}) va {dim} (DIM, dimstyle dung nhieu nhat trong ban ve).
+; So TT va chu tren DIM trung voi sheet "Theo mau" cua file Excel cung lan chay.
+; Khong dung ActiveX (vla-*) de chay duoc ca trong AutoCAD Core Console (accoreconsole).
+(defun dhcb:layer (name col)
+  (if (not (tblsearch "LAYER" name))
+    (entmake (list '(0 . "LAYER") '(100 . "AcDbSymbolTableRecord") '(100 . "AcDbLayerTableRecord")
+                   (cons 2 name) '(70 . 0) (cons 62 col)))))
+(defun dhcb:top-dimstyle (/ ss i s a al)
+  (if (setq ss (ssget "_X" '((0 . "DIMENSION"))))
+    (progn
+      (setq i 0)
+      (repeat (sslength ss)
+        (setq s (cdr (assoc 3 (entget (ssname ss i)))))
+        (if (setq a (assoc s al)) (setq al (subst (cons s (1+ (cdr a))) a al)) (setq al (cons (cons s 1) al)))
+        (setq i (1+ i)))
+      (car (car (vl-sort al '(lambda (x y) (> (cdr x) (cdr y)))))))))
+(defun dhcb:t (x y a s)
+  (entmake (list '(0 . "TEXT") (cons 8 "{stt}") (list 10 x y 0.0) (list 11 x y 0.0) (cons 40 {h})
+                 (cons 1 s) (cons 50 a) '(72 . 1) '(73 . 2))))
+(defun dhcb:d (x1 y1 x2 y2 x3 y3 s / e)
+  (command "_.DIMALIGNED" (list x1 y1) (list x2 y2) (list x3 y3))
+  (if (setq e (entlast)) (entmod (subst (cons 1 s) (assoc 1 (entget e)) (entget e)))))
+(defun dhcb:run (/ old ds)
+  (setq old (list (getvar "CMDECHO") (getvar "OSMODE") (getvar "CLAYER")))
+  (setvar "CMDECHO" 0)
+  (command "_.UNDO" "_BE")
+  (setvar "OSMODE" 0)
+  (dhcb:layer "{stt}" 1) (dhcb:layer "{dim}" 3)
+  (if (setq ds (dhcb:top-dimstyle)) (command "_.-DIMSTYLE" "_R" ds))
+  (setvar "CLAYER" "{dim}")
+'''
+LSP_TAIL = r'''  (setvar "OSMODE" (nth 1 old)) (setvar "CLAYER" (nth 2 old))
+  (command "_.UNDO" "_E")
+  (setvar "CMDECHO" (nth 0 old))
+  (princ "\nDa ghi {n} so TT va {m} DIM. Undo mot lan de bo."))
+(defun c:DHCB_KL_GHI ()
+  (initget "Yes No")
+  (if (= (getkword "\nGhi {n} so TT va {m} DIM len layer {stt} / {dim}? [Yes/No] <No>: ") "Yes")
+    (dhcb:run)
+    (princ "\nDa huy, khong ghi gi."))
+  (princ))
+(defun c:DHCB_KL_XOA (/ ss)
+  (initget "Yes No")
+  (if (and (= (getkword "\nXoa toan bo doi tuong tren {stt} va {dim}? [Yes/No] <No>: ") "Yes")
+           (setq ss (ssget "_X" '((8 . "{stt},{dim}")))))
+    (command "_.ERASE" ss ""))
+  (princ))
+(princ "\nDHCB: go DHCB_KL_GHI de ghi so TT + DIM, DHCB_KL_XOA de xoa.")
+(princ)
+'''
+
+
+def write_lsp(path: Path, sections: list, text_height: float = 150, text_gap: float = 250, dim_gap: float = 450) -> tuple:
+    """File AutoLISP ghi số TT (mọi mục: ống, box, co, giảm, gót) và DIM chiều dài (ống thẳng, box) lên bản vẽ.
+    Trả (số TT, số DIM).
+    Số TT đặt bên trái tuyến (theo chiều u), DIM bên phải, chữ DIM ghi đè đúng chiều dài trong Excel."""
+    def f(v):
+        return f"{v:.3f}"
+
+    body, n_txt, n_dim = [], 0, 0
+    for _, clusters in sections:
+        for items in clusters:
+            for it in items:
+                if it["ma"] in ("C", "G"):  # co, giảm, gót: số đặt giữa block phụ kiện
+                    body.append(f'  (dhcb:t {f(it["x"])} {f(it["y"])} 0.0 "{it["tt"]}")')
+                    n_txt += 1
+                    continue
+                r = it["piece"]["run"]
+                (ux, uy), half = r["u"], r["w"] / 2
+                nx, ny = -uy, ux
+                cx, cy, L = it["x"], it["y"], it["len"]
+                ang = math.atan2(uy, ux)
+                body.append(f'  (dhcb:t {f(cx + nx * (half + text_gap))} {f(cy + ny * (half + text_gap))} {ang:.6f} "{it["tt"]}")')
+                x1, y1 = cx - ux * L / 2 - nx * half, cy - uy * L / 2 - ny * half
+                x2, y2 = cx + ux * L / 2 - nx * half, cy + uy * L / 2 - ny * half
+                body.append(f'  (dhcb:d {f(x1)} {f(y1)} {f(x2)} {f(y2)} {f(cx - nx * (half + dim_gap))} '
+                            f'{f(cy - ny * (half + dim_gap))} "{L}")')
+                n_txt += 1
+                n_dim += 1
+    text = LSP_HEAD + "\n".join(body) + "\n" + LSP_TAIL
+    for k, v in {"stt": LSP_STT, "dim": LSP_DIM, "h": f"{text_height:.1f}", "n": n_txt, "m": n_dim}.items():
+        text = text.replace("{" + k + "}", str(v))
+    path.write_bytes(text.replace("\n", "\r\n").encode("ascii"))  # AutoCAD đọc .lsp ANSI: giữ ASCII thuần
+    return n_txt, n_dim
 
 
 def count_fittings(geometry: list, bbox=None, prefix: str = "M-HVAC-DUCT") -> collections.Counter:
@@ -599,7 +924,7 @@ def _sys_key(s):
 
 
 def build_sheets(pieces: list, elbows: list, unsized: list, fittings: collections.Counter, source: str,
-                 waste: float) -> list:
+                 waste: float, sections: list = ()) -> list:
     D, C = "'Chi tiết'!", "Co!"
     # Chi tiết — header dòng 3, dữ liệu từ dòng 4. A STT · B Mã · C Tuyến · D Hệ · E KT · F R · G C · H Nẹp
     # · I Đốt tối đa · J Loại · K Dài mm · L Dài m · M Chu vi · N Diện tích · O X · P Y · Q Handle · R Cách tag · S Ghi chú
@@ -707,7 +1032,8 @@ def build_sheets(pieces: list, elbows: list, unsized: list, fittings: collection
              ["• Côn, tê, chân rẽ, van chỉ đếm số lượng (trang Phụ kiện); chưa tính m²."],
              ["• Đoạn có ghi chú 'có chân rẽ/miệng gió bên hông' dài hơn L max theo quy tắc chân rẽ — xem lại vị trí chân rẽ."],
              ["• Co không nối tuyến nào có kích thước để '?' — không vào trang Tổng hợp."]]
-    return [("Tổng hợp", tot, [6, 34, 8, 18, 8, 8, 7, 10, 10, 10, 11, 10, 12, 10, 11, 8, 11, 12, 14], styles_tot),
+    sample = [("Theo mẫu", *sample_rows(sections))] if sections else []
+    return [("Tổng hợp", tot, [6, 34, 8, 18, 8, 8, 7, 10, 10, 10, 11, 10, 12, 10, 11, 8, 11, 12, 14], styles_tot)] + sample + [
             ("Chi tiết", det, [6, 11, 7, 7, 12, 8, 8, 6, 10, 12, 9, 9, 10, 12, 12, 12, 16, 12, 24], {1: BOLD, 3: HEAD, len(det): TOTAL}),
             ("Đoạn bù & box", fill, [6, 13, 8, 12, 10, 10, 12, 14], {1: BOLD, 3: HEAD, len(fill): TOTAL}),
             ("Co", co, [6, 9, 9, 7, 12, 8, 8, 8, 6, 12, 10, 12, 12, 12, 30, 12, 9], {1: BOLD, 3: HEAD, len(co): TOTAL}),
@@ -767,6 +1093,8 @@ def main(argv=None, agent=None) -> int:
     ap.add_argument("--texts", help="JSON đầu ra query text")
     ap.add_argument("--geometry", help="JSON đầu ra entity_geometry cho block mối nối/phụ kiện")
     ap.add_argument("--source", default="", help="tên bản vẽ ghi vào bảng")
+    ap.add_argument("--lsp", help="ghi thêm file AutoLISP vẽ số TT + DIM chiều dài đốt lên bản vẽ (lệnh DHCB_KL_GHI)")
+    ap.add_argument("--text-height", type=float, default=150, help="cao chữ số TT trong file LISP (mặc định 150)")
     args = ap.parse_args(argv)
     try:
         bbox = parse_bbox(args.bbox) if args.bbox else None
@@ -801,7 +1129,8 @@ def main(argv=None, agent=None) -> int:
     if not pieces:
         print("Không tìm thấy đoạn ống nào có kích thước — kiểm --bbox và --layer-prefix.", file=sys.stderr)
         return 1
-    write_xlsx(Path(args.output), build_sheets(pieces, elbows, unsized, fittings, source, args.waste))
+    sections = build_sections(runs, pieces, elbows, boxes, shaft_labels(texts, bbox))
+    write_xlsx(Path(args.output), build_sheets(pieces, elbows, unsized, fittings, source, args.waste, sections))
 
     kinds = collections.Counter(p["kind"] for p in pieces)
     length = sum(p["len"] for p in pieces if p["kind"] != BOX_LABEL) / 1000
@@ -812,6 +1141,9 @@ def main(argv=None, agent=None) -> int:
           f"trên {len({id(p['run']) for p in pieces})} tuyến ({length:.2f} m ống), {len(elbows)} co, {area:.2f} m² tôn "
           f"(+{args.waste:.0%}: {area * (1 + args.waste):.2f} m²), {sum(fittings.values())} phụ kiện, "
           f"{len(unsized)} tuyến chưa xác định ({sum(r['t1'] - r['t0'] for r in unsized) / 1000:.2f} m).")
+    if args.lsp:
+        n_txt, n_dim = write_lsp(Path(args.lsp), sections, args.text_height)
+        print(f"Đã ghi {args.lsp}: {n_txt} số TT, {n_dim} DIM — APPLOAD rồi gõ DHCB_KL_GHI (xoá: DHCB_KL_XOA).")
     return 0
 
 

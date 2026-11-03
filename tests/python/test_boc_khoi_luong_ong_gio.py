@@ -293,6 +293,104 @@ class GeometryTests(unittest.TestCase):
                                                  "Rec_C_Union": 1, "Rec_Cap_End": 1, "Rec_C_Elbow_45": 1, "DSupport": 1}))
 
 
+LABELS = [(-500, 1000, "HÚT KHÓI 700X1300 T/A"), (11000, 3500, "FCU 01")]
+
+
+def sections_of(geometry=GEOMETRY, labels=LABELS):
+    runs, pieces, elbows = pipeline(geometry)
+    return bog.build_sections(runs, pieces, elbows, bog.fitting_boxes(geometry, BBOX), labels)
+
+
+class SectionTests(unittest.TestCase):
+    def test_nhan_truc(self) -> None:
+        got = bog.shaft_labels([text("HÚT KHÓI 700X1300 T/A", 0, 0), text("SEAD - 700x300", 0, 0),
+                                text("FAF-2F-01 100L/S", 99999, 0)], BBOX)
+        self.assertEqual(got, [(0, 0, "HÚT KHÓI 700X1300 T/A")])
+
+    def test_chia_cum_va_danh_so_theo_truc(self) -> None:
+        got = [(title, [[(it["ma"], it.get("len") or it.get("angle"), it["tt"]) for it in c] for c in clusters])
+               for title, clusters in sections_of()]
+        self.assertEqual(got, [
+            # SEAD bắt đầu từ đầu gần van (DAMPER), co ở đầu đó đứng trước các đốt
+            ("TRỤC HÚT KHÓI 700X1300 T/A", [[("C", 90, 1), ("T", 1110, 2), ("T", 1110, 3), ("B", 1400, 4)]]),
+            # đi từ đầu gần nhãn ra ngoài: co ở đầu trên trước; cụm thứ 2 (giữa hai côn) đánh lại từ 1, côn = G
+            ("GIÓ HỒI (RAD) — gần FCU 01", [[("C", 45, 1), ("T", 640, 2), ("T", 1180, 3), ("T", 1180, 4)],
+                                           [("G", 200, 1), ("T", 1300, 2), ("G", 200, 3)]]),
+            ("GIÓ TƯƠI (FAD)", [[("T", 1070, 1), ("T", 930, 2)]]),
+        ])
+
+    def test_chuoi_ong_giam_co_ong_tu_van_ra(self) -> None:
+        segs = [line("a1", 0, 0, 2000, 0), line("a2", 0, 700, 2000, 700),
+                line("b1", 2400, 700, 2400, 2500), line("b2", 3100, 700, 3100, 2500)]
+        geo = [block("VHT_M_DF_Rec_C_Transition - VHT_Type1-1", 2000, 0, 2400, 700),
+               block("VHT_M_DF_Rec_C_Elbow_Square - VHT_Type1-1", 2400, 0, 3100, 700),
+               block("VHT_M_DA_MotorizedFireDamper - X", -300, 0, -100, 700, layer="VHT_AC.EQUIP")]
+        boxes = bog.fitting_boxes(geo)
+        runs = bog.build_runs(bog.assign_sizes(bog.pair_segments(bog.duct_segments(segs)),
+                                               bog.parse_tags([text("SEAD - 700x300", 1000, 1500)])), [])
+        elbows = bog.find_elbows(boxes, runs)
+        secs = bog.build_sections(runs, bog.split_runs(runs, [], boxes), elbows, boxes, [])
+        got = [[(it["ma"], it.get("len") or it.get("angle"), it["tt"]) for it in c] for _, cl in secs for c in cl]
+        # giảm sát co là một chuỗi: một cụm, số chạy liên tục từ đầu gần van ra ngoài
+        self.assertEqual(got, [[("T", 1110, 1), ("T", 890, 2), ("G", 400, 3), ("C", 90, 4), ("T", 1110, 5), ("T", 690, 6)]])
+        rows, _, _ = bog.sample_rows(secs)
+        self.assertEqual([r[2] for r in rows if r and r[1] == "G"], ["Giảm 700x300 L400"])
+
+    def test_tuyen_noi_dau_cham_dau_cung_mot_cum_va_co_le(self) -> None:
+        runs, pieces, elbows = pipeline(geometry=[])  # FAD hai mảnh cách 150 mm → hai tuyến chạm đầu
+        stray = {"sys": "SEAD", "W": 700, "H": 300, "R": None, "angle": 90, "joint": "TDC", "x": 0, "y": 0,
+                 "links": [], "boxes": []}
+        sections = bog.build_sections(runs, pieces, elbows + [stray], [], [])
+        titles = [t for t, _ in sections]
+        self.assertEqual(titles, ["HÚT KHÓI (SEAD)", "GIÓ HỒI (RAD)", "GIÓ TƯƠI (FAD)", "CO CHƯA GẮN ĐƯỢC VÀO TUYẾN"])
+        fad = dict(sections)["GIÓ TƯƠI (FAD)"]
+        self.assertEqual([[it["len"] for it in c] for c in fad], [[1000, 850]])
+
+    def test_sheet_theo_mau(self) -> None:
+        rows, widths, styles = bog.sample_rows(sections_of())
+        self.assertEqual(rows[0][:4], ["TT", "MÃ", "QUY CÁCH ỐNG", "W"])
+        self.assertEqual(rows[1][2], "TRỤC HÚT KHÓI 700X1300 T/A")
+        self.assertEqual((rows[2][0], rows[2][2], rows[2][12], rows[2][14]), ("1", "Co vuông 90 độ 700x300", "cái", None))
+        self.assertEqual(rows[2][17], "ỐNG EI30; DT co theo công thức của đơn vị bóc")
+        self.assertEqual(rows[3][:5] + [rows[3][9], rows[3][13], rows[3][14]],
+                         ["2~3", "T", "Ống 700x300xL1110", 700, 300, 1110, 2, "ROUND((2*(D4+E4)*J4)*N4/10^6,3)"])
+        self.assertEqual((rows[4][0], rows[4][2], rows[4][14], rows[4][16]),
+                         ("4", "Ống bịt đầu 700x300xL1400", "ROUND((2*(D5+E5)*J5+D5*E5)*N5/10^6,3)", "TDC/ bít đầu"))
+        rad = [r for r in rows if r and r[1] == "C" and r[3] == 400][0]
+        self.assertEqual(rad[2], "Co 45 độ 400x250")
+        g = [r for r in rows if r and r[1] == "G"]
+        self.assertEqual([(r[0], r[2], r[9], r[12], r[14]) for r in g],
+                         [("1", "Giảm 400x250 L200", 200, "cái", None), ("3", "Giảm 400x250 L200", 200, "cái", None)])
+        self.assertEqual(g[0][17], "DT giảm/gót theo công thức của đơn vị bóc")
+        self.assertEqual(rows[-1][14], f"SUM(O2:O{len(rows) - 1})")
+        self.assertEqual(len(widths), 18)
+        self.assertEqual(styles[1], bog.HEAD)
+
+    def test_co_co_R_ghi_vao_quy_cach(self) -> None:
+        sec = [("X", [[{"ma": "C", "sys": "SEAD", "W": 700, "H": 300, "R": 150, "angle": 90, "joint": "TDC", "tt": 1}]])]
+        rows, _, _ = bog.sample_rows(sec)
+        self.assertEqual((rows[2][2], rows[2][10]), ("Co vuông 90 độ 700x300xR150", 150))
+
+    def test_file_lisp(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "kl.lsp"
+            self.assertEqual(bog.write_lsp(p, sections_of()), (13, 9))
+            raw = p.read_bytes()
+        text_ = raw.decode("ascii")
+        self.assertIn(b"\r\n", raw)
+        self.assertNotIn("{", text_)
+        self.assertEqual(text_.count("(dhcb:t "), 13)
+        self.assertEqual(text_.count("(dhcb:d "), 9)
+        # đốt SEAD đầu tiên (TT 2, sau co): tâm (555, 350), số bên trái tuyến, DIM bên phải ghi đè chiều dài Excel
+        self.assertIn('(dhcb:t 555.000 950.000 0.000000 "2")', text_)
+        self.assertIn('(dhcb:d 0.000 0.000 1110.000 0.000 555.000 -450.000 "1110")', text_)
+        self.assertIn('(dhcb:d 2220.000 0.000 3620.000 0.000 2920.000 -450.000 "1400")', text_)
+        self.assertIn('(dhcb:t 13200.000 1400.000 0.0 "1")', text_)  # côn: số đặt giữa block
+        for s in ("DHCB-KL-STT", "DHCB-KL-DIM", "(cons 40 150.0)", "c:DHCB_KL_GHI", "c:DHCB_KL_XOA",
+                  "Ghi 13 so TT va 9 DIM", '(command "_.UNDO" "_BE")', '(command "_.UNDO" "_E")'):
+            self.assertIn(s, text_)
+
+
 class XlsxTests(unittest.TestCase):
     def test_col_name(self) -> None:
         self.assertEqual([bog.col_name(n) for n in (1, 26, 27, 52)], ["A", "Z", "AA", "AZ"])
@@ -381,17 +479,22 @@ class LiveAndMainTests(unittest.TestCase):
             e.write_text(json.dumps(ENTITIES), encoding="utf-8")
             t.write_text(json.dumps({"texts": TEXTS}), encoding="utf-8")
             g.write_text(json.dumps({"entities": GEOMETRY}), encoding="utf-8")
-            out = Path(d) / "kl.xlsx"
+            out, lsp = Path(d) / "kl.xlsx", Path(d) / "kl.lsp"
             buf = io.StringIO()
             with redirect_stdout(buf):
                 code = bog.main(["--entities", str(e), "--texts", str(t), "--geometry", str(g),
-                                 "--bbox=-1000,-1000,25000,25000", "-o", str(out)])
+                                 "--bbox=-1000,-1000,25000,25000", "-o", str(out), "--lsp", str(lsp)])
             self.assertEqual(code, 0)
             self.assertTrue(out.is_file())
             self.assertIn("4 đốt chuẩn, 4 đoạn bù, 1 box bít đầu trên 4 tuyến (8.52 m ống), 3 co, 16.06 m² tôn",
                           buf.getvalue())
             self.assertIn("1 tuyến chưa xác định (2.00 m)", buf.getvalue())
+            self.assertIn("13 số TT, 9 DIM", buf.getvalue())
             self.assertIn("e.json", sheet_cells(out, 1)["A2"])
+            with zipfile.ZipFile(out) as z:
+                names = re.findall(r'<sheet name="([^"]+)"', z.read("xl/workbook.xml").decode())
+            self.assertEqual(names[:3], ["Tổng hợp", "Theo mẫu", "Chi tiết"])
+            self.assertIn("DHCB_KL_GHI", lsp.read_text(encoding="ascii"))
 
             with redirect_stderr(io.StringIO()) as err:
                 self.assertEqual(bog.main(["--entities", str(e), "-o", str(out)]), 2)
