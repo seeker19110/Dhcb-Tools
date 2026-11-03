@@ -1,22 +1,33 @@
 #!/usr/bin/env python3
-"""Bóc khối lượng ống gió chữ nhật từ bản vẽ AutoCAD 2D → Excel (mét dài + m² tôn), đánh số từng đoạn.
+"""Bóc khối lượng ống gió chữ nhật từ bản vẽ AutoCAD 2D → Excel theo **đốt**, box bít đầu và co, m² tôn.
 
 Bản vẽ ĐHKK xuất từ Revit sang DWG không còn đối tượng ống: mỗi đoạn ống chỉ là **hai đường thẳng song song**
-trên layer `M-HVAC-DUCT*`, kích thước nằm ở tag chữ (`SEAD - 700x300`), phụ kiện là block mang tên family
-Revit (`VHT_M_DF_Rec_C_Elbow_Square - …`). Script dựng lại ống từ ba thứ đó:
+trên layer `M-HVAC-DUCT*`, kích thước nằm ở tag chữ (`SEAD - 700x300`), mối nối là block `…Rec_TDC_Union…` /
+`…Rec_C_Union…` vắt ngang ống, co/côn/tê là block mang tên family Revit. Ống thi công chia thành đốt có chiều
+dài tối đa theo loại nẹp — **TDC 1110 mm, nẹp C và bích V 1180 mm** — cộng các đoạn bù; đoạn cuối ở đầu kín dài
+hơn đốt tối đa là **box gió bít đầu** (sản xuất riêng). Script dựng lại đúng cách chia đó:
 
 1. lấy Line trên layer ống trong khung mặt bằng (bỏ layer CNTR/ANNO/IDEN — tim ống, ghi chú, tag);
-2. ghép cặp hai cạnh song song cách nhau 80–2000 mm, chồng nhau ≥ 60 % → một đoạn ống, dài = phần chồng;
-3. gán R×C theo tag ống (hệ kết thúc bằng `AD`: SEAD/SAD/RAD/FAD/EAD/PAD) gần nhất có một cạnh khớp khoảng
-   cách hai cạnh (±30 mm, trong 8 m) — miệng gió/van (OBD, PAG, SAG…) không phải ống nên không dùng làm tag;
-4. đếm block phụ kiện theo family;
-5. ghi .xlsx: Tổng hợp (theo hệ + kích thước, công thức `2×(R+C)×L`, ô hao hụt), Chi tiết (STT, mã đoạn
-   `SEAD-001`…), Phụ kiện, Chưa xác định (cặp đường không gán được — kỹ sư kiểm tay), Ghi chú.
+2. ghép cặp hai cạnh song song cách nhau 80–2000 mm, chồng nhau ≥ 60 % → một mảnh ống; bỏ mảnh nằm trọn trong
+   hộp bao phụ kiện (nét vẽ bên trong co, ống mềm, cổ tê);
+3. nối các mảnh cùng trục, cùng bề rộng thành **tuyến** (khe ≤ 80 mm, hoặc ≤ 300 mm mà có block mối nối trong khe);
+4. gán R×C cho mảnh theo tag ống (hệ kết thúc bằng `AD`: SEAD/SAD/RAD/FAD/EAD/PAD) gần nhất có một cạnh khớp
+   bề rộng (±30 mm, trong 8 m) — miệng gió/van (OBD, PAG, SAG…) không phải ống; tuyến lấy kích thước chiếm
+   nhiều chiều dài nhất; loại nẹp lấy từ block mối nối trên tuyến, tuyến không có mối nối thì theo tuyến cùng
+   kích thước, rồi cùng hệ;
+5. **cắt tuyến tại tâm block mối nối** (không có hình học block thì tại khe giữa các mảnh), rồi chia tiếp theo
+   quy tắc của công cụ BKL.lsp: khoảng dài hơn L max quá 80 mm chia L max từ đầu khoảng, đoạn cuối < 300 mm cộng
+   đốt trước rồi chia đôi, khoảng có chân rẽ/miệng gió bên hông được tới 1400 mm; làm tròn 10 mm như dim, từ
+   L max − 10 trở lên tính bằng L max (*đốt chuẩn*). Khoảng cuối ở đầu kín (nắp bịt hoặc không nối gì) dài hơn
+   L max, tới 1400 mm, là *box bít đầu*; còn lại là *đoạn bù*;
+6. nhận diện **co** (block `…Elbow…`): góc 90°/45°, kích thước và loại nẹp theo tuyến nối vào;
+7. ghi .xlsx: Tổng hợp (theo hệ + kích thước: đốt chuẩn, đoạn bù, box, co, m² có công thức, ô hao hụt),
+   Chi tiết (STT, mã đốt `SEAD-001`, tuyến, loại), Đoạn bù & box, Co, Phụ kiện, Chưa xác định, Ghi chú.
 
-Chỉ ĐỌC bản vẽ. Kết quả là ước lượng có kiểm được: mỗi dòng chi tiết mang handle hai cạnh để tra lại.
+Chỉ ĐỌC bản vẽ. Kết quả là ước lượng có kiểm được: mỗi dòng chi tiết mang toạ độ tâm và handle để tra lại.
 
 Cách dùng (bản vẽ đang mở trong AutoCAD, Bridge 8766 đang bật):
-    python scripts/boc-khoi-luong-ong-gio.py --bbox -170000,300000,-40000,340000 -o KL-ong-gio.xlsx
+    python scripts/boc-khoi-luong-ong-gio.py --bbox=-170000,300000,-40000,340000 -o KL-ong-gio.xlsx
 
 Hoặc từ JSON đã lưu (đầu ra `query entities` / `query text` / `entity_geometry`):
     python scripts/boc-khoi-luong-ong-gio.py --entities e.json --texts t.json [--geometry g.json] -o kl.xlsx
@@ -45,16 +56,39 @@ SYSTEMS = {
 }
 ORDER = list(SYSTEMS)
 FITTINGS = {
-    "Rec_TDC_Union": "Mối nối bích TDC", "Rec_C_Union": "Mối nối (C)", "Rec_C_Elbow_Square": "Cút vuông 90°",
-    "Rec_C_Elbow_45": "Cút 45°", "Rec_Tap_Round": "Tê/chân rẽ tròn", "Rec_Cap_End": "Nắp bịt đầu ống",
+    "Rec_TDC_Union": "Mối nối bích TDC", "Rec_C_Union": "Mối nối (C)", "Rec_C_Elbow_Square": "Co vuông 90°",
+    "Rec_C_Elbow_45": "Co 45°", "Rec_Tap_Round": "Tê/chân rẽ tròn", "Rec_Cap_End": "Nắp bịt đầu ống",
     "Rec_C_Transition_Round": "Côn chữ nhật → tròn", "Rec_C_Transition": "Côn thu (C)",
     "Rec_TDC_Transition": "Côn thu bích TDC", "Rec_C_Tap": "Chân rẽ chữ nhật (C)",
     "Rec_TDC_Tap": "Chân rẽ chữ nhật bích TDC", "MotorizedFireDamper": "Van chặn lửa có motor",
     "REC_Flexible": "Ống mềm",
 }
+# Quy tắc chia ống — cùng giá trị mặc định với công cụ BKL.lsp (BKL_QUYTAC) mà tổ bóc khối lượng đang dùng.
+MAX_DOT = {"TDC": 1110, "C": 1180, "V": 1180}  # đốt dài nhất theo kiểu mối ghép (mm)
+JOINT_TABLE = ((0, "TDC"), (2000, "V"))        # chưa rõ mối ghép: theo cạnh lớn
+TAP_MAX = 1400    # đoạn thẳng có chân rẽ / miệng gió bên hông được dài tới
+LEN_TOL = 80      # chỉ chia khi dài hơn L max quá chừng này
+SCRAP_LEN = 300   # đoạn cuối ngắn hơn → cộng đốt nguyên trước rồi chia đôi
+LEN_STEP = 10     # bước làm tròn
+# Loại phụ kiện theo từ khoá trong tên family (bỏ mã phần tử Revit), thứ tự ưu tiên như BKL.
+FIT_KINDS = (
+    (None, ("UNION", "HANGER", "CANVAS", "SUPPORT")),
+    ("ENDCAP", ("ENDCAP", "CAP_END", "BIT ONG")),
+    ("DAMPER", ("DAMPER", "VCD", "VAN GIO")),
+    ("TAP", ("TAP", "TAKEOFF", "SHOE", "CHAN RE")),
+    ("TRANS", ("TRANSITION", "REDUCER", "CON THU", "CON GIAM")),
+    ("TERM", ("MIENG GIO", "GRILLE", "DIFFUSER", "LOUVER", "REGISTER")),
+    ("ELBOW", ("ELBOW", "BEND")),
+    ("TEE", ("TEE", "CHAC BA")),
+    ("BOX", ("AIR BOX", "PLENUM", "HOP GIO")),
+    ("FLEX", ("FLEXIBLE", "ONG MEM")),
+)
+TERM_NAME = re.compile(r"^\$?GV\d", re.I)  # block miệng gió vẽ tay kiểu "$GV1200x400"
 SKIP_LAYER = ("CNTR", "ANNO", "IDEN")
 TAG = re.compile(r"\b([A-Z]{2,4})\s*-\s*(\d{2,4})\s*[xX×]\s*(\d{2,4})")
 FAMILY = re.compile(r"(Rec_\w+|MotorizedFireDamper|REC_Flexible)")
+JOINT = re.compile(r"Rec_([A-Za-z]+)_Union\b")
+STD_LABEL, FILL_LABEL, BOX_LABEL = "Đốt chuẩn", "Đoạn bù", "Box bít đầu"
 
 
 # ── Đọc dữ liệu ──────────────────────────────────────────────────────────────
@@ -100,41 +134,118 @@ def duct_segments(entities: list, bbox=None, prefix: str = "M-HVAC-DUCT") -> lis
     return segs
 
 
+def _center(e: dict):
+    mn, mx = e.get("extentsMin"), e.get("extentsMax")
+    if mn and mx:
+        return (mn["x"] + mx["x"]) / 2, (mn["y"] + mx["y"]) / 2
+    p = e.get("position")
+    return (p["x"], p["y"]) if p else None
+
+
+def joint_points(geometry: list, bbox=None) -> list:
+    """(x, y, loại nẹp) tại tâm hộp bao block mối nối `…Rec_<LOẠI>_Union` — chỗ cắt đốt."""
+    pts = []
+    for e in geometry:
+        m = JOINT.search(e.get("blockName") or "") if e.get("type") == "BlockReference" else None
+        c = _center(e) if m else None
+        if c and in_box(c[0], c[1], bbox):
+            pts.append((c[0], c[1], m.group(1).upper()))
+    return pts
+
+
+def family_part(name: str) -> str:
+    """'Họ - Kiểu-1234567-TÊN VIEW' → 'Họ - Kiểu' (bỏ mã phần tử Revit `-1234567-` / `-V377-` và tên view)."""
+    return re.split(r"-(?:\d{6,}|V\d{1,5})-", name, maxsplit=1)[0]
+
+
+def fit_kind(name: str):
+    """Loại phụ kiện theo từ khoá trong tên family; None = không phải phụ kiện (mối nối, giá treo…) hoặc không rõ."""
+    if TERM_NAME.match(name):
+        return "TERM"
+    u = family_part(name).upper()
+    for kind, keys in FIT_KINDS:
+        if any(k in u for k in keys):
+            return kind
+    return None
+
+
+def fitting_boxes(geometry: list, bbox=None, prefix: str = "M-HVAC-DUCT") -> list:
+    """Hộp bao các phụ kiện nhận diện được (trừ mối nối): co, côn, tê, chân rẽ, nắp bịt, van, ống mềm, miệng gió.
+    `duct` = nằm trên layer ống (miệng gió thường ở layer riêng)."""
+    out = []
+    for e in geometry:
+        name = e.get("blockName") or ""
+        mn, mx = e.get("extentsMin"), e.get("extentsMax")
+        kind = fit_kind(name) if e.get("type") == "BlockReference" and mn and mx else None
+        if kind and in_box((mn["x"] + mx["x"]) / 2, (mn["y"] + mx["y"]) / 2, bbox):
+            out.append({"name": name, "family": re.split(r"\s+-\s+", name)[0], "kind": kind,
+                        "duct": e.get("layer", "").startswith(prefix), "box": (mn["x"], mn["y"], mx["x"], mx["y"])})
+    return out
+
+
+def _near(box: tuple, x: float, y: float, pad: float) -> bool:
+    return box[0] - pad <= x <= box[2] + pad and box[1] - pad <= y <= box[3] + pad
+
+
 # ── Hình học ─────────────────────────────────────────────────────────────────
 
 def direction(s: dict) -> tuple:
+    """Vectơ đơn vị đã chuẩn hoá chiều (x dương, hoặc y dương khi đứng), làm tròn để so khớp được."""
     ux, uy = (s["x2"] - s["x1"]) / s["len"], (s["y2"] - s["y1"]) / s["len"]
     if ux < -1e-9 or (abs(ux) < 1e-9 and uy < 0):
         ux, uy = -ux, -uy
-    return ux, uy
+    return round(ux, 3) + 0.0, round(uy, 3) + 0.0
+
+
+def axis(u: tuple, x: float, y: float) -> tuple:
+    """(toạ độ dọc trục t, toạ độ vuông góc off) của điểm theo phương u."""
+    return x * u[0] + y * u[1], -x * u[1] + y * u[0]
+
+
+def point(u: tuple, t: float, off: float) -> tuple:
+    """Ngược của `axis`."""
+    return t * u[0] - off * u[1], t * u[1] + off * u[0]
 
 
 def pair_segments(segs: list, min_w: float = 80, max_w: float = 2000, min_overlap: float = 0.6) -> list:
-    """Mỗi cạnh ghép với cạnh song song gần nhất phía sau nó trong danh sách → đoạn ống."""
+    """Mỗi cạnh ghép với cạnh song song gần nhất phía sau nó trong danh sách → mảnh ống [t0, t1] trên trục."""
     pairs = []
     dirs = [direction(s) for s in segs]
     for i, s in enumerate(segs):
-        ux, uy = dirs[i]
+        u = dirs[i]
         best = None
         for j in range(i + 1, len(segs)):
             t = segs[j]
-            if abs(ux * dirs[j][1] - uy * dirs[j][0]) > 0.01:
+            if abs(u[0] * dirs[j][1] - u[1] * dirs[j][0]) > 0.01:
                 continue
-            width = abs((t["x1"] - s["x1"]) * -uy + (t["y1"] - s["y1"]) * ux)
+            width = abs(axis(u, t["x1"], t["y1"])[1] - axis(u, s["x1"], s["y1"])[1])
             if not min_w <= width <= max_w:
                 continue
-            proj = [(x - s["x1"]) * ux + (y - s["y1"]) * uy
-                    for x, y in ((s["x1"], s["y1"]), (s["x2"], s["y2"]), (t["x1"], t["y1"]), (t["x2"], t["y2"]))]
-            overlap = min(max(proj[:2]), max(proj[2:])) - max(min(proj[:2]), min(proj[2:]))
-            if overlap < min_overlap * min(s["len"], t["len"]):
+            ps = sorted(axis(u, x, y)[0] for x, y in ((s["x1"], s["y1"]), (s["x2"], s["y2"])))
+            pt = sorted(axis(u, x, y)[0] for x, y in ((t["x1"], t["y1"]), (t["x2"], t["y2"])))
+            t0, t1 = max(ps[0], pt[0]), min(ps[1], pt[1])
+            if t1 - t0 < min_overlap * min(s["len"], t["len"]):
                 continue
             if best is None or width < best[0]:
-                best = (width, t, overlap)
+                best = (width, t, t0, t1)
         if best:
-            width, t, overlap = best
-            pairs.append({"w": round(width), "len": overlap, "a": s["handle"], "b": t["handle"], "layer": s["layer"],
-                          "mid": [(s["x1"] + s["x2"] + t["x1"] + t["x2"]) / 4, (s["y1"] + s["y2"] + t["y1"] + t["y2"]) / 4]})
+            width, t, t0, t1 = best
+            off = (axis(u, s["x1"], s["y1"])[1] + axis(u, t["x1"], t["y1"])[1]) / 2
+            xs, ys = (s["x1"], s["x2"], t["x1"], t["x2"]), (s["y1"], s["y2"], t["y1"], t["y2"])
+            pairs.append({"w": round(width), "len": t1 - t0, "a": s["handle"], "b": t["handle"], "layer": s["layer"],
+                          "u": u, "off": off, "t0": t0, "t1": t1, "mid": list(point(u, (t0 + t1) / 2, off)),
+                          "extent": (min(xs), min(ys), max(xs), max(ys))})
     return pairs
+
+
+def drop_inside_fittings(pairs: list, boxes: list, pad: float = 10) -> list:
+    """Bỏ mảnh có cả hai cạnh nằm trọn trong hộp bao một phụ kiện — đó là nét vẽ của phụ kiện, không phải ống."""
+    keep = []
+    for p in pairs:
+        e = p["extent"]
+        if not any(b["duct"] and _near(b["box"], e[0], e[1], pad) and _near(b["box"], e[2], e[3], pad) for b in boxes):
+            keep.append(p)
+    return keep
 
 
 def assign_sizes(pairs: list, tags: list, tol: float = 30, radius: float = 8000) -> list:
@@ -153,25 +264,199 @@ def assign_sizes(pairs: list, tags: list, tol: float = 30, radius: float = 8000)
     return out
 
 
-def number_segments(assigned: list) -> list:
-    """Sắp theo hệ → tiết diện lớn trước → vị trí (trên→dưới theo dải 2 m, trái→phải), gán STT và mã `HỆ-001`."""
-    ok = [a for a in assigned if a["sys"]]
-    ok.sort(key=lambda a: (ORDER.index(a["sys"]) if a["sys"] in ORDER else len(ORDER), -a["W"] * a["H"],
-                           a["W"], a["H"], -round(a["mid"][1] / 2000), a["mid"][0]))
-    counter = collections.Counter()
-    for n, a in enumerate(ok, 1):
-        counter[a["sys"]] += 1
-        a["stt"], a["code"] = n, f"{a['sys']}-{counter[a['sys']]:03d}"
-    return ok
+def _joints_between(joints: list, u: tuple, off: float, w: float, lo: float, hi: float) -> list:
+    """[(t, loại nẹp)] của mối nối nằm trên tim tuyến trong khoảng [lo, hi]."""
+    out = []
+    for x, y, kind in joints:
+        t, o = axis(u, x, y)
+        if abs(o - off) <= w / 2 + 60 and lo - 1 <= t <= hi + 1:
+            out.append((t, kind))
+    return sorted(out)
+
+
+def build_runs(pieces: list, joints: list, gap: float = 80, joint_gap: float = 300) -> list:
+    """Nối mảnh cùng trục (|Δoff| ≤ 30, |Δw| ≤ 20) thành tuyến; gán kích thước và loại nẹp cho tuyến."""
+    runs = []
+    for p in sorted(pieces, key=lambda p: (p["u"], p["t0"])):
+        for r in runs:
+            if r["u"] != p["u"] or abs(r["off"] - p["off"]) > 30 or abs(r["w"] - p["w"]) > 20:
+                continue
+            g = p["t0"] - r["t1"]
+            if -5 <= g <= gap or (0 < g <= joint_gap and _joints_between(joints, r["u"], r["off"], r["w"], r["t1"], p["t0"])):
+                if g > 0:
+                    r["gaps"].append(r["t1"] + g / 2)
+                r["t1"] = max(r["t1"], p["t1"])
+                r["items"].append(p)
+                break
+        else:
+            runs.append({"u": p["u"], "off": p["off"], "w": p["w"], "t0": p["t0"], "t1": p["t1"], "items": [p], "gaps": []})
+    by_size, by_sys = collections.defaultdict(collections.Counter), collections.defaultdict(collections.Counter)
+    for r in runs:
+        size = collections.defaultdict(float)
+        for p in r["items"]:
+            if p["sys"]:
+                size[(p["sys"], p["W"], p["H"])] += p["len"]
+        r["size"] = max(size, key=size.get) if size else None
+        kinds = collections.Counter(k for _, k in _joints_between(joints, r["u"], r["off"], r["w"], r["t0"], r["t1"]))
+        r["joint"] = kinds.most_common(1)[0][0] if kinds else None
+        if r["size"] and r["joint"]:
+            by_size[r["size"]][r["joint"]] += 1
+            by_sys[r["size"][0]][r["joint"]] += 1
+    for r in runs:  # tuyến không có mối nối: theo tuyến cùng kích thước, rồi cùng hệ, rồi bảng theo cạnh lớn
+        if r["size"] and not r["joint"]:
+            src = by_size.get(r["size"]) or by_sys.get(r["size"][0])
+            r["joint"] = src.most_common(1)[0][0] if src else joint_by_size(r["size"][1], r["size"][2])
+    return runs
+
+
+def joint_by_size(w: int, h: int) -> str:
+    kind = JOINT_TABLE[0][1]
+    for edge, k in JOINT_TABLE:
+        if max(w, h) >= edge:
+            kind = k
+    return kind
+
+
+def round_len(v: float, step: int = LEN_STEP) -> int:
+    """Làm tròn tới bội `step` gần nhất — bằng số dim hiển thị trên bản vẽ (dimstyle làm tròn 10 mm). BKL áp
+    kiểu 'le7' lên chính số dim đã làm tròn đó, nên với số đo hình học thì làm tròn gần nhất mới khớp bản vẽ
+    (767 → 770 như dim, le7 trên 767 sẽ ra 760)."""
+    return int(v / step + 0.5) * step
+
+
+def split_interval(s0: float, e: float, lmax: float, tol: float = LEN_TOL, scrap: float = SCRAP_LEN) -> list:
+    """Vị trí cắt thêm trong khoảng [s0, e] giữa hai mối nối: dài hơn lmax + tol → chia lmax từ đầu khoảng;
+    đoạn cuối < scrap → cộng với đốt nguyên trước rồi chia đôi."""
+    if e - s0 <= lmax + tol:
+        return []
+    cuts, c = [], s0 + lmax
+    while c < e - 5:
+        cuts.append(c)
+        c += lmax
+    if e - cuts[-1] < scrap:
+        cuts[-1] = (e + (cuts[-2] if len(cuts) > 1 else s0)) / 2
+    return cuts
+
+
+def _end_state(run: dict, t: float, runs: list, boxes: list) -> str:
+    """'cap' (có nắp bịt) · 'open' (không nối gì — đầu kín) · 'fitting' (nối phụ kiện/tuyến khác)."""
+    x, y = point(run["u"], t, run["off"])
+    hits = [b for b in boxes if b["duct"] and _near(b["box"], x, y, 60)]
+    if any(b["kind"] == "ENDCAP" for b in hits):
+        return "cap"
+    if hits:
+        return "fitting"
+    for r in runs:
+        if r is not run and any(math.hypot(x - ex, y - ey) <= r["w"] for ex, ey in
+                                (point(r["u"], r["t0"], r["off"]), point(r["u"], r["t1"], r["off"]))):
+            return "fitting"
+    return "open"
+
+
+def _side_branch(run: dict, s0: float, e: float, boxes: list) -> bool:
+    """Có chân rẽ / miệng gió (TAP, TERM) bám bên hông khoảng [s0, e] của tuyến không."""
+    for b in boxes:
+        if b["kind"] not in ("TAP", "TERM"):
+            continue
+        corners = [axis(run["u"], x, y) for x in (b["box"][0], b["box"][2]) for y in (b["box"][1], b["box"][3])]
+        ts, os_ = [c[0] for c in corners], [c[1] for c in corners]
+        if min(ts) < e and max(ts) > s0 and min(os_) <= run["off"] + run["w"] / 2 + 150 and max(os_) >= run["off"] - run["w"] / 2 - 150:
+            return True
+    return False
+
+
+def split_runs(runs: list, joints: list, boxes: list = ()) -> list:
+    """Cắt tuyến có kích thước thành đốt theo quy tắc BKL:
+    - cắt tại mối nối (không có hình học block thì tại khe giữa các mảnh cạnh);
+    - khoảng dài hơn L max (+ LEN_TOL) thì chia L max từ đầu khoảng, đoạn cuối < SCRAP_LEN cộng đốt trước rồi chia đôi;
+      khoảng có chân rẽ / miệng gió bên hông được dài tới TAP_MAX;
+    - khoảng cuối ở đầu kín (nắp bịt hoặc không nối gì) dài hơn L max, tới TAP_MAX (+ LEN_TOL) = box bít đầu, không chia;
+    - chiều dài làm tròn 'le7'; từ L max − 10 tới L max + LEN_TOL tính bằng L max (đốt chuẩn)."""
+    out = []
+    for r in runs:
+        if not r["size"]:
+            continue
+        if joints:
+            cuts = [t for t, _ in _joints_between(joints, r["u"], r["off"], r["w"], r["t0"], r["t1"])
+                    if r["t0"] + 20 < t < r["t1"] - 20]
+        else:
+            cuts = r["gaps"]
+        b = [r["t0"]] + cuts + [r["t1"]]
+        sys_, w, h = r["size"]
+        dot = MAX_DOT[r["joint"]]
+        closed = {0: _end_state(r, r["t0"], runs, boxes) != "fitting",
+                  len(b) - 2: _end_state(r, r["t1"], runs, boxes) != "fitting"}
+        tag = min((p["tagDist"] for p in r["items"] if p["sys"]), default=None)
+        pieces = []  # (s, e, loại, ghi chú)
+        for k in range(len(b) - 1):
+            s0, e = b[k], b[k + 1]
+            side = dot <= 2000 and _side_branch(r, s0, e, boxes)
+            if closed.get(k) and dot + LEN_TOL < e - s0 <= TAP_MAX + LEN_TOL:
+                pieces.append((s0, e, BOX_LABEL, ""))
+                continue
+            limit = max(dot, TAP_MAX) if side else dot
+            edges = [s0] + split_interval(s0, e, limit) + [e]
+            for a, z in zip(edges, edges[1:]):
+                pieces.append((a, z, None, "có chân rẽ/miệng gió bên hông" if side and z - a > dot + LEN_TOL else ""))
+        for s0, e, kind, note in pieces:
+            raw = round_len(e - s0)  # cắt cách đầu tuyến > 20 mm nên luôn > 0
+            length = dot if kind is None and dot - 10 <= raw <= dot + LEN_TOL and not note else raw
+            kind = kind or (STD_LABEL if length == dot else FILL_LABEL)
+            x, y = point(r["u"], (s0 + e) / 2, r["off"])
+            out.append({"run": r, "sys": sys_, "W": w, "H": h, "joint": r["joint"], "dot": dot, "len": length,
+                        "kind": kind, "note": note, "x": x, "y": y, "handle": r["items"][0]["a"], "tagDist": tag})
+    return out
+
+
+def number_pieces(pieces: list) -> list:
+    """Sắp theo hệ → tiết diện lớn trước → tuyến (trên→dưới theo dải 2 m, trái→phải) → dọc tuyến; gán STT, mã đốt
+    `HỆ-001` và mã tuyến `T01`."""
+    order = {}
+    for p in pieces:
+        r = p["run"]
+        x0, y0 = point(r["u"], r["t0"], r["off"])
+        order.setdefault(id(r), (ORDER.index(p["sys"]) if p["sys"] in ORDER else len(ORDER), -p["W"] * p["H"],
+                                 p["W"], p["H"], -round(y0 / 2000), x0))
+    pieces = sorted(pieces, key=lambda p: (order[id(p["run"])], axis(p["run"]["u"], p["x"], p["y"])[0]))
+    counter, runs = collections.Counter(), {}
+    for n, p in enumerate(pieces, 1):
+        counter[p["sys"]] += 1
+        runs.setdefault(id(p["run"]), len(runs) + 1)
+        p["stt"], p["code"], p["runCode"] = n, f"{p['sys']}-{counter[p['sys']]:03d}", f"T{runs[id(p['run'])]:02d}"
+    return pieces
+
+
+def find_elbows(boxes: list, runs: list) -> list:
+    """Co (phụ kiện loại ELBOW trên layer ống): góc từ tên family (`_45` → 45°, còn lại 90°), kích thước/nẹp theo
+    tuyến nối vào."""
+    out = []
+    for b in boxes:
+        if b["kind"] != "ELBOW" or not b["duct"]:
+            continue
+        sizes, joints = collections.Counter(), collections.Counter()
+        for r in runs:
+            if r["size"] and any(_near(b["box"], *point(r["u"], t, r["off"]), 60) for t in (r["t0"], r["t1"])):
+                sizes[r["size"]] += 1
+                joints[r["joint"]] += 1
+        size = sizes.most_common(1)[0][0] if sizes else (None, None, None)
+        m = re.search(r"Elbow_(\d+)", b["family"])
+        out.append({"sys": size[0], "W": size[1], "H": size[2], "angle": int(m.group(1)) if m else 90,
+                    "joint": (joints.most_common(1)[0][0] if joints else None) or "?",
+                    "x": (b["box"][0] + b["box"][2]) / 2, "y": (b["box"][1] + b["box"][3]) / 2, "family": b["family"]})
+    out.sort(key=lambda e: (ORDER.index(e["sys"]) if e["sys"] in ORDER else len(ORDER), -(e["W"] or 0) * (e["H"] or 0),
+                            e["angle"], -round(e["y"] / 2000), e["x"]))
+    for n, e in enumerate(out, 1):
+        e["stt"], e["code"] = n, f"CO-{n:03d}"
+    return out
 
 
 def count_fittings(geometry: list, bbox=None, prefix: str = "M-HVAC-DUCT") -> collections.Counter:
     c = collections.Counter()
     for e in geometry:
-        p = e.get("position")
-        if e.get("type") != "BlockReference" or not e.get("layer", "").startswith(prefix) or not p:
+        if e.get("type") != "BlockReference" or not e.get("layer", "").startswith(prefix):
             continue
-        if not in_box(p["x"], p["y"], bbox):
+        p = _center(e)  # cùng tiêu chí với fitting_boxes để số co ở trang Phụ kiện khớp trang Co
+        if not p or not in_box(p[0], p[1], bbox):
             continue
         family = re.split(r"\s+-\s+", e.get("blockName") or "")[0]
         m = FAMILY.search(family)
@@ -270,26 +555,55 @@ def write_xlsx(path: Path, sheets: list) -> None:
             z.writestr(f"xl/worksheets/sheet{i}.xml", sheet_xml(rows, widths, styles))
 
 
-def build_sheets(numbered: list, unassigned: list, fittings: collections.Counter, source: str, waste: float) -> list:
-    # Chi tiết — dòng 1 tiêu đề, dòng 3 header, dữ liệu từ dòng 4.
-    det = [["CHI TIẾT TỪNG ĐOẠN ỐNG GIÓ — đánh số theo hệ, tiết diện, vị trí"], [],
-           ["STT", "Mã đoạn", "Hệ", "Kích thước", "R (mm)", "C (mm)", "Dài (m)", "Chu vi (m)", "Diện tích (m²)",
-            "X tâm", "Y tâm", "Layer", "Handle cạnh 1", "Handle cạnh 2", "Cách tag (mm)"]]
-    for a in numbered:
-        r = len(det) + 1
-        det.append([a["stt"], a["code"], a["sys"], f"{a['W']}x{a['H']}", a["W"], a["H"], round(a["len"] / 1000, 3),
-                    F(f"2*(E{r}+F{r})/1000"), F(f"ROUND(G{r}*H{r},3)"), round(a["mid"][0]), round(a["mid"][1]),
-                    a["layer"], a["a"], a["b"], a["tagDist"]])
-    last = len(det)
-    det.append([None] * 5 + ["Tổng", F(f"SUM(G4:G{last})"), None, F(f"SUM(I4:I{last})")])
+def _sys_key(s):
+    return ORDER.index(s) if s in ORDER else len(ORDER)
 
-    # Tổng hợp — header dòng 5, dữ liệu từ dòng 6.
-    tot = [["BẢNG KHỐI LƯỢNG ỐNG GIÓ"], [f"Nguồn: {source}"],
-           [None] * 7 + ["Hao hụt", waste], [],
-           ["STT", "Hệ thống", "Mã", "Kích thước R×C (mm)", "R (mm)", "C (mm)", "Chiều dài (m)", "Chu vi (m)",
-            "Diện tích tôn (m²)", "DT có hao hụt (m²)", "Số đoạn"]]
+
+def build_sheets(pieces: list, elbows: list, unsized: list, fittings: collections.Counter, source: str,
+                 waste: float) -> list:
+    D, C = "'Chi tiết'!", "Co!"
+    # Chi tiết — header dòng 3, dữ liệu từ dòng 4. A STT · B Mã · C Tuyến · D Hệ · E KT · F R · G C · H Nẹp
+    # · I Đốt tối đa · J Loại · K Dài mm · L Dài m · M Chu vi · N Diện tích · O X · P Y · Q Handle · R Cách tag · S Ghi chú
+    det = [["CHI TIẾT TỪNG ĐỐT ỐNG GIÓ — đốt chuẩn theo nẹp (TDC 1110, C/V 1180), đoạn bù, box bít đầu"], [],
+           ["STT", "Mã đốt", "Tuyến", "Hệ", "Kích thước", "R (mm)", "C (mm)", "Nẹp", "Đốt tối đa (mm)", "Loại",
+            "Dài (mm)", "Dài (m)", "Chu vi (m)", "Diện tích (m²)", "X tâm", "Y tâm", "Handle cạnh tuyến",
+            "Cách tag (mm)", "Ghi chú"]]
+    for p in pieces:
+        r = len(det) + 1
+        cap = f"+F{r}*G{r}/1000000" if p["kind"] == BOX_LABEL else ""  # box bít một đầu: cộng tấm bít R×C
+        det.append([p["stt"], p["code"], p["runCode"], p["sys"], f"{p['W']}x{p['H']}", p["W"], p["H"], p["joint"],
+                    p["dot"], p["kind"], p["len"], F(f"K{r}/1000"), F(f"2*(F{r}+G{r})/1000"),
+                    F(f"ROUND(L{r}*M{r}{cap},3)"), round(p["x"]), round(p["y"]), p["handle"], p["tagDist"], p["note"]])
+    last = len(det)
+    det.append([None] * 10 + ["Tổng", F(f"SUM(L4:L{last})"), None, F(f"SUM(N4:N{last})")])
+
+    # Co — header dòng 3. A STT · B Mã · C Loại · D Hệ · E KT · F R · G C · H Góc · I Nẹp · J Dài tim quy đổi
+    # · K Chu vi · L Diện tích · M X · N Y · O Family
+    co = [["CO ỐNG GIÓ — diện tích = 2×(R+C) × chiều dài tim quy đổi; tim quy đổi = R × tan(góc/2) (co 90° = R)"], [],
+          ["STT", "Mã co", "Loại", "Hệ", "Kích thước", "R (mm)", "C (mm)", "Góc (°)", "Nẹp", "Dài tim quy đổi (m)",
+           "Chu vi (m)", "Diện tích (m²)", "X tâm", "Y tâm", "Family Revit"]]
+    for e in elbows:
+        r = len(co) + 1
+        co.append([e["stt"], e["code"], f"Co {e['angle']}°", e["sys"] or "?",
+                   f"{e['W']}x{e['H']}" if e["W"] else "?", e["W"], e["H"], e["angle"], e["joint"],
+                   F(f"ROUND(F{r}*TAN(RADIANS(H{r}/2))/1000,3)"), F(f"2*(F{r}+G{r})/1000"), F(f"ROUND(J{r}*K{r},3)"),
+                   round(e["x"]), round(e["y"]), e["family"]])
+    co.append([None, "Tổng", None, None, None, None, None, None, None, None, None, F(f"SUM(L4:L{len(co)})")])
+
+    # Tổng hợp — header dòng 5, dữ liệu từ dòng 6. Cột A..S như header.
+    tot = [["BẢNG KHỐI LƯỢNG ỐNG GIÓ — ĐỐT, BOX BÍT ĐẦU, CO"], [f"Nguồn: {source}"],
+           [None] * 17 + ["Hao hụt", waste], [],
+           ["STT", "Hệ thống", "Mã", "Kích thước R×C (mm)", "R (mm)", "C (mm)", "Nẹp", "Đốt tối đa (mm)",
+            "Số đốt chuẩn", "Số đoạn bù", "Dài ống (m)", "Chu vi (m)", "DT ống (m²)", "Số box bít đầu", "DT box (m²)",
+            "Số co", "DT co (m²)", "Tổng DT (m²)", "DT có hao hụt (m²)"]]
     styles_tot = {1: BOLD, 5: HEAD}
-    groups = list(collections.OrderedDict.fromkeys((a["sys"], a["W"], a["H"]) for a in numbered))
+    info = collections.OrderedDict()
+    for p in pieces:
+        info.setdefault((p["sys"], p["W"], p["H"]), (p["joint"], p["dot"]))
+    for e in elbows:
+        if e["sys"]:
+            info.setdefault((e["sys"], e["W"], e["H"]), (e["joint"], MAX_DOT.get(e["joint"], "")))
+    groups = sorted(info, key=lambda k: (_sys_key(k[0]), -k[1] * k[2], k[1], k[2]))
     cur, n = None, 0
     for s, w, h in groups:
         if s != cur:
@@ -298,15 +612,32 @@ def build_sheets(numbered: list, unassigned: list, fittings: collections.Counter
             styles_tot[len(tot)] = BOLD
         n += 1
         r = len(tot) + 1
-        tot.append([n, SYSTEMS.get(s, s), s, f"{w}x{h}", w, h,
-                    F(f"SUMIFS('Chi tiết'!G:G,'Chi tiết'!C:C,C{r},'Chi tiết'!D:D,D{r})"), F(f"2*(E{r}+F{r})/1000"),
-                    F(f"ROUND(G{r}*H{r},2)"), F(f"ROUND(I{r}*(1+$I$3),2)"),
-                    F(f"COUNTIFS('Chi tiết'!C:C,C{r},'Chi tiết'!D:D,D{r})")])
+        key = f"{D}D:D,C{r},{D}E:E,D{r}"
+        joint, dot = info[(s, w, h)]
+        tot.append([n, SYSTEMS.get(s, s), s, f"{w}x{h}", w, h, joint, dot,
+                    F(f'COUNTIFS({key},{D}J:J,"{STD_LABEL}")'), F(f'COUNTIFS({key},{D}J:J,"{FILL_LABEL}")'),
+                    F(f'SUMIFS({D}L:L,{key},{D}J:J,"<>{BOX_LABEL}")'), F(f"2*(E{r}+F{r})/1000"), F(f"ROUND(K{r}*L{r},2)"),
+                    F(f'COUNTIFS({key},{D}J:J,"{BOX_LABEL}")'), F(f'SUMIFS({D}N:N,{key},{D}J:J,"{BOX_LABEL}")'),
+                    F(f"COUNTIFS({C}D:D,C{r},{C}E:E,D{r})"), F(f"SUMIFS({C}L:L,{C}D:D,C{r},{C}E:E,D{r})"),
+                    F(f"M{r}+O{r}+Q{r}"), F(f"ROUND(R{r}*(1+$S$3),2)")])
     end = len(tot)
-    tot.append([None, "TỔNG CỘNG", None, None, None, None, F(f"SUM(G6:G{end})"), None,
-                F(f"SUM(I6:I{end})"), F(f"SUM(J6:J{end})"), F(f"SUM(K6:K{end})")])
+    tot.append([None, "TỔNG CỘNG"] + [None] * 6 + [F(f"SUM({c}6:{c}{end})") for c in "IJK"] + [None]
+               + [F(f"SUM({c}6:{c}{end})") for c in "MNOPQRS"])
     styles_tot[len(tot)] = TOTAL
-    tot += [[], [None, "Diện tích tôn = 2 × (R + C) × chiều dài. Đổi ô I3 để thay tỉ lệ hao hụt."]]
+    tot += [[], [None, "Đốt tối đa theo nẹp: TDC 1110 mm, nẹp C / bích V 1180 mm. Box bít đầu sản xuất riêng, tính cả tấm bít R×C."],
+            [None, "Diện tích ống = 2 × (R + C) × chiều dài; co theo trang Co. Đổi ô S3 để thay tỉ lệ hao hụt."]]
+
+    # Đoạn bù & box — gom theo loại, hệ, kích thước, chiều dài.
+    fill = [["ĐOẠN BÙ VÀ BOX BÍT ĐẦU — gom theo kích thước và chiều dài"], [],
+            ["STT", "Loại", "Hệ", "Kích thước", "Dài (mm)", "Số lượng", "Tổng dài (m)", "Diện tích (m²)"]]
+    keys = sorted({(p["kind"], p["sys"], p["W"], p["H"], p["len"]) for p in pieces if p["kind"] != STD_LABEL},
+                  key=lambda k: (k[0] != BOX_LABEL, _sys_key(k[1]), -k[2] * k[3], k[2], k[3], k[4]))
+    for i, (kind, s, w, h, length) in enumerate(keys, 1):
+        r = len(fill) + 1
+        crit = f'{D}J:J,B{r},{D}D:D,C{r},{D}E:E,D{r},{D}K:K,E{r}'
+        fill.append([i, kind, s, f"{w}x{h}", length, F(f"COUNTIFS({crit})"), F(f"E{r}*F{r}/1000"),
+                     F(f"SUMIFS({D}N:N,{crit})")])
+    fill.append([None, "Tổng", None, None, None] + [F(f"SUM({c}4:{c}{len(fill)})") for c in "FGH"])
 
     fit = [["THỐNG KÊ PHỤ KIỆN ỐNG GIÓ (đếm block trên layer ống)"], [],
            ["STT", "Loại phụ kiện", "Family Revit", "Số lượng", "ĐVT"]]
@@ -314,25 +645,36 @@ def build_sheets(numbered: list, unassigned: list, fittings: collections.Counter
         fit.append([i, FITTINGS.get(k, k), k, v, "cái"])
     fit.append([None, "Tổng", None, F(f"SUM(D4:D{len(fit)})")])
 
-    un = [["CẶP ĐƯỜNG SONG SONG CHƯA GÁN ĐƯỢC KÍCH THƯỚC — kiểm tay (côn, cút, chạc, cách nhiệt…)"], [],
+    un = [["TUYẾN CHƯA GÁN ĐƯỢC KÍCH THƯỚC — kiểm tay (côn, chạc, cách nhiệt…)"], [],
           ["STT", "Khoảng cách 2 cạnh (mm)", "Dài (m)", "X tâm", "Y tâm", "Layer", "Handle cạnh 1", "Handle cạnh 2"]]
-    for i, a in enumerate(sorted(unassigned, key=lambda a: (a["w"], a["mid"][0])), 1):
-        un.append([i, a["w"], round(a["len"] / 1000, 3), round(a["mid"][0]), round(a["mid"][1]), a["layer"], a["a"], a["b"]])
+    for i, r in enumerate(sorted(unsized, key=lambda r: (r["w"], r["items"][0]["mid"][0])), 1):
+        p = r["items"][0]
+        un.append([i, r["w"], round((r["t1"] - r["t0"]) / 1000, 3), round(p["mid"][0]), round(p["mid"][1]),
+                   p["layer"], p["a"], p["b"]])
     un.append([None, "Tổng", F(f"SUM(C4:C{len(un)})")])
 
     notes = [["CÁCH TÍNH"],
-             ["1. Hai cạnh Line song song trên layer ống (bỏ CNTR/ANNO/IDEN), cách 80–2000 mm, chồng ≥ 60 % → một đoạn; dài = phần chồng."],
-             ["2. R×C lấy từ tag ống (SEAD/SAD/RAD/FAD/EAD/PAD - RxC) gần nhất có một cạnh khớp khoảng cách hai cạnh (±30 mm, ≤ 8 m)."],
-             ["3. Diện tích tôn = 2 × (R + C) / 1000 × chiều dài (m²); hao hụt theo ô I3 trang Tổng hợp."],
+             ["1. Hai cạnh Line song song trên layer ống (bỏ CNTR/ANNO/IDEN), cách 80–2000 mm, chồng ≥ 60 % → một mảnh; bỏ mảnh nằm trọn trong hộp bao phụ kiện."],
+             ["2. Mảnh cùng trục, cùng bề rộng nối thành tuyến (khe ≤ 80 mm, hoặc ≤ 300 mm có block mối nối)."],
+             ["3. R×C lấy từ tag ống (SEAD/SAD/RAD/FAD/EAD/PAD - RxC) gần nhất có một cạnh khớp bề rộng (±30 mm, ≤ 8 m)."],
+             ["4. Nẹp theo block mối nối trên tuyến (Rec_TDC_Union / Rec_C_Union); tuyến không có mối nối lấy theo tuyến cùng kích thước, rồi cùng hệ, rồi theo cạnh lớn (< 2000 TDC, ≥ 2000 V)."],
+             [f"5. Tuyến cắt tại tâm mối nối. Khoảng dài hơn L max quá {LEN_TOL} mm chia L max từ đầu khoảng; đoạn cuối < {SCRAP_LEN} mm cộng đốt trước rồi chia đôi; có chân rẽ/miệng gió bên hông được tới {TAP_MAX} mm (quy tắc BKL)."],
+             [f"   L max: TDC 1110, C/V 1180. Làm tròn {LEN_STEP} mm gần nhất như số dim; từ L max − 10 tới L max + {LEN_TOL} tính bằng L max = đốt chuẩn."],
+             [f"6. Khoảng cuối ở đầu kín (nắp bịt hoặc không nối gì) dài hơn L max, tới {TAP_MAX} (+{LEN_TOL}) mm = box bít đầu (sản xuất riêng, cộng tấm bít R×C), không chia."],
+             ["7. Co: block Elbow; góc 45° nếu tên có _45, còn lại 90°; R×C và nẹp theo tuyến nối vào; DT = 2(R+C) × R·tan(góc/2)."],
+             ["8. Diện tích tôn = 2 × (R + C) / 1000 × chiều dài (m²); hao hụt theo ô S3 trang Tổng hợp."],
              [], ["GIỚI HẠN — kỹ sư kiểm trước khi dùng"],
              ["• Không tính ống vẽ bằng polyline/spline/trong block, chi tiết xref ghép, khung ngoài vùng --bbox."],
-             ["• Phụ kiện chỉ đếm số lượng; diện tích tôn phụ kiện chưa cộng. Cặp không gán được ở trang Chưa xác định."],
-             ["• Hai tiết diện cùng bề rộng nằm sát nhau có thể gán nhầm — xem cột Cách tag; cặp ~100 mm có thể là viền/cách nhiệt."]]
-    return [("Tổng hợp", tot, [6, 34, 8, 18, 9, 9, 13, 11, 16, 17, 9], styles_tot),
-            ("Chi tiết", det, [6, 11, 8, 12, 8, 8, 9, 10, 12, 12, 12, 16, 13, 13, 12], {1: BOLD, 3: HEAD, len(det): TOTAL}),
+             ["• Côn, tê, chân rẽ, van chỉ đếm số lượng (trang Phụ kiện); chưa tính m²."],
+             ["• Đoạn có ghi chú 'có chân rẽ/miệng gió bên hông' dài hơn L max theo quy tắc chân rẽ — xem lại vị trí chân rẽ."],
+             ["• Co không nối tuyến nào có kích thước để '?' — không vào trang Tổng hợp."]]
+    return [("Tổng hợp", tot, [6, 34, 8, 18, 8, 8, 7, 10, 10, 10, 11, 10, 12, 10, 11, 8, 11, 12, 14], styles_tot),
+            ("Chi tiết", det, [6, 11, 7, 7, 12, 8, 8, 6, 10, 12, 9, 9, 10, 12, 12, 12, 16, 12, 24], {1: BOLD, 3: HEAD, len(det): TOTAL}),
+            ("Đoạn bù & box", fill, [6, 13, 8, 12, 10, 10, 12, 14], {1: BOLD, 3: HEAD, len(fill): TOTAL}),
+            ("Co", co, [6, 9, 9, 7, 12, 8, 8, 8, 6, 12, 10, 12, 12, 12, 30], {1: BOLD, 3: HEAD, len(co): TOTAL}),
             ("Phụ kiện", fit, [6, 28, 30, 10, 7], {1: BOLD, 3: HEAD, len(fit): TOTAL}),
             ("Chưa xác định", un, [6, 14, 10, 12, 12, 16, 13, 13], {1: BOLD, 3: HEAD, len(un): TOTAL}),
-            ("Ghi chú", notes, [130], {1: BOLD, 6: BOLD})]
+            ("Ghi chú", notes, [140], {1: BOLD, 11: BOLD})]
 
 
 # ── Bridge ───────────────────────────────────────────────────────────────────
@@ -349,7 +691,8 @@ def fetch_live(agent, app: str = "autocad", chunk: int = 25, retries: int = 3, p
     t = agent.request(app, "POST", "/query", {"query": "text", "params": {"limit": 5000}}, timeout=120)
     if "texts" not in t:
         raise RuntimeError(t.get("error") or "query text không trả dữ liệu")
-    handles = [e["handle"] for e in entities if e.get("type") == "BlockReference" and "DUCT" in e.get("layer", "").upper()]
+    # Mọi block: mối nối/phụ kiện nằm trên layer ống, miệng gió thường ở layer riêng (cần để nhận chân rẽ bên hông).
+    handles = [e["handle"] for e in entities if e.get("type") == "BlockReference"]
     geometry = []
     for i in range(0, len(handles), chunk):
         for _ in range(retries):
@@ -376,14 +719,14 @@ def parse_bbox(text: str):
 
 
 def main(argv=None, agent=None) -> int:
-    ap = argparse.ArgumentParser(description="Bóc khối lượng ống gió từ bản vẽ AutoCAD → Excel")
+    ap = argparse.ArgumentParser(description="Bóc khối lượng ống gió theo đốt từ bản vẽ AutoCAD → Excel")
     ap.add_argument("-o", "--output", required=True, help="file .xlsx")
     ap.add_argument("--bbox", help="khung mặt bằng xmin,ymin,xmax,ymax (đơn vị bản vẽ) — nên luôn truyền")
     ap.add_argument("--layer-prefix", default="M-HVAC-DUCT")
     ap.add_argument("--waste", type=float, default=0.05, help="tỉ lệ hao hụt tôn (mặc định 0.05)")
     ap.add_argument("--entities", help="JSON đầu ra query entities (bỏ trống = đọc trực tiếp qua Bridge)")
     ap.add_argument("--texts", help="JSON đầu ra query text")
-    ap.add_argument("--geometry", help="JSON đầu ra entity_geometry cho block phụ kiện")
+    ap.add_argument("--geometry", help="JSON đầu ra entity_geometry cho block mối nối/phụ kiện")
     ap.add_argument("--source", default="", help="tên bản vẽ ghi vào bảng")
     args = ap.parse_args(argv)
     try:
@@ -406,24 +749,30 @@ def main(argv=None, agent=None) -> int:
 
     if bbox is None:
         print("Cảnh báo: không có --bbox — tính cả khung mặt cắt/chi tiết nếu chúng dùng layer ống.", file=sys.stderr)
-    pairs = pair_segments(duct_segments(entities, bbox, args.layer_prefix))
-    assigned = assign_sizes(pairs, parse_tags(texts, bbox))
-    numbered = number_segments(assigned)
-    unassigned = [a for a in assigned if not a["sys"]]
+    joints = joint_points(geometry, bbox)
+    if not joints:
+        print("Cảnh báo: không có block mối nối (thiếu --geometry?) — cắt đốt theo khe giữa các mảnh cạnh.", file=sys.stderr)
+    boxes = fitting_boxes(geometry, bbox, args.layer_prefix)
+    pairs = drop_inside_fittings(pair_segments(duct_segments(entities, bbox, args.layer_prefix)), boxes)
+    runs = build_runs(assign_sizes(pairs, parse_tags(texts, bbox)), joints)
+    pieces = number_pieces(split_runs(runs, joints, boxes))
+    elbows = find_elbows(boxes, runs)
+    unsized = [r for r in runs if not r["size"]]
     fittings = count_fittings(geometry, bbox, args.layer_prefix)
-    if not numbered:
+    if not pieces:
         print("Không tìm thấy đoạn ống nào có kích thước — kiểm --bbox và --layer-prefix.", file=sys.stderr)
         return 1
-    write_xlsx(Path(args.output), build_sheets(numbered, unassigned, fittings, source, args.waste))
+    write_xlsx(Path(args.output), build_sheets(pieces, elbows, unsized, fittings, source, args.waste))
 
-    totals = collections.defaultdict(float)
-    for a in numbered:
-        totals[(a["sys"], a["W"], a["H"])] += a["len"] / 1000
-    length = sum(totals.values())
-    area = sum(2 * (w + h) / 1000 * L for (_, w, h), L in totals.items())
-    print(f"Đã ghi {args.output}: {len(numbered)} đoạn, {length:.2f} m, {area:.2f} m² tôn "
+    kinds = collections.Counter(p["kind"] for p in pieces)
+    length = sum(p["len"] for p in pieces if p["kind"] != BOX_LABEL) / 1000
+    area = sum(2 * (p["W"] + p["H"]) / 1e6 * p["len"] + (p["W"] * p["H"] / 1e6 if p["kind"] == BOX_LABEL else 0)
+               for p in pieces)
+    area += sum(2 * (e["W"] + e["H"]) / 1e6 * e["W"] * math.tan(math.radians(e["angle"] / 2)) for e in elbows if e["W"])
+    print(f"Đã ghi {args.output}: {kinds[STD_LABEL]} đốt chuẩn, {kinds[FILL_LABEL]} đoạn bù, {kinds[BOX_LABEL]} box bít đầu "
+          f"trên {len({id(p['run']) for p in pieces})} tuyến ({length:.2f} m ống), {len(elbows)} co, {area:.2f} m² tôn "
           f"(+{args.waste:.0%}: {area * (1 + args.waste):.2f} m²), {sum(fittings.values())} phụ kiện, "
-          f"{len(unassigned)} cặp chưa xác định ({sum(a['len'] for a in unassigned) / 1000:.2f} m).")
+          f"{len(unsized)} tuyến chưa xác định ({sum(r['t1'] - r['t0'] for r in unsized) / 1000:.2f} m).")
     return 0
 
 
