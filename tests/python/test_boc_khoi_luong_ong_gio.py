@@ -18,6 +18,7 @@ import collections
 import importlib.util
 import io
 import json
+import math
 import re
 import tempfile
 import unittest
@@ -108,7 +109,25 @@ def pipeline(geometry=GEOMETRY):
     joints, boxes = bog.joint_points(geometry, BBOX), bog.fitting_boxes(geometry, BBOX)
     pairs = bog.drop_inside_fittings(bog.pair_segments(bog.duct_segments(ENTITIES, BBOX)), boxes)
     runs = bog.build_runs(bog.assign_sizes(pairs, bog.parse_tags(TEXTS, BBOX)), joints)
-    return runs, bog.number_pieces(bog.split_runs(runs, joints, boxes)), bog.find_elbows(boxes, runs)
+    elbows = bog.find_elbows(boxes, runs)
+    return runs, bog.number_pieces(bog.split_runs(runs, joints, boxes)), elbows
+
+
+# Co vuông 90° Revit xuất thành hai nửa block 45° + đoạn chéo 100 mm (cổ co) giữa hai tuyến SEAD 700x300.
+_N = 350 / math.sqrt(2)  # nửa bề rộng chiếu lên x/y theo pháp tuyến của phương chéo (0.707, 0.707)
+_D = 100 / math.sqrt(2)
+CO_PAIR_LINES = [
+    line("H1", 0, 0, 2000, 0), line("H2", 0, 700, 2000, 700),                         # tuyến ngang
+    line("D1", 2450 - _N, 650 + _N, 2450 - _N + _D, 650 + _N + _D),                  # hai cạnh đoạn chéo
+    line("D2", 2450 + _N, 650 - _N, 2450 + _N + _D, 650 - _N + _D),
+    line("V1", 2500, 1200, 2500, 3000), line("V2", 3200, 1200, 3200, 3000),          # tuyến đứng
+    # nét trong block co bị ghép thành "tuyến" chéo rộng 100 — không được làm lệch góc co
+    line("X1", 2100, 600, 2600, 100), line("X2", 2171, 671, 2671, 171),
+]
+CO_PAIR_BLOCKS = [
+    block("VHT_M_DF_Rec_C_Elbow_Square - VHT_Type1-11064867", 2000, 0, 2500, 700),
+    block("VHT_M_DF_Rec_C_Elbow_Square - VHT_Type1-11064867", 2500, 700, 3200, 1200),
+]
 
 
 def sheet_cells(path: Path, index: int) -> dict:
@@ -240,6 +259,33 @@ class GeometryTests(unittest.TestCase):
         self.assertEqual([(e["code"], e["sys"], e["W"], e["H"], e["angle"], e["joint"]) for e in elbows],
                          [("CO-001", "SEAD", 700, 300, 90, "TDC"), ("CO-002", "RAD", 400, 250, 45, "C"),
                           ("CO-003", None, None, None, 90, "?")])
+        self.assertEqual([(e["R"], e["halves"]) for e in elbows], [(None, 1), (None, 1), (None, 1)])
+
+    def test_gop_hai_nua_co_45_thanh_co_90(self) -> None:
+        boxes = bog.fitting_boxes(CO_PAIR_BLOCKS)
+        pairs = bog.drop_inside_fittings(bog.pair_segments(bog.duct_segments(CO_PAIR_LINES)), boxes)
+        tags = bog.parse_tags([text("SEAD - 700x300", 1000, 1500), text("FAD - 100x100", 2300, 2000)])
+        runs = bog.build_runs(bog.assign_sizes(pairs, tags), [])
+        # tuyến ngang, đoạn chéo, tuyến đứng + "tuyến" FAD nhiễu trong block co
+        self.assertEqual(sorted(r["size"][0] for r in runs if r["size"]), ["FAD", "SEAD", "SEAD", "SEAD"])
+        elbows = bog.find_elbows(boxes, runs)
+        self.assertEqual([(e["sys"], e["W"], e["H"], e["angle"], e["R"], e["halves"], e["joint"]) for e in elbows],
+                         [("SEAD", 700, 300, 90, 100, 2, "TDC")])
+        neck = [r for r in runs if r.get("elbow_part")]
+        self.assertEqual([round(r["t1"] - r["t0"]) for r in neck], [100])
+        pieces = [p for p in bog.split_runs(runs, [], boxes) if p["sys"] == "SEAD"]
+        self.assertEqual(sorted(p["len"] for p in pieces), [690, 890, 1110, 1110])  # cổ co 100 không thành ống
+
+    def test_goc_co_theo_tuyen_khong_theo_ten_family(self) -> None:
+        # block tên "Elbow_45" nhưng nối hai tuyến vuông góc → co 90°
+        boxes = bog.fitting_boxes([block("VHT_M_DF_Rec_C_Elbow_45 - VHT_Type _1W_-11000371", 2000, 0, 2700, 700)])
+        # tuyến ngang là SAD, tuyến đứng là RAD cùng 400x250 — khác hệ vẫn phải ra góc giữa hai tuyến
+        segs = [line("a", 0, 0, 2000, 0), line("b", 0, 400, 2000, 400),
+                line("c", 2100, 700, 2100, 3500), line("d", 2500, 700, 2500, 3500)]
+        tags = bog.parse_tags([text("SAD - 400x250", 1000, -300), text("RAD - 400x250", 2900, 3000)])
+        runs = bog.build_runs(bog.assign_sizes(bog.pair_segments(bog.duct_segments(segs)), tags), [])
+        self.assertEqual(sorted(r["size"][0] for r in runs), ["RAD", "SAD"])
+        self.assertEqual([(e["sys"], e["angle"]) for e in bog.find_elbows(boxes, runs)], [("RAD", 90)])
 
     def test_dem_phu_kien(self) -> None:
         c = bog.count_fittings(GEOMETRY, BBOX)

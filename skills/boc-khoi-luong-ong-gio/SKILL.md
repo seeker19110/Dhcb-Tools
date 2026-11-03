@@ -57,7 +57,10 @@ Cách script chia đốt (để giải thích khi kỹ sư hỏi):
   khoảng có chân rẽ/miệng gió bên hông được dài tới 1400 mm;
 - khoảng cuối ở **đầu kín** (nắp bịt, hoặc không nối gì) dài hơn L max tới 1400 mm → **box bít đầu**;
 - chiều dài làm tròn 10 mm gần nhất như số dim; từ L max − 10 tới L max + 80 tính bằng L max (đốt chuẩn);
-- **co**: block Elbow, góc 90°/45° theo tên, R×C và nẹp theo tuyến nối vào, m² = 2(R+C) × R·tan(góc/2).
+- **co**: Revit xuất một co vuông 90° thành **hai nửa block co 45°** nối nhau bằng đoạn chéo ngắn — script gộp
+  thành một co, đoạn chéo là cổ co (ghi ở cột "Cổ co", không tính thành ống); góc theo hướng hai tuyến cùng R×C
+  nối vào (tên family `Elbow_45` không đáng tin), chỉ một tuyến thì theo tên; R×C và nẹp theo tuyến nối vào,
+  m² = 2(R+C) × R·tan(góc/2).
 
 ### 3. Đối chiếu — bắt buộc trước khi báo số
 
@@ -69,7 +72,10 @@ Dòng cuối script in: số đốt chuẩn, đoạn bù, box, co, mét ống, m
 - **Tiết diện lạ**: tiết diện có rất nhiều đoạn vụn mà kỹ sư không thấy trên bản vẽ (thường gặp: cặp ~100 mm là
   đường viền/cách nhiệt bị ghép nhầm). Báo rõ, đừng tự xoá.
 - **Cột Ghi chú** trang Chi tiết: đoạn "có chân rẽ/miệng gió bên hông" dài hơn L max — xem lại vị trí chân rẽ.
-- **Trang Co**: co có kích thước "?" là co không nối tuyến nào có tag — kiểm tay.
+- **Trang Co**: co có kích thước "?" là co không nối tuyến nào có tag — kiểm tay. Co "Số nửa block" = 1 mà bản
+  vẽ là co vuông thì nửa còn lại thiếu block hoặc nằm ngoài khung — đếm lại trên bản vẽ.
+- **So với bản bóc tay** (khi kỹ sư đưa file): so theo MÃ + kích thước + L (co theo góc), cùng phạm vi ống thẳng +
+  bịt đầu; bóc tay hay quy chiều dài về số tròn (box 1400, đốt 1180) nên lệch từng dòng nhưng tổng gần khớp.
 - Lấy 2–3 handle ở trang Chi tiết, xem lại hình học: `query entity_geometry { "handles": ["2CC1DB"] }`.
 
 ### 4. Giao kết quả
