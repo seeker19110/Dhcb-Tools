@@ -20,7 +20,8 @@ hơn đốt tối đa là **box gió bít đầu** (sản xuất riêng). Script
    đốt trước rồi chia đôi, khoảng có chân rẽ/miệng gió bên hông được tới 1400 mm; làm tròn 10 mm như dim, từ
    L max − 10 trở lên tính bằng L max (*đốt chuẩn*). Khoảng cuối ở đầu kín (nắp bịt hoặc không nối gì) dài hơn
    L max, tới 1400 mm, là *box bít đầu*; còn lại là *đoạn bù*;
-6. nhận diện **co** (block `…Elbow…`): góc 90°/45°, kích thước và loại nẹp theo tuyến nối vào;
+6. nhận diện **co** (block `…Elbow…`): hai nửa co 45° nối bằng đoạn chéo ngắn gộp thành một co vuông (đoạn chéo
+   là cổ co, không tính ống), góc theo hướng tuyến nối vào, kích thước và loại nẹp theo tuyến nối vào;
 7. ghi .xlsx: Tổng hợp (theo hệ + kích thước: đốt chuẩn, đoạn bù, box, co, m² có công thức, ô hao hụt),
    Chi tiết (STT, mã đốt `SEAD-001`, tuyến, loại), Đoạn bù & box, Co, Phụ kiện, Chưa xác định, Ghi chú.
 
@@ -374,7 +375,7 @@ def split_runs(runs: list, joints: list, boxes: list = ()) -> list:
     - chiều dài làm tròn 'le7'; từ L max − 10 tới L max + LEN_TOL tính bằng L max (đốt chuẩn)."""
     out = []
     for r in runs:
-        if not r["size"]:
+        if not r["size"] or r.get("elbow_part"):  # đoạn chéo giữa hai nửa co là cổ co, không phải ống
             continue
         if joints:
             cuts = [t for t, _ in _joints_between(joints, r["u"], r["off"], r["w"], r["t0"], r["t1"])
@@ -426,23 +427,61 @@ def number_pieces(pieces: list) -> list:
     return pieces
 
 
-def find_elbows(boxes: list, runs: list) -> list:
-    """Co (phụ kiện loại ELBOW trên layer ống): góc từ tên family (`_45` → 45°, còn lại 90°), kích thước/nẹp theo
-    tuyến nối vào."""
+def find_elbows(boxes: list, runs: list, diag_max: float = 400) -> list:
+    """Co (phụ kiện loại ELBOW trên layer ống), theo cách bóc tay:
+    - Revit xuất một co vuông 90° thành **hai block nửa co 45°** nối nhau bằng một đoạn chéo ngắn → gộp thành một
+      co; đoạn chéo (< `diag_max`, chạm ≥ 2 block co) là cổ co, đánh dấu `elbow_part` để không tính thành ống, và
+      chiều dài của nó ghi làm R;
+    - góc lấy theo hướng các tuyến chính nối vào (≥ 2 hướng); chỉ một hướng thì theo tên family (`_45` → 45°,
+      còn lại 90°) — tên family không đáng tin khi đủ tuyến (block `Elbow_45` nối hai tuyến vuông góc là co 90°);
+    - kích thước/nẹp theo tuyến chính nối vào."""
+    eb = [b for b in boxes if b["kind"] == "ELBOW" and b["duct"]]
+    sized = [r for r in runs if r["size"]]
+    touch = {id(r): {i for i, b in enumerate(eb) for t in (r["t0"], r["t1"])
+                     if _near(b["box"], *point(r["u"], t, r["off"]), 60)} for r in sized}
+    parent = list(range(len(eb)))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    for r in sized:
+        if abs(r["u"][0]) > 0.01 and abs(r["u"][1]) > 0.01 and r["t1"] - r["t0"] < diag_max and len(touch[id(r)]) >= 2:
+            r["elbow_part"] = True
+            first, *others = sorted(touch[id(r)])
+            for i in others:
+                parent[find(i)] = find(first)
+    groups = collections.defaultdict(set)
+    for i in range(len(eb)):
+        groups[find(i)].add(i)
     out = []
-    for b in boxes:
-        if b["kind"] != "ELBOW" or not b["duct"]:
-            continue
-        sizes, joints = collections.Counter(), collections.Counter()
-        for r in runs:
-            if r["size"] and any(_near(b["box"], *point(r["u"], t, r["off"]), 60) for t in (r["t0"], r["t1"])):
-                sizes[r["size"]] += 1
-                joints[r["joint"]] += 1
-        size = sizes.most_common(1)[0][0] if sizes else (None, None, None)
-        m = re.search(r"Elbow_(\d+)", b["family"])
-        out.append({"sys": size[0], "W": size[1], "H": size[2], "angle": int(m.group(1)) if m else 90,
-                    "joint": (joints.most_common(1)[0][0] if joints else None) or "?",
-                    "x": (b["box"][0] + b["box"][2]) / 2, "y": (b["box"][1] + b["box"][3]) / 2, "family": b["family"]})
+    for members in groups.values():
+        linked = [r for r in sized if touch[id(r)] & members]
+        mains = [r for r in linked if not r.get("elbow_part")]
+        necks = [r for r in linked if r.get("elbow_part")]
+        weight = collections.Counter()
+        for r in mains or necks:
+            weight[r["size"]] += r["t1"] - r["t0"]
+        size = weight.most_common(1)[0][0] if weight else (None, None, None)
+        # chỉ tuyến cùng R×C với co (khác hệ vẫn tính — co nối RAD với SAD cùng 400x250): nét trong block co hay
+        # bị ghép nhầm thành "tuyến" nhỏ chéo
+        src = [r for r in mains or necks if r["size"][1:] == size[1:]]
+        dirs = sorted({r["u"] for r in src if not r.get("elbow_part")})
+        family = eb[min(members)]["family"]
+        if len(dirs) >= 2:
+            dot = abs(dirs[0][0] * dirs[1][0] + dirs[0][1] * dirs[1][1])
+            angle = round(math.degrees(math.acos(min(1.0, dot))) / 45) * 45 or 90
+        else:
+            m = re.search(r"Elbow_(\d+)", family)
+            angle = int(m.group(1)) if m else 90
+        cx = sum((eb[i]["box"][0] + eb[i]["box"][2]) / 2 for i in members) / len(members)
+        cy = sum((eb[i]["box"][1] + eb[i]["box"][3]) / 2 for i in members) / len(members)
+        out.append({"sys": size[0], "W": size[1], "H": size[2], "angle": angle,
+                    "R": round_len(max(r["t1"] - r["t0"] for r in necks)) if necks else None, "halves": len(members),
+                    "joint": collections.Counter(r["joint"] for r in src).most_common(1)[0][0] if src else "?",
+                    "x": cx, "y": cy, "family": family})
     out.sort(key=lambda e: (ORDER.index(e["sys"]) if e["sys"] in ORDER else len(ORDER), -(e["W"] or 0) * (e["H"] or 0),
                             e["angle"], -round(e["y"] / 2000), e["x"]))
     for n, e in enumerate(out, 1):
@@ -578,16 +617,16 @@ def build_sheets(pieces: list, elbows: list, unsized: list, fittings: collection
     det.append([None] * 10 + ["Tổng", F(f"SUM(L4:L{last})"), None, F(f"SUM(N4:N{last})")])
 
     # Co — header dòng 3. A STT · B Mã · C Loại · D Hệ · E KT · F R · G C · H Góc · I Nẹp · J Dài tim quy đổi
-    # · K Chu vi · L Diện tích · M X · N Y · O Family
+    # · K Chu vi · L Diện tích · M X · N Y · O Family · P Cổ co (đoạn chéo) · Q Số nửa block
     co = [["CO ỐNG GIÓ — diện tích = 2×(R+C) × chiều dài tim quy đổi; tim quy đổi = R × tan(góc/2) (co 90° = R)"], [],
           ["STT", "Mã co", "Loại", "Hệ", "Kích thước", "R (mm)", "C (mm)", "Góc (°)", "Nẹp", "Dài tim quy đổi (m)",
-           "Chu vi (m)", "Diện tích (m²)", "X tâm", "Y tâm", "Family Revit"]]
+           "Chu vi (m)", "Diện tích (m²)", "X tâm", "Y tâm", "Family Revit", "Cổ co / đoạn chéo (mm)", "Số nửa block"]]
     for e in elbows:
         r = len(co) + 1
         co.append([e["stt"], e["code"], f"Co {e['angle']}°", e["sys"] or "?",
                    f"{e['W']}x{e['H']}" if e["W"] else "?", e["W"], e["H"], e["angle"], e["joint"],
                    F(f"ROUND(F{r}*TAN(RADIANS(H{r}/2))/1000,3)"), F(f"2*(F{r}+G{r})/1000"), F(f"ROUND(J{r}*K{r},3)"),
-                   round(e["x"]), round(e["y"]), e["family"]])
+                   round(e["x"]), round(e["y"]), e["family"], e["R"], e["halves"]])
     co.append([None, "Tổng", None, None, None, None, None, None, None, None, None, F(f"SUM(L4:L{len(co)})")])
 
     # Tổng hợp — header dòng 5, dữ liệu từ dòng 6. Cột A..S như header.
@@ -661,7 +700,7 @@ def build_sheets(pieces: list, elbows: list, unsized: list, fittings: collection
              [f"5. Tuyến cắt tại tâm mối nối. Khoảng dài hơn L max quá {LEN_TOL} mm chia L max từ đầu khoảng; đoạn cuối < {SCRAP_LEN} mm cộng đốt trước rồi chia đôi; có chân rẽ/miệng gió bên hông được tới {TAP_MAX} mm (quy tắc BKL)."],
              [f"   L max: TDC 1110, C/V 1180. Làm tròn {LEN_STEP} mm gần nhất như số dim; từ L max − 10 tới L max + {LEN_TOL} tính bằng L max = đốt chuẩn."],
              [f"6. Khoảng cuối ở đầu kín (nắp bịt hoặc không nối gì) dài hơn L max, tới {TAP_MAX} (+{LEN_TOL}) mm = box bít đầu (sản xuất riêng, cộng tấm bít R×C), không chia."],
-             ["7. Co: block Elbow; góc 45° nếu tên có _45, còn lại 90°; R×C và nẹp theo tuyến nối vào; DT = 2(R+C) × R·tan(góc/2)."],
+             ["7. Co: block Elbow; hai nửa co 45° nối nhau bằng đoạn chéo ngắn gộp thành một co (đoạn chéo là cổ co, không tính ống); góc theo hướng hai tuyến nối vào, chỉ một tuyến thì theo tên family; R×C và nẹp theo tuyến nối vào; DT = 2(R+C) × R·tan(góc/2)."],
              ["8. Diện tích tôn = 2 × (R + C) / 1000 × chiều dài (m²); hao hụt theo ô S3 trang Tổng hợp."],
              [], ["GIỚI HẠN — kỹ sư kiểm trước khi dùng"],
              ["• Không tính ống vẽ bằng polyline/spline/trong block, chi tiết xref ghép, khung ngoài vùng --bbox."],
@@ -671,7 +710,7 @@ def build_sheets(pieces: list, elbows: list, unsized: list, fittings: collection
     return [("Tổng hợp", tot, [6, 34, 8, 18, 8, 8, 7, 10, 10, 10, 11, 10, 12, 10, 11, 8, 11, 12, 14], styles_tot),
             ("Chi tiết", det, [6, 11, 7, 7, 12, 8, 8, 6, 10, 12, 9, 9, 10, 12, 12, 12, 16, 12, 24], {1: BOLD, 3: HEAD, len(det): TOTAL}),
             ("Đoạn bù & box", fill, [6, 13, 8, 12, 10, 10, 12, 14], {1: BOLD, 3: HEAD, len(fill): TOTAL}),
-            ("Co", co, [6, 9, 9, 7, 12, 8, 8, 8, 6, 12, 10, 12, 12, 12, 30], {1: BOLD, 3: HEAD, len(co): TOTAL}),
+            ("Co", co, [6, 9, 9, 7, 12, 8, 8, 8, 6, 12, 10, 12, 12, 12, 30, 12, 9], {1: BOLD, 3: HEAD, len(co): TOTAL}),
             ("Phụ kiện", fit, [6, 28, 30, 10, 7], {1: BOLD, 3: HEAD, len(fit): TOTAL}),
             ("Chưa xác định", un, [6, 14, 10, 12, 12, 16, 13, 13], {1: BOLD, 3: HEAD, len(un): TOTAL}),
             ("Ghi chú", notes, [140], {1: BOLD, 11: BOLD})]
@@ -755,8 +794,8 @@ def main(argv=None, agent=None) -> int:
     boxes = fitting_boxes(geometry, bbox, args.layer_prefix)
     pairs = drop_inside_fittings(pair_segments(duct_segments(entities, bbox, args.layer_prefix)), boxes)
     runs = build_runs(assign_sizes(pairs, parse_tags(texts, bbox)), joints)
+    elbows = find_elbows(boxes, runs)  # trước split_runs: đánh dấu đoạn chéo cổ co để không tính thành ống
     pieces = number_pieces(split_runs(runs, joints, boxes))
-    elbows = find_elbows(boxes, runs)
     unsized = [r for r in runs if not r["size"]]
     fittings = count_fittings(geometry, bbox, args.layer_prefix)
     if not pieces:
