@@ -14,13 +14,32 @@ namespace DhcbTools.Shared.Logic.Tests;
 /// </summary>
 public class PlaybookTests
 {
-    /// <summary>Các truy vấn hợp lệ, theo <c>QueryRequest</c> (Core) và <c>UiQueryHandler</c> (vỏ Revit).</summary>
+    /// <summary>
+    /// Các truy vấn hợp lệ, theo <c>QueryRequest</c> (Core) và <c>UiQueryHandler</c> (vỏ Revit), cộng danh sách
+    /// của <c>AcadQueryHandler</c> (AutoCAD) — playbook AutoCAD dùng <c>entities</c>, <c>text</c>…
+    /// </summary>
     private static readonly HashSet<string> QueryNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "document_info", "elements", "levels", "views", "sheets", "rooms", "families", "warnings",
         "links", "stats", "element_geometry", "schedule_rows", "parameters_of", "snapshot",
         "selection", "show_elements", "active_view",
+        // AutoCAD
+        "drawing_info", "layers", "blocks", "inserts", "entities", "text", "xrefs", "layouts",
+        "entity_geometry", "attributes_of",
     };
+
+    /// <summary>Danh sách AutoCAD ở trên phải khớp đúng chuỗi lỗi mà <c>AcadQueryHandler</c> trả cho truy vấn lạ.</summary>
+    [Fact]
+    public void TruyVanAutoCad_KhopAcadQueryHandler()
+    {
+        var handler = File.ReadAllText(Path.Combine(RepoRoot(), "src", "DhcbTools.Core.AutoCAD", "Query", "AcadQueryHandler.cs"));
+        var m = Regex.Match(handler, "\"(drawing_info,[^\"]+)\"");
+        Assert.True(m.Success, "Không tìm thấy danh sách truy vấn trong AcadQueryHandler.cs.");
+        foreach (var name in m.Groups[1].Value.Split(',', StringSplitOptions.TrimEntries))
+        {
+            Assert.Contains(name, QueryNames);
+        }
+    }
 
     private static string SkillsFolder()
     {
