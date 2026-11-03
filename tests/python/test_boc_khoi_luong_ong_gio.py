@@ -1,7 +1,15 @@
-"""Test cho scripts/boc-khoi-luong-ong-gio.py — bóc ống gió từ cặp Line song song + tag RxC → .xlsx.
+"""Test cho scripts/boc-khoi-luong-ong-gio.py — dựng tuyến ống gió từ cặp Line + tag RxC, cắt đốt tại mối nối,
+chia theo quy tắc BKL (L max theo nẹp TDC 1110 / C 1180, dung sai 80, đoạn vụn < 300 chia đôi, chân rẽ tới 1400),
+box bít đầu, co.
 
-Bản vẽ giả: ống SEAD 700x300 nằm ngang dài 5 m, ống RAD 400x250 đứng dài 3 m, một cặp rộng 1650 mm không
-có tag (phải rơi vào "Chưa xác định"), cùng các đường nhiễu (tim ống, đường ngắn, đường xiên, ngoài khung).
+Bản vẽ giả:
+- SEAD 700x300 ngang dài 3620, nẹp TDC ở x = 1110 và 2220, đầu trái nối co 90°, đầu phải có nắp bịt
+  → 1110 + 1110 + box 1400; trong hộp bao co có hai nét vẽ song song phải bị bỏ;
+- RAD 400x250 đứng dài 3000, nẹp C ở y = 1180, đầu trên nối co 45° → 1180 + (khoảng 1820 chia) 1180 + 640;
+- RAD 400x250 dài 1300 giữa hai côn, có miệng gió bên hông, không mối nối → nhận nẹp C theo tuyến cùng kích
+  thước, được giữ 1300 (≤ 1400) thay vì chia;
+- FAD 200x150 hai mảnh cách nhau 150 mm, mối nối TDC ở x = 1070 nằm trong khe → một tuyến, 1070 + 930;
+- một cặp rộng 1650 không có tag ("Chưa xác định"), một co không nối tuyến nào, cùng các đường nhiễu.
 """
 
 from __future__ import annotations
@@ -25,7 +33,7 @@ bog = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(bog)
 
 NS = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
-BBOX = (-1000, -1000, 20000, 20000)
+BBOX = (-1000, -1000, 25000, 25000)
 
 
 def line(handle, x1, y1, x2, y2, layer="M-HVAC-DUCT-1"):
@@ -37,39 +45,70 @@ def text(t, x, y, layer="M-HVAC-DUCT-IDEN"):
     return {"type": "MText", "layer": layer, "text": t, "x": x, "y": y}
 
 
+def block(name, x0, y0, x1=None, y1=None, layer="M-HVAC-DUCT-1"):
+    e = {"type": "BlockReference", "layer": layer, "position": {"x": x0, "y": y0}, "blockName": name}
+    if x1 is not None:
+        e["extentsMin"], e["extentsMax"] = {"x": x0, "y": y0}, {"x": x1, "y": y1}
+    return e
+
+
+TDC = "VHT_M_DF_Rec_TDC_Union - VHT_Type1-1"
 ENTITIES = [
-    line("A1", 0, 0, 5000, 0), line("A2", 5000, 700, 0, 700),           # SEAD 700x300, cạnh 2 vẽ ngược chiều
-    line("B1", 10000, 3000, 10000, 0), line("B2", 10400, 0, 10400, 3000),  # RAD 400x250 đứng, cạnh 1 vẽ từ trên xuống
-    line("C1", 0, 15000, 2000, 15000), line("C2", 0, 16650, 2000, 16650),   # rộng 1650, không có tag
-    line("N1", 0, 350, 5000, 350, layer="M-HVAC-DUCT-CNTR-1"),            # tim ống — bỏ
+    # SEAD: cạnh dưới ngắt tại mối nối, cạnh trên vẽ ngược chiều
+    line("A1", 0, 0, 1100, 0), line("A3", 1120, 0, 2210, 0), line("A5", 2230, 0, 3620, 0),
+    line("A2", 1100, 700, 0, 700), line("A4", 2210, 700, 1120, 700), line("A6", 3620, 700, 2230, 700),
+    line("B1", 10000, 3000, 10000, 0), line("B2", 10400, 0, 10400, 3000),   # RAD đứng, cạnh 1 vẽ từ trên xuống
+    line("R1", 13000, 0, 13000, 1300), line("R2", 13400, 0, 13400, 1300),   # RAD có miệng gió bên hông
+    line("F1", 0, 15000, 1000, 15000), line("F2", 0, 15200, 1000, 15200),   # FAD mảnh 1
+    line("F3", 1150, 15000, 2000, 15000), line("F4", 1150, 15200, 2000, 15200),  # FAD mảnh 2
+    line("C1", 0, 19000, 2000, 19000), line("C2", 0, 20650, 2000, 20650),   # rộng 1650, không có tag
+    line("N1", 0, 350, 4000, 350, layer="M-HVAC-DUCT-CNTR-1"),            # tim ống — bỏ
     line("N2", 0, 5000, 30, 5000),                                         # quá ngắn
     line("N3", 0, 8000, 3000, 9000),                                       # xiên, không có cặp
     line("N4", 50000, 0, 55000, 0),                                        # ngoài khung
-    line("N5", 3000, 9000, 3000, 9030),                                    # ngắn
     line("N6", 0, 12000, 5000, 12000), line("N7", 4900, 12300, 9000, 12300),  # song song nhưng chồng quá ít
-    line("N8", 0, 19000, 5000, 19000), line("N9", 0, 19020, 5000, 19020),     # quá sát (< 80 mm)
+    line("N8", 0, 23000, 5000, 23000), line("N9", 0, 23020, 5000, 23020),     # quá sát (< 80 mm)
+    line("E1", -650, 100, -50, 100), line("E2", -650, 600, -50, 600),         # nét vẽ trong co — bỏ
     {"handle": "P1", "type": "Polyline", "layer": "M-HVAC-DUCT-1"},
     line("X1", 0, 0, 100, 0, layer="A-WALL"),
 ]
 TEXTS = [
     text("{\\fArial|b1;SEAD - 700x300}", 2500, 1200),
     text("\\pxql;RAD - 400x250", 10900, 1500),
+    text("FAD - 200x150", 1000, 15600),
     text("PAG+OBD 500X500\\PBOG=FFL+1900", 2500, 900, layer="VHT_AC.FAD.LINE"),  # miệng gió, không phải ống
     text("SEAD - 700x300", 2500, 800, layer="AC.6 Chi tiet$0$M-HVAC-DUCT"),      # chi tiết xref ghép
     text("SAD - 400x250", 90000, 90000),                                          # ngoài khung
     text("Ghi chú chung", 0, 0),
 ]
-GEOMETRY = [
-    {"type": "BlockReference", "layer": "M-HVAC-DUCT-1", "position": {"x": 100, "y": 100},
-     "blockName": "VHT_M_DF_Rec_C_Elbow_Square - VHT_Type1-11064867-MẶT BẰNG"},
-    {"type": "BlockReference", "layer": "M-HVAC-DUCT-1", "position": {"x": 200, "y": 100},
-     "blockName": "VHT_M_DF_Rec_C_Elbow_Square - VHT_Type1-2"},
-    {"type": "BlockReference", "layer": "M-HVAC-DUCT-4", "position": {"x": 300, "y": 100}, "blockName": "DSupport"},
-    {"type": "BlockReference", "layer": "M-HVAC-DUCT-4", "position": {"x": 99999, "y": 100}, "blockName": "Rec_Cap_End"},
-    {"type": "BlockReference", "layer": "VHT_AC.EQUIP", "position": {"x": 300, "y": 100}, "blockName": "DAMPER"},
-    {"type": "BlockReference", "layer": "M-HVAC-DUCT-1", "position": None, "blockName": "Rec_Cap_End"},
+JOINTS = [
+    block(TDC, 1096, -30, 1124, 730), block(TDC, 2206, -30, 2234, 730),
+    block("VHT_M_DF_Rec_C_Union - VHT_Type1-9", 9980, 1166, 10420, 1194),
+    block(TDC, 1070, 15100),                                         # không có hộp bao → dùng điểm chèn
+    block(TDC, 99999, 0),                                            # ngoài khung
+    {"type": "BlockReference", "layer": "M-HVAC-DUCT-1", "blockName": "Rec_C_Union"},  # không có toạ độ
+]
+FITS = [
+    block("VHT_M_DF_Rec_C_Elbow_Square - VHT_Type1-11064867-MẶT BẰNG", -700, 0, 0, 700),
+    block("VHT_M_DF_Rec_Cap_End - VHT_Type1-10820628", 3620, 0, 3645, 700),
+    block("VHT_M_DF_Rec_C_Elbow_45 - VHT_Type _1W_-11000371", 9900, 3000, 10500, 3600),
+    block("VHT_M_DF_Rec_C_Elbow_Square - VHT_Type1-2", 20000, 20000, 20500, 20500),  # không nối tuyến nào
+    block("VHT_M_DF_Rec_C_Transition - VHT_Type1-11000497", 12950, 1300, 13450, 1500),
+    block("VHT_M_DF_Rec_C_Transition - VHT_Type1-11000498", 12950, -200, 13450, 0),
+    block("$GV600x300", 13400, 300, 13700, 900, layer="VHT_AC.EAD.LINE"),           # miệng gió bên hông
+]
+GEOMETRY = JOINTS + FITS + [
+    block("DSupport", 300, 100, layer="M-HVAC-DUCT-4"),
+    block("DAMPER", 300, 100, 400, 200, layer="VHT_AC.EQUIP"),
     {"type": "Polyline", "layer": "M-HVAC-DUCT-1"},
 ]
+
+
+def pipeline(geometry=GEOMETRY):
+    joints, boxes = bog.joint_points(geometry, BBOX), bog.fitting_boxes(geometry, BBOX)
+    pairs = bog.drop_inside_fittings(bog.pair_segments(bog.duct_segments(ENTITIES, BBOX)), boxes)
+    runs = bog.build_runs(bog.assign_sizes(pairs, bog.parse_tags(TEXTS, BBOX)), joints)
+    return runs, bog.number_pieces(bog.split_runs(runs, joints, boxes)), bog.find_elbows(boxes, runs)
 
 
 def sheet_cells(path: Path, index: int) -> dict:
@@ -89,12 +128,39 @@ class ParseTests(unittest.TestCase):
 
     def test_parse_tags_chi_lay_ong_trong_khung(self) -> None:
         tags = bog.parse_tags(TEXTS, BBOX)
-        self.assertEqual([(t["sys"], t["W"], t["H"]) for t in tags], [("SEAD", 700, 300), ("RAD", 400, 250)])
-        self.assertEqual(len(bog.parse_tags(TEXTS)), 3)  # không khung → lấy cả tag ngoài
+        self.assertEqual([(t["sys"], t["W"], t["H"]) for t in tags], [("SEAD", 700, 300), ("RAD", 400, 250), ("FAD", 200, 150)])
+        self.assertEqual(len(bog.parse_tags(TEXTS)), 4)  # không khung → lấy cả tag ngoài
 
     def test_duct_segments_bo_nhieu(self) -> None:
         handles = {s["handle"] for s in bog.duct_segments(ENTITIES, BBOX)}
-        self.assertEqual(handles, {"A1", "A2", "B1", "B2", "C1", "C2", "N3", "N6", "N7", "N8", "N9"})
+        self.assertFalse(handles & {"N1", "N2", "N4", "X1"})
+        self.assertIn("A6", handles)
+
+    def test_joint_points_kem_loai_nep(self) -> None:
+        self.assertEqual(bog.joint_points(GEOMETRY, BBOX),
+                         [(1110, 350, "TDC"), (2220, 350, "TDC"), (10200, 1180, "C"), (1070, 15100, "TDC")])
+
+    def test_fitting_boxes(self) -> None:
+        self.assertEqual([(b["kind"], b["duct"]) for b in bog.fitting_boxes(GEOMETRY, BBOX)],
+                         [("ELBOW", True), ("ENDCAP", True), ("ELBOW", True), ("ELBOW", True), ("TRANS", True),
+                          ("TRANS", True), ("TERM", False), ("DAMPER", False)])
+
+    def test_loai_phu_kien_theo_ten_family(self) -> None:
+        self.assertEqual(bog.family_part("VHT_M_DF_Rec_C_Elbow_Square - VHT_Type1-11064867-HỆ THỐNG"),
+                         "VHT_M_DF_Rec_C_Elbow_Square - VHT_Type1")
+        self.assertEqual(bog.family_part("A - B-V273-MẶT BẰNG"), "A - B")
+        got = [bog.fit_kind(n) for n in ("$GV1200x400", "VHT_M_DF_Rec_TDC_Union - X-1234567-V", "DSupport",
+                                         "VHT_M_DA_MotorizedFireDamper - X", "02_DSC_REC_Flexible - 250mm",
+                                         "VHT_M_DF_Rec_C_Tap - X", "Khung tên")]
+        self.assertEqual(got, ["TERM", None, None, "DAMPER", "FLEX", "TAP", None])
+
+    def test_quy_tac_chia_va_lam_tron(self) -> None:
+        self.assertEqual(bog.split_interval(0, 1150, 1110), [])             # vượt ≤ 80 mm: không chia
+        self.assertEqual(bog.split_interval(0, 1500, 1110), [1110])          # dư 390 ≥ 300: giữ
+        self.assertEqual(bog.split_interval(0, 2400, 1110), [1110, 1755])    # dư 180 < 300: cộng đốt trước, chia đôi
+        self.assertEqual(bog.split_interval(0, 1300, 1110, tol=50), [650])   # chỉ một cắt: chia đôi cả khoảng
+        self.assertEqual([bog.round_len(v) for v in (767, 764, 1107, 1404.9)], [770, 760, 1110, 1400])
+        self.assertEqual((bog.joint_by_size(700, 300), bog.joint_by_size(500, 2000)), ("TDC", "V"))
 
     def test_direction_chuan_hoa_chieu(self) -> None:
         segs = {s["handle"]: s for s in bog.duct_segments(ENTITIES, BBOX)}
@@ -116,34 +182,69 @@ class ParseTests(unittest.TestCase):
 
 
 class GeometryTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.pairs = bog.pair_segments(bog.duct_segments(ENTITIES, BBOX))
-        self.assigned = bog.assign_sizes(self.pairs, bog.parse_tags(TEXTS, BBOX))
-
-    def test_ghep_cap(self) -> None:
-        got = sorted((p["a"], p["b"], p["w"], round(p["len"])) for p in self.pairs)
-        self.assertEqual(got, [("A1", "A2", 700, 5000), ("B1", "B2", 400, 3000), ("C1", "C2", 1650, 2000)])
+    def test_ghep_cap_va_bo_net_trong_phu_kien(self) -> None:
+        pairs = bog.pair_segments(bog.duct_segments(ENTITIES, BBOX))
+        self.assertIn(("E1", "E2"), [(p["a"], p["b"]) for p in pairs])
+        kept = bog.drop_inside_fittings(pairs, bog.fitting_boxes(GEOMETRY, BBOX))
+        got = sorted((p["a"], p["b"], p["w"], round(p["len"])) for p in kept)
+        self.assertEqual(got, [("A1", "A2", 700, 1100), ("A3", "A4", 700, 1090), ("A5", "A6", 700, 1390),
+                               ("B1", "B2", 400, 3000), ("C1", "C2", 1650, 2000),
+                               ("F1", "F2", 200, 1000), ("F3", "F4", 200, 850), ("R1", "R2", 400, 1300)])
 
     def test_chon_canh_gan_nhat(self) -> None:
         segs = bog.duct_segments([line("a", 0, 0, 1000, 0), line("b", 0, 900, 1000, 900), line("c", 0, 500, 1000, 500)])
         self.assertEqual([(p["a"], p["b"]) for p in bog.pair_segments(segs)], [("a", "c"), ("b", "c")])
 
     def test_gan_kich_thuoc(self) -> None:
-        by = {p["a"]: p for p in self.assigned}
+        pairs = bog.pair_segments(bog.duct_segments(ENTITIES, BBOX))
+        by = {p["a"]: p for p in bog.assign_sizes(pairs, bog.parse_tags(TEXTS, BBOX))}
         self.assertEqual((by["A1"]["sys"], by["A1"]["W"], by["A1"]["H"]), ("SEAD", 700, 300))
         self.assertEqual((by["B1"]["sys"], by["B1"]["W"]), ("RAD", 400))
         self.assertIsNone(by["C1"]["sys"])
-        far = bog.assign_sizes(self.pairs, bog.parse_tags(TEXTS, BBOX), radius=10)
+        far = bog.assign_sizes(pairs, bog.parse_tags(TEXTS, BBOX), radius=10)
         self.assertTrue(all(p["sys"] is None for p in far))
 
-    def test_danh_so(self) -> None:
-        extra = dict(self.assigned[0], sys="XAD", stt=None)
-        numbered = bog.number_segments(self.assigned + [extra])
-        self.assertEqual([(a["stt"], a["code"]) for a in numbered], [(1, "SEAD-001"), (2, "RAD-001"), (3, "XAD-001")])
+    def test_tuyen_dot_theo_nep_va_box(self) -> None:
+        runs, pieces, _ = pipeline()
+        self.assertEqual(len(runs), 5)  # SEAD, RAD, RAD có miệng gió, FAD (hai mảnh nối qua mối nối), cặp 1650
+        got = [(p["code"], p["runCode"], p["joint"], p["len"], p["kind"]) for p in pieces]
+        self.assertEqual(got, [("SEAD-001", "T01", "TDC", 1110, "Đốt chuẩn"), ("SEAD-002", "T01", "TDC", 1110, "Đốt chuẩn"),
+                               ("SEAD-003", "T01", "TDC", 1400, "Box bít đầu"),
+                               ("RAD-001", "T02", "C", 1180, "Đốt chuẩn"), ("RAD-002", "T02", "C", 1180, "Đốt chuẩn"),
+                               ("RAD-003", "T02", "C", 640, "Đoạn bù"), ("RAD-004", "T03", "C", 1300, "Đoạn bù"),
+                               ("FAD-001", "T04", "TDC", 1070, "Đoạn bù"), ("FAD-002", "T04", "TDC", 930, "Đoạn bù")])
+        self.assertEqual(pieces[6]["note"], "có chân rẽ/miệng gió bên hông")
+        self.assertEqual((round(pieces[0]["x"]), round(pieces[0]["y"])), (555, 350))
+        self.assertEqual([r["w"] for r in runs if not r["size"]], [1650])
+
+    def test_khong_co_block_thi_cat_tai_khe(self) -> None:
+        _, pieces, elbows = pipeline(geometry=[])
+        self.assertEqual([(p["code"], p["joint"], p["len"], p["kind"]) for p in pieces],
+                         [("SEAD-001", "TDC", 1110, "Đốt chuẩn"), ("SEAD-002", "TDC", 1110, "Đốt chuẩn"),
+                          ("SEAD-003", "TDC", 1400, "Box bít đầu"),
+                          ("RAD-001", "TDC", 1110, "Đốt chuẩn"), ("RAD-002", "TDC", 1110, "Đốt chuẩn"),
+                          ("RAD-003", "TDC", 780, "Đoạn bù"), ("RAD-004", "TDC", 1300, "Box bít đầu"),
+                          ("FAD-001", "TDC", 1000, "Đoạn bù"), ("FAD-002", "TDC", 850, "Đoạn bù")])  # khe FAD 150 → hai tuyến
+        self.assertNotEqual(pieces[7]["runCode"], pieces[8]["runCode"])
+        self.assertEqual(elbows, [])
+
+    def test_danh_so_he_ngoai_danh_muc(self) -> None:
+        runs, _, _ = pipeline()
+        next(r for r in runs if r["size"] and r["size"][0] == "SEAD")["size"] = ("XAD", 700, 300)
+        joints, boxes = bog.joint_points(GEOMETRY, BBOX), bog.fitting_boxes(GEOMETRY, BBOX)
+        pieces = bog.number_pieces(bog.split_runs(runs, joints, boxes))
+        self.assertEqual(pieces[-1]["code"], "XAD-003")
+
+    def test_nhan_dien_co(self) -> None:
+        _, _, elbows = pipeline()
+        self.assertEqual([(e["code"], e["sys"], e["W"], e["H"], e["angle"], e["joint"]) for e in elbows],
+                         [("CO-001", "SEAD", 700, 300, 90, "TDC"), ("CO-002", "RAD", 400, 250, 45, "C"),
+                          ("CO-003", None, None, None, 90, "?")])
 
     def test_dem_phu_kien(self) -> None:
         c = bog.count_fittings(GEOMETRY, BBOX)
-        self.assertEqual(c, collections.Counter({"Rec_C_Elbow_Square": 2, "DSupport": 1}))
+        self.assertEqual(c, collections.Counter({"Rec_TDC_Union": 3, "Rec_C_Elbow_Square": 2, "Rec_C_Transition": 2,
+                                                 "Rec_C_Union": 1, "Rec_Cap_End": 1, "Rec_C_Elbow_45": 1, "DSupport": 1}))
 
 
 class XlsxTests(unittest.TestCase):
@@ -158,9 +259,8 @@ class XlsxTests(unittest.TestCase):
         self.assertNotIn('r="D1"', xml)
 
     def test_workbook_day_du_va_cong_thuc_dung_dong(self) -> None:
-        assigned = bog.assign_sizes(bog.pair_segments(bog.duct_segments(ENTITIES, BBOX)), bog.parse_tags(TEXTS, BBOX))
-        numbered = bog.number_segments(assigned)
-        sheets = bog.build_sheets(numbered, [a for a in assigned if not a["sys"]],
+        runs, pieces, elbows = pipeline()
+        sheets = bog.build_sheets(pieces, elbows, [r for r in runs if not r["size"]],
                                   bog.count_fittings(GEOMETRY, BBOX), "test.dwg", 0.05)
         with tempfile.TemporaryDirectory() as d:
             out = Path(d) / "kl.xlsx"
@@ -169,16 +269,26 @@ class XlsxTests(unittest.TestCase):
                 self.assertIsNone(z.testzip())
                 wb = z.read("xl/workbook.xml").decode()
             self.assertEqual(re.findall(r'<sheet name="([^"]+)"', wb),
-                             ["Tổng hợp", "Chi tiết", "Phụ kiện", "Chưa xác định", "Ghi chú"])
-            tot, det = sheet_cells(out, 1), sheet_cells(out, 2)
-            self.assertEqual(tot["I3"], 0.05)
-            self.assertEqual((tot["B6"], tot["C7"], tot["D7"]), ("Hút khói (Smoke Exhaust Air Duct)", "SEAD", "700x300"))
-            self.assertEqual(tot["I7"], "=ROUND(G7*H7,2)")
-            self.assertEqual(tot["J7"], "=ROUND(I7*(1+$I$3),2)")
-            self.assertEqual((det["B4"], det["G4"], det["H4"]), ("SEAD-001", 5.0, "=2*(E4+F4)/1000"))
-            self.assertEqual(det["G6"], "=SUM(G4:G5)")
-            self.assertEqual(sheet_cells(out, 3)["D4"], 2.0)
-            self.assertEqual(sheet_cells(out, 4)["B4"], 1650.0)
+                             ["Tổng hợp", "Chi tiết", "Đoạn bù &amp; box", "Co", "Phụ kiện", "Chưa xác định", "Ghi chú"])
+            tot, det, fill, co = (sheet_cells(out, i) for i in (1, 2, 3, 4))
+            self.assertEqual(tot["S3"], 0.05)
+            self.assertEqual((tot["B6"], tot["C7"], tot["D7"], tot["G7"], tot["H7"]),
+                             ("Hút khói (Smoke Exhaust Air Duct)", "SEAD", "700x300", "TDC", 1110.0))
+            self.assertEqual(tot["I7"], "=COUNTIFS('Chi tiết'!D:D,C7,'Chi tiết'!E:E,D7,'Chi tiết'!J:J,\"Đốt chuẩn\")")
+            self.assertEqual(tot["P7"], "=COUNTIFS(Co!D:D,C7,Co!E:E,D7)")
+            self.assertEqual(tot["S7"], "=ROUND(R7*(1+$S$3),2)")
+            self.assertEqual((tot["G9"], tot["H9"]), ("C", 1180.0))
+            self.assertEqual((det["B4"], det["C4"], det["H4"], det["J4"], det["K4"], det["L4"]),
+                             ("SEAD-001", "T01", "TDC", "Đốt chuẩn", 1110.0, "=K4/1000"))
+            self.assertEqual((det["B6"], det["J6"], det["N6"]), ("SEAD-003", "Box bít đầu", "=ROUND(L6*M6+F6*G6/1000000,3)"))
+            self.assertEqual(det["S10"], "có chân rẽ/miệng gió bên hông")
+            self.assertEqual(det["L13"], "=SUM(L4:L12)")
+            self.assertEqual([fill[f"E{r}"] for r in range(4, 9)], [1400.0, 640.0, 1300.0, 930.0, 1070.0])
+            self.assertEqual(fill["B4"], "Box bít đầu")
+            self.assertEqual((co["B4"], co["C4"], co["J4"]), ("CO-001", "Co 90°", "=ROUND(F4*TAN(RADIANS(H4/2))/1000,3)"))
+            self.assertEqual((co["D6"], co["E6"]), ("?", "?"))
+            self.assertEqual(sheet_cells(out, 5)["D4"], 3.0)
+            self.assertEqual(sheet_cells(out, 6)["B4"], 1650.0)
 
 
 class FakeAgent:
@@ -202,7 +312,7 @@ class FakeAgent:
             if self.fail:
                 self.fail = False
                 return {"error": "Timeout"}
-            return {"entities": GEOMETRY[:1]}
+            return {"entities": JOINTS[:2]}
         return {"filename": "C:\\du an\\Tang 2.dwg"}
 
 
@@ -212,7 +322,7 @@ class LiveAndMainTests(unittest.TestCase):
         entities, texts, geometry, name = bog.fetch_live(agent, pause=0)
         self.assertEqual(len(entities), len(ENTITIES) + 1)
         self.assertEqual(agent.calls.count("entity_geometry"), 2)
-        self.assertEqual((len(texts), len(geometry), name), (len(TEXTS), 1, "Tang 2.dwg"))
+        self.assertEqual((len(texts), len(geometry), name), (len(TEXTS), 2, "Tang 2.dwg"))
 
     def test_fetch_live_bao_loi(self) -> None:
         for bad in ("entities", "text"):
@@ -229,11 +339,12 @@ class LiveAndMainTests(unittest.TestCase):
             buf = io.StringIO()
             with redirect_stdout(buf):
                 code = bog.main(["--entities", str(e), "--texts", str(t), "--geometry", str(g),
-                                 "--bbox=-1000,-1000,20000,20000", "-o", str(out)])
+                                 "--bbox=-1000,-1000,25000,25000", "-o", str(out)])
             self.assertEqual(code, 0)
             self.assertTrue(out.is_file())
-            self.assertIn("2 đoạn, 8.00 m", buf.getvalue())
-            self.assertIn("1 cặp chưa xác định (2.00 m)", buf.getvalue())
+            self.assertIn("4 đốt chuẩn, 4 đoạn bù, 1 box bít đầu trên 4 tuyến (8.52 m ống), 3 co, 16.06 m² tôn",
+                          buf.getvalue())
+            self.assertIn("1 tuyến chưa xác định (2.00 m)", buf.getvalue())
             self.assertIn("e.json", sheet_cells(out, 1)["A2"])
 
             with redirect_stderr(io.StringIO()) as err:
@@ -241,12 +352,13 @@ class LiveAndMainTests(unittest.TestCase):
                 self.assertEqual(bog.main(["--entities", str(Path(d) / "khong-co.json"), "--texts", str(t), "-o", str(out)]), 2)
                 self.assertEqual(bog.main(["--entities", str(e), "--texts", str(t), "--layer-prefix", "KHONG-CO", "-o", str(out)]), 1)
             self.assertIn("không có --bbox", err.getvalue())
+            self.assertIn("không có block mối nối", err.getvalue())
 
     def test_main_doc_truc_tiep_qua_bridge(self) -> None:
         with tempfile.TemporaryDirectory() as d, mock.patch.object(bog.time, "sleep"):
             out = Path(d) / "kl.xlsx"
             with redirect_stdout(io.StringIO()):
-                self.assertEqual(bog.main(["--bbox=-1000,-1000,20000,20000", "-o", str(out)], agent=FakeAgent()), 0)
+                self.assertEqual(bog.main(["--bbox=-1000,-1000,25000,25000", "-o", str(out)], agent=FakeAgent()), 0)
             self.assertEqual(sheet_cells(out, 1)["A2"], "Nguồn: Tang 2.dwg")
             with redirect_stderr(io.StringIO()):
                 self.assertEqual(bog.main(["-o", str(out)], agent=FakeAgent(bad="text")), 2)
