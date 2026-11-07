@@ -36,6 +36,9 @@ class IdsConformanceTests(unittest.TestCase):
             self.assertEqual("pass", conf.run_case("r.dll", Path("x/pass-a.ids")))
         self.assertEqual("utf-8", run.call_args.kwargs["encoding"])
         stream = mock.Mock()
+        # Python 3.14: argparse dò màu qua stdout.fileno()/isatty() — giả như stream không phải terminal.
+        stream.fileno.side_effect = io.UnsupportedOperation
+        stream.isatty.return_value = False
         with tempfile.TemporaryDirectory() as folder, mock.patch.object(conf.sys, "stdout", stream), \
                 redirect_stderr(io.StringIO()):
             self.assertEqual(1, conf.main([folder, "--runner", "r.dll"]))

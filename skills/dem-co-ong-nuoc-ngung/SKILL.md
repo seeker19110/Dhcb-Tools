@@ -67,4 +67,11 @@ Lập bảng gồm: vị trí (toạ độ gần đúng), handle co, loại co, 
 bằng**, **co 45 ở chi tiết đổi cao độ**, và **chưa chắc**. Nói rõ những gì chỉ suy ra từ hình 2D, chưa kiểm
 trong mô hình.
 
-Nếu repo là public, không chép tên bản vẽ hay số khối lượng thật của dự án vào commit hoặc PR.
+## Không được làm
+
+- Không đếm co theo tên block hay theo layer: tên block Revit không mang góc, cũng không mang cỡ ống.
+- Không tính co chỉ vì hộp bao của nó chạm ống: phải đo cỡ của chính ống nối vào co.
+- Không bỏ qua đoạn ngắn thẳng hàng kẹp giữa 2 co: đó là chi tiết đổi cao độ, tính 2 co 45.
+- Không tự gán góc cho co chuyển sang ống đứng khi chưa có cao độ hoặc mô hình; ghi riêng ra và hỏi kỹ sư.
+- Không sửa hay xoá entity trong bản vẽ; skill chỉ đọc.
+- Không commit tên bản vẽ, handle hay số khối lượng thật của dự án vào repo public.
