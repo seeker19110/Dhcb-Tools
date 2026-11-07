@@ -133,6 +133,13 @@ class LoadTokenTests(unittest.TestCase):
                 mock.patch("builtins.open", side_effect=OSError("không có file")):
             self.assertEqual("", dhcb_agent.load_token())
 
+    def test_khong_co_appdata_tra_chuoi_rong_khong_mo_file(self) -> None:
+        """Tiến trình bị xoá APPDATA (dịch vụ, sandbox) không đoán đường dẫn token."""
+        with mock.patch.dict(dhcb_agent.os.environ, {}, clear=True), \
+                mock.patch("builtins.open") as mo:
+            self.assertEqual("", dhcb_agent.load_token())
+        mo.assert_not_called()
+
 
 class RequestTests(unittest.TestCase):
     def setUp(self) -> None:
