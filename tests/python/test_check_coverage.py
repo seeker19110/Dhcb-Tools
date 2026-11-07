@@ -102,7 +102,7 @@ class CheckCoverageTests(unittest.TestCase):
         """Hồi quy: cổng phủ từng sập ở máy Windows trước khi in nổi một dòng.
 
         Console Windows mặc định cp1252, mà mọi thông báo của cổng đều có dấu tiếng Việt →
-        UnicodeEncodeError ngay ở print đầu tiên. CI Linux chạy UTF-8 nên không bao giờ đỏ,
+        UnicodeEncodeError ngay ở print đầu tiên. Console UTF-8 không làm lộ lỗi này,
         lỗi chỉ lộ khi chạy tay ở máy. main() nay tự đặt lại encoding cho stdout/stderr.
         """
         write_report(self.folder, 1.0, [])

@@ -3,16 +3,17 @@
 Chạy source DHCB để xuất 5 fixture, rồi đối chiếu schema chính thức và reader IfcOpenShell.
 Không cần Revit/AutoCAD; không gửi model/BCF lên dịch vụ ngoài. Công cụ này không đi kèm add-in.
 
-```bash
+```powershell
 python -m pip install bcf-client==0.9.0 lxml==6.1.3
-git init /tmp/bcf-schema
-git -C /tmp/bcf-schema fetch --depth 1 https://github.com/buildingSMART/BCF-XML.git 92fdcf4bfaa8f0576e7562730f341fc7781e2065
-git -C /tmp/bcf-schema checkout FETCH_HEAD -- Schemas
+$schema = Join-Path $env:TEMP 'dhcb-bcf-schema'
+git init $schema
+git -C $schema fetch --depth 1 https://github.com/buildingSMART/BCF-XML.git 92fdcf4bfaa8f0576e7562730f341fc7781e2065
+git -C $schema checkout FETCH_HEAD -- Schemas
 dotnet run --project tools/bcf-acceptance/DhcbTools.Bcf.Acceptance.csproj -c Release -- ./out/bcf-fixtures
-python tools/bcf-acceptance/verify.py ./out/bcf-fixtures /tmp/bcf-schema/Schemas
+python tools/bcf-acceptance/verify.py ./out/bcf-fixtures "$schema/Schemas"
 ```
 
-Trên Windows thay thư mục `/tmp` bằng đường dẫn tạm của bạn. Thư mục fixture phải mới/rỗng;
+Chạy bằng Windows PowerShell trong thư mục repo. Thư mục fixture phải mới/rỗng;
 không ghi đè bằng chứng lần trước. CI chạy cùng lệnh, ghim commit schema và phiên bản reader.
 `requirements-dev.txt` cũng có hai dependency; Python/runtime add-in không cần chúng.
 

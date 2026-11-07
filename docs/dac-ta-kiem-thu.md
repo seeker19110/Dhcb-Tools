@@ -12,8 +12,8 @@ Revit API và AutoCAD .NET API **không mock được một cách trung thực**
 
 | Tầng | Chứa gì | Kiểm thử thế nào |
 |---|---|---|
-| `DhcbTools.Shared.Logic` | CSV, số, đánh số, số học MEPF, tên file, HTML, token | **xUnit tự động, chạy trên CI Linux** |
-| `DhcbTools.BatchRunner` (đường CLI) | mã thoát và thông điệp khi **đầu vào hỏng**: .ifc rác, IDS hỏng/rỗng, job hỏng, nhật ký bị sửa, gói bàn giao | **xUnit tự động, chạy trên CI Linux** (`tests/DhcbTools.BatchRunner.Tests`, §47) |
+| `DhcbTools.Shared.Logic` | CSV, số, đánh số, số học MEPF, tên file, HTML, token | **xUnit tự động, chạy trên CI Windows** |
+| `DhcbTools.BatchRunner` (đường CLI) | mã thoát và thông điệp khi **đầu vào hỏng**: .ifc rác, IDS hỏng/rỗng, job hỏng, nhật ký bị sửa, gói bàn giao | **xUnit tự động, chạy trên CI Windows** (`tests/DhcbTools.BatchRunner.Tests`, §47) |
 | `DhcbTools.Core*` | logic có `Document`/`Database` | kịch bản thủ công trên file mẫu (§4), có checklist |
 | `DhcbTools.Revit` / `DhcbTools.AutoCAD` | Ribbon, ExternalCommand, Bridge | kịch bản thủ công (§4.1) |
 
@@ -25,7 +25,7 @@ một cách không cần thiết.
 
 Chạy:
 
-```bash
+```powershell
 dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj
 ```
 
@@ -36,15 +36,15 @@ CI chạy đúng lệnh này trên mỗi push/PR (`.github/workflows/tests.yml`)
 Cả hai tầng test tự động đều có **ngưỡng phủ 100% dòng**, kiểm ngay trong CI. Thêm code mà không
 thêm test thì job đỏ và nói đúng file:dòng nào chưa chạy.
 
-```bash
+```powershell
 # C# — tầng logic thuần + vỏ hosting
-dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj \
+dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj `
   --collect:"XPlat Code Coverage" --results-directory ./coverage
-python3 scripts/check-coverage.py ./coverage
+python scripts/check-coverage.py ./coverage
 
 # Python — scripts/ và tools/autocad-mcp-server/
 pip install -r requirements-dev.txt
-python3 -m coverage run -m pytest && python3 -m coverage report
+python -m coverage run -m pytest && python -m coverage report
 ```
 
 Ngưỡng Python nằm ở `fail_under` trong `pyproject.toml`, ngưỡng C# ở
@@ -96,7 +96,7 @@ tham số ≤ 0 ném `ArgumentOutOfRangeException` thay vì lặp vô hạn.
 
 ### 2.5 `FileNamingTests`, `ExportVersionMapTests`, `HtmlTextTests`, `BridgeAuthTests`
 
-- Tên file: thay ký tự cấm (kể cả tập ký tự cấm của Windows khi chạy trên Linux), giữ tiếng Việt,
+- Tên file: thay ký tự cấm theo tập ký tự cấm của Windows, giữ tiếng Việt,
   cắt dấu chấm/dấu cách cuối, tên rỗng → `unnamed`, token trong mẫu được sanitize **trước** khi ghép
   (để `A/101` không thành thư mục con), và chống trùng tên không phân biệt hoa thường.
 - Phiên bản xuất: `AcadRelease2018`/`2013` → hằng đúng; `IFC2x3 CV 2.0 + 4D` **không** bị đọc nhầm

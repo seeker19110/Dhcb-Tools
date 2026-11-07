@@ -128,8 +128,8 @@ class LoadTokenTests(unittest.TestCase):
             self.assertEqual("token-tu-file", dhcb_agent.load_token())
 
     def test_khong_co_file_tra_chuoi_rong(self) -> None:
-        """Không có token thì vẫn gửi request (để Bridge trả 401 nói rõ), chứ không nổ tại client."""
-        with mock.patch.dict(dhcb_agent.os.environ, {}, clear=True), \
+        """File token thiếu được báo ngay, không gửi request xác thực lỗi tới Bridge."""
+        with mock.patch.dict(dhcb_agent.os.environ, {"APPDATA": "C:/fixture-appdata"}, clear=True), \
                 mock.patch("builtins.open", side_effect=OSError("không có file")):
             self.assertEqual("", dhcb_agent.load_token())
 

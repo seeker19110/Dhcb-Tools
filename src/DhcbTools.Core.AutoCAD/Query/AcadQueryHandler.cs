@@ -21,8 +21,22 @@ public static class AcadQueryHandler
     public const string ValidQueries =
         "drawing_info, layers, blocks, inserts, entities, text, xrefs, layouts, stats, entity_geometry, attributes_of, snapshot";
 
+    // Resolve known managed types before walking Model Space: reject unrelated native classes
+    // without materializing managed Entity wrappers for every line in a large drawing.
+    private static readonly Dictionary<string, Type> EntityTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Line"] = typeof(Line), ["Arc"] = typeof(Arc), ["Circle"] = typeof(Circle),
+        ["Polyline"] = typeof(Polyline), ["DBText"] = typeof(DBText), ["MText"] = typeof(MText),
+        ["BlockReference"] = typeof(BlockReference), ["Ray"] = typeof(Ray), ["Xline"] = typeof(Xline),
+        ["Spline"] = typeof(Spline), ["Ellipse"] = typeof(Ellipse), ["DBPoint"] = typeof(DBPoint),
+    };
+
     public static object Handle(Database db, QueryRequest req)
     {
+        if (req == null || req.Params == null || string.IsNullOrWhiteSpace(req.Query))
+            return new { error = "query và params phải là object/chuỗi hợp lệ, không được null hoặc rỗng." };
+        if (req.Params.Handles?.Count > QueryPage.MaxLimit)
+            return new { error = "handles tối đa 10000 phần tử; chia nhỏ danh sách để truy vấn/chọn." };
         if (req.Params.Limit < 0 || req.Params.Limit > QueryPage.MaxLimit || req.Params.Offset < 0)
             return new { error = "limit phải từ 0 đến 10000; offset phải không âm. 0 dùng giới hạn mặc định 2000." };
         return req.Query.ToUpperInvariant() switch
@@ -179,8 +193,10 @@ public static class AcadQueryHandler
 
         var list = new List<object>();
         var page = new QueryPage(p.Limit, p.Offset);
+        var insertClass = Autodesk.AutoCAD.Runtime.RXObject.GetClass(typeof(BlockReference));
         foreach (ObjectId entId in ms)
         {
+            if (!entId.ObjectClass.IsDerivedFrom(insertClass)) continue;
             if (tr.GetObject(entId, OpenMode.ForRead) is not BlockReference br) continue;
 
             var blockName = br.IsDynamicBlock
@@ -240,14 +256,18 @@ public static class AcadQueryHandler
 
         var list = new List<object>();
         var page = new QueryPage(p.Limit, p.Offset);
+        var entityType = string.Equals(p.EntityType, "Text", StringComparison.OrdinalIgnoreCase) ? "DBText" : p.EntityType;
+        EntityTypes.TryGetValue(entityType ?? string.Empty, out var managedType);
+        var nativeClass = managedType == null ? null : Autodesk.AutoCAD.Runtime.RXObject.GetClass(managedType);
         foreach (ObjectId entId in ms)
         {
+            if (nativeClass != null && !entId.ObjectClass.IsDerivedFrom(nativeClass)) continue;
             var entity = tr.GetObject(entId, OpenMode.ForRead) as Entity;
             if (entity is null) continue;
 
             var typeName = entity.GetType().Name;
-            if (p.EntityType is { Length: > 0 } &&
-                !string.Equals(typeName, p.EntityType, StringComparison.OrdinalIgnoreCase))
+            if (entityType is { Length: > 0 } &&
+                !string.Equals(typeName, entityType, StringComparison.OrdinalIgnoreCase))
                 continue;
 
             if (p.LayerContains is { Length: > 0 } &&
@@ -323,30 +343,34 @@ public static class AcadQueryHandler
 
         var list = new List<object>();
         var page = new QueryPage(p.Limit, p.Offset);
+        var textClass = Autodesk.AutoCAD.Runtime.RXObject.GetClass(typeof(DBText));
+        var mtextClass = Autodesk.AutoCAD.Runtime.RXObject.GetClass(typeof(MText));
         foreach (ObjectId entId in ms)
         {
-            var entity = tr.GetObject(entId, OpenMode.ForRead);
-
-            if (p.TextLayer is { Length: > 0 } && entity is Entity e &&
-                e.Layer.IndexOf(p.TextLayer, StringComparison.OrdinalIgnoreCase) < 0)
+            var cls = entId.ObjectClass;
+            if (!cls.IsDerivedFrom(textClass) && !cls.IsDerivedFrom(mtextClass)) continue;
+            if (tr.GetObject(entId, OpenMode.ForRead) is not Entity entity) continue;
+            if ((p.TextLayer is { Length: > 0 } && entity.Layer.IndexOf(p.TextLayer, StringComparison.OrdinalIgnoreCase) < 0)
+                || (p.LayerContains is { Length: > 0 } && entity.Layer.IndexOf(p.LayerContains, StringComparison.OrdinalIgnoreCase) < 0))
                 continue;
-
-            if (entity is not DBText && entity is not MText) continue;
+            var display = entity is MText mtDisplay ? mtDisplay.Text : ((DBText)entity).TextString;
+            if (p.TextContains is { Length: > 0 } && display.IndexOf(p.TextContains, StringComparison.OrdinalIgnoreCase) < 0)
+                continue;
             if (!page.IncludeMatch())
             {
                 if (page.HasMore) break;
                 continue;
             }
-
+            var handle = HandleText.ToText(entId.Handle.Value);
             switch (entity)
             {
                 case DBText t:
-                    list.Add(new { type = "DBText", layer = t.Layer, text = t.TextString,
-                                   x = t.Position.X, y = t.Position.Y, height = t.Height });
+                    list.Add(new { handle, type = "DBText", layer = t.Layer, text = t.TextString, displayText = display,
+                                   x = t.Position.X, y = t.Position.Y, z = t.Position.Z, height = t.Height });
                     break;
                 case MText mt:
-                    list.Add(new { type = "MText", layer = mt.Layer, text = mt.Contents,
-                                   x = mt.Location.X, y = mt.Location.Y, width = mt.Width });
+                    list.Add(new { handle, type = "MText", layer = mt.Layer, text = mt.Contents, displayText = display,
+                                   x = mt.Location.X, y = mt.Location.Y, z = mt.Location.Z, width = mt.Width });
                     break;
             }
         }

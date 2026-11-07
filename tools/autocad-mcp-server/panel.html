@@ -721,6 +721,18 @@
   <!-- Content -->
   <main class="content">
 
+    <div class="card">
+      <div class="card-header">Tác vụ AutoCAD</div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
+        <div class="layers-toolbar">
+          <input class="field" id="recoverJobId" placeholder="Job ID để đọc lại kết quả sau khi mất kết nối">
+          <button class="btn" onclick="recoverJob()">Đọc kết quả</button>
+        </div>
+        <div id="jobsList" style="font-size:12px;color:var(--muted);">Lệnh dài chạy nền; kết quả và tiến độ sẽ xuất hiện tại đây.</div>
+        <div class="result-box" id="jobResult" style="max-height:220px;min-height:0;"></div>
+      </div>
+    </div>
+
     <!-- ── Query ──────────────────────────────── -->
     <div class="panel-page active" id="tab-query">
       <div class="page-title">📊 Query <small>Truy vấn bản vẽ hiện tại</small></div>
@@ -756,12 +768,23 @@
               <span class="qico">⬛</span>Blocks
             </button>
           </div>
+          <div class="form-section" style="margin-top:14px;">
+            <div class="form-row"><label class="form-label">Dữ liệu</label><select class="field" id="queryType"><option value="text">Text</option><option value="entities">Entities</option><option value="inserts">Inserts</option><option value="blocks">Blocks</option><option value="layers">Layers</option></select></div>
+            <div class="form-row"><label class="form-label">Tên layer chứa</label><input class="field" id="queryLayer" placeholder="Để trống = mọi layer"></div>
+            <div class="form-row"><label class="form-label">Nội dung text chứa</label><input class="field" id="queryText" placeholder="Tìm trong chữ hiển thị DBText/MText"></div>
+            <div class="form-row"><label class="form-label">Tên block chứa</label><input class="field" id="queryBlock" placeholder="Áp dụng cho Blocks; Inserts dùng tên chính xác"></div>
+            <div class="form-row"><label class="form-label">Số dòng mỗi trang</label><select class="field" id="queryLimit"><option>50</option><option selected>200</option><option>1000</option><option>5000</option><option>10000</option></select></div>
+          </div>
+          <button class="btn primary" style="margin-top:10px;" onclick="runFilteredQuery()">Tìm trong bản vẽ</button>
         </div>
       </div>
 
       <div class="result-wrap">
         <div class="result-toolbar">
           <span class="result-label-txt" id="queryLabel">Kết quả</span>
+          <span id="queryPageLabel" style="font-size:11px;color:var(--muted);"></span>
+          <button class="btn sm ghost" id="queryPrev" disabled onclick="turnQueryPage(-1)">← Trang trước</button>
+          <button class="btn sm ghost" id="queryNext" disabled onclick="turnQueryPage(1)">Trang sau →</button>
           <button class="btn sm ghost" onclick="clearResult('queryResult')">✕ Xoá</button>
         </div>
         <div class="result-box" id="queryResult"></div>
@@ -778,9 +801,10 @@
             <button class="btn primary" onclick="loadLayers()">↻ Tải layers</button>
             <div class="search-wrap">
               <span class="search-ico">🔍</span>
-              <input class="search-field field" id="layerFilter" placeholder="Lọc tên layer..." oninput="filterLayers()">
+              <input class="search-field field" id="layerFilter" placeholder="Lọc trong layer đã tải..." oninput="filterLayers()">
             </div>
             <button class="btn" onclick="exportLayers()">💾 Xuất CSV</button>
+            <button class="btn" id="layersMore" disabled onclick="loadLayers(false)">Tải thêm layers</button>
           </div>
           <div id="layerCount" style="font-size:11px;color:var(--muted);"></div>
 
@@ -1003,6 +1027,8 @@ const BASE = location.protocol === 'http:' ? location.origin : 'http://127.0.0.1
 const PANEL_TOKEN = '__PANEL_TOKEN__';
 let allLayers = [];
 const previews = new Map();
+const jobs = new Map();
+let querySession = null, layerSession = null;
 
 // ── Helpers ──────────────────────────────────────
 function isComplete(result) {
@@ -1010,9 +1036,10 @@ function isComplete(result) {
 }
 
 function outcomeBadge(result, isDry, doneText, dryText = 'DRY RUN') {
-  if (result.outcomeUnknown || (result.id && result.status === 'running')) {
+  if (result.outcomeUnknown) {
     return '<span class="badge badge-dry">⚠ CHƯA XÁC ĐỊNH — KHÔNG GỬI LẠI</span>';
   }
+  if (result.id && result.status === 'running') return '<span class="badge badge-dry">⏳ ĐANG CHẠY — KHÔNG GỬI LẠI</span>';
   if (!result.success) return '<span class="badge badge-err">✗ THẤT BẠI</span>';
   if (!isComplete(result)) return '<span class="badge badge-dry">⚠ MỘT PHẦN — XEM LỖI</span>';
   return isDry
@@ -1025,18 +1052,123 @@ async function apiFetch(path, body) {
   if (executing && body.config?.dryRun === false && !body.previewToken) {
     const preview = previews.get(body.command);
     if (!preview) return {success:false, summary:'Hãy xem trước và duyệt kết quả trước khi ghi.'};
+    if (preview.configKey !== configKey(body.config)) return {success:false, summary:'Cấu hình đã thay đổi. Hãy xem trước lại trước khi ghi.'};
     body = {...body, documentId:preview.documentId, previewToken:preview.previewToken};
+  }
+  if (executing) {
+    const active = [...jobs.values()].find(job => !job.resolved && job.request?.command === body.command);
+    if (active) return {success:false, id:active.id, status:'running', summary:'Tác vụ này còn đang xử lý. Đọc tiến độ trước khi gửi thêm lệnh.'};
+    if (body.config?.dryRun !== false) previews.delete(body.command);
   }
   const opts = body
     ? { method:'POST', headers:{'Content-Type':'application/json', 'X-Panel-Token':PANEL_TOKEN}, body: JSON.stringify(body) }
     : { method:'GET', headers:{'X-Panel-Token':PANEL_TOKEN} };
-  const r = await fetch(BASE + path, opts);
-  const result = await r.json();
-  if (executing && body.config?.dryRun !== false) {
-    previews.delete(body.command);
-    if (isComplete(result) && result.previewToken) previews.set(body.command, result);
+  let result;
+  try {
+    const r = await fetch(BASE + path, opts);
+    result = await r.json();
+    if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('Phản hồi không hợp lệ');
+    if (r.ok === false) result.success = false;
+  } catch (_) {
+    return {success:false, outcomeUnknown:!!executing,
+      summary:executing ? 'Kết nối bị ngắt; chưa xác định kết quả. KHÔNG gửi lại lệnh ghi. Đọc job ID nếu đã nhận được.' : 'Không đọc được phản hồi gateway. Kiểm tra kết nối rồi thử đọc lại.'};
+  }
+  if (executing) {
+    rememberPreview(body, result);
+    if (result.id) {
+      jobs.set(String(result.id), {id:String(result.id), request:body, state:result, resolved:false});
+      for (const [id, job] of jobs) if (jobs.size > 20 && job.resolved) jobs.delete(id);
+    }
   }
   return result;
+}
+
+function configKey(config) {
+  return JSON.stringify(Object.fromEntries(Object.keys(config || {}).filter(key => key !== 'dryRun').sort().map(key => [key, config[key]])));
+}
+
+function rememberPreview(request, result) {
+  if (request?.config?.dryRun !== false && isComplete(result) && result.previewToken && result.documentId) {
+    previews.set(request.command, {...result, configKey:configKey(request.config)});
+  }
+}
+
+function jobOutcome(state, id) {
+  if (state.success === false) return {...state, id, outcomeUnknown:true};
+  if (state.status === 'done' && state.result && typeof state.result === 'object' && !Array.isArray(state.result)) return {...state.result, id};
+  if (state.status === 'abandoned') return {success:false, abandoned:true, id, summary:state.error || 'Đã hủy trước khi chạy.'};
+  if (state.status === 'error') return {success:false, id, summary:state.error || 'Tác vụ kết thúc với lỗi.'};
+  return {...state, id, success:false, outcomeUnknown:true, summary:state.summary || state.error || 'Chưa có kết quả cuối; KHÔNG gửi lại lệnh ghi.'};
+}
+
+async function executeTracked(request, target) {
+  const result = await apiFetch('/execute', {...request, async:true});
+  const job = result.id && jobs.get(String(result.id));
+  if (job) job.target = target;
+  renderJobs();
+  return result;
+}
+
+function renderJobs() {
+  document.getElementById('jobsList').innerHTML = [...jobs.values()].reverse().map(job => {
+    const state = job.state || {}, progress = state.progress || {};
+    const label = job.lastError ? 'Chưa đọc được kết quả' : job.resolved ? (state.status === 'done' ? 'Đã kết thúc' : state.status === 'abandoned' ? 'Đã hủy' : 'Lỗi') : state.started ? 'Đang chạy' : 'Đang chờ';
+    const detail = job.lastError || progress.message || progress.stage || state.summary || '';
+    const measured = Number.isFinite(progress.completed) && progress.total > 0 ? ` · ${progress.completed}/${progress.total} (${Math.min(100,Math.round(100*progress.completed/progress.total))}%)` : '';
+    return `<div style="margin-bottom:8px;"><strong>${escHtml(job.request?.command || state.command || 'Tác vụ')}</strong> · ${escHtml(label)} · ${escHtml(Math.round((state.elapsedMs || 0)/1000))} s<br><span>${escHtml(job.id)}</span> ${escHtml(detail + measured)}
+      <button class="btn sm ghost" data-job="${escHtml(job.id)}" onclick="refreshJob(this.dataset.job)">Đọc kết quả</button>
+      ${!job.resolved && (!state.started || state.canCancel) ? `<button class="btn sm ghost" data-job="${escHtml(job.id)}" ${state.cancellationRequested ? 'disabled' : ''} onclick="cancelJob(this.dataset.job)">${state.cancellationRequested ? 'Đang yêu cầu hủy' : 'Yêu cầu hủy'}</button>` : ''}</div>`;
+  }).join('') || 'Chưa có tác vụ nền.';
+}
+
+async function refreshJob(id) {
+  const job = jobs.get(id);
+  if (!job || job.polling) return;
+  job.polling = true;
+  try {
+    const state = await apiFetch('/progress/' + encodeURIComponent(id));
+    if (state.status) {
+      job.state = state;
+      job.resolved = ['done','error','abandoned'].includes(state.status);
+      job.lastError = '';
+    } else job.lastError = state.summary || state.error || 'Không đọc được tiến độ; giữ nguyên job ID để hỏi lại.';
+    const result = jobOutcome(state, id);
+    if (job.resolved && job.request) rememberPreview(job.request, result);
+    showResult('jobResult', job.resolved ? result : state);
+    if (job.target) {
+      if (job.target.result) showResult(job.target.result, result);
+      if (job.target.badge) document.getElementById(job.target.badge).innerHTML = outcomeBadge(job.resolved ? result : state, job.request.config?.dryRun !== false, 'ĐÃ HOÀN THÀNH');
+      if (job.target.message) document.getElementById(job.target.message).textContent = result.summary || state.error || 'Đang xử lý trong AutoCAD...';
+    }
+  } finally {
+    job.polling = false;
+    renderJobs();
+  }
+}
+
+async function cancelJob(id) {
+  const state = await apiFetch('/cancel/' + encodeURIComponent(id), {});
+  showResult('jobResult', state);
+  await refreshJob(id);
+}
+
+async function recoverJob() {
+  const id = document.getElementById('recoverJobId').value.trim();
+  if (!id || id.length > 128) return;
+  if (!jobs.has(id)) jobs.set(id, {id, state:{}, resolved:false});
+  await refreshJob(id);
+}
+
+async function drawingContext() {
+  const result = await apiFetch('/query', {query:'document_context'});
+  if (!result.documentId) throw new Error(result.error || result.summary || 'Không xác minh được phiên bản vẽ; cần cập nhật Bridge.');
+  return result;
+}
+
+function assertSameDrawing(expected, actual) {
+  if (expected.documentId !== actual.documentId || (expected.revision !== undefined && actual.revision !== expected.revision)) {
+    throw new Error('Bản vẽ đã đổi hoặc được chỉnh sửa. Tải lại từ trang đầu để tránh trộn dữ liệu.');
+  }
 }
 
 function setLoading(el, msg = 'Đang tải...') {
@@ -1101,14 +1233,28 @@ function switchTab(name, el) {
 }
 
 // ── Query Tab ────────────────────────────────────
-async function runQuery(type, config) {
+async function runQuery(type, config, existingSession = null) {
   const el  = document.getElementById('queryResult');
   const lbl = document.getElementById('queryLabel');
+  const session = existingSession || {type, config:{limit:200, offset:0, ...(config || {})}, history:[]};
+  querySession = session;
+  document.getElementById('queryPrev').disabled = true;
+  document.getElementById('queryNext').disabled = true;
   setLoading(el);
   lbl.textContent = type + '…';
   try {
-    const body = config ? { query: type, config } : { query: type };
+    const context = await drawingContext();
+    if (session.context) assertSameDrawing(session.context, context);
+    else session.context = context;
+    const body = {query:type, config:session.config, documentId:session.context.documentId};
     const d = await apiFetch('/query', body);
+    if (d.error || d.success === false) throw new Error(d.error || d.summary);
+    assertSameDrawing(session.context, await drawingContext());
+    if (querySession !== session) return;
+    session.nextOffset = Number.isInteger(d.nextOffset) && d.nextOffset > session.config.offset && d.hasMore ? d.nextOffset : null;
+    document.getElementById('queryPrev').disabled = session.history.length === 0;
+    document.getElementById('queryNext').disabled = session.nextOffset === null;
+    document.getElementById('queryPageLabel').textContent = `Từ dòng ${session.config.offset + 1} · ${d.count ?? d.total ?? ''} kết quả`;
 
     if (type === 'stats' && d.byType) {
       const cards = document.getElementById('statCards');
@@ -1128,22 +1274,72 @@ async function runQuery(type, config) {
 
     showResult('queryResult', d, 'queryLabel', `${type} — ${new Date().toLocaleTimeString('vi')}`);
   } catch(e) {
-    el.innerHTML = `<span class="err">Lỗi: ${escHtml(e.message)}</span>`;
+    if (querySession === session) {
+      querySession = null;
+      el.innerHTML = `<span class="err">Lỗi: ${escHtml(e.message)}</span>`;
+      document.getElementById('queryPageLabel').textContent = '';
+    }
   }
 }
 
+function runFilteredQuery() {
+  const type = document.getElementById('queryType').value;
+  const config = {limit:Number(document.getElementById('queryLimit').value), offset:0};
+  const layer = document.getElementById('queryLayer').value.trim();
+  const text = document.getElementById('queryText').value.trim();
+  const block = document.getElementById('queryBlock').value.trim();
+  if (layer) config.layerContains = layer;
+  if (text && type === 'text') config.textContains = text;
+  if (block && type === 'blocks') config.blockNameContains = block;
+  if (block && type === 'inserts') config.blockName = block;
+  return runQuery(type, config);
+}
+
+function turnQueryPage(direction) {
+  const session = querySession;
+  if (!session) return;
+  if (direction > 0 && session.nextOffset !== null) {
+    session.history.push(session.config.offset);
+    session.config = {...session.config, offset:session.nextOffset};
+  } else if (direction < 0 && session.history.length) {
+    session.config = {...session.config, offset:session.history.pop()};
+  } else return;
+  return runQuery(session.type, session.config, session);
+}
+
 // ── Layers Tab ───────────────────────────────────
-async function loadLayers() {
+async function loadLayers(reset = true) {
   const tbody = document.getElementById('layerBody');
-  tbody.innerHTML = '<tr><td colspan="7" style="padding:16px"><span class="spinner"></span><span class="loading-txt">Đang tải layers...</span></td></tr>';
+  if (reset) { allLayers = []; layerSession = {nextOffset:0}; }
+  const session = layerSession;
+  if (!session || session.loading || session.nextOffset === null) return;
+  session.loading = true;
+  document.getElementById('layersMore').disabled = true;
+  if (reset) tbody.innerHTML = '<tr><td colspan="7" style="padding:16px"><span class="spinner"></span><span class="loading-txt">Đang tải layers...</span></td></tr>';
   try {
-    const d = await apiFetch('/query', { query: 'layers' });
-    allLayers = d.layers || [];
+    const context = await drawingContext();
+    if (session.context) assertSameDrawing(session.context, context);
+    else session.context = context;
+    const offset = session.nextOffset;
+    const d = await apiFetch('/query', {query:'layers', config:{limit:500, offset}, documentId:context.documentId});
+    if (d.error || d.success === false || !Array.isArray(d.layers)) throw new Error(d.error || d.summary || 'Phản hồi layers không hợp lệ');
+    assertSameDrawing(session.context, await drawingContext());
+    if (layerSession !== session) return;
+    allLayers.push(...d.layers);
+    session.nextOffset = d.hasMore && Number.isInteger(d.nextOffset) && d.nextOffset > offset ? d.nextOffset : null;
+    document.getElementById('layersMore').disabled = session.nextOffset === null;
     document.getElementById('layerCount').textContent =
-      `${allLayers.length} layer${allLayers.length !== 1 ? 's' : ''} — dùng ô tìm kiếm để lọc`;
-    renderLayerTable(allLayers);
+      `${allLayers.length} layers đã tải${session.nextOffset !== null ? ' — còn trang tiếp theo' : ' — đã tải hết'}; ô tìm kiếm lọc trong dữ liệu đã tải.`;
+    filterLayers();
   } catch(e) {
-    tbody.innerHTML = `<tr><td colspan="7" style="padding:12px;color:var(--red)">${escHtml(e.message)}</td></tr>`;
+    if (layerSession === session) {
+      allLayers = [];
+      layerSession = null;
+      document.getElementById('layerCount').textContent = '';
+      tbody.innerHTML = `<tr><td colspan="7" style="padding:12px;color:var(--red)">${escHtml(e.message)}</td></tr>`;
+    }
+  } finally {
+    session.loading = false;
   }
 }
 
@@ -1186,7 +1382,8 @@ async function exportLayers() {
   msg.style.color = 'var(--muted)';
   const out = 'dhcb_layers_export.csv';
   try {
-    const d = await apiFetch('/execute', { command:'LayerExport', config:{ outputPath: out } });
+    const d = await executeTracked({command:'LayerExport', config:{outputPath:out}}, {message:'exportMsg'});
+    if (d.id) { msg.textContent = '⏳ Đã nhận tác vụ xuất CSV; theo dõi kết quả ở trên.'; return; }
     if (isComplete(d)) {
       msg.textContent = `✓ ${d.summary}`;
       msg.style.color = 'var(--green)';
@@ -1224,7 +1421,7 @@ async function runNumbering() {
   try {
     const request = { command: 'AutoNumbering', config };
     if (!isDry) request.confirmation = 'WRITE_AUTONUMBER';
-    const d = await apiFetch('/execute', request);
+    const d = await executeTracked(request, {result:'numResult', badge:'numBadge'});
     badge.innerHTML = outcomeBadge(d, isDry, 'ĐÃ GHI');
     showResult('numResult', d, 'numLabel',
       `AutoNumbering — ${d.affectedCount} blocks — ${new Date().toLocaleTimeString('vi')}`);
@@ -1272,7 +1469,7 @@ async function runCleanup(isDry = true) {
   try {
     const request = { command: 'DrawingCleanup', config };
     if (!isDry) request.confirmation = 'DELETE_UNUSED';
-    const d = await apiFetch('/execute', request);
+    const d = await executeTracked(request, {result:'cleanResult', badge:'cleanBadge'});
     badge.innerHTML = outcomeBadge(d, isDry, 'ĐÃ XOÁ THẬT', 'DRY RUN — CHƯA XOÁ');
     showResult('cleanResult', d, 'cleanLabel',
       `${isDry ? 'Xem trước' : 'ĐÃ XOÁ THẬT'} — ${d.affectedCount || 0} objects — ${new Date().toLocaleTimeString('vi')}`);
@@ -1295,6 +1492,7 @@ async function runRaw() {
   try {
     const body = ep === '/health' ? null : JSON.parse(bodyStr);
     const d = await apiFetch(ep, body);
+    renderJobs();
     const ms = Date.now() - t0;
     document.getElementById('rawTime').textContent = `${ms}ms`;
     showResult('rawResult', d, 'rawLabel', `${ep} — ${ms}ms`);
@@ -1427,6 +1625,7 @@ function clearChat() {
 // ── Init ─────────────────────────────────────────
 healthCheck();
 setInterval(healthCheck, 15000);
+setInterval(() => { for (const job of jobs.values()) if (!job.resolved) refreshJob(job.id); }, 3000);
 </script>
 </body>
 </html>

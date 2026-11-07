@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
-PWSH = shutil.which("pwsh")
+PWSH = shutil.which("powershell") or shutil.which("pwsh")
 HELPER = ROOT / "tools/acceptance/HostPreflight.ps1"
 
 
@@ -21,7 +21,7 @@ class AcceptanceScriptTests(unittest.TestCase):
     def execute(self, code, folder):
         script = folder / "probe.ps1"
         script.write_text("$ErrorActionPreference = 'Stop'\n. " + quote(HELPER)
-                          + "\n" + code, encoding="utf-8")
+                          + "\n" + code, encoding="utf-8-sig")
         return subprocess.run([PWSH, "-NoProfile", "-File", str(script)],
                               capture_output=True, text=True, timeout=30)
 
@@ -78,7 +78,7 @@ class AcceptanceScriptTests(unittest.TestCase):
                 self.assertIn("-p:AcadVersion=2026 -p:AcadRuntime=net10", text)
                 self.assertLess(text.index("Get-AcceptanceHost"), text.index(" build "))
                 self.assertLess(text.index("Assert-AcceptanceOutput"), text.index("New-Item"))
-        helper = HELPER.read_text(encoding="utf-8")
+        helper = HELPER.read_text(encoding="utf-8-sig")
         self.assertIn("-getProperty:TargetDir", helper)
         self.assertIn("-p:AcadVersion=2026 -p:AcadRuntime=net10", helper)
 

@@ -1,6 +1,6 @@
 """Kiểm `scripts/don-ket-qua.ps1` trên thư mục giả: chính sách giữ/xoá và mặc định xem trước.
 
-Chạy pwsh thật làm tiến trình con (CI ubuntu có pwsh); không có pwsh thì bỏ qua.
+Chạy pwsh thật làm tiến trình con (Windows PowerShell 5.1 hoặc pwsh); không có pwsh thì bỏ qua.
 """
 import os
 import shutil
@@ -12,7 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "don-ket-qua.ps1"
-PWSH = shutil.which("pwsh") or shutil.which("powershell")
+PWSH = shutil.which("powershell") or shutil.which("pwsh") or shutil.which("powershell")
 
 
 def _run(*args):

@@ -17,7 +17,7 @@ class QualityGateTests(unittest.TestCase):
         self.gate = self.workflow.split("  quality-gate:\n", 1)[1]
         match = re.search(r"        run: \|\n((?: {10}.*\n|\n)*)", self.gate)
         block = textwrap.dedent(match.group(1)).strip()
-        self.script = block.split("\n", 1)[1].rsplit("\nPY", 1)[0]
+        self.script = block
 
     def test_gate_always_runs_and_covers_every_other_job(self):
         jobs = set(re.findall(r"^  ([\w-]+):$", self.workflow.split("jobs:\n", 1)[1], re.M))
@@ -32,7 +32,7 @@ class QualityGateTests(unittest.TestCase):
                               capture_output=True, text=True, timeout=15)
 
     def test_gate_requires_success_for_every_job(self):
-        names = ("logic-tests", "check-build", "build-wpf-windows", "build-autocad-windows")
+        names = ("logic-tests", "check-build")
         success = {name: {"result": "success"} for name in names}
         result = self.execute(success)
         self.assertEqual(0, result.returncode, result.stderr)

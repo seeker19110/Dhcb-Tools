@@ -1,0 +1,2 @@
+# Windows source checkout; preserve UTF-8 BOM in PowerShell 5.1 scripts.
+* text=auto eol=crlf

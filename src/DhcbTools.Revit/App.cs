@@ -7,9 +7,7 @@ using DhcbTools.Revit.Batch;
 using DhcbTools.Revit.Bridge;
 using DhcbTools.Shared.Hosting;
 using DhcbTools.Shared.Logic.Ai;
-#if !DHCB_NO_WPF
 using DhcbTools.Revit.UI;
-#endif
 
 namespace DhcbTools.Revit;
 
@@ -334,15 +332,12 @@ public sealed class App : IExternalApplication
     /// </summary>
     private static void Decorate(ButtonData data, string id)
     {
-#if !DHCB_NO_WPF
         var glyph = Glyph(id);
         var color = ColorOf(id);
         data.LargeImage = RibbonIcons.Create(glyph, color, RibbonIcons.Large);
         data.Image = RibbonIcons.Create(glyph, color, RibbonIcons.Small);
-#endif
     }
 
-#if !DHCB_NO_WPF
     private static string Glyph(string id)
     {
         // net48 (Revit ≤2024) không có System.Index/Range nên dùng Substring thay cho toán tử [..].
@@ -377,5 +372,4 @@ public sealed class App : IExternalApplication
             => RibbonIcons.Checks,
         _ => RibbonIcons.Mepf,
     };
-#endif
 }

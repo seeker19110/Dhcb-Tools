@@ -1,7 +1,5 @@
 # CD: đóng gói bản Release thật cho từng phiên bản Revit/AutoCAD và phát hành lên GitHub Releases.
-# Chạy trên windows-latest (khác với tests.yml/check-build trên ubuntu) vì đây là build UseWPF thật —
-# runner Linux không có WindowsDesktop SDK cho net48. Không cần cài Revit/AutoCAD: mọi tham chiếu API
-# đều qua package NuGet (Nice3point.Revit.Api.RevitAPI*, AutoCAD.NET*).
+# Build WPF đầy đủ trên Windows; mọi tham chiếu API qua NuGet, không cần cài host.
 #
 # Kích hoạt: đẩy tag "vX.Y.Z" (ví dụ v1.0.0), hoặc chạy tay (workflow_dispatch) với input version.
 name: release
@@ -29,29 +27,25 @@ jobs:
       contents: read
 
   version:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     outputs:
       version: ${{ steps.v.outputs.version }}
     steps:
       - id: v
-        shell: bash
+        shell: pwsh
         # inputs.version đi qua biến môi trường, không nội suy thẳng vào script: giá trị
-        # `1.0.0"$(...)"` từ workflow_dispatch sẽ được bash chạy nếu chèn bằng ${{ }}.
+        # `1.0.0"$(...)"` từ workflow_dispatch có thể được PowerShell thực thi nếu chèn bằng ${{ }}.
         # Tên tag cũng phải qua cùng bộ lọc: git cho phép `$ ( ) ; |` trong tên ref, và tag
         # `v1.2.3$(…)` vẫn khớp mẫu 'v*.*.*'. Output này được chèn vào pwsh/ISCC ở các job sau,
         # nên chỉ để lọt chữ, số, . + -.
         env:
           INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            version="${GITHUB_REF_NAME#v}"
-          else
-            version="$INPUT_VERSION"
-          fi
-          case "$version" in
-            *[!A-Za-z0-9.+-]*|"") echo "version không hợp lệ: chỉ nhận chữ, số, . + -" >&2; exit 1 ;;
-          esac
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.Substring(1) } else { $env:INPUT_VERSION }
+          if (-not $version -or $version -notmatch '\A[A-Za-z0-9.+-]+\z') {
+            throw 'Invalid version: use letters, digits, . + - only.'
+          }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
   build-revit:
     needs: version
@@ -339,7 +333,7 @@ jobs:
   publish:
     if: github.ref_type == 'tag'
     needs: [verify, version, build-revit, build-autocad, build-batchrunner, installer]
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     permissions:
       contents: write
     steps:
@@ -349,7 +343,7 @@ jobs:
           merge-multiple: true
 
       - name: Danh sách gói
-        run: ls -la dist
+        run: Get-ChildItem dist | Format-Table Name, Length
 
       # Ghim SHA (v2.4.x) thay vì tag di động: action này chạy trong job duy nhất có contents: write.
       - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3

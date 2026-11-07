@@ -423,9 +423,13 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Words("nhập layer", "import layer"),
             new CommandDescriptor("DrawingCleanup", AutoCad, "Dọn layer rỗng, block/linetype/textstyle/dimstyle/regapp không dùng", true, "Cleanup", "Purge")
                 .Field("purgeUnusedTextStyles", "text style").Field("purgeUnusedDimStyles", "dim style").Field("purgeRegApps", "regapp").Field("dryRun", "xem trước")
+                .Field("removeEmptyLayers", "xóa layer rỗng").Field("purgeUnusedBlocks", "dọn block không dùng")
+                .Field("purgeUnusedLinetypes", "dọn kiểu nét không dùng").Field("keepLayerNameContains", "giữ layer có tên chứa các chuỗi này", FieldKind.TextList)
                 .Words("dọn bản vẽ", "purge", "cleanup drawing", "dọn layer"),
             new CommandDescriptor("AutoNumbering", AutoCad, "Đánh số Block Reference theo attribute", true, "AutoNumber")
                 .Field("blockName", "tên block").Field("attributeTag", "tag").Field("prefix", "tiền tố").Field("dryRun", "xem trước")
+                .Field("startNumber", "số bắt đầu").Field("step", "bước nhảy", FieldKind.Number).Field("padWidth", "số chữ số tối thiểu")
+                .Field("direction", "LeftToRightThenTopToBottom hoặc TopToBottomThenLeftToRight").Field("rowToleranceMm", "dung sai gom hàng/cột, đơn vị bản vẽ")
                 .Words("đánh số block", "numbering block"),
             new CommandDescriptor("AttributeExport", AutoCad, "Xuất attribute của block ra CSV", false)
                 .Field("blockName", "tên block (rỗng = mọi block có attribute)").Field("outputPath", "file CSV")
@@ -436,6 +440,13 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Words("nhập attribute", "import attribute"),
             new CommandDescriptor("TextReplace", AutoCad, "Tìm/thay văn bản trong Text, MText, Attribute (regex)", true, "FindReplace")
                 .Field("find", "chuỗi/regex").Field("replace", "thay bằng").Field("useRegex", "regex").Field("dryRun", "xem trước")
+                .Field("ignoreCase", "không phân biệt hoa/thường", FieldKind.Bool).Field("multiline", "regex khớp từng dòng", FieldKind.Bool)
+                .Field("scope", "All, ModelSpace, PaperSpace hoặc BlockDefinitions").Field("layerContains", "lọc tên layer chứa chuỗi")
+                .Field("attributeTag", "chỉ xử lý attribute đúng tag này")
+                .Field("includeDbText", "xử lý Text", FieldKind.Bool).Field("includeMText", "xử lý MText", FieldKind.Bool)
+                .Field("includeAttributes", "xử lý attribute", FieldKind.Bool)
+                .Field("maxPreviewItems", "giới hạn chi tiết 0–10000, mặc định 200", FieldKind.Number)
+                .Field("timeBudgetSeconds", "ngân sách lập kế hoạch 1–600 giây, mặc định 30")
                 .Words("thay text", "find replace", "đổi chữ", "sửa text hàng loạt"),
             new CommandDescriptor("LayerStandardCheck", AutoCad, "Kiểm tra layer theo bộ quy tắc đặt tên → HTML", false, "LayerCheck")
                 .Field("rulesPath", "file JSON quy tắc").Field("outputPath", "file HTML")
@@ -457,6 +468,7 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Words("đếm block", "thống kê block", "bom block", "block quantity").Endorsed(),
             new CommandDescriptor("AttributeIncrement", AutoCad, "Gán attribute tăng dần theo mẫu {n:000} theo thứ tự vị trí (Lee Mac BATTE)", true, "BatchAttribute")
                 .Field("blockName", "tên block").Field("attributeTag", "tag").Field("pattern", "mẫu, ví dụ P-{n:000}").Field("startNumber", "bắt đầu").Field("dryRun", "xem trước")
+                .Field("rowToleranceMm", "dung sai gom hàng/cột, đơn vị bản vẽ")
                 .Words("attribute tăng dần", "đánh số attribute", "batte", "increment attribute").Endorsed(),
             new CommandDescriptor("CadLayerMap", AutoCad, "AI offline: gợi ý map layer → Revit type từ danh sách type", false, "LayerMap")
                 .Field("revitTypesPath", "file .txt danh sách type").Field("outputPath", "CSV mapping").Field("useOllama", "dùng model local nếu có")

@@ -51,7 +51,7 @@ Bảng compatibility theo năm của Autodesk cần đọc cùng tài liệu c�
 ```
 
 Output: `bin/<năm>/<profile>/<cấu hình>/<TFM>/`; restore: `obj/<năm>/<profile>/`.
-Build kiểm tra `UseWPF=false` thêm nhánh `headless/`, tránh ghi đè bản có giao diện.
+Build giao diện luôn dùng WPF trên Windows; Core Console có project riêng không dùng WPF.
 Installer giữ bundle tại `Contents/<năm>/`, chọn DLL net8/net10 theo host cho 2025/2026.
 Gói có `dhcb-host-profile.json` để chẩn đoán năm/runtime; không sửa file này để ép nhận gói sai.
 ZIP tự cài phải chọn đúng năm và runtime. SDK Autodesk là tham chiếu build, không được chép thành
@@ -103,7 +103,7 @@ Gói để dùng thử; không phải chứng nhận nghiệm thu Revit. Workflo
 điều kiện nhánh và các rule bảo vệ khác. Auto-merge phải chờ gitleaks và dependency-audit
 (nếu chạy) đạt trên đúng head SHA.
 Cổng phủ dòng không bao gồm toàn bộ API/GUI host. Các ca thực thi PowerShell/installer cũng được
-chạy riêng trên môi trường phù hợp thay cho những ca bị skip ở Linux.
+chạy trên Windows cùng các ca PowerShell và installer.
 
 Ưu tiên tiếp theo theo giá trị công việc:
 

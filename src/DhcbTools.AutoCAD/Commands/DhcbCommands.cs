@@ -39,6 +39,28 @@ namespace DhcbTools.AutoCAD.Commands;
 /// </summary>
 public sealed class DhcbCommands
 {
+    [CommandMethod("DHCB_TOOLS", CommandFlags.Modal)]
+    public void Tools() => Run("DHCB_TOOLS", () => OpenWorkspace(null));
+
+    [CommandMethod("DHCB_FORM", CommandFlags.Modal)]
+    public void Form() => Run("DHCB_FORM", () =>
+    {
+        var doc = Application.DocumentManager.MdiActiveDocument;
+        if (doc == null) return;
+        var choice = doc.Editor.GetString(new PromptStringOptions("\nTên công cụ: ") { AllowSpaces = false });
+        if (choice.Status != PromptStatus.OK) return;
+        var descriptor = CommandCatalog.Find(CommandCatalog.AutoCad, choice.StringResult);
+        if (descriptor == null || descriptor.Internal || !descriptor.Implemented)
+        { doc.Editor.WriteMessage("\nKhông tìm thấy công cụ. Gõ DHCB_TOOLS để xem danh sách.\n"); return; }
+        OpenWorkspace(descriptor.Name);
+    });
+
+    private static void OpenWorkspace(string? command)
+    {
+        var doc = Application.DocumentManager.MdiActiveDocument;
+        if (doc != null) Autodesk.AutoCAD.ApplicationServices.Core.Application.ShowModalWindow(new UI.CadCommandWindow(new UI.AutoCadCommandContext(doc), command));
+    }
+
     // ──────────────────────────────────────────────
     // Lệnh 1: Xuất layer ra CSV
     // ──────────────────────────────────────────────
@@ -661,7 +683,7 @@ public sealed class DhcbCommands
     /// <summary>Mọi đường ghi tương tác phải xem trước và duyệt, kể cả khi kỹ sư chọn chế độ Thật.</summary>
     private static CommandResult ExecuteWithPreview(Document doc, string command, object config)
     {
-        Bridge.DhcbHttpBridge.TrackDocument(doc.Database);
+        var context = Bridge.DhcbHttpBridge.TrackDocument(doc.Database);
         var json = JObject.FromObject(config, new JsonSerializer
         {
             ContractResolver = new CamelCasePropertyNamesContractResolver(),
@@ -670,7 +692,7 @@ public sealed class DhcbCommands
         if (descriptor?.WritesModel != true || json["dryRun"]?.Value<bool>() != false)
             return AcadCommandTable.Dispatch(doc.Database, command, json.ToString(Formatting.None));
 
-        var snapshot = BridgeCommitGuard.CaptureInputSnapshot(json, BridgeDocumentContext.RevisionFor(doc.Database));
+        var snapshot = BridgeCommitGuard.CaptureInputSnapshot(json, BridgeDocumentContext.RevisionFor(context));
         json["dryRun"] = true;
         var preview = AcadCommandTable.Dispatch(doc.Database, command, json.ToString(Formatting.None));
         if (!preview.IsComplete) return preview;
@@ -684,7 +706,7 @@ public sealed class DhcbCommands
         if (answer.Status != PromptStatus.OK || answer.StringResult != "Có")
             return CommandResult.Ok("Đã huỷ chạy thật; bản vẽ không đổi.");
 
-        if (snapshot != BridgeCommitGuard.CaptureInputSnapshot(json, BridgeDocumentContext.RevisionFor(doc.Database)))
+        if (snapshot != BridgeCommitGuard.CaptureInputSnapshot(json, BridgeDocumentContext.RevisionFor(context)))
             return CommandResult.Fail("Cấu hình/model hoặc file đầu vào đã thay đổi. Hãy xem trước lại.");
         json["dryRun"] = false;
         return AcadCommandTable.Dispatch(doc.Database, command, json.ToString(Formatting.None));

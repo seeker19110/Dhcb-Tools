@@ -17,7 +17,7 @@ namespace DhcbTools.Shared.Logic
         /// <summary>
         /// Thay ký tự không hợp lệ trong tên file bằng "_". Ký tự không hợp lệ được lấy theo
         /// <see cref="Path.GetInvalidFileNameChars"/> và bổ sung tập ký tự cấm của Windows để tên sinh
-        /// trên máy Linux (CI, batch runner) vẫn dùng được khi copy sang Windows.
+        /// nhất quán khi chạy trong add-in, BatchRunner và bộ kiểm thử Windows.
         /// </summary>
         public static string Sanitize(string? name)
         {

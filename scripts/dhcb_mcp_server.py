@@ -54,7 +54,7 @@ PROTOCOL_VERSION = "2024-11-05"
 # server trả về DUY NHẤT tool query/chat và người dùng tưởng gói cài hỏng. Nay danh mục lệnh được
 # nhớ lại sau mỗi lần lấy được, nên vẫn liệt kê đủ lệnh kèm ghi chú "chưa kết nối".
 CATALOG_CACHE = os.path.join(
-    os.environ.get("APPDATA") or os.path.expanduser("~"), "DHCB", f"tools-cache-{APP}.json")
+    os.environ["APPDATA"], "DHCB", f"tools-cache-{APP}.json")
 
 
 def _load_catalog() -> tuple:
@@ -127,7 +127,10 @@ def tool_list() -> list:
             "gì; truyền elementIds để ĐẶT lựa chọn), show_elements (zoom tới phần tử cho kỹ sư nhìn), active_view. "
             "AutoCAD: drawing_info, layers, blocks, inserts…"
         ),
-        "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}, "params": {"type": "object"}}, "required": ["query"]},
+        "inputSchema": {"type": "object", "properties": {
+            "query": {"type": "string"}, "params": {"type": "object"},
+            "documentId": {"type": "string", "description": "ID từ document_context; giữ nguyên giữa các trang AutoCAD"},
+        }, "required": ["query"]},
     })
     if allowed is not None and "chat" not in allowed:
         return tools
@@ -151,7 +154,13 @@ def _json_field_names(name: str) -> set:
 
 def call_tool(name: str, arguments: dict) -> dict:
     if name == "query":
-        return dhcb_agent.request(APP, "POST", "/query", {"query": arguments.get("query", ""), "params": arguments.get("params", {})})
+        payload = {"query": arguments.get("query", ""), "params": arguments.get("params", {})}
+        if "documentId" in arguments:
+            document_id = arguments["documentId"]
+            if not isinstance(document_id, str) or not document_id.strip() or len(document_id) > 4096:
+                return {"success": False, "summary": "documentId phải là chuỗi không rỗng, tối đa 4096 ký tự."}
+            payload["documentId"] = document_id
+        return dhcb_agent.request(APP, "POST", "/query", payload)
     if name == "chat":
         return dhcb_agent.request(APP, "POST", "/chat", {"text": arguments.get("text", "")})
     if READ_ONLY:

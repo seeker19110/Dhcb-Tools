@@ -66,6 +66,12 @@ DhcbTools.BatchRunner.exe --verify-log logs\2026-09-04\run-013000.jsonl
 DhcbTools.BatchRunner.exe --verify-ifc D:\xuat\toa-a.ifc --ifc-spec configs\ifc-check.json
 ```
 
+Mỗi lần gọi chỉ chọn một chế độ chính: `--job`, `--verify-log`, `--verify-ifc` hoặc `--dossier`.
+Truyền nhiều chế độ trả mã 2, không chạy rồi bỏ qua phần còn lại. `--verify-ids` cần `--verify-ifc`;
+`--ids-report` cần cả hai; `--ifc-spec` chỉ dùng cho kiểm IFC và không đi cùng `--verify-ids`
+(muốn kiểm cả hai bộ quy tắc thì chạy hai lượt). `--dossier-spec`/`--dossier-report` cần `--dossier`.
+`--dry-run` và `--report-only` phải chạy riêng. Tham số thiếu phụ thuộc hoặc mâu thuẫn trả mã 2 kèm lý do.
+
 AutoCAD tự chọn cặp host/DLL hoàn chỉnh theo thứ tự 2027 → 2026 → 2025 → 2024 → 2023 → 2022.
 Trong mỗi cặp, runner ưu tiên DLL phù hợp cạnh EXE, rồi tìm trong
 `%APPDATA%\Autodesk\ApplicationPlugins\DhcbTools.bundle\Contents\<năm>`;
@@ -102,7 +108,7 @@ sản phẩm, danh mục bản vẽ từ `SheetIndex`, kết quả `--verify-log
 
 ## Danh mục hồ sơ hoàn công (`--dossier`)
 
-```bash
+```powershell
 DhcbTools.BatchRunner --dossier "D:/DHCB/ho-so" --dossier-spec configs/ho-so-hoan-cong.json --dossier-report bao-cao/danh-muc.html
 ```
 
@@ -121,7 +127,7 @@ Mỗi dòng trong log JSONL của lượt chạy mang thêm hai trường ở cu
 
 Sửa một dòng cũ làm gãy chuỗi từ dòng đó trở đi. Kiểm lại bất cứ lúc nào:
 
-```bash
+```powershell
 DhcbTools.BatchRunner.exe --verify-log logs\2026-09-04\run-013000.jsonl
 ```
 
@@ -148,7 +154,7 @@ trước vẫn đọc bình thường.
 
 ## Kiểm file IFC vừa xuất (`--verify-ifc`)
 
-```bash
+```powershell
 DhcbTools.BatchRunner.exe --verify-ifc D:\xuat\toa-a.ifc --ifc-spec configs\ifc-check.json
 ```
 
