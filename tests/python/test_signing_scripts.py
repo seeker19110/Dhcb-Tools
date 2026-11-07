@@ -55,8 +55,11 @@ class SigningScriptTests(unittest.TestCase):
                                      + "if (-not $cert.HasPrivateKey -or $cert.Subject -ne 'CN=DHCB Signing Compatibility Test') { throw 'Wrong certificate' }\n"
                                      + "Write-Output 'PFX_IMPORT_OK'\n"
                                      + "} finally { if ($cert) { $cert.Dispose() } }\n", encoding="utf-8-sig")
+                    # Gọi từ pwsh 7 (CI) thì PSModulePath trỏ module PS7; 5.1 nạp nhầm và hỏng Microsoft.PowerShell.Security.
+                    ps_env = {k: v for k, v in os.environ.items() if k.upper() != "PSMODULEPATH"}
                     result = subprocess.run([POWERSHELL, "-NoProfile", "-File", str(probe)],
-                                            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
+                                            capture_output=True, text=True, encoding="utf-8", errors="replace",
+                                            timeout=30, env=ps_env)
                     self.assertEqual(expected_success, result.returncode == 0, result.stdout + result.stderr)
                     self.assertEqual(expected_success, "PFX_IMPORT_OK" in result.stdout)
                     if not expected_success:
