@@ -9,10 +9,9 @@ namespace DhcbTools.Revit.Commands;
 
 /// <summary>
 /// Chạy một lệnh Core theo tên. Bản có WPF mở <see cref="UI.CommandFormWindow"/> — form dựng ô nhập
-/// từ <c>CommandCatalog</c> nên mọi lệnh đều có giao diện thật (giai đoạn 9.1). Bản không WPF
-/// (<c>DHCB_SKIP_WPF</c>, dùng cho build kiểm tra trên CI) rơi về đường cũ: đọc config JSON ở
-/// <c>%APPDATA%\DHCB\configs\revit</c> → xem trước → hỏi → chạy thật.
-/// <para>Cả hai đường đều giữ nguyên tắc xuyên suốt: <c>DryRun</c> chạy trước, kỹ sư xác nhận mới ghi.</para>
+/// từ <c>CommandCatalog</c> trên Windows. Cấu hình lưu trong
+/// <c>%APPDATA%\DHCB\configs\revit</c>.
+/// <para><c>DryRun</c> chạy trước, kỹ sư xác nhận mới ghi.</para>
 /// </summary>
 internal static class CommandRunner
 {
@@ -60,7 +59,6 @@ internal static class CommandRunner
             return Result.Failed;
         }
 
-#if !DHCB_SKIP_WPF
         var descriptor = DhcbTools.Shared.Logic.Ai.CommandCatalog.Find(
             DhcbTools.Shared.Logic.Ai.CommandCatalog.Revit, commandName);
 
@@ -83,7 +81,6 @@ internal static class CommandRunner
             window.ShowDialog();
             return window.Executed ? Result.Succeeded : Result.Cancelled;
         }
-#endif
 
         // Bước 1 — xem trước, không ghi vào mô hình.
         string snapshot;

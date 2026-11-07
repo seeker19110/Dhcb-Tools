@@ -32,6 +32,7 @@ thêm mã mà quên ghi vào đây (hoặc ngược lại) là test đỏ.
 
 | Mã | Nghĩa | Cách xử lý |
 |---|---|---|
+| `E-TEXT-BUDGET` | Tìm/thay văn bản vượt ngân sách thời gian; chưa ghi đối tượng nào | Thu hẹp phạm vi/layer/tag hoặc tăng `timeBudgetSeconds` (tối đa 600) |
 | `E-PREVIEW-REQUIRED` | Ghi thiếu token preview hoặc documentId | Chạy preview, duyệt kết quả rồi truyền lại đúng hai trường |
 | `E-PREVIEW-INVALID` | Token hết hạn/không tồn tại/không khớp hoặc config mơ hồ | Kiểm tra cấu hình và preview lại; token đã dùng không được đổi mục đích |
 | `E-PREVIEW-CHANGED` | Model/file đã thay đổi trong hoặc sau preview | Preview lại và yêu cầu duyệt kết quả mới |

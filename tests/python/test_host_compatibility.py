@@ -8,9 +8,6 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 DOTNET = os.environ.get("DHCB_DOTNET") or shutil.which("dotnet")
-if not DOTNET and Path("/mnt/c/Program Files/dotnet/dotnet.exe").is_file():
-    DOTNET = "/mnt/c/Program Files/dotnet/dotnet.exe"
-
 
 @unittest.skipUnless(DOTNET, "MSBuild profile checks require a .NET SDK")
 class HostCompatibilityTests(unittest.TestCase):
@@ -61,15 +58,15 @@ class HostCompatibilityTests(unittest.TestCase):
                 self.assertEqual(profile["BaseOutputPath"].replace(chr(92), "/"), f"bin/{year}/{runtime}/")
                 self.assertEqual(profile["BaseIntermediateOutputPath"].replace(chr(92), "/"), f"obj/{year}/{runtime}/")
 
-    def test_headless_checks_do_not_replace_full_ui_binaries_or_restore_assets(self):
-        for host, year_property in [("AutoCAD", "AcadVersion"), ("Revit", "RevitVersion")]:
+    def test_host_shells_always_include_wpf(self):
+        for host in ("AutoCAD", "Revit"):
             with self.subTest(host=host):
-                full = self.profile(host, **{year_property: 2027})
-                headless = self.profile(host, UseWPF="false", **{year_property: 2027})
-                for key in ("BaseOutputPath", "BaseIntermediateOutputPath"):
-                    self.assertNotEqual(headless[key], full[key])
-                    self.assertIn("/headless/", headless[key].replace(chr(92), "/"))
-                self.assertEqual(headless["TargetFramework"], full["TargetFramework"])
+                result = self.msbuild(host, "-getProperty:UseWPF")
+                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+                self.assertEqual("true", result.stdout.strip())
+                project = (ROOT / f"src/DhcbTools.{host}/DhcbTools.{host}.csproj").read_text(encoding="utf-8-sig")
+                self.assertNotIn("Compile Remove", project)
+                self.assertNotIn("Page Remove", project)
 
     def test_defaults_preserve_existing_host_policy(self):
         self.assertEqual(self.profile("Revit")["RevitApiVersion"], "2024.3.60")

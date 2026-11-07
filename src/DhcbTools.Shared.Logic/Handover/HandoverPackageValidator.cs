@@ -233,7 +233,7 @@ namespace DhcbTools.Shared.Logic.Handover
             }
 
             var full = Path.GetFullPath(Path.Combine(root, relative));
-            // Windows không phân biệt hoa thường trong đường dẫn; Linux (CI) thì có.
+            // So đường dẫn theo quy tắc Windows: không phân biệt hoa thường.
             var comparison = Path.DirectorySeparatorChar == '\\' ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
             return full.StartsWith(root, comparison) ? full : null;
         }

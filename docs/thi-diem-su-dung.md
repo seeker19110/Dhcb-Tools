@@ -55,7 +55,7 @@ Quy trình kỹ thuật và tiêu chí tiếp theo: [kế hoạch chất lượn
 
 ## Tổng hợp số liệu bằng công cụ đi kèm
 
-```bash
+```powershell
 python scripts/dhcb_pilot.py du-lieu-thi-diem.csv --output out/pilot.html
 python scripts/dhcb_pilot.py du-lieu-thi-diem.csv --output out/pilot.json
 ```

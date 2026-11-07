@@ -23,6 +23,10 @@ namespace DhcbTools.Shared.Hosting
         public static void Touch(object document) =>
             System.Threading.Interlocked.Increment(ref Identities.GetValue(document, _ => new Identity()).Revision);
 
+        public static string? ValidateQuery(BridgeQuery request, string currentId) =>
+            string.IsNullOrWhiteSpace(request.DocumentId) || string.Equals(request.DocumentId, currentId, StringComparison.Ordinal)
+                ? null : "E-DOCUMENT-CHANGED: Bản vẽ đang mở khác phiên truy vấn. Đọc lại document_context và tải từ trang đầu.";
+
         public static string? Validate(string app, BridgeRequest request, string currentId)
         {
             if (!string.IsNullOrWhiteSpace(request.DocumentId))

@@ -55,10 +55,6 @@
     <TargetFramework Condition="'$(RevitRuntime)'=='net10'">net10.0-windows</TargetFramework>
     <DhcbHostBuildPath>$(RevitVersion)/$(RevitRuntime)</DhcbHostBuildPath>
   </PropertyGroup>
-  <!-- A headless validation build must not replace DLLs needed by the WPF host or SkipBuild. -->
-  <PropertyGroup Condition="'$(DhcbHostBuildPath)'!='' And '$(UseWPF)'=='false'">
-    <DhcbHostBuildPath>$(DhcbHostBuildPath)/headless</DhcbHostBuildPath>
-  </PropertyGroup>
   <!-- Isolate restore assets AND assemblies when compiling several SDK baselines in one checkout. -->
   <PropertyGroup Condition="'$(DhcbHostBuildPath)'!=''">
     <BaseOutputPath>bin/$(DhcbHostBuildPath)/</BaseOutputPath>
@@ -70,10 +66,6 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(DhcbIsRevitProject)'=='true' And ('$(RevitVersion)'=='2024' Or '$(RevitVersion)'=='2025' Or '$(RevitVersion)'=='2026' Or '$(RevitVersion)'=='2027')">
     <DefineConstants>$(DefineConstants);REVIT2024_OR_GREATER</DefineConstants>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(UseWPF)'=='false'">
-    <DhcbSkipWpf>true</DhcbSkipWpf>
-    <DefineConstants>$(DefineConstants);DHCB_SKIP_WPF</DefineConstants>
   </PropertyGroup>
   <ItemGroup Condition="'$(TargetFramework)'=='net48'">
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />

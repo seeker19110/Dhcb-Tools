@@ -9,25 +9,25 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
-BASH = shutil.which("bash")
+PWSH = shutil.which("powershell") or shutil.which("pwsh")
 PROFILES = [("2022", "net48"), ("2023", "net48"), ("2024", "net48"),
             ("2025", "net8"), ("2025", "net10"), ("2026", "net8"),
             ("2026", "net10"), ("2027", "net10")]
 
 
-@unittest.skipIf(os.name == "nt" or not BASH, "Native stub executables require a POSIX shell")
+@unittest.skipUnless(PWSH, "Windows PowerShell is required")
 class DependencyAuditTests(unittest.TestCase):
     def execute(self, vulnerable=False, native_failure=False, python_failure=False):
         with tempfile.TemporaryDirectory(prefix="dhcb-audit-") as tmp:
             folder = Path(tmp)
             (folder / "scripts").mkdir()
             (folder / "bin").mkdir()
-            shutil.copy2(ROOT / "scripts/check-vulnerable.sh", folder / "scripts/check-vulnerable.sh")
-            stub = folder / "bin/dotnet"
-            stub.write_text("#!" + sys.executable + "\n" + r'''import json, os, sys
+            shutil.copy2(ROOT / "scripts/check-vulnerable.ps1", folder / "scripts/check-vulnerable.ps1")
+            stub = folder / "bin/dotnet.py"
+            stub.write_text(r'''import json, os, sys
 from pathlib import Path
 properties = {name: os.environ.get(name) for name in
-              ("RevitVersion", "AcadVersion", "AcadRuntime", "EnableWindowsTargeting")}
+              ("RevitVersion", "AcadVersion", "AcadRuntime")}
 event = {"tool": "dotnet", "args": sys.argv[1:], "properties": properties}
 with open(os.environ["AUDIT_LOG"], "a") as stream:
     stream.write(json.dumps(event) + "\n")
@@ -48,16 +48,14 @@ else:
                      "vulnerabilities": [{"advisoryurl": "https://example.test/advisory"}]}]}]}]
     print(json.dumps({"projects": projects}))
 ''', encoding="utf-8")
-            stub.chmod(0o755)
-            python_stub = folder / "bin/python3"
-            python_stub.write_text("#!" + sys.executable + "\n" + r'''import json, os, sys
+            python_stub = folder / "bin/python.py"
+            python_stub.write_text(r'''import json, os, sys
 if sys.argv[1:3] == ["-m", "pip_audit"]:
     with open(os.environ["AUDIT_LOG"], "a") as stream:
-        stream.write(json.dumps({"tool": "pip-audit", "args": sys.argv[1:]}) + "\n")
+        stream.write(json.dumps({"tool": "pip-audit", "args": sys.argv[1:], "utf8": os.environ.get("PYTHONUTF8")}) + "\n")
     sys.exit(int(os.environ.get("AUDIT_PYTHON_FAILURE", "0")))
 os.execv(sys.executable, [sys.executable, *sys.argv[1:]])
 ''', encoding="utf-8")
-            python_stub.chmod(0o755)
             log = folder / "calls.jsonl"
             env = {**os.environ, "PATH": str(folder / "bin") + os.pathsep + os.environ["PATH"],
                    "AUDIT_LOG": str(log), "AUDIT_FIXTURE": str(folder),
@@ -66,8 +64,18 @@ os.execv(sys.executable, [sys.executable, *sys.argv[1:]])
                    "AUDIT_PYTHON_FAILURE": str(int(python_failure)),
                    # Poison the inherited defaults; the script must select every profile itself.
                    "RevitVersion": "2024", "AcadVersion": "2024", "AcadRuntime": "net48"}
-            result = subprocess.run([BASH, str(folder / "scripts/check-vulnerable.sh")], env=env,
-                                    capture_output=True, text=True, timeout=30)
+            def ps_quote(value):
+                return "'" + str(value).replace("'", "''") + "'"
+            wrapper = folder / "audit.ps1"
+            wrapper.write_text(
+                "$ErrorActionPreference = 'Stop'\n"
+                "[Console]::OutputEncoding = [Text.Encoding]::UTF8\n"
+                + "function dotnet { & " + ps_quote(sys.executable) + " " + ps_quote(stub) + " @args }\n"
+                + "function python { & " + ps_quote(sys.executable) + " " + ps_quote(python_stub) + " @args }\n"
+                + "& " + ps_quote(folder / "scripts/check-vulnerable.ps1") + "\nexit $LASTEXITCODE\n", encoding="utf-8-sig")
+            result = subprocess.run([PWSH, "-NoProfile", "-File", str(wrapper)], env=env,
+                                    capture_output=True, text=True, encoding="utf-8", timeout=30)
+            self.assertTrue(log.is_file(), result.stdout + result.stderr)
             events = [json.loads(line) for line in log.read_text().splitlines()]
             return result, events
 
@@ -79,8 +87,7 @@ os.execv(sys.executable, [sys.executable, *sys.argv[1:]])
             self.assertEqual("restore", restore["args"][0])
             self.assertEqual("list", listing["args"][0])
             self.assertEqual(restore["properties"], listing["properties"])
-            self.assertEqual({"RevitVersion": year, "AcadVersion": year, "AcadRuntime": runtime,
-                              "EnableWindowsTargeting": "true"}, listing["properties"])
+            self.assertEqual({"RevitVersion": year, "AcadVersion": year, "AcadRuntime": runtime}, listing["properties"])
             self.assertIn("--no-restore", listing["args"])
             self.assertFalse(any(arg.startswith("-p:") for arg in listing["args"]))
 
@@ -89,6 +96,7 @@ os.execv(sys.executable, [sys.executable, *sys.argv[1:]])
         self.assertEqual(0, result.returncode, result.stderr)
         self.assert_profiles(events)
         self.assertEqual("pip-audit", events[-1]["tool"])
+        self.assertEqual("1", events[-1]["utf8"])
 
     def test_vulnerability_in_alternate_runtime_fails_but_finishes_other_profiles(self):
         result, events = self.execute(vulnerable=True)
@@ -97,6 +105,7 @@ os.execv(sys.executable, [sys.executable, *sys.argv[1:]])
         self.assertIn("AffectedPackage 1.0.0", result.stdout)
         self.assertIn("https://example.test/advisory", result.stdout)
         self.assertEqual("pip-audit", events[-1]["tool"])
+        self.assertEqual("1", events[-1]["utf8"])
 
     def test_native_package_listing_failure_cannot_pass_the_audit(self):
         result, events = self.execute(native_failure=True)

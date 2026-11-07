@@ -13,7 +13,6 @@ import json
 import os
 import secrets
 import subprocess
-import sys
 import tempfile
 import urllib.error
 import urllib.parse
@@ -50,7 +49,8 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 LOOPBACK = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
 ALLOWED_QUERIES = {
     "drawing_info", "layers", "blocks", "inserts", "entities",
-    "text", "xrefs", "layouts", "stats",
+    "text", "xrefs", "layouts", "stats", "document_context", "active_layout",
+    "entity_geometry", "attributes_of", "snapshot",
 }
 ALLOWED_COMMANDS = {
     "AutoNumbering", "DrawingCleanup", "LayerExport", "LayerImport",
@@ -106,13 +106,11 @@ def _same_secret(provided: str, expected: str) -> bool:
 
 
 def launch_file_path() -> Path:
-    """File khởi chạy panel: %LOCALAPPDATA%\\DHCB\\autocad-panel.html (ngoài Windows: ~/.cache/DHCB, quyền 600).
+    """File khởi chạy panel: %LOCALAPPDATA%\\DHCB\\autocad-panel.html.
 
     LOCALAPPDATA, không phải APPDATA: khoá chỉ sống theo một tiến trình gateway, không có lý do đi theo roaming profile.
     """
-    base = os.environ.get("LOCALAPPDATA")
-    root = Path(base) if base else Path.home() / ".cache"
-    return root / "DHCB" / "autocad-panel.html"
+    return Path(os.environ["LOCALAPPDATA"]) / "DHCB" / "autocad-panel.html"
 
 
 def panel_url() -> str:
@@ -140,7 +138,7 @@ def write_launch_file(path: Path) -> None:
     temp.unlink(missing_ok=True)
     # O_BINARY (chỉ có trên Windows): os.open mặc định mở fd ở chế độ văn bản của CRT, nên "\r\n" mà TextIOWrapper ghi
     # ra bị đổi thêm lần nữa thành "\r\r\n" — cùng lý do module tempfile luôn thêm cờ này.
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_BINARY
     fd = os.open(temp, flags, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         handle.write(page)
@@ -159,9 +157,12 @@ def _require_confirmation(command: str, payload: dict[str, Any]) -> None:
 
 def validate_proxy_payload(path: str, payload: dict[str, Any]) -> None:
     """Reject unknown bridge operations and malformed boundary payloads."""
+    for name in ("documentId", "previewToken"):
+        if name in payload and (not isinstance(payload[name], str) or not payload[name].strip() or len(payload[name]) > 4096):
+            raise ValueError(f"{name} phải là chuỗi không rỗng, tối đa 4096 ký tự")
     if path == "/query":
         query = payload.get("query")
-        if query not in ALLOWED_QUERIES:
+        if not isinstance(query, str) or query not in ALLOWED_QUERIES:
             raise ValueError("query không hợp lệ")
         # Bridge ưu tiên params hơn config. Kiểm cả hai bí danh để raw JSON không vượt trần phân trang.
         for key in ("config", "params"):
@@ -170,19 +171,38 @@ def validate_proxy_payload(path: str, payload: dict[str, Any]) -> None:
                 raise ValueError(f"{key} phải là JSON object")
             if isinstance(config, dict) and "limit" in config:
                 limit = config["limit"]
-                if type(limit) is not int or not 1 <= limit <= 200:
-                    raise ValueError("limit phải là số nguyên từ 1 đến 200")
+                if type(limit) is not int or not 0 <= limit <= 10000:
+                    raise ValueError("limit phải là số nguyên từ 0 đến 10000 (0 = mặc định 2000)")
             if isinstance(config, dict) and "offset" in config:
                 offset = config["offset"]
                 if type(offset) is not int or not 0 <= offset <= 2147483647:
                     raise ValueError("offset phải là số nguyên từ 0 đến 2147483647")
+            if isinstance(config, dict):
+                for name in ("layerContains", "entityType", "blockName", "blockNameContains", "textLayer", "textContains"):
+                    if name in config and (not isinstance(config[name], str) or len(config[name]) > 4096):
+                        raise ValueError(f"{name} phải là chuỗi, tối đa 4096 ký tự")
+                if "handles" in config:
+                    handles = config["handles"]
+                    if not isinstance(handles, list) or len(handles) > 200 or any(
+                        not isinstance(value, str) or not 1 <= len(value) <= 16
+                        or any(char not in "0123456789abcdefABCDEF" for char in value) for value in handles
+                    ):
+                        raise ValueError("handles phải là danh sách tối đa 200 handle hex (1–16 ký tự)")
+                if "imageWidth" in config and (type(config["imageWidth"]) is not int or not 200 <= config["imageWidth"] <= 4000):
+                    raise ValueError("imageWidth phải là số nguyên từ 200 đến 4000")
+                if "source" in config and config["source"] not in ("live", "thumbnail"):
+                    raise ValueError("source phải là live hoặc thumbnail")
         return
 
     if path != "/execute":
         raise ValueError("endpoint proxy không hợp lệ")
     command = payload.get("command")
-    if command not in ALLOWED_COMMANDS:
+    if not isinstance(command, str) or command not in ALLOWED_COMMANDS:
         raise ValueError("command không hợp lệ")
+    if "async" in payload and type(payload["async"]) is not bool:
+        raise ValueError("async phải là boolean")
+    if "timeoutSeconds" in payload and (type(payload["timeoutSeconds"]) is not int or not 1 <= payload["timeoutSeconds"] <= 600):
+        raise ValueError("timeoutSeconds phải là số nguyên từ 1 đến 600")
     config = payload.get("config")
     if not isinstance(config, dict):
         raise ValueError("config phải là JSON object")
@@ -232,13 +252,22 @@ def prepare_bridge_payload(path: str, payload: dict[str, Any]) -> dict[str, Any]
     return bridge_payload
 
 
+def job_path(operation: str, job_id: str) -> str:
+    """Build only the two supported job routes; never proxy an arbitrary URL."""
+    if operation not in ("progress", "cancel") or not isinstance(job_id, str) or not job_id.strip() \
+            or len(job_id) > 128 or any(ord(char) < 32 for char in job_id):
+        raise ValueError("job_id phải là chuỗi không rỗng, tối đa 128 ký tự, không chứa ký tự điều khiển")
+    return f"/{operation}/" + urllib.parse.quote(job_id, safe="")
+
+
 def bridge_headers(has_body: bool) -> dict[str, str]:
     headers = {"Content-Type": "application/json"} if has_body else {}
     token = os.environ.get("DHCB_BRIDGE_TOKEN", "").strip()
     if not token:
         appdata = os.environ.get("APPDATA")
-        base = Path(appdata) if appdata else Path.home() / "AppData" / "Roaming"
-        token_path = base / "DHCB" / "bridge-token.txt"
+        if not appdata:
+            return headers
+        token_path = Path(appdata) / "DHCB" / "bridge-token.txt"
         try:
             token = token_path.read_text(encoding="utf-8").strip()
         except (OSError, UnicodeError):
@@ -253,16 +282,23 @@ def bridge_headers(has_body: bool) -> dict[str, str]:
 def fetch_autocad(path: str, body: dict[str, Any] | None = None, timeout: int = 35) -> dict[str, Any]:
     if path == "/execute" and (not isinstance(body, dict) or not isinstance(body.get("config", {}), dict)):
         return {"success": False, "error": "Payload /execute và config phải là JSON object; chưa gửi lệnh."}
+    try:
+        headers = bridge_headers(body is not None)
+    except ValueError as exc:
+        return {"success": False, "error": str(exc), "summary": str(exc)}
+    if path != "/health" and "Authorization" not in headers:
+        # Bridge counts missing credentials as failed authentication and locks after five attempts.
+        summary = (
+            "Không tìm thấy token Bridge. Khởi động AutoCAD có add-in DHCB rồi kiểm tra "
+            "%APPDATA%\\DHCB\\bridge-token.txt hoặc DHCB_BRIDGE_TOKEN; chưa gửi yêu cầu."
+        )
+        return {"success": False, "error": summary, "summary": summary}
     if path == "/execute" and body and body.get("config", {}).get("dryRun") is False and not body.get("documentId"):
         context = fetch_autocad("/query", {"query": "document_context"}, timeout)
         if not context.get("documentId"):
             return {"success": False, "error": "Không xác minh được phiên bản vẽ; chưa gửi lệnh ghi. Hãy cập nhật Bridge."}
         body = {**body, "documentId": context["documentId"]}
     data = None if body is None else json.dumps(body).encode("utf-8")
-    try:
-        headers = bridge_headers(data is not None)
-    except ValueError as exc:
-        return {"success": False, "error": str(exc), "summary": str(exc)}
     request = urllib.request.Request(AUTOCAD_URL + path, data=data, headers=headers,
                                      method="POST" if data is not None else "GET")
     try:
@@ -317,7 +353,7 @@ def run_hermes(prompt: str, timeout: int = 150) -> str:
     if len(prompt) > MAX_PROMPT_CHARS:
         raise ValueError(f"Prompt vượt trần {MAX_PROMPT_CHARS} ký tự")
     command = ["hermes", "--ignore-rules", "-t", HERMES_TOOLSETS, "-z"]
-    creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+    creationflags = subprocess.CREATE_NO_WINDOW
     completed = subprocess.run(
         command,
         input=prompt,
@@ -596,6 +632,14 @@ class Handler(BaseHTTPRequestHandler):
         if not self.token_valid():
             self.send_json(403, {"error": "Panel token không hợp lệ"})
             return
+        if route.path.startswith("/progress/") and not route.query:
+            try:
+                path = job_path("progress", urllib.parse.unquote(route.path[len("/progress/"):]))
+            except ValueError as exc:
+                self.send_json(400, {"error": str(exc)})
+                return
+            self.send_json(200, fetch_autocad(path))
+            return
         if self.path == "/health":
             result = fetch_autocad("/health", timeout=4)
             result["panelApi"] = "ok"
@@ -619,6 +663,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(403, {"error": "Panel token không hợp lệ"})
                 return
             payload = self.read_json()
+            if self.path.startswith("/cancel/"):
+                route = urllib.parse.urlsplit(self.path)
+                if route.query:
+                    raise ValueError("Route hủy job không nhận query string")
+                path = job_path("cancel", urllib.parse.unquote(route.path[len("/cancel/"):]))
+                self.send_json(200, fetch_autocad(path, {}))
+                return
             if self.path == "/ai/chat":
                 self.send_json(200, ai_chat(payload))
                 return

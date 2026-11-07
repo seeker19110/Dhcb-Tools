@@ -642,7 +642,7 @@ Sau mỗi lát:
 pytest
 Dotnet Shared.Logic tests
 BatchRunner tests
-scripts/check-build.sh cho matrix đang hỗ trợ
+scripts/check-build.ps1 cho matrix đang hỗ trợ
 Windows WPF build
 Python MCP tests nếu sửa server
 AutoCAD/Revit host suite tương ứng trước khi bỏ nhãn thử nghiệm

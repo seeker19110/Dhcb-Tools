@@ -88,7 +88,7 @@ class ClientQualityTests(unittest.TestCase):
                 request.assert_not_called()
 
     def test_corrupt_token_file_does_not_crash_or_send_auth(self):
-        with mock.patch.dict(dhcb_agent.os.environ, {}, clear=True), \
+        with mock.patch.dict(dhcb_agent.os.environ, {"APPDATA": "C:/fixture-appdata"}, clear=True), \
                 mock.patch("builtins.open", side_effect=UnicodeDecodeError("utf-8", b"x", 0, 1, "invalid")), \
                 mock.patch.object(dhcb_agent.LOOPBACK, "open") as request:
             self.assertEqual("", dhcb_agent.load_token())

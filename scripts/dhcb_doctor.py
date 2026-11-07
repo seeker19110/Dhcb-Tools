@@ -115,7 +115,7 @@ def inspect_config(path: Path) -> tuple:
 
 def inspect_autocad_installation(acad_dir=None, year=None) -> list:
     """Kiểm bundle và runtime đã cài; không tải assembly hoặc chạy AutoCAD."""
-    bundle = Path(os.environ.get("APPDATA") or str(Path.home() / ".config")) / "Autodesk" / "ApplicationPlugins" / "DhcbTools.bundle"
+    bundle = Path(os.environ["APPDATA"]) / "Autodesk" / "ApplicationPlugins" / "DhcbTools.bundle"
     manifest_path = bundle / "PackageContents.xml"
     if not manifest_path.exists():
         return [_check("Bundle AutoCAD", "warning", "Chưa thấy bundle trong APPDATA. Cài plugin hoặc kiểm đường NETLOAD đang dùng.")]
@@ -174,7 +174,7 @@ def inspect_autocad_installation(acad_dir=None, year=None) -> list:
 
 def inspect_revit_installation(revit_dir=None, year=None) -> list:
     """Kiểm manifest, dependencies và host; không chạy Revit hoặc tải DLL."""
-    user_base = Path(os.environ.get("APPDATA") or str(Path.home() / ".config")) / "Autodesk" / "Revit" / "Addins"
+    user_base = Path(os.environ["APPDATA"]) / "Autodesk" / "Revit" / "Addins"
     machine_base = Path(os.environ.get("PROGRAMDATA") or "C:/ProgramData") / "Autodesk" / "Revit" / "Addins"
     custom_year = year if year is not None else 2026
     years = (year,) if year is not None else YEARS
@@ -241,12 +241,11 @@ def inspect_revit_installation(revit_dir=None, year=None) -> list:
 def diagnose(app: str = "all", offline: bool = False, config_dir=None, acad_dir=None, *, year=None, revit_dir=None) -> dict:
     if app not in ("all", "revit", "autocad") or (year is not None and year not in YEARS):
         raise ValueError("Chọn app hợp lệ và năm từ 2022 đến 2027.")
-    base = Path(config_dir) if config_dir is not None else Path(
-        os.environ.get("APPDATA") or str(Path.home() / ".config")) / "DHCB"
+    base = Path(config_dir) if config_dir is not None else Path(os.environ["APPDATA"]) / "DHCB"
     checks = [
         _check("Python", "ok" if sys.version_info >= (3, 9) else "error", "Cần Python 3.9 trở lên."),
-        _check("Nền tảng", "ok" if platform.system() == "Windows" else "warning",
-               "Add-in chạy trên Windows; kiểm logic/script có thể chạy trên hệ điều hành khác."),
+        _check("Nền tảng", "ok" if platform.system() == "Windows" else "error",
+               "DHCB Tools yêu cầu Windows và Python Windows cùng máy với AutoCAD/Revit."),
     ]
     settings = None
     for name in ("settings.json", "dictionary.json", "ai.json"):
@@ -262,10 +261,10 @@ def diagnose(app: str = "all", offline: bool = False, config_dir=None, acad_dir=
 
     enabled = settings is not None and settings.get("bridge", {}).get("enabled", True)
     apps = ("revit", "autocad") if app == "all" else (app,)
-    if "autocad" in apps and platform.system() == "Windows":
+    if "autocad" in apps:
         checks.extend(inspect_autocad_installation(acad_dir) if year is None
                       else inspect_autocad_installation(acad_dir, year))
-    if "revit" in apps and platform.system() == "Windows":
+    if "revit" in apps:
         checks.extend(inspect_revit_installation(revit_dir, year))
     for target in apps:
         if offline or not enabled or not token_ready:

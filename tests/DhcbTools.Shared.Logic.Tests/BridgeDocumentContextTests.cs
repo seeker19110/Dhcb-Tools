@@ -39,4 +39,18 @@ public class BridgeDocumentContextTests
         Assert.Null(BridgeDocumentContext.Validate("revit", request, "A"));
         Assert.Contains("CHANGED", BridgeDocumentContext.Validate("revit", request, "B"));
     }
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("", true)]
+    [InlineData("A", true)]
+    [InlineData("B", false)]
+    public void Query_paging_remains_bound_to_the_selected_document(string? target, bool allowed)
+    {
+        var query = Newtonsoft.Json.JsonConvert.DeserializeObject<BridgeQuery>(
+            new JObject { ["query"] = "entities", ["documentId"] = target }.ToString())!;
+        var result = BridgeDocumentContext.ValidateQuery(query, "A");
+        Assert.Equal(allowed, result == null);
+        if (!allowed) Assert.Contains("E-DOCUMENT-CHANGED", result);
+    }
+
 }

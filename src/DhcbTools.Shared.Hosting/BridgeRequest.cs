@@ -48,6 +48,10 @@ namespace DhcbTools.Shared.Hosting
     /// <summary>Body của <c>POST /query</c>: tên truy vấn + params thô (vỏ tự deserialize).</summary>
     public sealed class BridgeQuery
     {
+        /// <summary>Phiên bản vẽ đã chọn; khi có, query từ chối chạy trên document khác.</summary>
+        [JsonProperty("documentId")]
+        public string? DocumentId { get; set; }
+
         [JsonProperty("query")]
         public string Query { get; set; } = string.Empty;
 

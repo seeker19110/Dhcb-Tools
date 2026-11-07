@@ -77,6 +77,8 @@ public sealed class QueryAcceptance
                 var text = new DBText { TextString = "BENCH-" + i, Position = new Point3d(i, 20, 0), Height = 2.5 };
                 ms.AppendEntity(text); tx.AddNewlyCreatedDBObject(text, true);
             }
+            var formatted = new MText { Contents = @"{\C1;ROOM-42}", Location = new Point3d(10, 30, 7), TextHeight = 1 };
+            ms.AppendEntity(formatted); tx.AddNewlyCreatedDBObject(formatted, true);
             tx.Commit();
         }
         var allPassed = true;
@@ -98,13 +100,30 @@ public sealed class QueryAcceptance
         Check("text filtered offset", new QueryRequest { Query = "text", Params = new AcadQueryParams { Limit = 3, Offset = 2 } },
             j => (int)j["count"]! == 3 && (string?)j["texts"]![0]!["text"] == "BENCH-2" && (int)j["nextOffset"]! == 5);
         Check("default text limit", new QueryRequest { Query = "text" }, j => (int)j["count"]! == 2000 && (bool)j["hasMore"]!);
+        Check("text search applies before offset", new QueryRequest { Query = "text", Params = new AcadQueryParams { TextContains = "bench-49", Limit = 3, Offset = 2 } },
+            j => (int)j["count"]! == 3 && (string?)j["texts"]![0]!["text"] == "BENCH-491" && (int)j["nextOffset"]! == 5);
+        Check("text search handles and display", new QueryRequest { Query = "text", Params = new AcadQueryParams { TextContains = "BeNcH-4999" } },
+            j => (int)j["count"]! == 1 && (string?)j["texts"]![0]!["displayText"] == "BENCH-4999" && !string.IsNullOrEmpty((string?)j["texts"]![0]!["handle"]));
+        Check("formatted text searches visible characters", new QueryRequest { Query = "text", Params = new AcadQueryParams { TextContains = "room-42", LayerContains = "0" } },
+            j => (int)j["count"]! == 1 && (string?)j["texts"]![0]!["displayText"] == "ROOM-42" && (double)j["texts"]![0]!["z"]! == 7);
+        Check("formatting codes do not match text search", new QueryRequest { Query = "text", Params = new AcadQueryParams { TextContains = @"\C1;" } },
+            j => (int)j["count"]! == 0 && !(bool)j["hasMore"]!);
+        Check("text layer/search filters combine", new QueryRequest { Query = "text", Params = new AcadQueryParams { TextContains = "room", LayerContains = "NOT-FOUND" } },
+            j => (int)j["count"]! == 0);
+        Check("Text alias uses typed native filter", new QueryRequest { Query = "entities", Params = new AcadQueryParams { EntityType = "Text", Limit = 5, Offset = 4998 } },
+            j => (int)j["count"]! == 2 && (string?)j["entities"]![0]!["type"] == "DBText" && !(bool)j["hasMore"]!);
+        Check("unknown entity type remains a valid empty query", new QueryRequest { Query = "entities", Params = new AcadQueryParams { EntityType = "DOES-NOT-EXIST" } },
+            j => (int)j["count"]! == 0);
         Check("layer page", new QueryRequest { Query = "layers", Params = new AcadQueryParams { Limit = 1 } }, j => (int)j["count"]! == 1);
         Check("empty definitions", new QueryRequest { Query = "blocks" }, j => (int)j["count"]! == 0 && !(bool)j["hasMore"]!);
         Check("empty inserts", new QueryRequest { Query = "inserts" }, j => (int)j["count"]! == 0 && !(bool)j["hasMore"]!);
         Check("negative offset rejected", new QueryRequest { Query = "entities", Params = new AcadQueryParams { Offset = -1 } }, j => j["error"] != null);
         Check("oversized page rejected", new QueryRequest { Query = "entities", Params = new AcadQueryParams { Limit = 10001 } }, j => j["error"] != null);
+        Check("null params rejected", new QueryRequest { Query = "text", Params = null! }, j => j["error"] != null);
+        Check("empty query rejected", new QueryRequest { Query = " " }, j => j["error"] != null);
+        Check("oversized handle set rejected", new QueryRequest { Query = "entity_geometry", Params = new AcadQueryParams { Handles = Enumerable.Repeat("1", 10001).ToList() } }, j => j["error"] != null);
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(response.StringResult))!);
-        File.WriteAllText(response.StringResult, JsonConvert.SerializeObject(new { allPassed, fixtureEntities = 30000, results }, Formatting.Indented));
+        File.WriteAllText(response.StringResult, JsonConvert.SerializeObject(new { allPassed, fixtureEntities = 30001, results }, Formatting.Indented));
         editor.WriteMessage("\nDHCB_ACCEPTANCE " + (allPassed ? "PASS" : "FAIL"));
     }
 }

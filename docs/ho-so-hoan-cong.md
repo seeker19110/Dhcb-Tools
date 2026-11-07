@@ -2,7 +2,7 @@
 
 Đối chiếu **danh mục hồ sơ** của dự án với **file có thật** trong một thư mục, rồi báo thiếu mục nào.
 
-```bash
+```powershell
 DhcbTools.BatchRunner --dossier "D:/DHCB/ho-so" --dossier-spec "D:/DHCB/configs/ho-so-hoan-cong.json" --dossier-report "D:/DHCB/bao-cao/danh-muc.html"
 ```
 

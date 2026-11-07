@@ -2,7 +2,7 @@
 
 Cần **Python 3.10+** (fastmcp 4.x) và Hermes CLI. `<repo>` = thư mục repo trên máy bạn.
 
-```bash
+```powershell
 pip install -r <repo>/tools/autocad-mcp-server/requirements.txt
 
 hermes mcp add autocad-tools \

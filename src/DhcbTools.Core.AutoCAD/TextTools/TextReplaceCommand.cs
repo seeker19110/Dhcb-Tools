@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Autodesk.AutoCAD.DatabaseServices;
 using DhcbTools.Shared.Logic.Cad;
@@ -32,6 +33,19 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
             return CommandResult.Fail("Thiếu chuỗi cần tìm (find) — không được để rỗng.");
         }
 
+        if (!Enum.IsDefined(typeof(TextReplaceScope), config.Scope))
+            return CommandResult.Fail("Scope phải là All, ModelSpace, PaperSpace hoặc BlockDefinitions.");
+        if (config.MaxPreviewItems < 0 || config.MaxPreviewItems > 10000 || config.TimeBudgetSeconds < 1 || config.TimeBudgetSeconds > 600)
+            return CommandResult.Fail("MaxPreviewItems phải từ 0 đến 10000; TimeBudgetSeconds phải từ 1 đến 600.");
+        if ((!config.IncludeDbText && !config.IncludeMText && !config.IncludeAttributes)
+            || (!string.IsNullOrEmpty(config.AttributeTag) && !config.IncludeAttributes))
+            return CommandResult.Fail("Chưa chọn loại văn bản để tìm; AttributeTag cần IncludeAttributes=true.");
+
+        var watch = Stopwatch.StartNew();
+        bool OverBudget() => watch.Elapsed.TotalSeconds > config.TimeBudgetSeconds;
+        CommandResult BudgetExceeded() => CommandResult.Fail(
+            $"E-TEXT-BUDGET: Vượt ngân sách {config.TimeBudgetSeconds} giây khi lập kế hoạch; chưa ghi đối tượng nào. Thu hẹp Scope/LayerContains hoặc đơn giản hoá regex.");
+
         Regex? regex = null;
         if (config.UseRegex)
         {
@@ -52,6 +66,13 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
         var formattingNotes = new List<string>();
         var timeouts = 0;
         var formattingSkips = 0;
+        var fieldSkips = 0;
+        var omittedNotes = 0;
+        void Note(string message)
+        {
+            if (formattingNotes.Count < config.MaxPreviewItems) formattingNotes.Add(message);
+            else omittedNotes++;
+        }
 
         using var transaction = database.TransactionManager.StartTransaction();
         var lockedLayers = AcadHelpers.LockedLayerIds(database, transaction);
@@ -61,6 +82,11 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
         // cả lệnh (bản cũ). Bỏ qua ngay lúc lập kế hoạch nên xem trước và chạy thật cùng một con số, như FIND của AutoCAD.
         void AddToPlan(Entity entity, ObjectId id, string kind, string oldValue, string newValue, string? lockedParentLayer = null)
         {
+            if (entity.HasFields)
+            {
+                fieldSkips++;
+                return;
+            }
             if (lockedParentLayer != null || lockedLayers.Contains(entity.LayerId))
             {
                 lockedSkips.Add(lockedParentLayer ?? entity.Layer);
@@ -97,66 +123,88 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
             }
         }
 
-        var blockTable = (BlockTable)transaction.GetObject(database.BlockTableId, OpenMode.ForRead);
+        var modelSpace = SymbolUtilityServices.GetBlockModelSpaceId(database);
+        bool LayerMatches(Entity entity, BlockReference? parent = null)
+        {
+            var layer = parent != null && entity.Layer == "0" ? parent.Layer : entity.Layer;
+            return string.IsNullOrEmpty(config.LayerContains)
+                || layer.IndexOf(config.LayerContains, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+        bool TagMatches(string tag) => string.IsNullOrEmpty(config.AttributeTag)
+            || string.Equals(tag, config.AttributeTag, StringComparison.OrdinalIgnoreCase);
 
+        void PlanPlain(Entity entity, ObjectId id, string kind, string value, string? lockedParent = null)
+        {
+            var replaced = Substitute(value);
+            if (replaced != value) AddToPlan(entity, id, kind, value, replaced, lockedParent);
+        }
+        void PlanMText(Entity entity, ObjectId id, string kind, string value, string? lockedParent = null)
+        {
+            var outcome = SubstituteMText(value);
+            if (outcome.Contents != value) AddToPlan(entity, id, kind, value, outcome.Contents, lockedParent);
+            if (outcome.Skipped > 0)
+            {
+                formattingSkips += outcome.Skipped;
+                Note($"[{kind}] {AcadHelpers.HandleOf(id)}: {outcome.Skipped} chỗ khớp vắt qua mã định dạng hoặc field — không thay, cần sửa tay.");
+            }
+        }
+
+        var blockTable = (BlockTable)transaction.GetObject(database.BlockTableId, OpenMode.ForRead);
         foreach (ObjectId blockId in blockTable)
         {
+            if (OverBudget()) return BudgetExceeded();
             var block = (BlockTableRecord)transaction.GetObject(blockId, OpenMode.ForRead);
-            if (AcadHelpers.IsProtectedBlock(block))
-            {
+            if (AcadHelpers.IsProtectedBlock(block)
+                || (config.Scope == TextReplaceScope.ModelSpace && blockId != modelSpace)
+                || (config.Scope == TextReplaceScope.PaperSpace && (!block.IsLayout || blockId == modelSpace))
+                || (config.Scope == TextReplaceScope.BlockDefinitions && block.IsLayout))
                 continue;
-            }
 
             foreach (ObjectId entityId in block)
             {
+                if (OverBudget()) return BudgetExceeded();
                 var entity = transaction.GetObject(entityId, OpenMode.ForRead);
-
                 switch (entity)
                 {
-                    case DBText text:
+                    case AttributeDefinition definition when config.IncludeAttributes && TagMatches(definition.Tag) && LayerMatches(definition):
+                        if (definition.IsMTextAttributeDefinition)
                         {
-                            var replaced = Substitute(text.TextString);
-                            if (replaced != text.TextString)
-                            {
-                                AddToPlan(text, entityId, "DBText", text.TextString, replaced);
-                            }
-                            break;
+                            using var mt = definition.MTextAttributeDefinition;
+                            PlanMText(definition, entityId, "MTextAttributeDefinition", mt.Contents);
                         }
-                    case MText mtext:
+                        else PlanPlain(definition, entityId, "AttributeDefinition", definition.TextString);
+                        break;
+                    case DBText text when entity is not AttributeDefinition && config.IncludeDbText
+                        && string.IsNullOrEmpty(config.AttributeTag) && LayerMatches(text):
+                        PlanPlain(text, entityId, "DBText", text.TextString);
+                        break;
+                    case MText mtext when config.IncludeMText && string.IsNullOrEmpty(config.AttributeTag) && LayerMatches(mtext):
+                        PlanMText(mtext, entityId, "MText", mtext.Contents);
+                        break;
+                    case BlockReference blockRef when config.IncludeAttributes:
+                        foreach (ObjectId attId in blockRef.AttributeCollection)
                         {
-                            var outcome = SubstituteMText(mtext.Contents);
-                            if (outcome.Contents != mtext.Contents)
+                            if (OverBudget()) return BudgetExceeded();
+                            var attRef = (AttributeReference)transaction.GetObject(attId, OpenMode.ForRead);
+                            if (!TagMatches(attRef.Tag) || !LayerMatches(attRef, blockRef)) continue;
+                            var lockedParent = lockedLayers.Contains(blockRef.LayerId) ? blockRef.Layer : null;
+                            if (attRef.IsMTextAttribute)
                             {
-                                AddToPlan(mtext, entityId, "MText", mtext.Contents, outcome.Contents);
+                                using var mt = attRef.MTextAttribute;
+                                PlanMText(attRef, attId, "MTextAttribute", mt.Contents, lockedParent);
                             }
-
-                            if (outcome.Skipped > 0)
-                            {
-                                formattingSkips += outcome.Skipped;
-                                // Khớp trên chữ hiển thị nhưng vắt qua mã định dạng: gộp lại sẽ xoá định dạng của một
-                                // phần chuỗi, nên chỉ báo, không tự sửa.
-                                formattingNotes.Add(
-                                    $"[MText] {AcadHelpers.HandleOf(entityId)}: {outcome.Skipped} chỗ khớp vắt qua mã định dạng — không thay, cần sửa tay.");
-                            }
-                            break;
+                            else PlanPlain(attRef, attId, "Attribute", attRef.TextString, lockedParent);
                         }
-                    case BlockReference blockRef:
-                        {
-                            foreach (ObjectId attId in blockRef.AttributeCollection)
-                            {
-                                var attRef = (AttributeReference)transaction.GetObject(attId, OpenMode.ForRead);
-                                var replaced = Substitute(attRef.TextString);
-                                if (replaced != attRef.TextString)
-                                {
-                                    AddToPlan(attRef, attId, "Attribute", attRef.TextString, replaced,
-                                        lockedLayers.Contains(blockRef.LayerId) ? blockRef.Layer : null);
-                                }
-                            }
-                            break;
-                        }
+                        break;
                 }
             }
         }
+        // The final match may consume its entire per-string regex timeout.
+        if (OverBudget()) return BudgetExceeded();
+        if (fieldSkips > 0)
+            formattingNotes.Add($"{fieldSkips} đối tượng có field động được giữ nguyên để bảo toàn liên kết/công thức.");
+        if (omittedNotes > 0)
+            formattingNotes.Add($"{omittedNotes} chi tiết bỏ qua khác đã được lược bớt (MaxPreviewItems={config.MaxPreviewItems}).");
 
         if (lockedSkips.Message("đối tượng văn bản") is { } lockedNote)
         {
@@ -173,11 +221,11 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
         if (plan.Count == 0)
         {
             transaction.Commit();
-            var none = CommandResult.Ok(lockedSkips.Count > 0 || timeouts > 0 || formattingSkips > 0
+            var none = CommandResult.Ok(lockedSkips.Count > 0 || timeouts > 0 || formattingSkips > 0 || fieldSkips > 0
                 ? "Không có văn bản nào thay được — xem lý do bên dưới."
                 : "Không tìm thấy văn bản nào khớp để thay.");
             none.Messages.AddRange(formattingNotes);
-            return none.WithIncompleteWork(lockedSkips.Count > 0 || timeouts > 0 || formattingSkips > 0);
+            return none.WithIncompleteWork(lockedSkips.Count > 0 || timeouts > 0 || formattingSkips > 0 || fieldSkips > 0);
         }
 
         if (config.DryRun)
@@ -186,12 +234,14 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
             var preview = CommandResult.Ok(
                 $"[Xem trước] Sẽ thay {plan.Count} đối tượng văn bản.",
                 plan.Count);
-            foreach (var (id, kind, oldValue, newValue) in plan)
+            foreach (var (id, kind, oldValue, newValue) in plan.Take(config.MaxPreviewItems))
             {
-                preview.Messages.Add($"[{kind}] {AcadHelpers.HandleOf(id)}: \"{oldValue}\" → \"{newValue}\"");
+                preview.Messages.Add($"[{kind}] {AcadHelpers.HandleOf(id)}: \"{Snippet(oldValue)}\" → \"{Snippet(newValue)}\"");
             }
+            if (plan.Count > config.MaxPreviewItems)
+                preview.Messages.Add($"Đã lược bớt {plan.Count - config.MaxPreviewItems} chi tiết; tổng số thay đổi vẫn là {plan.Count}.");
             preview.Messages.AddRange(formattingNotes);
-            return preview.WithIncompleteWork(lockedSkips.Count > 0 || timeouts > 0 || formattingSkips > 0);
+            return preview.WithIncompleteWork(lockedSkips.Count > 0 || timeouts > 0 || formattingSkips > 0 || fieldSkips > 0);
         }
 
         foreach (var (id, kind, _, newValue) in plan)
@@ -201,6 +251,22 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
             {
                 // AttributeReference kế thừa DBText trong AutoCAD API — phải khớp trước DBText,
                 // nếu không case DBText sẽ "nuốt" mất case này (CS8120: unreachable).
+                case AttributeReference attRef when kind == "MTextAttribute":
+                    using (var mt = attRef.MTextAttribute)
+                    {
+                        mt.Contents = newValue;
+                        attRef.MTextAttribute = mt;
+                        attRef.UpdateMTextAttribute();
+                    }
+                    break;
+                case AttributeDefinition definition when kind == "MTextAttributeDefinition":
+                    using (var mt = definition.MTextAttributeDefinition)
+                    {
+                        mt.Contents = newValue;
+                        definition.MTextAttributeDefinition = mt;
+                        definition.UpdateMTextAttributeDefinition();
+                    }
+                    break;
                 case AttributeReference attRef:
                     attRef.TextString = newValue;
                     // Như AttributeImport: attribute canh giữa/Fit/Aligned giữ hình học canh cũ sau khi đổi chữ.
@@ -220,8 +286,10 @@ public sealed class TextReplaceCommand : ICoreCommand<TextReplaceConfig>
 
         var result = CommandResult.Ok($"Đã thay {plan.Count} đối tượng văn bản.", plan.Count);
         result.Messages.AddRange(formattingNotes);
-        return result.WithIncompleteWork(lockedSkips.Count > 0 || timeouts > 0 || formattingSkips > 0);
+        return result.WithIncompleteWork(lockedSkips.Count > 0 || timeouts > 0 || formattingSkips > 0 || fieldSkips > 0);
     }
+
+    private static string Snippet(string value) => value.Length > 2000 ? value.Substring(0, 2000) + "…" : value;
 
     private static string Apply(string value, TextReplaceConfig config, Regex? regex, out bool timedOut)
     {

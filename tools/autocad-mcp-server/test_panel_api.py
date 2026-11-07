@@ -373,7 +373,7 @@ class PostProxyTests(unittest.TestCase):
         self.assertEqual(fetch.call_args[0][1], {"query": "entities", "config": {"limit": 20}})
 
     def test_query_with_bad_limit_is_400(self) -> None:
-        handler, fetch = self._post("/query", {"query": "entities", "config": {"limit": 5000}})
+        handler, fetch = self._post("/query", {"query": "entities", "config": {"limit": 10001}})
         self.assertEqual(handler.captured[0]["code"], 400)
         fetch.assert_not_called()
 

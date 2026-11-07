@@ -34,10 +34,10 @@ public sealed class QueryRequest
 
 public sealed class AcadQueryParams
 {
-    /// <summary>[entities, inserts] Lọc theo tên layer (substring, case-insensitive).</summary>
+    /// <summary>[layers, entities, inserts, text] Lọc theo tên layer (substring, case-insensitive).</summary>
     public string? LayerContains { get; set; }
 
-    /// <summary>[entities] Lọc theo loại entity (Line, Arc, Text, …).</summary>
+    /// <summary>[entities] Lọc theo loại entity (Line, Arc, DBText, MText, …; Text là bí danh của DBText).</summary>
     public string? EntityType { get; set; }
 
     /// <summary>[inserts] Lọc theo tên block (exact, case-insensitive).</summary>
@@ -48,6 +48,9 @@ public sealed class AcadQueryParams
 
     /// <summary>[text] Lọc theo layer.</summary>
     public string? TextLayer { get; set; }
+
+    /// <summary>[text] Chỉ lấy văn bản hiển thị chứa chuỗi này (không phân biệt hoa/thường), trước khi phân trang.</summary>
+    public string? TextContains { get; set; }
 
     /// <summary>[entity_geometry, selection, show_entities] Handle (hex) của entity cần xem/chọn/zoom.</summary>
     public List<string> Handles { get; set; } = new();

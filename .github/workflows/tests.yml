@@ -1,86 +1,67 @@
-# CI: test tầng logic thuần + test CLI BatchRunner + build kiểm tra toàn bộ Core/vỏ bằng API package NuGet (không cần cài Revit/AutoCAD).
-# Vỏ Revit build với UseWPF=false (bỏ thư mục UI) vì runner Linux không có WindowsDesktop SDK — xem scripts/check-build.sh.
+# CI Windows: logic/CLI, WPF đầy đủ theo SDK host và kiểm thử công cụ đi kèm.
 name: tests
-
-# Chạy trên pull_request từ fork lẫn nhánh trong repo: token chỉ cần đọc mã và ghi artifact.
 permissions:
   contents: read
-
 on:
   workflow_call:
   push:
     branches: [main]
   pull_request:
-
-# Đẩy commit mới lên cùng PR thì huỷ lượt CI cũ: các hàng ma trận của lượt cũ không còn giá trị gì
-# mà vẫn chiếm runner, lượt mới phải xếp hàng. Chỉ huỷ trên PR — trên main mỗi commit phải có
-# kết quả CI riêng (release.yml và bằng chứng kiểm thử tra theo commit).
-# Quan sát 2026-09-23: hai merge cách nhau 2 phút thì lượt của commit trước trên main bị HUỶ dù
-# cancel-in-progress đã là false cho push — nhóm trùng tên là đủ để GitHub xếp chồng. Nhóm theo SHA
-# cho push để mỗi commit trên main chắc chắn có kết quả riêng; PR vẫn nhóm theo ref để huỷ lượt cũ.
 concurrency:
   group: tests-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   logic-tests:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
-
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
       - name: Restore
         run: dotnet restore tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj
-
       - name: Build
         run: dotnet build tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj --no-restore -c Release
-
-      # Ngưỡng 100% dòng là cổng, không phải mục tiêu phấn đấu: nhánh nào thật sự không chạy được
-      # trên CI Linux (icacls chỉ có trên Windows, polyfill attribute, đua "client ngắt giữa chừng")
-      # đã được đánh dấu [ExcludeFromCodeCoverage] kèm lý do ngay tại chỗ. Thêm code không có test
-      # thì job này đỏ và báo đúng dòng nào chưa chạy.
-      # Ngưỡng phủ NHÁNH không đặt: một số nhánh phụ thuộc nền tảng (net48 vs net8) không cùng lúc
-      # đo được ở một lần chạy — xem docs/dac-ta-kiem-thu.md.
       - name: Test (ngưỡng phủ 100% dòng)
         run: |
-          dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj --no-build -c Release \
-            --logger "trx;LogFileName=test-results.trx" \
-            --collect:"XPlat Code Coverage" --results-directory ./coverage
-          python3 scripts/check-coverage.py ./coverage
-
-      # Bộ test CLI của BatchRunner: đường "đầu vào hỏng" mà cổng phủ ở trên không với tới (§44/§47).
-      # Không đặt ngưỡng phủ cho nó: nó gọi Program.Main nên đi qua cả nhánh chỉ chạy được khi có
-      # Revit/AutoCAD trên máy — ngưỡng 100% ở đây sẽ ép viết test giả cho những nhánh đó.
-      - name: Test CLI BatchRunner (đầu vào hỏng)
-        run: |
-          dotnet test tests/DhcbTools.BatchRunner.Tests/DhcbTools.BatchRunner.Tests.csproj -c Release             --logger "trx;LogFileName=batchrunner-cli-results.trx"
-
+          dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj --no-build -c Release --logger "trx;LogFileName=test-results.trx" --collect:"XPlat Code Coverage" --results-directory ./coverage
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/check-coverage.py ./coverage
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Test CLI BatchRunner
+        run: dotnet test tests/DhcbTools.BatchRunner.Tests/DhcbTools.BatchRunner.Tests.csproj -c Release --logger "trx;LogFileName=batchrunner-cli-results.trx"
       - name: Đối chiếu BCF 2.1 với schema và reader độc lập
         run: |
-          python3 -m pip install --quiet bcf-client==0.9.0 lxml==6.1.3
-          git init --quiet "$RUNNER_TEMP/bcf-schema"
-          git -C "$RUNNER_TEMP/bcf-schema" fetch --quiet --depth 1 https://github.com/buildingSMART/BCF-XML.git 92fdcf4bfaa8f0576e7562730f341fc7781e2065
-          git -C "$RUNNER_TEMP/bcf-schema" checkout --quiet FETCH_HEAD -- Schemas
+          python -m pip install --quiet bcf-client==0.9.0 lxml==6.1.3
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $schema = Join-Path $env:RUNNER_TEMP 'bcf-schema'
+          git init --quiet $schema
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C $schema fetch --quiet --depth 1 https://github.com/buildingSMART/BCF-XML.git 92fdcf4bfaa8f0576e7562730f341fc7781e2065
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C $schema checkout --quiet FETCH_HEAD -- Schemas
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet run --project tools/bcf-acceptance/DhcbTools.Bcf.Acceptance.csproj -c Release -- ./out/bcf-fixtures
-          python3 tools/bcf-acceptance/verify.py ./out/bcf-fixtures "$RUNNER_TEMP/bcf-schema/Schemas"
-
-      # Bộ ca IDS chính thức của buildingSMART (334 cặp .ids/.ifc có sẵn kết quả đúng), ghim commit để kết quả
-      # không trôi theo repo của họ. Đỏ khi một ca NGOÀI tests/ids-buildingsmart/known-gaps.txt lệch — tức hồi
-      # quy so với chuẩn; ca trong danh sách mà nay khớp thì chỉ nhắc xoá dòng. Chạy sau bước trên vì cần
-      # BatchRunner đã build (--verify-ifc/--verify-ids). Xem docs/kiem-ids.md.
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/bcf-acceptance/verify.py ./out/bcf-fixtures "$schema/Schemas"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Đối chiếu bộ ca IDS của buildingSMART
         run: |
-          git init --quiet "$RUNNER_TEMP/bsids"
-          git -C "$RUNNER_TEMP/bsids" fetch --quiet --depth 1 https://github.com/buildingSMART/IDS.git 870f9c4e6e8f414e737b4d84ca1aa9b46fc6c8f3
-          git -C "$RUNNER_TEMP/bsids" checkout --quiet FETCH_HEAD -- Documentation/ImplementersDocumentation/TestCases
-          python3 scripts/ids-conformance.py "$RUNNER_TEMP/bsids/Documentation/ImplementersDocumentation/TestCases" \
-            --runner src/DhcbTools.BatchRunner/bin/Release/net10.0/DhcbTools.BatchRunner.dll
-
+          $cases = Join-Path $env:RUNNER_TEMP 'bsids'
+          git init --quiet $cases
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C $cases fetch --quiet --depth 1 https://github.com/buildingSMART/IDS.git 870f9c4e6e8f414e737b4d84ca1aa9b46fc6c8f3
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C $cases checkout --quiet FETCH_HEAD -- Documentation/ImplementersDocumentation/TestCases
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/ids-conformance.py "$cases/Documentation/ImplementersDocumentation/TestCases" --runner src/DhcbTools.BatchRunner/bin/Release/net10.0/DhcbTools.BatchRunner.dll
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Tải kết quả test
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -89,7 +70,7 @@ jobs:
           path: '**/*-results.trx'
 
   check-build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
@@ -99,167 +80,92 @@ jobs:
           - { version: '2024', acad-runtime: net48 }
           - { version: '2025', acad-runtime: net8 }
           - { version: '2025', acad-runtime: net10 }
-          - { version: '2026', acad-runtime: net10 }
           - { version: '2026', acad-runtime: net8 }
+          - { version: '2026', acad-runtime: net10 }
           - { version: '2027', acad-runtime: net10 }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          # Cần cả hai: nhánh net48/net8.0-windows (Revit/AutoCAD 2024–2026) build bằng SDK 8;
-          # BatchRunner (net10.0) và nhánh net10.0-windows (AutoCAD 2026+, Revit 2027+) cần SDK 10.
           dotnet-version: |
             8.0.x
             10.0.x
-
-      - name: Build BatchRunner
-        run: dotnet build src/DhcbTools.BatchRunner/DhcbTools.BatchRunner.csproj -c Release
-
-      - name: Check-build Core + vỏ (Revit/AutoCAD ${{ matrix.version }} API từ NuGet)
-        run: |
-          for proj in src/DhcbTools.Core/DhcbTools.Core.csproj src/DhcbTools.Core.AutoCAD/DhcbTools.Core.AutoCAD.csproj \
-                      src/DhcbTools.Revit/DhcbTools.Revit.csproj src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj \
-                      src/DhcbTools.AutoCAD.Core/DhcbTools.AutoCAD.Core.csproj; do
-            dotnet build "$proj" -p:EnableWindowsTargeting=true \
-              -p:RevitVersion=${{ matrix.version }} -p:AcadVersion=${{ matrix.version }} -p:AcadRuntime=${{ matrix.acad-runtime }} \
-              -p:UseWPF=false -c Release
-          done
-
-      - name: Build fixture nghiệm thu AutoCAD (không cài vào bundle)
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        if: matrix.version == '2025' && matrix.acad-runtime == 'net8'
+        with:
+          python-version: '3.12'
+      - name: Build toàn bộ Core, WPF và Core Console
+        shell: powershell
+        run: ./scripts/check-build.ps1 -RevitVersion ${{ matrix.version }} -AcadVersion ${{ matrix.version }} -AcadRuntime ${{ matrix.acad-runtime }} -SkipTests
+      - name: Build fixture nghiệm thu AutoCAD
         if: matrix.version == '2026' && matrix.acad-runtime == 'net10'
-        run: dotnet build tools/acceptance/DhcbTools.AutoCAD.Acceptance.csproj -c Release -p:AcadVersion=2026 -p:EnableWindowsTargeting=true
-
-      - name: Kiểm tra script Python (ngưỡng phủ 100% câu lệnh)
-        if: matrix.version == '2025' && matrix.acad-runtime == 'net8'   # không phụ thuộc TFM, chạy một lần là đủ
-        run: |
-          # test_panel_api.py nhập server.py để kiểm cổng xác nhận của MCP, mà server.py cần fastmcp.
-          # Không cài thì bộ test không chạy nổi một ca nào (ImportError) — CI đỏ đúng vì lý do đó.
-          python3 -m pip install --quiet -r tools/autocad-mcp-server/requirements.txt
-          python3 -m pip install --quiet 'coverage>=7,<8' 'pyflakes>=3,<4'
-          python3 -m py_compile scripts/dhcb_agent.py scripts/dhcb_mcp_server.py scripts/dhcb_ai.py \
-            scripts/doi-chieu-setout-ifc.py tools/autocad-mcp-server/server.py tools/autocad-mcp-server/panel_api.py
-          # CONTRIBUTING và PR template đã ghi pyflakes là bước kiểm, nhưng trước 2026-09-28 CI không chạy nó.
-          python3 -m pyflakes scripts/*.py tools/autocad-mcp-server/*.py tests/python/*.py
-          # Ngưỡng 100% câu lệnh (fail_under trong pyproject.toml) — cùng con số khi chạy ở máy.
-          python3 -m coverage run -m unittest discover -s tools/autocad-mcp-server -p 'test_*.py'
-          python3 -m coverage run --append -m unittest discover -s tests/python -p 'test_*.py'
-          python3 scripts/muc-luc-bang-chung.py --check
-          python3 -m coverage report
-
-      - name: Kiểm tra JavaScript panel AutoCAD
-        if: matrix.version == '2025' && matrix.acad-runtime == 'net8'   # không phụ thuộc TFM, chạy một lần là đủ
-        run: |
-          node -e "const fs=require('fs');const s=fs.readFileSync('tools/autocad-mcp-server/panel.html','utf8');const m=s.match(/<script>([\\s\\S]*?)<\\/script>/);if(!m)throw Error('script missing');new Function(m[1]);if(!s.includes('runCleanup(false)'))throw Error('real cleanup path missing');"
-
-      # Script .ps1 phải chạy được bằng Windows PowerShell 5.1 — bản có sẵn trên mọi máy kỹ sư. Toán tử chỉ có ở
-      # PowerShell 7 (?. ?? ?: && ||) làm 5.1 báo lỗi cú pháp cho CẢ file: install-nightly-task.ps1 từng như thế,
-      # nên cài task chạy đêm theo đúng README là hỏng ngay dòng lệnh đầu (audit 2026-10-01). Runner Linux có sẵn
-      # pwsh 7; bộ đọc của nó gắn loại token riêng cho đúng các toán tử này nên kiểm được mà không cần Windows.
-      - name: Kiểm script PowerShell (cú pháp, chạy được trên 5.1)
-        if: matrix.version == '2025' && matrix.acad-runtime == 'net8'   # không phụ thuộc TFM, chạy một lần là đủ
-        shell: pwsh
-        run: |
-          $ps7Only = 'QuestionDot', 'QuestionQuestion', 'QuestionQuestionEquals', 'QuestionLBracket', 'AndAnd', 'OrOr', 'QuestionMark'
-          $bad = 0
-          foreach ($f in Get-ChildItem scripts/*.ps1, tools/acceptance/*.ps1) {
-            $tokens = $null; $errors = $null
-            [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$tokens, [ref]$errors) | Out-Null
-            foreach ($e in $errors) {
-              Write-Host "::error file=$($f.FullName),line=$($e.Extent.StartLineNumber)::$($e.Message)"
-              $bad++
-            }
-            foreach ($t in @($tokens | Where-Object { $ps7Only -contains $_.Kind.ToString() })) {
-              Write-Host "::error file=$($f.FullName),line=$($t.Extent.StartLineNumber)::'$($t.Text)' chỉ có ở PowerShell 7 — Windows PowerShell 5.1 báo lỗi cú pháp cả file."
-              $bad++
-            }
-          }
-          if ($bad -gt 0) { exit 1 }
-          Write-Host "Mọi script .ps1 đọc được bằng cú pháp chung của PowerShell 5.1 và 7."
-
-  # Build ĐẦY ĐỦ có WPF trên Windows — đúng thứ release.yml đóng gói.
-  # Job check-build ở trên chạy UseWPF=false (Linux không có WindowsDesktop SDK), mà bật WPF
-  # thì SDK BỎ System.IO khỏi implicit usings (tránh nhập nhằng System.IO.Path với
-  # System.Windows.Shapes.Path). Vì thế add-in Revit từng hỏng CS0103 ở bản build thật trong khi
-  # CI vẫn xanh — release.yml chỉ chạy khi đẩy tag nên không ai bắt được. Job này đóng khe hở đó.
-  build-wpf-windows:
-    runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        # 2027 là bản WPF đầu tiên trên net10.0-windows — đúng chỗ SDK đổi implicit usings khi bật WPF.
-        revit: ['2027', '2026', '2025', '2024', '2023', '2022']
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        run: dotnet build tools/acceptance/DhcbTools.AutoCAD.Acceptance.csproj -c Release -p:AcadVersion=2026
+      - name: Nghiệm thu palette và form WPF trên Windows
+        if: matrix.version == '2026' && matrix.acad-runtime == 'net10'
+        shell: powershell
+        run: ./tools/ui-acceptance/run-ui.ps1 -OutputRoot ./out/ui-acceptance
+      - name: Tải báo cáo WPF
+        if: always() && matrix.version == '2026' && matrix.acad-runtime == 'net10'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          persist-credentials: false
-
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          dotnet-version: |
-            8.0.x
-            10.0.x
-
-      - name: Build đầy đủ vỏ Revit (WPF, Revit ${{ matrix.revit }})
-        run: dotnet build src/DhcbTools.Revit/DhcbTools.Revit.csproj -c Release -p:RevitVersion=${{ matrix.revit }}
-
-      # Dựng và chạy bộ cài trên sandbox: lỗi Pascal/UTF-8 và nâng cấp bỏ chọn không lọt đến release.
-      - name: Kiểm installer (biên dịch và cài/nâng cấp trong thư mục tạm)
-        if: matrix.revit == '2025'
-        shell: pwsh
+          name: windows-ui-acceptance
+          path: out/ui-acceptance
+      - name: Cài Inno Setup cho kiểm thử installer
+        if: matrix.version == '2025' && matrix.acad-runtime == 'net8'
         run: |
           choco install innosetup --version=6.7.1 --yes --no-progress
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $env:DHCB_ISCC = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          python -m unittest discover -s tests/python -p test_installer.py -v
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-  # Ribbon AutoCAD dùng WPF: biên dịch đầy đủ như artifact phát hành, cho từng SDK/runtime.
-  build-autocad-windows:
-    runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { acad: '2022', runtime: net48 }
-          - { acad: '2023', runtime: net48 }
-          - { acad: '2024', runtime: net48 }
-          - { acad: '2025', runtime: net8 }
-          - { acad: '2025', runtime: net10 }
-          - { acad: '2026', runtime: net8 }
-          - { acad: '2026', runtime: net10 }
-          - { acad: '2027', runtime: net10 }
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          dotnet-version: |
-            8.0.x
-            10.0.x
-      - name: Build AutoCAD WPF và Core Console
-        shell: pwsh
+      - name: Kiểm tra Python (ngưỡng phủ 100% câu lệnh)
+        if: matrix.version == '2025' && matrix.acad-runtime == 'net8'
         run: |
-          foreach ($project in 'AutoCAD', 'AutoCAD.Core') {
-            dotnet build "src/DhcbTools.$project/DhcbTools.$project.csproj" -c Release -p:AcadVersion=${{ matrix.acad }} -p:AcadRuntime=${{ matrix.runtime }}
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pip install --quiet -r requirements-dev.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $files = @(Get-ChildItem scripts/*.py, tools/autocad-mcp-server/*.py, tests/python/*.py | ForEach-Object { $_.FullName })
+          python -m py_compile @files
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pyflakes @files
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m coverage run -m unittest discover -s tools/autocad-mcp-server -p 'test_*.py'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m coverage run --append -m unittest discover -s tests/python -p 'test_*.py'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/muc-luc-bang-chung.py --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m coverage report
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Kiểm tra JavaScript panel AutoCAD
+        if: matrix.version == '2025' && matrix.acad-runtime == 'net8'
+        run: |
+          node -e "const fs=require('fs');const s=fs.readFileSync('tools/autocad-mcp-server/panel.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);if(!m)throw Error('script missing');new Function(m[1]);if(!s.includes('runCleanup(false)'))throw Error('real cleanup path missing');"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Kiểm cú pháp Windows PowerShell 5.1
+        if: matrix.version == '2025' && matrix.acad-runtime == 'net8'
+        shell: powershell
+        run: |
+          $bad = 0
+          foreach ($file in Get-ChildItem scripts/*.ps1, tools/acceptance/*.ps1, tools/ui-acceptance/*.ps1) {
+            $tokens = $null; $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+            foreach ($parseError in $errors) {
+              Write-Host "::error file=$($file.FullName),line=$($parseError.Extent.StartLineNumber)::$($parseError.Message)"
+              $bad++
+            }
           }
+          if ($bad -gt 0) { exit 1 }
 
-  # Stable branch protection context; matrix row names can change without dropping a required check.
-  # Python, JavaScript and PowerShell checks run inside check-build (2025/net8).
   quality-gate:
     if: ${{ always() }}
-    needs: [logic-tests, check-build, build-wpf-windows, build-autocad-windows]
-    runs-on: ubuntu-latest
+    needs: [logic-tests, check-build]
+    runs-on: windows-latest
     steps:
       - name: Require every validation job to succeed
+        shell: python
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
         run: |
-          python3 - <<'PY'
           import json
           import os
           import sys
@@ -269,4 +175,3 @@ jobs:
               print('Validation jobs did not all succeed:', failed, file=sys.stderr)
               sys.exit(1)
           print('All validation jobs passed.')
-          PY

@@ -19,6 +19,11 @@ import server
 
 
 class FetchTests(unittest.TestCase):
+    def setUp(self):
+        token = mock.patch.dict(server.panel_api.os.environ, {"DHCB_BRIDGE_TOKEN": "test-token"})
+        token.start()
+        self.addCleanup(token.stop)
+
     def test_write_uses_gateway_document_guard(self):
         body = {"config": {"dryRun": False}}
         with mock.patch.object(server.panel_api, "fetch_autocad", return_value={"success": True}) as send:
@@ -65,6 +70,38 @@ class ProbePanelApiTests(unittest.TestCase):
     def test_co_server_khac_tra_loi_json_la(self) -> None:
         with mock.patch.object(server.panel_api.LOOPBACK, "open", return_value=self._response({"hello": "world"})):
             self.assertEqual("foreign", server._probe_panel_api())
+
+    def test_non_object_json_is_an_occupied_port(self) -> None:
+        for payload in ([], None, True, 123, "ok"):
+            with self.subTest(payload=payload), mock.patch.object(
+                server.panel_api.LOOPBACK, "open", return_value=self._response(payload)
+            ):
+                self.assertEqual("foreign", server._probe_panel_api())
+
+    def test_non_json_response_does_not_spawn_another_gateway(self) -> None:
+        response = self._response({})
+        response.read.return_value = b"<html>Another service</html>"
+        with mock.patch.object(server.panel_api.LOOPBACK, "open", return_value=response), \
+                mock.patch.object(server.subprocess, "Popen") as popen:
+            problem = server._ensure_panel_api()
+        self.assertIn("đang bị một chương trình khác chiếm", problem)
+        popen.assert_not_called()
+
+    def test_disconnected_service_is_an_occupied_port(self) -> None:
+        response = self._response({})
+        response.read.side_effect = server.http.client.RemoteDisconnected()
+        with mock.patch.object(server.panel_api.LOOPBACK, "open", return_value=response):
+            self.assertEqual("foreign", server._probe_panel_api())
+        with mock.patch.object(server.panel_api.LOOPBACK, "open", side_effect=server.http.client.BadStatusLine("bad")):
+            self.assertEqual("foreign", server._probe_panel_api())
+
+    def test_timeout_and_reset_do_not_spawn_into_an_occupied_port(self) -> None:
+        import urllib.error
+        for error in (TimeoutError(), urllib.error.URLError(TimeoutError()), ConnectionResetError(), ConnectionAbortedError()):
+            with self.subTest(error=type(error).__name__), mock.patch.object(server.panel_api.LOOPBACK, "open", side_effect=error), \
+                    mock.patch.object(server.subprocess, "Popen") as popen:
+                self.assertIn("đang bị một chương trình khác chiếm", server._ensure_panel_api())
+                popen.assert_not_called()
 
     def test_co_server_khac_tra_ma_loi_http(self) -> None:
         import urllib.error
@@ -124,7 +161,7 @@ class EnsurePanelApiTests(unittest.TestCase):
         self.assertIn("đang bị một chương trình khác chiếm", problem)
 
     def test_tren_windows_spawn_khong_kem_cua_so_console(self) -> None:
-        """Cờ CREATE_NO_WINDOW chỉ có trên Windows; getattr(..., 0) giữ đường Linux chạy được."""
+        """Gateway Windows không mở cửa sổ console riêng."""
         with mock.patch.object(server.sys, "platform", "win32"), \
                 mock.patch.object(server.subprocess, "CREATE_NEW_PROCESS_GROUP", 0x200, create=True), \
                 mock.patch.object(server.subprocess, "CREATE_NO_WINDOW", 0x8000000, create=True), \
@@ -221,7 +258,7 @@ class QueryToolTests(unittest.TestCase):
 
     def test_limit_ngoai_khoang_bi_chan_boi_bo_validate_cua_gateway(self) -> None:
         with mock.patch.object(server, "_fetch") as fetch:
-            text = server.autocad_query("entities", limit=9999)
+            text = server.autocad_query("entities", limit=10001)
 
         fetch.assert_not_called()
         self.assertIn("limit", text)

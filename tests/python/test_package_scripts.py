@@ -20,6 +20,8 @@ INSTALLER = ROOT / "installer" / "dhcb-tools.iss"
 
 # Không đi kèm gói — mỗi tên kèm lý do. Script mới phải vào đây hoặc vào danh sách đi kèm.
 NOT_SHIPPED = {
+    "check-build.ps1": "Windows build/test CI",
+    "check-vulnerable.ps1": "Windows dependency audit CI",
     "sign-addin.ps1": "ký số — cần chứng chỉ của tổ chức",
     "sign-release.ps1": "ký số trong release.yml",
     "check-coverage.py": "CI",

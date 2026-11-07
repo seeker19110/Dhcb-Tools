@@ -62,7 +62,9 @@ def load_token() -> str:
     env = os.environ.get("DHCB_BRIDGE_TOKEN")
     if env:
         return env.strip()
-    appdata = os.environ.get("APPDATA") or os.path.join(os.path.expanduser("~"), ".config")
+    appdata = os.environ.get("APPDATA")
+    if not appdata:
+        return ""
     path = os.path.join(appdata, "DHCB", "bridge-token.txt")
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -243,7 +245,7 @@ def print_result(result: dict):
 
 def default_export_path(app: str) -> str:
     """CSV xuất mặc định nằm trong hồ sơ người dùng — C:/Users/Public thì mọi tài khoản trên máy đọc/đè được."""
-    base = os.environ.get("LOCALAPPDATA") or os.path.join(os.path.expanduser("~"), ".local", "share")
+    base = os.environ["LOCALAPPDATA"]
     return os.path.join(base, "DHCB", "exports", f"dhcb_{app}_export.csv").replace("\\", "/")
 
 

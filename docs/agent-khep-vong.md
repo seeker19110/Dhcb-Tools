@@ -65,23 +65,23 @@ Giới hạn 500 id một lượt để lệnh sửa cả vạn phần tử khô
 
 Đánh số cửa tầng 3, rồi tự kiểm:
 
-```bash
+```powershell
 # 1. Tham số nào ghi được trên Doors?
-python scripts/dhcb_agent.py revit query parameters_of \
+python scripts/dhcb_agent.py revit query parameters_of `
   --params '{"categories":["Doors"],"writableOnly":true}'
 
 # 2. Xem trước
-python scripts/dhcb_agent.py revit exec AutoNumbering \
+python scripts/dhcb_agent.py revit exec AutoNumbering `
   --config '{"category":"Doors","parameterName":"Mark","prefix":"D3-","padWidth":3}'
 
 # 3. Chạy thật (agent phải truyền confirm qua MCP) — kết quả có changedIds
 
 # 4. Kiểm lại đúng những phần tử vừa đổi
-python scripts/dhcb_agent.py revit query element_geometry \
+python scripts/dhcb_agent.py revit query element_geometry `
   --params '{"elementIds":[123456,123457]}'
 
 # 5. Chỉ cho kỹ sư xem
-python scripts/dhcb_agent.py revit query show_elements \
+python scripts/dhcb_agent.py revit query show_elements `
   --params '{"elementIds":[123456,123457]}'
 
 # 6. Nhìn kết quả

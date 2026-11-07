@@ -86,6 +86,11 @@ class BridgeHeadersTests(unittest.TestCase):
 
 
 class FetchAutocadTests(unittest.TestCase):
+    def setUp(self):
+        token = mock.patch.dict(panel_api.os.environ, {"DHCB_BRIDGE_TOKEN": "test-token"})
+        token.start()
+        self.addCleanup(token.stop)
+
     @staticmethod
     def _response(payload):
         response = mock.MagicMock()
@@ -114,8 +119,33 @@ class FetchAutocadTests(unittest.TestCase):
 
         self.assertFalse(result["connected"])
 
+    def test_missing_token_does_not_send_authenticated_routes(self) -> None:
+        for path, body in (("/query", {"query": "layers"}), ("/execute", {"config": {"dryRun": True}}),
+                           ("/execute", {"config": {"dryRun": False}}),
+                           ("/progress/job", None)):
+            with self.subTest(path=path), mock.patch.dict(panel_api.os.environ, {}, clear=True), \
+                    mock.patch.object(panel_api.Path, "read_text", side_effect=FileNotFoundError()), \
+                    mock.patch.object(panel_api.LOOPBACK, "open") as send:
+                result = panel_api.fetch_autocad(path, body)
+            self.assertFalse(result["success"])
+            self.assertIn("token Bridge", result["error"])
+            self.assertNotIn("outcomeUnknown", result)
+            send.assert_not_called()
+
+    def test_health_remains_available_without_token(self) -> None:
+        with mock.patch.dict(panel_api.os.environ, {}, clear=True), \
+                mock.patch.object(panel_api.Path, "read_text", side_effect=FileNotFoundError()), \
+                mock.patch.object(panel_api.LOOPBACK, "open", return_value=self._response({"status": "ok"})) as send:
+            self.assertEqual({"status": "ok"}, panel_api.fetch_autocad("/health"))
+        self.assertNotIn("Authorization", send.call_args.args[0].headers)
+
 
 class DocumentTargetTests(unittest.TestCase):
+    def setUp(self):
+        token = mock.patch.dict(panel_api.os.environ, {"DHCB_BRIDGE_TOKEN": "test-token"})
+        token.start()
+        self.addCleanup(token.stop)
+
     @staticmethod
     def response(payload):
         result = mock.MagicMock()
@@ -449,10 +479,9 @@ class LaunchFileTests(unittest.TestCase):
         with mock.patch.dict(panel_api.os.environ, {"LOCALAPPDATA": "/u/AppData/Local"}):
             self.assertEqual(Path("/u/AppData/Local/DHCB/autocad-panel.html"), panel_api.launch_file_path())
 
-    def test_khong_co_localappdata_thi_dung_cache_trong_home(self) -> None:
-        with mock.patch.dict(panel_api.os.environ, {}, clear=True), \
-                mock.patch.object(panel_api.Path, "home", return_value=Path("/home/kts")):
-            self.assertEqual(Path("/home/kts/.cache/DHCB/autocad-panel.html"), panel_api.launch_file_path())
+    def test_launch_requires_windows_localappdata(self) -> None:
+        with mock.patch.dict(panel_api.os.environ, {}, clear=True), self.assertRaises(KeyError):
+            panel_api.launch_file_path()
 
     def test_ghi_trang_chuyen_huong_mang_khoa(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -467,7 +496,7 @@ class LaunchFileTests(unittest.TestCase):
             self.assertEqual(["autocad-panel.html"], [p.name for p in target.parent.iterdir()])
 
     def test_mo_file_o_che_do_nhi_phan_khi_he_dieu_hanh_co_co_o_binary(self) -> None:
-        """Windows: thiếu O_BINARY thì CRT đổi "\\n" thêm lần nữa — file ra "\\r\\r\\n". Giả lập cờ trên Linux."""
+        """Windows: thiếu O_BINARY thì CRT đổi newline thêm lần nữa."""
         fake_binary = 1 << 30
         real_open = panel_api.os.open
         seen: list[int] = []
@@ -483,21 +512,18 @@ class LaunchFileTests(unittest.TestCase):
 
         self.assertTrue(seen and seen[0] & fake_binary)
 
-    @unittest.skipIf(sys.platform == "win32", "quyền POSIX; trên Windows quyền là ACL thừa kế của %LOCALAPPDATA%")
-    def test_file_chi_chu_tai_khoan_doc_duoc(self) -> None:
+    def test_stale_temp_file_is_replaced_and_binary_newlines_stay_valid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "autocad-panel.html"
             target.write_text("cũ", encoding="utf-8")
-            target.chmod(0o644)
             # File tạm sót lại từ lần trước (có thể quyền rộng) không được dùng lại — tạo mới bằng O_EXCL.
             stale = target.with_name(target.name + ".tmp")
             stale.write_text("sót", encoding="utf-8")
-            stale.chmod(0o666)
 
             panel_api.write_launch_file(target)
 
-            self.assertEqual(0o600, target.stat().st_mode & 0o777)
             self.assertIn(panel_api.LAUNCH_KEY, target.read_text(encoding="utf-8"))
+            self.assertNotIn(b"\r\r\n", target.read_bytes())
             self.assertFalse(stale.exists())
 
 

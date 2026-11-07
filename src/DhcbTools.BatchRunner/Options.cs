@@ -94,12 +94,28 @@ internal sealed class Options
             return null;
         }
 
-        // --verify-log, --verify-ifc và --dossier đứng một mình được: chúng không chạy job nào cả.
-        return string.IsNullOrEmpty(o.JobPath)
-               && string.IsNullOrEmpty(o.VerifyLog)
-               && string.IsNullOrEmpty(o.VerifyIfc)
-               && string.IsNullOrEmpty(o.Dossier)
-            ? null
-            : o;
+        // Các chế độ là độc lập: không được trả thành công cho một chế độ rồi âm thầm bỏ chế độ khác.
+        var modes = new[] { o.JobPath, o.VerifyLog, o.VerifyIfc, o.Dossier }
+            .Count(value => !string.IsNullOrEmpty(value));
+        if (modes > 1)
+            return Invalid("Chỉ chọn một chế độ: --job, --verify-log, --verify-ifc hoặc --dossier.");
+        if (o.VerifyIds != null && string.IsNullOrEmpty(o.VerifyIfc))
+            return Invalid("--verify-ids cần --verify-ifc để xác định file IFC phải kiểm.");
+        if (o.IdsReport != null && string.IsNullOrEmpty(o.VerifyIds))
+            return Invalid("--ids-report cần --verify-ifc và --verify-ids.");
+        if (o.IfcSpec != null && (string.IsNullOrEmpty(o.VerifyIfc) || o.VerifyIds != null))
+            return Invalid("--ifc-spec chỉ dùng với --verify-ifc, không dùng cùng --verify-ids; chạy hai lượt để kiểm cả hai bộ quy tắc.");
+        if ((o.DossierSpec != null || o.DossierReport != null) && string.IsNullOrEmpty(o.Dossier))
+            return Invalid("--dossier-spec và --dossier-report cần --dossier.");
+        if (o.DryRun && o.ReportOnly)
+            return Invalid("--dry-run và --report-only không dùng cùng nhau: chọn chạy thử hoặc dựng lại báo cáo.");
+
+        return modes == 0 ? null : o;
+    }
+
+    private static Options? Invalid(string message)
+    {
+        Console.Error.WriteLine(message);
+        return null;
     }
 }

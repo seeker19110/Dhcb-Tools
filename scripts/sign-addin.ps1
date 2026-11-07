@@ -52,8 +52,16 @@ if (-not (Test-Path $Path)) {
 
 # ── 1. Lấy chứng chỉ ────────────────────────────────────────────────────────
 if ($PfxPath) {
-    if (-not (Test-Path $PfxPath)) { Write-Host "Khong thay .pfx: $PfxPath" -ForegroundColor Red; exit 2 }
-    $cert = Get-PfxCertificate -FilePath $PfxPath -Password $PfxPassword
+    if (-not (Test-Path -LiteralPath $PfxPath)) { Write-Host "Khong thay .pfx: $PfxPath" -ForegroundColor Red; exit 2 }
+    if ($PfxPassword) {
+        # Windows PowerShell 5.1 Get-PfxCertificate has no -Password parameter.
+        $pfxFile = (Resolve-Path -LiteralPath $PfxPath).ProviderPath
+        $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($pfxFile, $PfxPassword)
+    }
+    else {
+        $cert = Get-PfxCertificate -LiteralPath $PfxPath
+    }
+    if (-not $cert.HasPrivateKey) { throw "File .pfx khong chua khoa rieng - khong ky duoc." }
     Write-Host "Dung chung chi tu file: $($cert.Subject)"
 }
 else {

@@ -1,0 +1,16 @@
+{
+  "find": "OLD",
+  "replace": "NEW",
+  "useRegex": false,
+  "ignoreCase": false,
+  "multiline": false,
+  "scope": "ModelSpace",
+  "layerContains": "NOTES",
+  "attributeTag": null,
+  "includeDbText": true,
+  "includeMText": true,
+  "includeAttributes": false,
+  "maxPreviewItems": 200,
+  "timeBudgetSeconds": 30,
+  "dryRun": true
+}

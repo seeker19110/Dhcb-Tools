@@ -14,7 +14,7 @@ namespace DhcbTools.Shared.Logic.Tests;
 /// </para>
 /// <para>
 /// Test đọc thẳng mã nguồn Core (cùng cách <c>RibbonCoverageTests</c> đọc vỏ Revit) nên chạy được trên
-/// CI Linux, không cần Revit/AutoCAD API.
+/// CI Windows, không cần Revit/AutoCAD API.
 /// </para>
 /// </summary>
 public class CatalogFieldTests
@@ -224,6 +224,8 @@ public class CatalogFieldTests
     {
         var (map, classes) = Read(platform, projectFolder, tableFile);
         var simple = new[] { "string", "int", "long", "double", "bool", "decimal", "float" };
+        var enums = new HashSet<string>(SourceFiles(projectFolder).SelectMany(file =>
+            Regex.Matches(File.ReadAllText(file), @"\benum\s+(\w+)").Select(m => m.Groups[1].Value)), StringComparer.Ordinal);
         var wrong = new List<string>();
 
         foreach (var command in CommandCatalog.AllFor(platform).Where(c => c.Implemented))
@@ -242,6 +244,11 @@ public class CatalogFieldTests
                 }
 
                 var bare = type.Replace("?", string.Empty).Trim();
+                if (enums.Contains(bare))
+                {
+                    if (field.Kind != FieldKind.Text) wrong.Add($"{command.Name}.{field.Name}: enum phải nhận tên dạng chuỗi");
+                    continue;
+                }
 
                 // Danh sách để test danh sách lo (List<enum>, List<long>… gửi mảng chuỗi là Newtonsoft
                 // đổi kiểu được). Ở đây chỉ soi property là MỘT đối tượng riêng: ô nhập phải là JSON thô.
@@ -277,4 +284,17 @@ public class CatalogFieldTests
     [Fact]
     public void TruongDanhSachCuaAutoCad_KhopVoiConfigThat() =>
         AssertListFieldsMatchConfig(CommandCatalog.AutoCad, "DhcbTools.Core.AutoCAD", "AcadCommandTable.cs");
+    [Fact]
+    public void EveryPublicAutoCadConfigurationOptionIsDiscoverableByAgents()
+    {
+        var (map, classes) = Read(CommandCatalog.AutoCad, "DhcbTools.Core.AutoCAD", "AcadCommandTable.cs");
+        var missing = new List<string>();
+        foreach (var command in CommandCatalog.AllFor(CommandCatalog.AutoCad).Where(c => c.Implemented && !c.Internal))
+        {
+            var properties = classes[map[command.Name]];
+            missing.AddRange(properties.Where(p => !command.ConfigFields.ContainsKey(p)).Select(p => command.Name + "." + p));
+        }
+        Assert.True(missing.Count == 0, "AutoCAD config fields missing from agent schema: " + string.Join(", ", missing));
+    }
+
 }

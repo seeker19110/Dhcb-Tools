@@ -30,7 +30,7 @@ Không sửa Bridge để bind `0.0.0.0`; agent ở máy khác dùng SSH tunnel.
 | Workflow | Làm gì |
 |---|---|
 | `secret-scan.yml` | gitleaks trên mọi PR và push `main` |
-| `dependency-audit.yml` | `scripts/check-vulnerable.sh`: NuGet (`dotnet list package --vulnerable`, ba TFM) + `pip-audit`; khi PR đổi dependency, trên `main`, và hằng tuần |
+| `dependency-audit.yml` | `scripts/check-vulnerable.ps1`: NuGet (`dotnet list package --vulnerable`, ba TFM) + `pip-audit`; khi PR đổi dependency, trên `main`, và hằng tuần |
 | `tests.yml` | test + cổng phủ 100 % (C# dòng, Python câu lệnh), pyflakes, build năm phiên bản, bộ ca IDS chính thức của buildingSMART (đỏ khi hồi quy) |
 | `.github/dependabot.yml` | PR cập nhật GitHub Actions và pip hằng tháng |
 
