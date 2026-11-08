@@ -97,7 +97,7 @@ Revit → khớp mới giao. Bước này là chỗ duy nhất bắt được sa
 cùng một mô hình; thứ độc lập với mã DHCB là **bộ xuất IFC của Autodesk** (Revit → IFC, `BatchExport` với
 `formats: ["Ifc"]`): IFCSITE mang gốc Survey và góc True North, IFCGRID mang từng trục, IFCCOLUMN mang thân cột.
 
-```bash
+```powershell
 python scripts/doi-chieu-setout-ifc.py C:/DHCB/setout/L1.csv "C:/DHCB/export/Model.ifc" --tol-mm 5
 ```
 

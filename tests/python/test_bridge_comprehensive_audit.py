@@ -20,6 +20,11 @@ from test_dhcb_mcp_server import load
 
 
 class PanelTransportAuditTests(unittest.TestCase):
+    def setUp(self):
+        token = mock.patch.dict(panel_api.os.environ, {"DHCB_BRIDGE_TOKEN": "test-token"})
+        token.start()
+        self.addCleanup(token.stop)
+
     def test_invalid_execute_shape_is_rejected_before_transport(self):
         for payload in (None, [], {"config": None}, {"config": "bad"}):
             with mock.patch.object(panel_api.LOOPBACK, "open") as send:

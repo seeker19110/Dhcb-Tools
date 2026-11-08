@@ -108,21 +108,15 @@ namespace DhcbTools.Shared.Hosting
 
         /// <summary>
         /// Thu quyền file về chủ sở hữu (Windows: xoá kế thừa ACL, chỉ giữ user hiện tại). Trả <c>true</c>
-        /// khi đã thu xong hoặc nền tảng không cần (không phải Windows); <c>false</c> khi icacls lỗi.
+        /// khi đã thu xong; <c>false</c> khi icacls lỗi.
         /// </summary>
         /// <remarks>
-        /// Chỉ làm việc thật trên Windows (icacls), nên CI Linux không chạy qua được — loại khỏi phép đo
-        /// phủ thay vì để một nhánh không đo được kéo cả cổng coverage xuống. Đường cảnh báo "thu ACL hỏng"
-        /// vẫn có test, qua tham số <c>restrictToOwner</c> của <see cref="LoadOrCreate"/>.
+        /// Native process timeout/kill phụ thuộc tiến trình Windows; đường cảnh báo lỗi được kiểm qua
+        /// tham số <c>restrictToOwner</c> của <see cref="LoadOrCreate"/>.
         /// </remarks>
         [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
         private static bool TryRestrictToOwner(string file)
         {
-            if (Environment.OSVersion.Platform != PlatformID.Win32NT)
-            {
-                return true;
-            }
-
             try
             {
                 // Dùng icacls để không phải tham chiếu System.Security.AccessControl (không có trong netstandard2.0 đầy đủ).

@@ -67,6 +67,10 @@ internal static class RibbonBuilder
         var tab = new RibbonTab { Id = TabId, Title = TabTitle, Name = TabTitle };
         ribbon.Tabs.Add(tab);
 
+        Panel(tab, "Công cụ",
+            ("DHCB_TOOLS", "Bảng công cụ", "DT", RibbonIcons.Drawing,
+                "Tìm công cụ, chỉnh đầy đủ cấu hình và xem kết quả trước khi ghi vào bản vẽ."));
+
         // ── Layer: xuất → nhập → kiểm chuẩn → đổi theo bảng → gợi ý map sang Revit ──
         Panel(tab, "Layer",
             ("DHCB_LAYER_EXPORT", "Xuất layer ra CSV", "LX", RibbonIcons.Layer,
@@ -157,6 +161,22 @@ internal static class RibbonBuilder
             CommandHandler = new AcadCommandHandler(),
             // "^C^C" là quy ước macro của menu CUI; SendStringToExecute gửi ký tự thô nên phải dùng
             // đúng ký tự ETX (Ctrl+C) để huỷ lệnh đang dở, nếu không AutoCAD nhận nguyên chữ "^C^C".
-            CommandParameter = $"\x03\x03_{command} ",
+            CommandParameter = Macro(command),
         };
+
+    private static string Macro(string command)
+    {
+        var core = command switch
+        {
+            "DHCB_LAYER_EXPORT" => "LayerExport", "DHCB_LAYER_IMPORT" => "LayerImport",
+            "DHCB_CLEANUP" => "DrawingCleanup", "DHCB_AUTONUMBER" => "AutoNumbering",
+            "DHCB_ATTR_EXPORT" => "AttributeExport", "DHCB_ATTR_IMPORT" => "AttributeImport",
+            "DHCB_TEXT_REPLACE" => "TextReplace", "DHCB_LAYER_CHECK" => "LayerStandardCheck",
+            "DHCB_GRID_EXTRACT" => "GridExtract", "DHCB_XREF_AUDIT" => "XrefAudit",
+            "DHCB_LAYER_TRANSLATE" => "LayerTranslate", "DHCB_DRAWING_COMPARE" => "DrawingCompare",
+            "DHCB_BLOCK_QUANTITY" => "BlockQuantity", "DHCB_ATTR_INCREMENT" => "AttributeIncrement",
+            "DHCB_LAYER_MAP" => "CadLayerMap", _ => null,
+        };
+        return core == null ? $"\x03\x03_{command} " : $"\x03\x03_DHCB_FORM {core} ";
+    }
 }

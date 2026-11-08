@@ -22,7 +22,7 @@ def verify(folder: Path, schemas: Path) -> dict:
             # Resolve the standard schema locally, with no network lookup or archive extraction.
             redefine = extension.find("{http://www.w3.org/2001/XMLSchema}redefine")
             assert redefine is not None and redefine.get("schemaLocation") == "markup.xsd"
-            redefine.set("schemaLocation", str((schemas / "markup.xsd").resolve()))
+            redefine.set("schemaLocation", (schemas / "markup.xsd").resolve().as_uri())
             extended_markup = etree.XMLSchema(extension)
             for name in package.namelist():
                 kind = ("version" if name == "bcf.version" else "project" if name == "project.bcfp"

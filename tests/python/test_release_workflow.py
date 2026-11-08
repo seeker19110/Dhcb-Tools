@@ -1,6 +1,5 @@
 """Thực thi bước đóng gói thật với công cụ native lỗi, không tạo artifact phát hành."""
 
-import os
 from pathlib import Path
 import re
 import shutil
@@ -12,11 +11,11 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github" / "workflows" / "release.yml"
-PWSH = shutil.which("pwsh")
+PWSH = shutil.which("powershell") or shutil.which("pwsh")
 
 
 def release_step(job, name):
-    workflow = WORKFLOW.read_text(encoding="utf-8")
+    workflow = WORKFLOW.read_text(encoding="utf-8-sig")
     section = re.search(rf"^  {re.escape(job)}:\n(.*?)(?=^  [\w-]+:|\Z)",
                         workflow, re.M | re.S).group(1)
     step = re.search(rf"^      - name: {re.escape(name)}\n(.*?)(?=^      - |\Z)",
@@ -40,15 +39,35 @@ class ReleaseWorkflowTests(unittest.TestCase):
             source = Path(tmp) / "step.ps1"
             source.write_text("$ErrorActionPreference = 'Stop'\n"
                               "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()\n"
-                              + script, encoding="utf-8")
+                              + script, encoding="utf-8-sig")
             return subprocess.run([PWSH, "-NoProfile", "-File", str(source)], cwd=tmp,
                                   capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
+
+    def test_version_gate_rejects_commands_paths_and_trailing_newlines(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8-sig")
+        section = workflow.split("  version:\n", 1)[1].split("  build-revit:\n", 1)[0]
+        block = re.search(r"        run: \|\n((?: {10}.*\n|\n)*)", section).group(1)
+        gate = textwrap.dedent(block).strip()
+        for ref_type in ("tag", "branch"):
+            for value in ("1.2.3", "1.2.3-dev+build", "", "1.2.3\n", "1.2.3\r\n", "../1.2.3", "1.2.3$(Get-Date)", "1.2.3;whoami"):
+                with self.subTest(ref_type=ref_type, value=value):
+                    valid = value in ("1.2.3", "1.2.3-dev+build")
+                    setup = ("$env:GITHUB_REF_TYPE = " + ps_quote(ref_type) + "\n"
+                             + "$env:GITHUB_REF_NAME = " + ps_quote("v" + value) + "\n"
+                             + "$env:INPUT_VERSION = " + ps_quote(value) + "\n"
+                             + "$env:GITHUB_OUTPUT = Join-Path $PWD 'output.txt'\n")
+                    result = self.run_script(setup + gate + "\nGet-Content $env:GITHUB_OUTPUT\n")
+                    self.assertEqual(valid, result.returncode == 0, result.stdout + result.stderr)
+                    if valid:
+                        self.assertIn("version=" + value, result.stdout)
+                    else:
+                        self.assertIn("Invalid version", result.stderr)
 
     def test_failed_msbuild_stops_before_packaging_even_with_tfm_on_stdout(self):
         # Native command trả cả TFM hợp lệ lẫn exit != 0. PowerShell vẫn nhận stdout;
         # kiểm chuỗi không rỗng hoặc để tới Copy-Item không bắt được lỗi này.
         native = ps_quote(sys.executable)
-        stub = f"function dotnet {{ & {native} -c 'import sys; print(\"net10.0\"); sys.exit(23)' }}\n"
+        stub = f"function dotnet {{ & {native} -c 'import sys; print(''net10.0''); sys.exit(23)' }}\n"
         for job, name in (("build-revit", "Đóng gói"), ("build-autocad", "Đóng gói"),
                           ("build-batchrunner", "Đóng gói kèm script và job mẫu")):
             with self.subTest(job=job):
@@ -76,10 +95,10 @@ class ReleaseWorkflowTests(unittest.TestCase):
     def test_failed_targetdir_lookup_stops_before_copying_stale_files(self):
         native = ps_quote(sys.executable)
         stub = ("function dotnet {\n"
-                "  if ($args -contains 'TargetDir') {\n"
-                f"    & {native} -c 'import sys; print(\"fixture-output\"); sys.exit(23)'\n"
+                "  if (@($args) -match '(^|:)TargetDir$') {\n"
+                f"    & {native} -c 'import sys; print(''fixture-output''); sys.exit(23)'\n"
                 "  } else {\n"
-                f"    & {native} -c 'print(\"net10.0\")'\n"
+                f"    & {native} -c 'print(''net10.0'')'\n"
                 "  }\n}\n")
         for job, name in (("build-revit", "Đóng gói"), ("build-autocad", "Đóng gói"),
                           ("build-batchrunner", "Đóng gói kèm script và job mẫu")):
@@ -93,7 +112,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
 
     def test_successful_msbuild_reaches_packaging(self):
         native = ps_quote(sys.executable)
-        stub = f"function dotnet {{ & {native} -c 'print(\"net10.0\")' }}\n"
+        stub = f"function dotnet {{ & {native} -c 'print(''net10.0'')' }}\n"
         for job, name in (("build-revit", "Đóng gói"), ("build-autocad", "Đóng gói"),
                           ("build-batchrunner", "Đóng gói kèm script và job mẫu")):
             with self.subTest(job=job):
@@ -116,16 +135,16 @@ class ReleaseWorkflowTests(unittest.TestCase):
                 def prepare(folder):
                     (folder / "fixture-output").mkdir()
                     for name in (*names, "RevitAPI.dll", "AcDbMgd.dll", "System.Drawing.Common.dll"):
-                        (folder / "fixture-output" / name).write_text("fixture", encoding="utf-8")
+                        (folder / "fixture-output" / name).write_text("fixture", encoding="utf-8-sig")
                     (folder / "docs").mkdir()
                     for name in ("LICENSE", "NOTICE", "docs/huong-dan-cai-dat-va-kiem-thu-thu-cong.md",
                                  "docs/tuong-thich-2022-2027.md", "docs/chan-doan-windows.md"):
-                        (folder / name).write_text("fixture", encoding="utf-8")
+                        (folder / name).write_text("fixture", encoding="utf-8-sig")
                 stub = ("function dotnet {\n"
-                        "  if ($args -contains 'TargetDir') {\n"
-                        f"    & {native} -c 'print(\"fixture-output\")'\n"
+                        "  if (@($args) -match '(^|:)TargetDir$') {\n"
+                        f"    & {native} -c 'print(''fixture-output'')'\n"
                         "  } else {\n"
-                        f"    & {native} -c 'print(\"net8.0-windows\")'\n"
+                        f"    & {native} -c 'print(''net8.0-windows'')'\n"
                         "  }\n}\n")
                 verify = "\n$profileFile = Get-ChildItem dist -Filter dhcb-host-profile.json -Recurse | Select-Object -First 1\n"
                 verify += "$profile = Get-Content $profileFile.FullName -Raw | ConvertFrom-Json\n"
@@ -138,14 +157,12 @@ class ReleaseWorkflowTests(unittest.TestCase):
                 self.assertEqual(0, result.returncode, result.stdout + result.stderr)
                 self.assertIn("PACKAGE_VERIFIED", result.stdout)
 
-    @unittest.skipIf(os.name == "nt", "Stub executable dùng shebang trên Linux CI")
     def test_failed_iscc_stops_even_when_old_installer_exists(self):
         with tempfile.TemporaryDirectory(prefix="dhcb-iscc-") as tmp:
-            compiler = Path(tmp) / "ISCC.exe"
-            compiler.write_text(f"#!{sys.executable}\nimport sys\nsys.exit(23)\n", encoding="utf-8")
-            compiler.chmod(0o755)
+            compiler = Path(tmp) / "ISCC.ps1"
+            compiler.write_text("& " + ps_quote(sys.executable) + " -c 'import sys; sys.exit(23)'\n", encoding="utf-8-sig")
             script = release_step("installer", "Đóng gói installer")
-            script = re.sub(r'^\$iscc = .*$', "$iscc = " + ps_quote(compiler), script, flags=re.M)
+            script = re.sub(r'^\$iscc = .*$', lambda _: "$iscc = " + ps_quote(compiler), script, flags=re.M)
             # Danh sách artifact cũ không được biến lỗi compiler thành bước thành công.
             prefix = ("New-Item -ItemType Directory -Path dist | Out-Null\n"
                       "Set-Content dist/DhcbTools-Setup-0.9.0.exe fixture\n")
@@ -154,14 +171,12 @@ class ReleaseWorkflowTests(unittest.TestCase):
             self.assertNotIn("OLD_INSTALLER_REACHED", result.stdout)
             self.assertIn("ISCC", result.stderr)
 
-    @unittest.skipIf(os.name == "nt", "Stub executable dùng shebang trên Linux CI")
     def test_successful_iscc_requires_installer_for_requested_version(self):
         with tempfile.TemporaryDirectory(prefix="dhcb-iscc-") as tmp:
-            compiler = Path(tmp) / "ISCC.exe"
-            compiler.write_text(f"#!{sys.executable}\n", encoding="utf-8")
-            compiler.chmod(0o755)
+            compiler = Path(tmp) / "ISCC.ps1"
+            compiler.write_text("& " + ps_quote(sys.executable) + " -c 'import sys; sys.exit(0)'\n", encoding="utf-8-sig")
             script = release_step("installer", "Đóng gói installer")
-            script = re.sub(r'^\$iscc = .*$', "$iscc = " + ps_quote(compiler), script, flags=re.M)
+            script = re.sub(r'^\$iscc = .*$', lambda _: "$iscc = " + ps_quote(compiler), script, flags=re.M)
             for version in ("0.9.0", "1.2.3"):
                 with self.subTest(version=version):
                     prefix = ("New-Item -ItemType Directory -Path dist | Out-Null\n"

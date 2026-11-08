@@ -6,7 +6,7 @@ namespace DhcbTools.Shared.Logic.Ids
 {
     /// <summary>
     /// Một phần tử nhìn dưới con mắt IDS. Vỏ Revit dựng lớp cài đặt riêng; test dựng lớp giả — nhờ vậy
-    /// toàn bộ luật kiểm chạy được trên CI Linux, không cần Revit.
+    /// toàn bộ luật kiểm chạy được trên CI Windows, không cần Revit.
     /// </summary>
     public interface IIdsElement
     {

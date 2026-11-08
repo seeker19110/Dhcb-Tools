@@ -38,6 +38,7 @@
     <Compile Include="..\..\src\DhcbTools.Core\Query\ViewPlacementIndex.cs" Link="RevitAudit\ViewPlacementIndex.cs" />
     <Compile Include="..\..\src\DhcbTools.Core\Query\QueryRequest.cs" Link="RevitAudit\QueryRequest.cs" />
     <Compile Include="..\..\src\DhcbTools.Core\MEPF\ElevationParameterWriter.cs" Link="RevitAudit\ElevationParameterWriter.cs" />
+    <Compile Include="..\..\src\DhcbTools.AutoCAD\Bridge\AcadDocumentContexts.cs" Link="AutoCadAudit\AcadDocumentContexts.cs" />
     <Using Include="DhcbTools.Shared.Hosting" />
   </ItemGroup>
 

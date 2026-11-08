@@ -6,11 +6,11 @@ Cài: hermes mcp add autocad-tools --command python --args <repo>/tools/autocad-
 
 from __future__ import annotations
 import atexit
+import http.client
 import json
 import subprocess
 import sys
 import tempfile
-import urllib.parse
 from pathlib import Path
 from typing import Any
 
@@ -34,12 +34,17 @@ def _probe_panel_api() -> str:
 
     try:
         with panel_api.LOOPBACK.open(PANEL_API_URL + "/alive", timeout=2) as resp:
-            data = json.loads(resp.read())
-            return "ours" if data.get("panelApi") == "ok" else "foreign"
+            try:
+                data = json.loads(resp.read())
+            except (ValueError, OSError, http.client.HTTPException):
+                return "foreign"
+            return "ours" if isinstance(data, dict) and data.get("panelApi") == "ok" else "foreign"
     except urllib.error.HTTPError:
         return "foreign"  # có server trả lời nhưng không phải /alive của gateway
-    except (urllib.error.URLError, OSError, ValueError):
-        return "free"
+    except http.client.HTTPException:
+        return "foreign"
+    except (urllib.error.URLError, OSError) as exc:
+        return "foreign" if isinstance(getattr(exc, "reason", exc), (TimeoutError, ConnectionResetError, ConnectionAbortedError)) else "free"
 
 
 def _stop_gateway() -> None:
@@ -71,12 +76,7 @@ def _ensure_panel_api() -> str | None:
             "Tắt chương trình đó hoặc đổi PORT trong panel_api.py rồi thử lại."
         )
 
-    creationflags = 0
-    if sys.platform == "win32":
-        creationflags = (
-            getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-            | getattr(subprocess, "CREATE_NO_WINDOW", 0)
-        )
+    creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
     _gateway_process = subprocess.Popen(
         [sys.executable, PANEL_API_SCRIPT],
         cwd=str(Path(__file__).parent),
@@ -134,10 +134,25 @@ def autocad_health() -> str:
 @mcp.tool()
 def autocad_progress(job_id: str) -> str:
     """Đọc lại kết quả job từ id của phản hồi timeout. Không gửi lại lệnh ghi."""
-    if not isinstance(job_id, str) or not job_id.strip() or len(job_id) > 128:
-        return "❌ job_id phải là chuỗi không rỗng, tối đa 128 ký tự."
-    result = _fetch("/progress/" + urllib.parse.quote(job_id, safe=""))
+    try:
+        path = panel_api.job_path("progress", job_id)
+    except ValueError as exc:
+        return f"❌ {exc}"
+    result = _fetch(path)
     return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def autocad_cancel(job_id: str) -> str:
+    """Yêu cầu hủy job đang chờ hoặc hỗ trợ hủy; tiếp tục hỏi progress tới khi kết thúc.
+
+    Không hủy cưỡng bức transaction đã nhận chạy, không gửi lại execute.
+    """
+    try:
+        path = panel_api.job_path("cancel", job_id)
+    except ValueError as exc:
+        return f"❌ {exc}"
+    return json.dumps(_fetch(path, {}), ensure_ascii=False, indent=2)
 
 
 # ── Tool 2: Open Panel ────────────────────────────────────────────────────────
@@ -183,29 +198,45 @@ def autocad_query(
     query_type: str,
     limit: int = 50,
     offset: int = 0,
+    params: dict[str, Any] | None = None,
+    document_id: str = "",
+    as_json: bool = False,
 ) -> str:
     """
     Truy vấn thông tin từ bản vẽ AutoCAD đang mở.
 
-    query_type: một trong: drawing_info, layers, blocks, inserts, entities,
-                text, xrefs, layouts, stats
-    limit: số lượng kết quả mỗi trang, 1–200 (entities/inserts/text/blocks/layers)
+    query_type: drawing_info, layers, blocks, inserts, entities, text, xrefs, layouts, stats,
+                document_context, active_layout, entity_geometry, attributes_of, snapshot
+    limit: số lượng kết quả mỗi trang, 0–10000; 0 = mặc định 2000
     offset: số kết quả phù hợp bỏ qua; dùng nextOffset của trang trước
+    params: lọc layerContains, entityType, blockName, blockNameContains, textLayer, textContains;
+            handles (hex) cho entity_geometry, blockName cho attributes_of; imageWidth/source cho snapshot.
+    document_id: lấy từ document_context, giữ nguyên giữa các trang để chặn đổi DWG.
+    as_json: trả đủ dữ liệu và metadata phân trang, kể cả layers/stats/drawing_info.
     """
     valid = panel_api.ALLOWED_QUERIES
-    if query_type not in valid:
+    if not isinstance(query_type, str) or query_type not in valid:
         return f"❌ query_type không hợp lệ. Chọn một trong: {', '.join(sorted(valid))}"
 
-    config = {"limit": limit, "offset": offset} if query_type in {"entities", "inserts", "text", "blocks", "layers"} else None
+    if params is not None and not isinstance(params, dict):
+        return "❌ params phải là JSON object"
+    config = dict(params or {})
+    if query_type in {"entities", "inserts", "text", "blocks", "layers"}:
+        config.setdefault("limit", limit)
+        config.setdefault("offset", offset)
     body: dict[str, Any] = {"query": query_type}
     if config:
         body["config"] = config
+    if document_id:
+        body["documentId"] = document_id
     try:
         body = panel_api.prepare_bridge_payload("/query", body)
     except ValueError as exc:
         return f"❌ {exc}"
 
     result = _fetch("/query", body)
+    if as_json:
+        return json.dumps(result, ensure_ascii=False, indent=2)
     if "error" in result and not result.get("layers") and not result.get("count") and not result.get("filename"):
         return f"❌ Lỗi: {result['error']}"
 
@@ -272,6 +303,7 @@ def build_execute_payload(
     confirm: str = "",
     document_id: str = "",
     preview_token: str = "",
+    background: bool = False,
 ) -> dict[str, Any]:
     """Dựng payload /execute rồi đưa qua ĐÚNG bộ validate của gateway (panel_api).
 
@@ -304,6 +336,10 @@ def build_execute_payload(
         config = {"inputPath": input_path, "createMissing": create_missing, "dryRun": dry_run}
 
     payload: dict[str, Any] = {"command": command, "config": config}
+    if type(background) is not bool:
+        raise ValueError("background phải là boolean")
+    if background:
+        payload["async"] = True
     if document_id:
         payload["documentId"] = document_id
     if preview_token:
@@ -331,6 +367,7 @@ def autocad_execute(
     confirm: str = "",
     document_id: str = "",
     preview_token: str = "",
+    background: bool = False,
 ) -> str:
     """
     Thực thi lệnh vào AutoCAD.
@@ -338,6 +375,7 @@ def autocad_execute(
     command: AutoNumbering | DrawingCleanup | LayerExport | LayerImport
     dry_run: True = xem trước không ghi thật (mặc định True để an toàn)
     document_id, preview_token: lấy từ kết quả preview đã duyệt; giữ nguyên khi gửi lại lần ghi.
+    background: trả job_id ngay cho lệnh dài; dùng autocad_progress/autocad_cancel theo dõi và yêu cầu hủy.
     confirm: BẮT BUỘC khi dry_run=False — chuỗi xác nhận theo lệnh:
              DrawingCleanup → "DELETE_UNUSED", AutoNumbering → "WRITE_AUTONUMBER",
              LayerImport → "IMPORT_LAYERS". Chỉ truyền sau khi kỹ sư đã xem trước và đồng ý.
@@ -355,11 +393,14 @@ def autocad_execute(
             purge_unused=purge_unused, audit_errors=audit_errors,
             output_path=output_path, input_path=input_path, create_missing=create_missing,
             dry_run=dry_run, confirm=confirm, document_id=document_id, preview_token=preview_token,
+            background=background,
         )
     except ValueError as exc:
         return f"❌ {exc}"
 
     result = _fetch("/execute", payload)
+    if background and result.get("id"):
+        return json.dumps(result, ensure_ascii=False, indent=2)
 
     success = result.get("success", False)
     summary = result.get("summary", "")

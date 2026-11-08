@@ -26,7 +26,7 @@ Kế hoạch kiểm thử ở [`dac-ta-kiem-thu.md`](dac-ta-kiem-thu.md).
 5. **Số và văn bản:** ghi/đọc số qua `DhcbTools.Shared.Logic.NumericText`, CSV qua `CsvText`
    (UTF-8 có BOM), tên file qua `FileNaming`. Không tự viết lại các hàm này.
 6. **Logic thuần tách khỏi Revit.** Thuật toán nào không cần `Document` thì đặt trong
-   `DhcbTools.Shared.Logic` để test được trên CI Linux.
+   `DhcbTools.Shared.Logic` để test được trên CI Windows.
 7. **Định nghĩa "xong" (DoD)** của mỗi mục dưới đây bao gồm: code + test (theo mục
    "Kiểm thử" của chính mục đó) + một dòng cập nhật `progress.md`.
 
@@ -79,7 +79,7 @@ chạy được dưới tài khoản của kỹ sư thì cũng mở thẳng đư
 ## 0.2 Tách phần dùng chung (lỗi #9)
 
 Đã tách xong phần **logic thuần**: `src/DhcbTools.Shared.Logic` (CSV, số, đánh số, hình học MEPF,
-tên file, HTML, token) — không tham chiếu Revit lẫn AutoCAD, nên test chạy được trên CI Linux.
+tên file, HTML, token) — không tham chiếu Revit lẫn AutoCAD, nên test chạy được trên CI Windows.
 
 **Còn lại — cần một assembly thứ hai, `DhcbTools.Shared.Hosting`** (netstandard2.0, chỉ phụ thuộc
 `System.Net.HttpListener` + `Newtonsoft.Json`), chứa:

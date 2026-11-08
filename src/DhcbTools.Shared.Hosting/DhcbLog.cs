@@ -57,8 +57,8 @@ namespace DhcbTools.Shared.Hosting
         /// </param>
         /// <param name="directory">
         /// Thư mục log; null = <see cref="DefaultDirectory"/>. Tiêm được để test không phải sửa biến môi
-        /// trường của cả tiến trình — <c>APPDATA</c>/<c>HOME</c> là trạng thái dùng chung, sửa nó thì test
-        /// chạy song song ảnh hưởng lẫn nhau và kết quả khác nhau giữa Windows với Linux.
+        /// trường của cả tiến trình — <c>APPDATA</c>/<c>LOCALAPPDATA</c> là trạng thái dùng chung, sửa nó thì test
+        /// chạy song song ảnh hưởng lẫn nhau và kết quả khác nhau giữa các tiến trình kiểm thử.
         /// </param>
         public static void Prune(string app, Action<string>? deleteFile = null, string? directory = null)
         {

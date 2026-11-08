@@ -8,7 +8,7 @@ namespace DhcbTools.Shared.Logic.Cad
     /// Một dòng CSV layer đã đọc xong (định dạng do <c>LayerExportCommand</c> ghi ra:
     /// <c>Name,Color,Linetype,Lineweight,IsPlottable,Description</c>).
     /// <para>
-    /// Đây là phần thuần của <c>LayerImportCommand</c>, tách khỏi vỏ AutoCAD để test được trên CI Linux —
+    /// Đây là phần thuần của <c>LayerImportCommand</c>, tách khỏi vỏ AutoCAD để test được trên CI Windows —
     /// vỏ chỉ còn việc so sánh với drawing và ghi. Ô để trống nghĩa là "giữ nguyên giá trị đang có" nên mọi
     /// thuộc tính đều nullable; riêng Description có ô rỗng vẫn là lệnh xoá mô tả (đúng như bản trước làm).
     /// </para>

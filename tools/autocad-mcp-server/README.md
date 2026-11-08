@@ -1,6 +1,6 @@
 # AutoCAD Tools — MCP Server cho Hermes
 
-Cung cấp 6 tools điều khiển AutoCAD từ Hermes Agent, kết nối qua HTTP Bridge `127.0.0.1:8766`.
+Cung cấp 7 tools điều khiển AutoCAD trên Windows từ Hermes Agent, kết nối qua HTTP Bridge `127.0.0.1:8766`.
 
 ## Cài đặt
 
@@ -8,17 +8,15 @@ Cung cấp 6 tools điều khiển AutoCAD từ Hermes Agent, kết nối qua HT
 
 Cần **Python 3.10+** (fastmcp 4.x). `panel_api.py` và bộ test chỉ dùng thư viện chuẩn.
 
-```bash
+```powershell
 pip install -r <repo>/tools/autocad-mcp-server/requirements.txt
 ```
 
 ### 2. Đăng ký vào Hermes
 
-```bash
-hermes mcp add autocad-tools \
-  --command python \
-  --args "<repo>/tools/autocad-mcp-server/server.py"
-# → Bấm Y để bật tất cả 6 tools
+```powershell
+hermes mcp add autocad-tools --command python --args "<repo>/tools/autocad-mcp-server/server.py"
+# → Bấm Y để bật tất cả 7 tools
 ```
 
 ### 3. Nạp plugin vào AutoCAD
@@ -30,12 +28,13 @@ Cài bằng [installer](../../installer/dhcb-tools.iss) thì plugin tự nạp k
 
 ## Sử dụng (trong chat Hermes)
 
-Sau khi mở session mới, agent có thêm 6 tools:
+Sau khi mở session mới, agent có thêm 7 tools:
 
 | Tool | Mô tả |
 |------|-------|
 | `autocad_health` | Kiểm tra bridge có sống không |
 | `autocad_progress` | Đọc lại kết quả theo job ID sau timeout, giữ changedIds và kết quả một phần |
+| `autocad_cancel` | Yêu cầu hủy job đang chờ hoặc hỗ trợ hủy; đọc progress để xác minh kết quả |
 | `autocad_open_panel` | Mở bảng điều khiển ngay trong chat |
 | `autocad_query` | Đọc thông tin bản vẽ (layers, stats, text...) |
 | `autocad_execute` | Chạy lệnh (AutoNumbering, Cleanup...) |
@@ -59,7 +58,7 @@ tools/autocad-mcp-server/
 ├── panel_api.py        # CORS proxy + Hermes AI thật tại 127.0.0.1:8767
 ├── panel.html          # Bảng điều khiển HTML (widget chat)
 ├── requirements.txt    # fastmcp (ghim phiên bản)
-├── test_panel_api.py   # test: python3 -m pytest tools/autocad-mcp-server -q
+├── test_panel_api.py   # test: python -m pytest tools/autocad-mcp-server -q
 └── README.md           # File này
 ```
 
@@ -80,7 +79,7 @@ theo. Gateway đọc `DHCB_BRIDGE_TOKEN` hoặc `%APPDATA%\DHCB\bridge-token.txt
 authentication. AI Chat dùng provider/model hiện hành của Hermes.
 
 Tool trả về `::preview{file=…}` của **file khởi chạy** `%LOCALAPPDATA%\DHCB\autocad-panel.html`, không phải
-`panel.html`: gateway ghi file này ngay sau khi bind được port (ngoài Windows: `~/.cache/DHCB`, quyền 600), xoá khi
+`panel.html`: gateway ghi file này ngay sau khi bind được port (dữ liệu theo tài khoản Windows), xoá khi
 tắt bằng Ctrl+C. Chạy tay `python panel_api.py` thì mở URL có `?k=` mà nó in ra. Mở thẳng `panel.html` hay
 `/panel` không có khoá → `403` kèm hướng dẫn. Gateway bản cũ (chưa có khoá) còn chạy thì tool báo thiếu file khởi
 chạy — tắt tiến trình đó rồi gọi lại.
@@ -147,8 +146,33 @@ Với bản vẽ thuộc diện bảo mật, dùng `DHCB_AI` trong AutoCAD thay 
 | `POST /query` | Đọc dữ liệu bản vẽ |
 | `POST /execute` | Thực thi lệnh |
 | `GET /progress/<id>` | Kết quả job đã được nhận; gọi qua `autocad_progress` |
+| `POST /cancel/<id>` | Yêu cầu hủy; không hủy cưỡng bức transaction đã nhận chạy |
 
 HTTP 500/504 vẫn có thể mang `changedIds`, kết quả một phần hoặc `id` job. MCP và gateway giữ các trường
 này; panel hiển thị “chưa xác định” khi kết nối bị ngắt hoặc job còn chạy. Dùng `autocad_progress` với
 job ID để xác minh kết quả, giữ nguyên token preview của lần ghi. Không tự tạo preview mới để gửi lại
 một lệnh chưa biết đã ghi hay chưa.
+
+## Truy vấn nhiều trang và tác vụ dài
+
+`autocad_query` nhận `params` với các bộ lọc `layerContains`, `entityType`, `blockName`,
+`blockNameContains`, `textLayer`, `textContains`; `textContains` tìm trên chữ hiển thị của DBText/MText,
+không phân biệt hoa thường. `limit` từ 0 đến 10000 (0 dùng mặc định 2000), `offset` lấy từ `nextOffset`.
+Đặt `as_json=true` để nhận đầy đủ dữ liệu và `hasMore`/`nextOffset`, kể cả khi đọc layers.
+Các truy vấn `entity_geometry` nhận `params.handles` (tối đa 200 handle hex), `attributes_of` nhận
+`params.blockName`; `snapshot` nhận `params.source` (`live`/`thumbnail`) và `imageWidth` (200–4000).
+
+Đọc `document_context` trước chuỗi truy vấn và giữ `document_id` cho các trang sau. Bridge kiểm
+đúng bản vẽ trên luồng AutoCAD; đổi DWG thì trả `E-DOCUMENT-CHANGED`. Panel tự ghim cả `documentId`
+và `revision`, kiểm trước/sau mỗi trang và yêu cầu tải từ đầu nếu bản vẽ thay đổi. Tab Query có bộ lọc,
+nút trang trước/sau; tab Layers có nút tải thêm và nói rõ bộ lọc tên chỉ áp dụng cho layers đã tải.
+
+`autocad_execute(background=true)` trả job ID ngay. Gọi `autocad_progress(job_id)` để nhận tiến độ
+thực tế và kết quả cuối; `autocad_cancel(job_id)` chỉ yêu cầu hủy nếu job còn chờ hoặc hỗ trợ hủy.
+Panel dùng chế độ nền cho AutoNumbering, Cleanup và xuất layers; bảng tác vụ tự đọc tiến độ, giữ
+job ID khi mất kết nối và cho nhập lại ID để phục hồi. Lệnh ghi giữ nguyên `documentId`/`previewToken`
+đã duyệt; đổi cấu hình phải xem trước lại. Panel không gửi thêm cùng lệnh khi job đã nhận còn chạy.
+
+Gateway ở port 8767 chuyển tiếp `GET /progress/<id>` và `POST /cancel/<id>` sau khi kiểm cùng token,
+Host và Origin như các thao tác khác. Thiếu token Bridge thì query/execute/progress/cancel bị chặn
+trước khi gửi, tránh tự khóa Bridge vì xác thực lỗi liên tiếp; `/health` vẫn dùng được để chẩn đoán.

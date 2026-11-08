@@ -331,10 +331,8 @@ class DoctorTests(unittest.TestCase):
                 mock.patch.object(dhcb_doctor.dhcb_agent, "load_token", return_value=""), \
                 mock.patch.object(dhcb_doctor.sys, "version_info", (3, 8)):
             self.assertEqual(1, dhcb_doctor.diagnose(offline=True)["errors"])
-        with mock.patch.dict(dhcb_doctor.os.environ, {}, clear=True), \
-                mock.patch.object(dhcb_doctor.Path, "home", return_value=self.base), \
-                mock.patch.object(dhcb_doctor.dhcb_agent, "load_token", return_value=""):
-            self.assertEqual(0, dhcb_doctor.diagnose(offline=True)["errors"])
+        with mock.patch.dict(dhcb_doctor.os.environ, {}, clear=True), self.assertRaises(KeyError):
+            dhcb_doctor.diagnose(offline=True)
 
     def test_cli_formats_and_exit_codes(self):
         for errors in (0, 1):

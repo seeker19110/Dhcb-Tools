@@ -18,6 +18,9 @@ Kế hoạch nâng chất lượng và kết quả kiểm chứng của lượt 
 [Ma trận 2022–2027 và các điểm yếu đã sửa](docs/tuong-thich-2022-2027.md).
 [Audit 2026-10-09: chính sách batch, bảo toàn đầu ra, PDF có dấu cách và bằng chứng kiểm thử](docs/audit-2026-10-09.md).
 [Audit toàn bộ 2026-10-10: giao dịch Revit, đơn vị CAD, MEP, Bridge/MCP và bàn giao](docs/audit-toan-bo-2026-10-10.md).
+[Hoàn thiện 2026-11-05: BatchRunner, MCP, ký PFX và kiểm chứng AutoCAD thật](docs/hoan-thien-2026-11-05.md).
+[AutoCAD Windows: cửa sổ công cụ, tìm/thay có phạm vi, phân trang và job nền](docs/autocad-windows.md).
+[Bằng chứng nâng cấp Windows 2026-11-05](docs/nang-cap-autocad-windows-2026-11-05.md).
 Dùng thử trên công việc thật: [`docs/thi-diem-su-dung.md`](docs/thi-diem-su-dung.md) và bảng đo thời gian đi kèm.
 
 ## Bắt đầu cho kỹ sư: cài → bấm 3 lệnh → thấy kết quả
@@ -49,7 +52,7 @@ phải bước bắt buộc để bắt đầu dùng.
 
 | Thành phần | Bản | Bắt buộc khi |
 |---|---|---|
-| Windows | 10/11 x64 | Chạy add-in (chỉ để build/test thuần thì Linux/macOS cũng được) |
+| Windows | 10/11 x64 | Build, kiểm thử và chạy add-in trên Windows |
 | .NET SDK | 8.0.x **+ 10.0.x** | SDK 10 cho BatchRunner và nhánh net10; SDK 8/10 build được nhánh net48/net8 |
 | Revit | 2022–2027 | Build và gói riêng từng năm; nghiệm thu trên host theo [ma trận tương thích](docs/tuong-thich-2022-2027.md) |
 | AutoCAD | 2022–2027 | 2022–2024: net48; 2025/2026: gói net8 hoặc net10 theo host; 2027: net10. Installer kiểm runtime trước khi chọn DLL |
@@ -60,10 +63,11 @@ phải bước bắt buộc để bắt đầu dùng.
 
 **Chạy test tại chỗ** (không cần cài Revit/AutoCAD — đúng ba việc CI chạy):
 
-```bash
+```powershell
 dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj -c Release
 dotnet test tests/DhcbTools.BatchRunner.Tests/DhcbTools.BatchRunner.Tests.csproj -c Release
-python3 -m coverage run -m pytest -q && python3 -m coverage report   # cần: pip install -r requirements-dev.txt
+python -m coverage run -m pytest -q
+python -m coverage report   # cần: pip install -r requirements-dev.txt
 ```
 
 Cài để dùng thật: [Cài đặt](#cài-đặt) · quy trình kiểm thử tay:
@@ -104,7 +108,8 @@ src/
 ├── DhcbTools.AutoCAD.Core/        # Vỏ core-only (AcDbMgd/AcCoreMgd, không AcMgd): DHCB_RUN cho accoreconsole
 └── DhcbTools.BatchRunner/         # Console chạy đêm (Revit qua add-in, AutoCAD qua accoreconsole), báo cáo, mã thoát
 scripts/  dhcb_agent.py · dhcb_mcp_server.py · dhcb_ai.py           # client Bridge, MCP server, AI offline
-          check-build.sh                                            # biên dịch Core + vỏ bằng API package (Linux/CI)
+          check-build.ps1                                           # build/test Windows, đủ giao diện WPF
+          check-vulnerable.ps1                                      # quét NuGet và pip trên Windows
           doi-chieu-setout-ifc.py                                   # đối chiếu setout.csv với IFC của Autodesk (gốc Survey, giao trục, tim cột)
           run-in-revit-tests.ps1 · run-in-autocad-tests.ps1          # chạy bộ ca kiểm bên trong Revit / accoreconsole
           install-nightly-task.ps1                                   # đăng ký Task Scheduler chạy batch đêm
@@ -114,7 +119,7 @@ tools/    autocad-mcp-server/ (MCP + panel web cho Hermes) · mcpb/ (manifest g�
 installer/ dhcb-tools.iss (Inno Setup) · PackageContents.xml
 jobs/     nightly.sample.json · autocad-nightly.sample.json
 configs/  parameter-rules · layer-rules · ai · settings · dictionary (mẫu)
-tests/    DhcbTools.Shared.Logic.Tests + DhcbTools.BatchRunner.Tests (chạy trên CI Linux — số ca xem output CI) + suites/ (ca kiểm chạy trong Revit & AutoCAD)
+tests/    DhcbTools.Shared.Logic.Tests + DhcbTools.BatchRunner.Tests (chạy trên CI Windows — số ca xem output CI) + suites/ (ca kiểm chạy trong Revit & AutoCAD)
 ```
 
 ## Lệnh
@@ -203,7 +208,7 @@ Khi Bridge dừng, job còn xếp hàng bị hủy; không hủy cưỡng bức 
 không làm mất kết quả của việc đã chạy xong (giữ 30 phút hoặc 50 lệnh gần nhất). Từ client:
 `python scripts/dhcb_agent.py revit HangerAuto --background …`.
 
-```bash
+```powershell
 python scripts/dhcb_agent.py revit tools
 python scripts/dhcb_agent.py revit chat "đánh số cửa tầng 3 tiền tố D- 3 chữ số"
 python scripts/dhcb_agent.py revit exec HangerAuto --config '{"hangerFamilyName":"DHCB_Hanger","spacingMm":2500}'
@@ -253,10 +258,10 @@ dotnet build src/DhcbTools.AutoCAD/DhcbTools.AutoCAD.csproj  -p:RevitVersion=202
 dotnet build src/DhcbTools.BatchRunner/DhcbTools.BatchRunner.csproj
 ```
 
-```bash
-# Mọi hệ điều hành (CI): test logic thuần + biên dịch toàn bộ Core/vỏ bằng API package NuGet, không cần cài phần mềm
+```powershell
+# Windows (CI và máy phát triển): test logic + build đầy đủ WPF bằng SDK NuGet, không cần cài host
 dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj
-./scripts/check-build.sh
+.\scripts\check-build.ps1
 ```
 
 **Kiểm thử chạy bên trong Revit/AutoCAD** (phần chạm API thật, không test được trên CI):
@@ -279,14 +284,14 @@ yêu cầu sai năm/runtime/SDK. Mỗi host có output riêng `bin/<năm>/<profi
 
 ## CI/CD
 
-- **CI** (`.github/workflows/tests.yml`, ubuntu-latest, mọi push/PR): test `Shared.Logic` + `dotnet build` toàn bộ
-  Core/vỏ (kể cả vỏ core-only) bằng API package NuGet, `UseWPF=false` — bắt lỗi biên dịch không cần Windows.
+- **CI** (`.github/workflows/tests.yml`, windows-latest, mọi push/PR): test `Shared.Logic` và CLI với cổng phủ 100%, build đầy đủ Core/WPF/Core Console cho 8 profile SDK; kiểm Python, panel JavaScript, PowerShell 5.1, giao diện WPF và installer trong thư mục tạm.
 - **CD** (`.github/workflows/release.yml`, windows-latest, khi đẩy tag `vX.Y.Z` hoặc chạy tay): build **Release thật**
   (đủ WPF) cho Revit/AutoCAD 2022–2027 + vỏ core-only, gồm hai runtime AutoCAD 2025/2026, đóng gói zip kèm hướng dẫn cài đặt, và tạo
   GitHub Release đính kèm toàn bộ gói.
 
 ```powershell
-git tag v1.0.0 && git push origin v1.0.0   # kích hoạt release.yml
+git tag v1.0.0
+git push origin v1.0.0   # kích hoạt release.yml
 ```
 
 ## Gặp lỗi có mã `E-...`?

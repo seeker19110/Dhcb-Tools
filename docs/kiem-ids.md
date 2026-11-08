@@ -38,7 +38,7 @@ Ribbon: *Kiểm tra & AI → Kiểm theo IDS*. Bridge/MCP/batch đêm: lệnh `I
 
 **Trên chính file IFC** (mục 11.4, không cần Revit, chạy được trên CI):
 
-```bash
+```powershell
 DhcbTools.BatchRunner --verify-ifc xuat/toa-a.ifc --verify-ids yeu-cau/chu-dau-tu.ids --ids-report bao-cao/ids-ifc.html
 ```
 
@@ -162,11 +162,11 @@ buildingSMART công bố 334 ca kiểm (`IDS/Documentation/ImplementersDocumenta
 ca lệch ngoài danh sách đã biết [`tests/ids-buildingsmart/known-gaps.txt`](../tests/ids-buildingsmart/known-gaps.txt).
 Chạy tại chỗ:
 
-```bash
+```powershell
 git init /tmp/bsids && git -C /tmp/bsids fetch --depth 1 https://github.com/buildingSMART/IDS.git 870f9c4e6e8f414e737b4d84ca1aa9b46fc6c8f3
 git -C /tmp/bsids checkout FETCH_HEAD -- Documentation/ImplementersDocumentation/TestCases
 dotnet build src/DhcbTools.BatchRunner/DhcbTools.BatchRunner.csproj -c Release
-python3 scripts/ids-conformance.py /tmp/bsids/Documentation/ImplementersDocumentation/TestCases \
+python scripts/ids-conformance.py /tmp/bsids/Documentation/ImplementersDocumentation/TestCases `
   --runner src/DhcbTools.BatchRunner/bin/Release/net10.0/DhcbTools.BatchRunner.dll
 ```
 

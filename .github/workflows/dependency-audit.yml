@@ -1,4 +1,4 @@
-# Quét dependency có lỗ hổng đã biết (NuGet + pip) bằng scripts/check-vulnerable.sh.
+# Quét dependency có lỗ hổng đã biết (NuGet + pip) bằng scripts/check-vulnerable.ps1.
 # Thay cho dependency-review-action — action đó đòi bật Dependency graph ở Settings → Security, repo chưa
 # bật nên đã phải bỏ ở PR #159. Script này không cần tính năng nào của GitHub, chạy ở máy cũng được.
 #
@@ -9,11 +9,11 @@ name: dependency-audit
 on:
   pull_request:
     paths: ['**/*.csproj', 'Directory.Build.props', '**/requirements*.txt', 'pyproject.toml',
-            'scripts/check-vulnerable.sh', '.github/workflows/dependency-audit.yml']
+            'scripts/check-vulnerable.ps1', '.github/workflows/dependency-audit.yml']
   push:
     branches: [main]
     paths: ['**/*.csproj', 'Directory.Build.props', '**/requirements*.txt', 'pyproject.toml',
-            'scripts/check-vulnerable.sh', '.github/workflows/dependency-audit.yml']
+            'scripts/check-vulnerable.ps1', '.github/workflows/dependency-audit.yml']
   schedule:
     - cron: '17 1 * * 1'   # thứ Hai 08:17 giờ Việt Nam
   workflow_dispatch:
@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   audit:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -40,13 +40,13 @@ jobs:
             8.0.x
             10.0.x
 
-      # Python riêng thay vì python3 của image: pip-audit dựng venv tạm để giải dependency, cần module venv đầy đủ.
+      # Python cố định cho pip-audit và môi trường kiểm tra Windows.
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
 
       - name: Cài pip-audit
-        run: python3 -m pip install --quiet 'pip-audit>=2.7,<3'
+        run: python -m pip install --quiet 'pip-audit>=2.7,<3'
 
       - name: Quét NuGet + Python
-        run: ./scripts/check-vulnerable.sh
+        run: ./scripts/check-vulnerable.ps1

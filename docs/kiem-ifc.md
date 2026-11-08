@@ -19,7 +19,7 @@ thành công. Xem [`bang-chung-test.md`](bang-chung-test.md) §27.
 
 ## Chạy
 
-```bash
+```powershell
 DhcbTools.BatchRunner --verify-ifc "D:\xuat\toa-a.ifc" --ifc-spec configs\ifc-check.json
 ```
 

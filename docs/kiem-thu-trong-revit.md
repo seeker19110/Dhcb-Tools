@@ -47,7 +47,7 @@ Mã thoát khác 0 khi có ca trượt, nên cắm thẳng vào Task Scheduler h
 
 Chạy qua Bridge khi đang mở Revit (nhanh hơn lúc viết ca mới):
 
-```bash
+```powershell
 python scripts/dhcb_agent.py revit exec RunTests --config '{"suitePath":"D:/DHCB/tests/suites/revit-smoke.json"}'
 ```
 
@@ -262,7 +262,7 @@ không người), nhưng **được ghi lại** và đưa vào `Messages` với 
 
 `Shared.Logic/Testing` (đọc bộ ca kiểm, đánh giá kỳ vọng, dựng TRX/Markdown) là phần quyết định một ca đạt hay trượt,
 nên chính nó có test trong [`TestingTests.cs`](../tests/DhcbTools.Shared.Logic.Tests/TestingTests.cs) chạy trên CI
-Linux — nếu không thì "bộ test xanh" lại là một con số không ai kiểm chứng được.
+Windows — nếu không thì "bộ test xanh" lại là một con số không ai kiểm chứng được.
 
 ## Còn thiếu
 

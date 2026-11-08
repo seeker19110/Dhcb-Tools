@@ -1,5 +1,14 @@
 # Hiện trạng dự án
 
+> Nâng cấp AutoCAD và chuyển quy trình sang Windows 2026-11-05: cửa sổ WPF cho 15 công cụ,
+> tìm/thay có phạm vi và giữ MText/field, truy vấn phân trang gắn document/revision, MCP/panel có job nền.
+> Toàn bộ CI/build/test/đóng gói dùng Windows PowerShell; đã bỏ script shell và nhánh build loại giao diện.
+> [Hướng dẫn sử dụng](autocad-windows.md) · [Kết quả kiểm chứng](nang-cap-autocad-windows-2026-11-05.md).
+
+> Hoàn thiện 2026-11-05: sửa tham số CLI bị bỏ qua, gateway MCP/thiếu token, checkout shell và ký PFX trên PowerShell 5.1.
+> C# lõi 2.226 ca, CLI 102 ca, Python 468 ca đạt; AutoCAD 2026 thật smoke 18/18 + write 12/12.
+> [Thay đổi, kiểm chứng và giới hạn nghiệm thu](hoan-thien-2026-11-05.md).
+
 > Audit toàn bộ 2026-10-10: sửa trạng thái commit và giao dịch nguyên tử Revit, ghi cao độ instance,
 > đơn vị trục CAD/CSV mâu thuẫn, ngân sách MEP, fault/cancel Bridge, recovery MCP và log/bàn giao nhiều model.
 > [Phát hiện, kiểm chứng và đề xuất nâng cấp](audit-toan-bo-2026-10-10.md).
@@ -136,7 +145,7 @@
 | Hướng dẫn cài đặt & kiểm thử thủ công | ✅ (PR #13) [`huong-dan-cai-dat-va-kiem-thu-thu-cong.md`](huong-dan-cai-dat-va-kiem-thu-thu-cong.md) — checklist R1–R48, C1–C17, B1–B12, M1–M4 |
 | Phạm vi cổng phủ 100 % | ⚠️ Chỉ `Shared.Logic` + `Shared.Hosting` (+ test CLI `BatchRunner`, không ngưỡng). `Core`, `Core.AutoCAD`, hai vỏ **không** nằm trong cổng — kiểm bằng bộ ca chạy trong Revit/AutoCAD thật (`tests/suites`, 155 ca) trên một máy. Đang chuyển dần: mỗi lệnh tách phần quyết định xuống `Shared.Logic` (§49–§51: 9 lệnh, 183 ca) |
 | Kiểm thử tự động | ✅ Bộ test xUnit (`Shared.Logic` + `Shared.Hosting`), gồm bốn bộ đối chiếu mã nguồn với nhau: `RibbonCoverageTests` (vỏ Revit ↔ bảng lệnh), `CatalogFieldTests` (catalog ↔ property config thật), `SuiteCoverageTests` (49/49 lệnh có ca kiểm chạy trong Revit), `VietnameseMessageTests` (không còn thông báo tiếng Anh trong Core) |
-| CI | ✅ `tests.yml` (test + check-build bằng API package, ubuntu) — xanh |
+| CI | ✅ `tests.yml` (test + check-build bằng API package, Windows) — xanh |
 | CD | ✅ đóng gói Release thật (Revit 2023/2024/2025/**2026**, **AutoCAD 2024/2025/2026**) + GitHub Release khi đẩy tag (`release.yml`, windows-latest). AutoCAD 2026 là nhánh .NET 10, installer đặt vào `DhcbTools.bundle\Contents6` |
 
 Toàn bộ 64 lệnh đã có mã nguồn và biên dịch xanh với API package. **49/49 lệnh Revit đã chạy thật ít nhất
@@ -188,8 +197,8 @@ Còn thiếu: **AI chat dạng WPF** — lớp AI hiện dùng qua Bridge `/chat
 JobTokens/BatchJob/RunLog/BatchReport/AcadScriptGen, GridClustering/GridNaming, RouteGraph, DevicePattern, Duct/PipeSizing,
 SystemNaming, FlowNumbering, PathFinder3D, RuleChecker, ClashAcceptance, LayerMappingSuggester, SpecTextExtractor,
 WarningAnalyzer, CommandIntentParser, CommandCatalog↔mã nguồn, NamePattern, PaletteGenerator, ThresholdRule, LayerMapTable,
-DiffSummary, RvtFileInfo, PlotPdf, SlopeMath, BomAggregator, PolylineSimplifier**. `scripts/check-build.sh` biên dịch toàn bộ
-Core/vỏ (kể cả vỏ core-only) trên Linux với API Revit 2025 + AutoCAD 2025; Core Revit cũng xanh với API 2023.
+DiffSummary, RvtFileInfo, PlotPdf, SlopeMath, BomAggregator, PolylineSimplifier**. `scripts/check-build.ps1` biên dịch toàn bộ
+Core/vỏ (kể cả vỏ core-only) trên Windows với API Revit 2025 + AutoCAD 2025; Core Revit cũng xanh với API 2023.
 
 ---
 
@@ -227,7 +236,7 @@ Core/vỏ (kể cả vỏ core-only) trên Linux với API Revit 2025 + AutoCAD 
 | **Thước đo chất lượng tuyến + đường thành công `RouteFromLines`** | 2026-09-06 | `PathResult` thêm `LengthMm`/`ManhattanMm`/`DetourRatio`/`MinTurns` (4 ca thuần), Summary `AutoRoute` in *dài X m = R× Manhattan, T rẽ (tối thiểu M)*; `autoroute` 13/13 với số thật; `write-mep` 15/15: AutoRoute vẽ 3 line → `RouteFromLines` dựng 3/3 duct + 2/2 elbow, xoá line → lần hai không còn line = commit — §55 |
 | **Tự đối chiếu `SetoutExport` bằng IFC của Autodesk** | 2026-09-06 | Đường độc lập với mã DHCB: xuất IFC 2x3 rồi đọc IFCSITE/IFCGRID/IFCCOLUMN bằng `scripts/doi-chieu-setout-ifc.py` (23 ca, 100 %). Gốc Survey khớp từng chữ số, **142/142 giao trục ≤ 0,7 mm**; lộ lỗi thật: điểm chèn family ≠ tim với họ *Off Center* (tới 305 mm) → `pointMode` Centre/Insertion, tâm = trọng tâm solid hình học gốc qua transform (ba lượt sai trước khi đúng, kể cả quên `GetTransform` → lệch 33 m). Phân xử 61 cột Off Center bằng tham số family (`Depth_Center to Front/Back`…): trọng tâm của lệnh khớp từng mm, **bộ xuất IFC sai** 186–305 mm (cắt join hoặc lệch gốc) — §52 |
 | **Bộ ghi thật thứ ba `write-plumbing` — đường thành công của `PipeKick` và `SlopePipes`** | 2026-09-06 | Trước đó hai lệnh này chỉ có ca lỗi/xem trước (model HVAC không có ống). Bộ mới trên model cấp thoát nước, id ống cố định của file mẫu: `PipeKick` **3 đoạn + 2/2 cút 45°** trên ống đồng 17,4 m, kick lại ở 16 m bị chặn (bằng chứng commit); `SlopePipes` đặt dốc 1 % rồi kiểm lại **0 chưa đạt**. 5/5 ngay lượt đầu — §53 |
-| **Bộ test CLI cho BatchRunner — 17 ca đầu vào hỏng** | 2026-09-06 | §44 chỉ ra cả hai lỗi sập runner đều ở BatchRunner, ngoài tầm cổng phủ 100%. Nay `tests/DhcbTools.BatchRunner.Tests` gọi thẳng `Program.Main`: file .ifc rác, IDS hỏng/rỗng/lệch chuẩn, job hỏng, nhật ký bị sửa, gói bàn giao vẫn dựng khi IFC hỏng. Gỡ tạm hai bản vá §44 → 5 ca đỏ đúng chỗ. Nối vào `tests.yml` và `check-build.sh` — §47 |
+| **Bộ test CLI cho BatchRunner — 17 ca đầu vào hỏng** | 2026-09-06 | §44 chỉ ra cả hai lỗi sập runner đều ở BatchRunner, ngoài tầm cổng phủ 100%. Nay `tests/DhcbTools.BatchRunner.Tests` gọi thẳng `Program.Main`: file .ifc rác, IDS hỏng/rỗng/lệch chuẩn, job hỏng, nhật ký bị sửa, gói bàn giao vẫn dựng khi IFC hỏng. Gỡ tạm hai bản vá §44 → 5 ca đỏ đúng chỗ. Nối vào `tests.yml` và `check-build.ps1` — §47 |
 | **v1.1.0 phát hành; task đêm trỏ vào bản cài; gói bàn giao dự án thứ hai (MEP L04, có sheet)** | 2026-09-06 | Tag v1.1.0 → installer + 7 zip; cài thật bằng installer (Setup không tự thoát — ✅ sửa §46: `MsgBox` trong `[Code]` không bị `/SUPPRESSMSGBOXES` tắt, thêm `not WizardSilent`; v1.1.1); task đêm trỏ `%LOCALAPPDATA%\\Programs\\DHCB Tools`. MEP L04: PDF, danh mục 1 sheet, **IFC 285 MB / 2,69 triệu thực thể xuất 36 phút**, IDS trên IFC 49.585 phần tử — job đêm file MEP cần 60–90 phút — §45 |
 | **Vai kỹ sư test — IFC hỏng làm sập gói bàn giao** | 2026-09-05 | 10 ca phá thử sau #93–#96: đối chiếu IfcTester trên IFC dự án A khớp 12/13 (lệch còn lại là lỗi IfcTester); **file IFC rác làm sập `--verify-ids` và cả runner khi dựng gói** (đêm đó không có gói) — bắt `IfcParseException`, gói ghi mục Không đạt; lint thêm thứ tự `<info>` — §44 |
 | **11.3 — gói bàn giao đêm chạy thật + Task Scheduler tự chạy lần đầu** | 2026-09-05 | Lệnh mới `SheetIndex` (55 sheet Snowdon), tầng thuần `HandoverPackage` (băm SHA-256, ô ký Điều 11 NĐ 207/2026), khối `handover` trong job. Dự án A ARC L01: IFC4 13 MB đạt, IDS 0 lỗi **ở cả hai đường**. Ba lỗi lộ và sửa: BatchExport đòi sheet cả khi xuất IFC; BuildHandover sửa danh sách đang duyệt; Revit-path Tag rỗng khi Mark rỗng (12 lỗi giả). Task đăng ký, Start-ScheduledTask Result 0 — §43 |

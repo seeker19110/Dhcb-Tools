@@ -27,7 +27,6 @@ public sealed class DhcbHttpBridge : IDisposable
 
     private readonly HttpBridgeServer _server;
     private readonly BridgeCommitGuard _commits = new(BridgeCommitGuard.DefaultDirectory("autocad"));
-    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Autodesk.AutoCAD.DatabaseServices.Database, object> Tracked = new();
     private bool _disposed;
 
     public DhcbHttpBridge()
@@ -38,10 +37,10 @@ public sealed class DhcbHttpBridge : IDisposable
                 item,
                 database =>
                 {
-                    TrackDocument(database);
+                    var context = TrackDocument(database);
                     using var executionScope = item.Execution.Enter();
-                    return _commits.Execute("autocad", item.Request, BridgeDocumentContext.IdFor(database),
-                        () => BridgeDocumentContext.RevisionFor(database),
+                    return _commits.Execute("autocad", item.Request, BridgeDocumentContext.IdFor(context),
+                        () => BridgeDocumentContext.RevisionFor(context),
                         request => AcadCommandTable.Dispatch(database, request.Command, request.ConfigJson));
                 },
                 message => CommandResult.Fail(message)),
@@ -50,7 +49,8 @@ public sealed class DhcbHttpBridge : IDisposable
             // còn lại rơi xuống AcadQueryHandler thuần Database như cũ.
             QueryAsync = item => RunOnAutoCadDocument(
                 item,
-                document => AcadUiQueryHandler.Handle(document, ToQueryRequest(item.Request)),
+                document => BridgeDocumentContext.ValidateQuery(item.Request, BridgeDocumentContext.IdFor(TrackDocument(document.Database))) is { } error
+                    ? (object)new { error } : AcadUiQueryHandler.Handle(document, ToQueryRequest(item.Request)),
                 message => (object)new { error = message }),
 
             Chat = text => CommandIntentParser.Parse(text, CommandCatalog.AutoCad).ToPayload(),
@@ -62,16 +62,7 @@ public sealed class DhcbHttpBridge : IDisposable
     public string? TokenPath => BridgeTokenStore.DefaultPath;
 
     /// <summary>Theo dõi revision cho cả Ribbon và Bridge, kể cả khi Bridge bị tắt.</summary>
-    internal static void TrackDocument(Autodesk.AutoCAD.DatabaseServices.Database database)
-    {
-        Tracked.GetValue(database, db =>
-        {
-            db.ObjectModified += (_, _) => BridgeDocumentContext.Touch(db);
-            db.ObjectAppended += (_, _) => BridgeDocumentContext.Touch(db);
-            db.ObjectErased += (_, _) => BridgeDocumentContext.Touch(db);
-            return new object();
-        });
-    }
+    internal static object TrackDocument(Autodesk.AutoCAD.DatabaseServices.Database database) => AcadDocumentContexts.For(database);
 
     public void Start() => _server.Start();
 
@@ -93,12 +84,16 @@ public sealed class DhcbHttpBridge : IDisposable
     /// chính. Kiểm tra <c>TryClaim()</c> trước khi chạy để không mở transaction cho request mà client
     /// đã bỏ vì timeout (mục 0.5).
     /// </summary>
-    private static Task RunOnAutoCadThread<TRequest, TResult>(
+    private static async Task RunOnAutoCadThread<TRequest, TResult>(
         BridgeWorkItem<TRequest, TResult> item,
         Func<Autodesk.AutoCAD.DatabaseServices.Database, TResult> work,
         Func<string, TResult> onError)
     {
-        Application.DocumentManager.ExecuteInCommandContextAsync(
+        TResult result = default!;
+        var hasResult = false;
+        try
+        {
+            await Application.DocumentManager.ExecuteInCommandContextAsync(
             _ =>
             {
                 if (!item.TryClaim())
@@ -109,20 +104,27 @@ public sealed class DhcbHttpBridge : IDisposable
                 try
                 {
                     var document = Application.DocumentManager.MdiActiveDocument;
-                    item.Completion.TrySetResult(document is null
+                    result = document is null
                         ? onError("Không có drawing nào đang mở trong AutoCAD.")
-                        : work(document.Database));
+                        : work(document.Database);
+                    hasResult = true;
                 }
                 catch (Exception ex)
                 {
-                    item.Completion.TrySetResult(onError($"Lỗi khi chạy trong AutoCAD: {ex.Message}"));
+                    result = onError($"Lỗi khi chạy trong AutoCAD: {ex.Message}");
+                    hasResult = true;
                 }
 
                 return Task.CompletedTask;
             },
             null);
-
-        return Task.CompletedTask;
+        }
+        finally
+        {
+            // Reply only after AutoCAD has unwound its command context, so an immediate next
+            // request cannot enter a nested command. Preserve a known Core result on cleanup faults.
+            if (hasResult) item.Completion.TrySetResult(result);
+        }
     }
 
     /// <summary>
@@ -130,12 +132,16 @@ public sealed class DhcbHttpBridge : IDisposable
     /// <c>Editor</c> (chọn, zoom, layout đang mở) — Core cố ý chỉ nhận <c>Database</c> để còn chạy
     /// được trong <c>accoreconsole</c>, nơi không có Editor nào cả.
     /// </summary>
-    private static Task RunOnAutoCadDocument<TRequest, TResult>(
+    private static async Task RunOnAutoCadDocument<TRequest, TResult>(
         BridgeWorkItem<TRequest, TResult> item,
         Func<Document, TResult> work,
         Func<string, TResult> onError)
     {
-        Application.DocumentManager.ExecuteInCommandContextAsync(
+        TResult result = default!;
+        var hasResult = false;
+        try
+        {
+            await Application.DocumentManager.ExecuteInCommandContextAsync(
             _ =>
             {
                 if (!item.TryClaim())
@@ -146,20 +152,27 @@ public sealed class DhcbHttpBridge : IDisposable
                 try
                 {
                     var document = Application.DocumentManager.MdiActiveDocument;
-                    item.Completion.TrySetResult(document is null
+                    result = document is null
                         ? onError("Không có drawing nào đang mở trong AutoCAD.")
-                        : work(document));
+                        : work(document);
+                    hasResult = true;
                 }
                 catch (Exception ex)
                 {
-                    item.Completion.TrySetResult(onError($"Lỗi khi chạy trong AutoCAD: {ex.Message}"));
+                    result = onError($"Lỗi khi chạy trong AutoCAD: {ex.Message}");
+                    hasResult = true;
                 }
 
                 return Task.CompletedTask;
             },
             null);
-
-        return Task.CompletedTask;
+        }
+        finally
+        {
+            // Reply only after AutoCAD has unwound its command context, so an immediate next
+            // request cannot enter a nested command. Preserve a known Core result on cleanup faults.
+            if (hasResult) item.Completion.TrySetResult(result);
+        }
     }
 
     /// <summary>Chuyển body dùng chung sang kiểu truy vấn của AutoCAD.</summary>

@@ -1067,7 +1067,7 @@ def fetch_live(agent, app: str = "autocad", chunk: int = 25, retries: int = 3, p
                 break
             time.sleep(pause)
     info = agent.request(app, "POST", "/query", {"query": "drawing_info"}, timeout=60)
-    # Đường dẫn do AutoCAD (Windows) trả về; PureWindowsPath tách được cả khi script chạy trên Linux/WSL.
+    # Đường dẫn do AutoCAD (Windows) trả về; PureWindowsPath giữ đúng quy tắc ổ đĩa và dấu phân cách Windows.
     return entities, t["texts"], geometry, PureWindowsPath(info.get("filename") or "").name
 
 

@@ -17,19 +17,17 @@ hiện tại của dự án này (add-in C#, một người làm). Repo **đã c
 ## CI đang chạy những gì
 
 Bốn workflow trong [`.github/workflows/`](.github/workflows/) — `tests.yml`, `release.yml` mô tả dưới đây, cộng
-`secret-scan.yml` (gitleaks, mọi PR) và `dependency-audit.yml` (`scripts/check-vulnerable.sh`: package NuGet/pip có
+`secret-scan.yml` (gitleaks, mọi PR) và `dependency-audit.yml` (`scripts/check-vulnerable.ps1`: package NuGet/pip có
 lỗ hổng đã biết; chạy khi PR đổi dependency, trên `main` và hằng tuần). `.github/dependabot.yml` mở PR cập nhật
 GitHub Actions và pip mỗi tháng. Mô hình an toàn tổng thể: [`SECURITY.md`](SECURITY.md).
 
-**`tests.yml` — chạy mọi push vào `main` và mọi pull request.** Bốn nhóm kiểm tra và một cổng tổng hợp:
+**`tests.yml` — chạy mọi push vào `main` và mọi pull request.** Hai nhóm kiểm tra trên Windows và một cổng tổng hợp:
 
 | Job | Máy/ma trận | Làm gì |
 |---|---|---|
-| `logic-tests` | ubuntu-latest | Restore/build/test C# Release; cổng phủ 100% dòng; CLI BatchRunner; đối chiếu BCF và IDS với dữ liệu chuẩn; tải `.trx` lên artifact `test-results` |
-| `check-build` | ubuntu-latest; 2022–2027, hai runtime AutoCAD 2025/2026 | Build BatchRunner và Core/vỏ bằng SDK NuGet với `UseWPF=false`; output `headless` tách khỏi build giao diện. Hàng 2025/net8 kiểm Python với phủ 100% câu lệnh, pyflakes, JavaScript panel và cú pháp PowerShell 5.1/7 |
-| `build-wpf-windows` | windows-latest; Revit 2022–2027 | Build đầy đủ vỏ Revit có WPF. Hàng 2025 biên dịch/chạy installer Inno Setup 6.7.1 trong thư mục tạm: 64 tổ hợp lựa chọn AutoCAD, runtime, nâng cấp/bỏ chọn/chọn lại và bảo toàn add-in khác |
-| `build-autocad-windows` | windows-latest; 8 profile năm/runtime | Build đầy đủ AutoCAD UI có WPF và vỏ Core Console cho mỗi SDK/runtime |
-| `quality-gate` | ubuntu-latest | Luôn chạy sau cả bốn nhóm; chỉ xanh khi mọi nhóm xanh. Job lỗi, bị hủy hoặc bị bỏ qua đều chặn cổng |
+| `logic-tests` | windows-latest | Restore/build/test C# Release, cổng phủ 100% dòng, CLI BatchRunner, đối chiếu BCF/IDS độc lập và artifact TRX |
+| `check-build` | windows-latest; 8 profile năm/runtime 2022–2027 | Build đầy đủ Core/WPF/Core Console bằng SDK NuGet. Hàng 2025/net8 kiểm Python phủ 100%, pyflakes, panel JavaScript, PowerShell 5.1 và installer thật trong sandbox; hàng 2026/net10 chạy nghiệm thu giao diện WPF |
+| `quality-gate` | windows-latest | Luôn chạy sau hai nhóm; chỉ xanh khi mọi hàng đều đạt. Lỗi, hủy hoặc bỏ qua đều chặn cổng |
 
 Revit/AutoCAD 2022–2024 dùng net48; Revit 2025/2026 giữ API baseline net8; Revit 2027 dùng net10.
 AutoCAD 2025/2026 có hai profile net8/net10 tùy mức cập nhật host; AutoCAD 2027 dùng net10.
@@ -99,27 +97,28 @@ là quy ước tự giác. Xem xét thêm gate ở Giai đoạn 0 nếu thấy c
 
 Chạy trước những gì CI sẽ chạy, để không phải đợi một vòng đỏ (không cần cài Revit/AutoCAD):
 
-```bash
-dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj -c Release \
+```powershell
+dotnet test tests/DhcbTools.Shared.Logic.Tests/DhcbTools.Shared.Logic.Tests.csproj -c Release `
   --collect:"XPlat Code Coverage" --results-directory ./coverage
-python3 scripts/check-coverage.py ./coverage   # cổng phủ 100% dòng — chỉ đúng file:dòng nếu thiếu
-./scripts/check-build.sh      # biên dịch toàn bộ Core + vỏ bằng API package NuGet (Revit/AutoCAD 2025)
+python scripts/check-coverage.py ./coverage   # cổng phủ 100% dòng — chỉ đúng file:dòng nếu thiếu
+.\scripts\check-build.ps1      # biên dịch toàn bộ Core + vỏ bằng API package NuGet (Revit/AutoCAD 2025)
 ```
 
 Có sửa phần Python (`scripts/`, `tools/autocad-mcp-server/`) thì chạy thêm — CI cũng chạy hai việc này:
 
-```bash
+```powershell
 pip install -r requirements-dev.txt          # pytest + coverage + pyflakes + fastmcp
-python3 -m coverage run -m pytest -q         # tools/autocad-mcp-server + tests/python
-python3 -m coverage report                   # đỏ nếu phủ < 100% câu lệnh
-python3 -m pyflakes scripts/*.py tools/autocad-mcp-server/*.py tests/python/*.py
+python -m coverage run -m pytest -q         # tools/autocad-mcp-server + tests/python
+python -m coverage report                   # đỏ nếu phủ < 100% câu lệnh
+$files = @(Get-ChildItem scripts/*.py, tools/autocad-mcp-server/*.py, tests/python/*.py | ForEach-Object { $_.FullName })
+python -m pyflakes @files
 ```
 
 Có đổi dependency (`*.csproj`, `Directory.Build.props`, `requirements*.txt`) thì chạy thêm
-`pip install pip-audit && ./scripts/check-vulnerable.sh` — cùng việc `dependency-audit.yml` làm.
+`python -m pip install pip-audit` rồi `.\scripts\check-vulnerable.ps1` — cùng việc `dependency-audit.yml` làm.
 
 **Cả hai tầng đều có ngưỡng phủ 100%**: thêm code mà không thêm test thì CI đỏ. Nhánh thật sự không
-chạy được trên CI (mã chỉ có trên Windows, đua giữa hai luồng) thì đánh dấu `[ExcludeFromCodeCoverage]`
+chạy được trên CI (luồng lỗi phụ thuộc host Autodesk, đua giữa hai luồng) thì đánh dấu `[ExcludeFromCodeCoverage]`
 / `# pragma: no cover` **kèm lý do ngay tại chỗ** — xem `docs/dac-ta-kiem-thu.md` §2.0 để biết danh
 sách hiện có và những chỗ đã được tiêm seam để test thay vì loại trừ.
 
@@ -149,7 +148,7 @@ Thêm lệnh Core mới = thêm class + một dòng trong `Shared.Logic/Ai/Comma
 - So chuỗi bí mật (token, chuỗi xác nhận) trong Python bằng `hmac.compare_digest` trên **byte UTF-8**, không trên
   `str` — `str` có ký tự ngoài ASCII làm nó ném `TypeError` thay vì trả `False`.
 - Script `.ps1` phải chạy được bằng **Windows PowerShell 5.1** (có sẵn trên mọi máy kỹ sư): không dùng `?.`, `??`,
-  `? :`, `&&`, `||` của PowerShell 7. CI kiểm bằng bộ đọc của pwsh (bước *Kiểm script PowerShell* trong `tests.yml`).
+  `? :`, `&&`, `||` của PowerShell 7. CI kiểm trực tiếp bằng parser Windows PowerShell 5.1 (bước *Kiểm cú pháp Windows PowerShell 5.1* trong `tests.yml`).
 - Regex do người dùng/agent nhập luôn có `matchTimeout` — chạy trên luồng UI Revit/AutoCAD, treo là treo cả phần mềm.
 - Lệnh mới ghi file ra định dạng mới thì thêm đuôi đó vào `BridgePathPolicy.AllowedExtensions`, và trường đầu ra
   không bắt đầu bằng `output` thì thêm vào danh sách trong `BridgeCommitGuard.IsOutputField` — thiếu là preview

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.AutoCAD.ApplicationServices;
@@ -32,13 +32,19 @@ internal static class AcadUiQueryHandler
     {
         return request.Query.ToUpperInvariant() switch
         {
-            "DOCUMENT_CONTEXT" => new { documentId = BridgeDocumentContext.IdFor(document.Database), name = document.Name },
+            "DOCUMENT_CONTEXT" => DocumentContext(document),
             "SELECTION" => Selection(document, request.Params),
             "SHOW_ENTITIES" => ShowEntities(document, request.Params),
             "ACTIVE_LAYOUT" => ActiveLayout(document),
             "SNAPSHOT" => Snapshot(document, request.Params),
             _ => AcadQueryHandler.Handle(document.Database, request),
         };
+    }
+
+    private static object DocumentContext(Document document)
+    {
+        var context = DhcbHttpBridge.TrackDocument(document.Database);
+        return new { documentId = BridgeDocumentContext.IdFor(context), revision = BridgeDocumentContext.RevisionFor(context), name = document.Name };
     }
 
     /// <summary>

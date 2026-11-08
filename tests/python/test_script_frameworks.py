@@ -11,7 +11,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
-PWSH = shutil.which("pwsh")
+PWSH = shutil.which("powershell") or shutil.which("pwsh")
 LOOKUPS = (
     ("run-in-autocad-tests.ps1", "acadTfm", "AutoCAD.Core"),
     ("run-in-autocad-tests.ps1", "runnerTfm", "BatchRunner"),
@@ -65,7 +65,7 @@ class ScriptFrameworkTests(unittest.TestCase):
                               "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()\n"
                               + stop + "\n" + stub + block
                               + "Set-Content existing-addin.dll overwritten\n"
-                              + f"Write-Output ('FRAMEWORK=' + ${variable})\n", encoding="utf-8")
+                              + f"Write-Output ('FRAMEWORK=' + ${variable})\n", encoding="utf-8-sig")
             result = subprocess.run([PWSH, "-NoProfile", "-File", str(script)], cwd=tmp,
                                     capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
             return result, marker.read_bytes()
@@ -81,7 +81,7 @@ class ScriptFrameworkTests(unittest.TestCase):
             source.write_text("$ErrorActionPreference = 'Stop'\n"
                               "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()\n"
                               + function + "\n"
-                              + f"Get-AcadRuntime {year} $PSScriptRoot '{requested}'\n", encoding="utf-8")
+                              + f"Get-AcadRuntime {year} $PSScriptRoot '{requested}'\n", encoding="utf-8-sig")
             return subprocess.run([PWSH, "-NoProfile", "-File", str(source)],
                                   capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
 

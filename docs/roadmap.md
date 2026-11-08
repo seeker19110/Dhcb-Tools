@@ -212,7 +212,7 @@ hành chứ không còn "preview".
 |---|---|
 | Nhánh TFM `net10.0-windows` cho **AutoCAD ≥ 2026** | ✅ có từ trước trong `Directory.Build.props`, nhưng **chưa từng có CI** — chỉ build được trên máy có cài AutoCAD 2026 |
 | Nhánh TFM `net10.0-windows` cho **Revit ≥ 2027** | ✅ 2026-09-05. Bản cũ điều kiện `>= 2025 → net8` **không có cận trên**, nên `-p:RevitVersion=2027` ra net8.0-windows sai âm thầm; nay `2025–2026 → net8`, `≥ 2027 → net10` |
-| `check-build.sh` chạy được đường .NET 10 | ✅ `REVIT_VERSION=2027 ACAD_VERSION=2027 ./scripts/check-build.sh` xanh; header ghi bảng phiên bản → TFM |
+| `check-build.ps1` chạy được đường .NET 10 | ✅ `./scripts/check-build.ps1 -RevitVersion 2027 -AcadVersion 2027` xanh; header ghi bảng phiên bản → TFM |
 | CI phủ .NET 10 | ✅ `tests.yml`: ma trận `check-build` **2023–2027**, `build-wpf-windows` **2023–2027** (2027 là bản WPF đầu tiên trên net10 — đúng chỗ SDK đổi implicit usings khi bật WPF), cài cả SDK 8 lẫn 10 |
 | `release.yml` không đóng gói nhầm thư mục | ✅ bỏ hai chỗ hardcode `-ge 2025 → net8`; TFM nay **hỏi MSBuild** (`-getProperty:TargetFramework`) — một nguồn sự thật trong `Directory.Build.props` |
 | Phát hành **AutoCAD 2026** (net10) | ✅ 2026-09-05: ma trận `build-autocad` thêm 2026, installer có component `acad2026` → bundle `Contents6`, `PackageContents.xml` thêm khối `SeriesMin/Max R25.1`. Làm được vì AutoCAD 2026.1 **đã chạy thật** (§24 batch 18/18 + 12/12, §25 snapshot) — khác Revit 2026/2027 vẫn chưa |

@@ -45,7 +45,7 @@ namespace DhcbTools.Shared.Logic.Cad
     /// </summary>
     public static class MTextReplace
     {
-        /// <summary>Ký tự hiển thị thay cho phân số xếp chồng <c>\S…;</c> và ký tự <c>\M+…</c> — không khớp chữ thường.</summary>
+        /// <summary>Ký tự giữ chỗ cho field, phân số xếp chồng <c>\S…;</c> và ký tự <c>\M+…</c>.</summary>
         private const char Placeholder = '￼';
 
         /// <summary>Một ký tự hiển thị và đoạn <c>Contents</c> sinh ra nó.</summary>
@@ -131,6 +131,14 @@ namespace DhcbTools.Shared.Logic.Cad
             while (i < s.Length)
             {
                 var c = s[i];
+                if (c == '%' && i + 1 < s.Length && s[i + 1] == '<')
+                {
+                    var end = FieldEnd(s, i + 2);
+                    units.Add(new Unit(Placeholder, i, end, false));
+                    i = end;
+                    continue;
+                }
+
                 if (c == '{' || c == '}')
                 {
                     i++; // nhóm định dạng, không hiển thị
@@ -207,6 +215,27 @@ namespace DhcbTools.Shared.Logic.Cad
             }
 
             return units;
+        }
+
+        // Field codes may contain nested fields. Keep the entire expression opaque so neither
+        // literal searches nor regexes can replace evaluator names, object IDs or format strings.
+        private static int FieldEnd(string source, int from)
+        {
+            var depth = 1;
+            for (var i = from; i + 1 < source.Length; i++)
+            {
+                if (source[i] == '%' && source[i + 1] == '<')
+                {
+                    depth++;
+                    i++;
+                }
+                else if (source[i] == '>' && source[i + 1] == '%')
+                {
+                    i++;
+                    if (--depth == 0) return i + 1;
+                }
+            }
+            return source.Length;
         }
 
         /// <summary>Vị trí ngay sau dấu ';' kết thúc mã; thiếu ';' thì mã kéo tới hết chuỗi.</summary>
