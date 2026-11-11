@@ -280,8 +280,8 @@ public sealed class DrawingCombineCommand : ICoreCommand<DrawingCombineConfig>
     }
 
     /// <summary>
-    /// Tạo layout <paramref name="targetName"/> và chép entity paper space của layout nguồn vào. Viewport tổng (số 1) không
-    /// chép — layout mới tự có. Viewport được biến đổi giống block (điểm p của bản nguồn → <paramref name="position"/> +
+    /// Tạo layout <paramref name="targetName"/> và chép entity paper space của layout nguồn vào, viewport tổng (số 1) đứng
+    /// đầu và giữ nguyên. Viewport được biến đổi giống block (điểm p của bản nguồn → <paramref name="position"/> +
     /// <paramref name="scale"/>·(p − <paramref name="origin"/>)) để vẫn nhìn đúng vùng hình với cùng tỉ lệ in.
     /// </summary>
     private static void CopyLayout(Database target, Database source, string sourceName, string targetName, Point3d origin, Point3d position, double scale, List<string> warnings)
@@ -289,13 +289,22 @@ public sealed class DrawingCombineCommand : ICoreCommand<DrawingCombineConfig>
         ObjectId sourceLayoutId;
         ObjectId sourceBtrId;
         var ids = new ObjectIdCollection();
+        ObjectId overall;
         using (var tr = source.TransactionManager.StartTransaction())
         {
             var dictionary = (DBDictionary)tr.GetObject(source.LayoutDictionaryId, OpenMode.ForRead);
             sourceLayoutId = dictionary.GetAt(sourceName);
             var layout = (Layout)tr.GetObject(sourceLayoutId, OpenMode.ForRead);
             sourceBtrId = layout.BlockTableRecordId;
-            var overall = OverallViewport(layout, tr);
+            // Viewport tổng PHẢI được chép và đứng đầu: layout mới chưa có viewport nào, lần đầu mở tab AutoCAD lấy
+            // viewport đầu tiên trong paper space làm viewport tổng. Bỏ nó đi (bản đầu) thì viewport nổi đầu tiên bị
+            // biến thành viewport tổng và mất khỏi bản vẽ — chỉ thấy khi mở tab trong AutoCAD GUI, accoreconsole không lộ.
+            overall = OverallViewport(layout, tr);
+            if (!overall.IsNull)
+            {
+                ids.Add(overall);
+            }
+
             foreach (ObjectId id in (BlockTableRecord)tr.GetObject(sourceBtrId, OpenMode.ForRead))
             {
                 if (id != overall)
@@ -354,7 +363,8 @@ public sealed class DrawingCombineCommand : ICoreCommand<DrawingCombineConfig>
         {
             foreach (IdPair pair in mapping)
             {
-                if (pair.IsCloned && pair.IsPrimary && tr.GetObject(pair.Value, OpenMode.ForRead) is Viewport viewport)
+                // Viewport tổng nhìn paper space, không nhìn model: giữ nguyên, chỉ dời/phóng viewport nổi.
+                if (pair.IsCloned && pair.IsPrimary && pair.Key != overall && tr.GetObject(pair.Value, OpenMode.ForRead) is Viewport viewport)
                 {
                     viewport.UpgradeOpen();
                     viewport.ViewTarget = position + (viewport.ViewTarget - origin) * scale;
