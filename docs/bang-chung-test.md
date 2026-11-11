@@ -77,6 +77,7 @@
 - §72 — [Đường Revit của `partOf`/`relation` — không có lỗi "phần của tổ hợp" mà §71 vừa sửa ở đường IFC (2026-09-07)](#72-đường-revit-của-partofrelation-không-có-lỗi-phần-của-tổ-hợp-mà-71-vừa-sửa-ở-đường-ifc-2026-09-07)
 - §73 — [`AsBuiltStamp` — dấu bản vẽ hoàn công (Phụ lục IIb, NĐ 207/2026/NĐ-CP) chạy thật lần đầu, khép mục 11.6 (2026-09-07)](#73-asbuiltstamp-dấu-bản-vẽ-hoàn-công-phụ-lục-iib-nđ-2072026nđ-cp-chạy-thật-lần-đầu-khép-mục-116-2026-09-07)
 - §74 — [Hai tính năng học từ GRAVITY TOOL — `DrawingCombine` (AutoCAD) chạy thật, `ElementRename` (Revit) chưa chạy thật (2026-11-12)](#74-hai-tính-năng-học-từ-gravity-tool-drawingcombine-autocad-chạy-thật-elementrename-revit-chưa-chạy-thật-2026-11-12)
+- §75 — [`DrawingCombine` trong AutoCAD GUI thật — hai lỗi accoreconsole không lộ ra, đã sửa (2026-11-12)](#75-drawingcombine-trong-autocad-gui-thật-hai-lỗi-accoreconsole-không-lộ-ra-đã-sửa-2026-11-12)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
@@ -3794,3 +3795,28 @@ qua build add-in Revit 2026 (0 lỗi/0 cảnh báo), ma trận build và test th
 - `DrawingCombine` chưa chạy trong AutoCAD GUI (mới accoreconsole); layout chưa từng mở ở file nguồn có thể
   không có danh sách viewport — khi đó viewport đầu tiên gặp được coi là viewport tổng.
 - Nhóm nối ống kiểu `1Y3E`/refnet VRV của Gravity chưa làm — cần Revit thật để kiểm hình học.
+
+## 75. `DrawingCombine` trong AutoCAD GUI thật — hai lỗi accoreconsole không lộ ra, đã sửa (2026-11-12)
+
+Chạy bản add-in của PR #198 trong **AutoCAD 2026.1 GUI** (cài vào `%APPDATA%\Autodesk\ApplicationPlugins\DhcbTools.bundle`,
+bản cũ sao lưu trước), trên bản sao `Floor Plan Sample.dwg` (inch), gộp 4 file trong một thư mục (3 file Manufacturing
+mm + `Sheet1.dwg` inch).
+
+| Bước | Trước sửa | Sau sửa |
+|---|---|---|
+| `DHCB_DRAWING_COMBINE` gõ dòng lệnh: thư mục → Row → chép layout → Thật → xem trước → Có | **Lỗi** `InvalidDataException: Path must be a string` trong `BridgeCommitGuard.CaptureInputSnapshot` — lớp chụp file đầu vào (chặn ghi khi file đổi sau xem trước) coi mọi trường `…Paths` là MỘT chuỗi, gặp mảng `inputPaths` thì ném. Đường Bridge/MCP đi qua cùng hàm nên cũng hỏng | Xem trước 8, ghi 8 (4 block + 4 layout); ba block mm scale ×0,039370 |
+| Mở từng tab layout mới (lần đầu kích hoạt) | **Mất viewport nổi** của `Sheet1 - Sheet 1`: layout mới không có viewport tổng (bản đầu bỏ nó khi chép), AutoCAD lấy viewport đầu tiên gặp — chính viewport nổi — làm viewport tổng số 1 | Số 1 = viewport tổng (target gốc), số 2 = viewport nổi, target `(3933.7, 736)` đúng điểm chèn block, tâm nhìn `(6; 4,5)`, cao `9,270` như nguồn. Layout VW252 có viewport tổng đúng khổ giấy mm của nguồn (`398×318`, `506×404`) thay vì khổ mặc định `12×9,57` |
+| Bridge: xem trước → token → ghi → gửi lại cùng token | (hỏng ở xem trước như trên) | Xem trước 4, ghi 4; tên không trùng `Sheet1-2`, `VW252-02-0142-2`; gửi lại chỉ trả kết quả đã lưu — nhật ký có đúng một lần ghi |
+
+Sửa:
+1. `CaptureInputSnapshot` nhận mảng đường dẫn và chụp từng phần tử (bỏ phần tử rỗng/null, phần tử không phải chuỗi vẫn bị từ chối).
+   Có lợi thêm: một DWG nguồn bị sửa giữa xem trước và ghi làm preview mất hiệu lực. Ca hồi quy
+   `Path_lists_are_bound_per_file_and_blank_entries_ignored`, `Path_list_with_non_string_entry_is_rejected`.
+2. `CopyLayout` chép cả viewport tổng, đặt đứng đầu, **không** dời/phóng nó (nó nhìn paper space); chỉ viewport nổi biến đổi theo block.
+
+Sau sửa: Shared.Logic **2284 đạt / 0 trượt**, phủ 100% dòng; `autocad-smoke` 20/20, `autocad-write` 13/13.
+
+### Còn mở
+
+- Layout nguồn chưa từng mở (không có danh sách viewport) vẫn lấy viewport đầu tiên gặp làm viewport tổng — giống cách AutoCAD tự làm khi mở tab.
+- `ElementRename` vẫn chưa chạy trong Revit thật (§74).

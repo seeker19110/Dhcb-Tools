@@ -186,14 +186,21 @@ namespace DhcbTools.Shared.Hosting
                     && !p.Name.EndsWith("Path", StringComparison.OrdinalIgnoreCase))
                     continue;
                 if (p.Value.Type == JTokenType.Null) continue;
-                if (p.Value.Type != JTokenType.String) throw new InvalidDataException("Path must be a string");
-                var path = p.Value.Value<string>();
-                if (string.IsNullOrWhiteSpace(path)) continue;
-                paths.Add(path!);
-                if (Directory.Exists(path))
+                // Danh sách đường dẫn (inputPaths của DrawingCombine): chụp từng phần tử. Trước đây mảng bị coi là
+                // config hỏng ("Path must be a string") nên lệnh không chạy được từ Ribbon lẫn Bridge.
+                var items = p.Value is JArray array ? array.ToList() : new List<JToken> { p.Value };
+                foreach (var item in items)
                 {
-                    // Không đi theo symlink/junction. Thư mục đầu vào được chụp toàn bộ, kể cả file mới.
-                    AddDirectory(path!, paths);
+                    if (item.Type == JTokenType.Null) continue;
+                    if (item.Type != JTokenType.String) throw new InvalidDataException("Path must be a string");
+                    var path = item.Value<string>();
+                    if (string.IsNullOrWhiteSpace(path)) continue;
+                    paths.Add(path!);
+                    if (Directory.Exists(path))
+                    {
+                        // Không đi theo symlink/junction. Thư mục đầu vào được chụp toàn bộ, kể cả file mới.
+                        AddDirectory(path!, paths);
+                    }
                 }
             }
             return Hash(revision.ToString(System.Globalization.CultureInfo.InvariantCulture)

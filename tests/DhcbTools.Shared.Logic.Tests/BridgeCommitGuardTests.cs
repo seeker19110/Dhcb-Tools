@@ -249,6 +249,30 @@ public sealed class BridgeCommitGuardTests : IDisposable
     }
 
     [Fact]
+    public void Path_lists_are_bound_per_file_and_blank_entries_ignored()
+    {
+        // Tái hiện lỗi chạy DHCB_DRAWING_COMBINE trong AutoCAD: mảng inputPaths từng ném "Path must be a string".
+        var a = Path.Combine(_root, "a.dwg");
+        var b = Path.Combine(_root, "b.dwg");
+        File.WriteAllText(a, "A");
+        File.WriteAllText(b, "B");
+        var list = new JArray(a, null, "  ", b);
+        Assert.NotNull(BridgeCommitGuard.CaptureInputSnapshot(new JObject { ["inputPaths"] = list }, 1));
+
+        var request = Approved(new JObject { ["inputPaths"] = new JArray(a, b) });
+        File.WriteAllText(b, "B2");
+        Assert.Contains("E-PREVIEW-CHANGED", Execute(request).Summary);
+        Assert.Equal(0, _writes);
+    }
+
+    [Fact]
+    public void Path_list_with_non_string_entry_is_rejected()
+    {
+        Assert.Throws<InvalidDataException>(() =>
+            BridgeCommitGuard.CaptureInputSnapshot(new JObject { ["inputPaths"] = new JArray("a.dwg", 3) }, 1));
+    }
+
+    [Fact]
     public void Folder_contents_and_membership_are_bound_recursively()
     {
         var folder = Path.Combine(_root, "families");
