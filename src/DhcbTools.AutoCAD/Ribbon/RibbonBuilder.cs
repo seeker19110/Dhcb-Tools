@@ -106,7 +106,9 @@ internal static class RibbonBuilder
             ("DHCB_XREF_AUDIT", "Kiểm kê Xref", "XR", RibbonIcons.Drawing,
                 "Liệt kê toàn bộ Xref của bản vẽ và tình trạng liên kết."),
             ("DHCB_DRAWING_COMPARE", "So sánh bản vẽ", "SS", RibbonIcons.Drawing,
-                "So layer giữa bản vẽ hiện tại và một file khác."));
+                "So layer giữa bản vẽ hiện tại và một file khác."),
+            ("DHCB_DRAWING_COMBINE", "Gộp nhiều bản vẽ", "GP", RibbonIcons.Drawing,
+                "Gộp các DWG trong một thư mục vào bản vẽ này: mỗi file thành một block, chép cả layout."));
 
         // ── Nối sang Revit / agent ──
         Panel(tab, "Revit & agent",
@@ -174,6 +176,7 @@ internal static class RibbonBuilder
             "DHCB_TEXT_REPLACE" => "TextReplace", "DHCB_LAYER_CHECK" => "LayerStandardCheck",
             "DHCB_GRID_EXTRACT" => "GridExtract", "DHCB_XREF_AUDIT" => "XrefAudit",
             "DHCB_LAYER_TRANSLATE" => "LayerTranslate", "DHCB_DRAWING_COMPARE" => "DrawingCompare",
+            "DHCB_DRAWING_COMBINE" => "DrawingCombine",
             "DHCB_BLOCK_QUANTITY" => "BlockQuantity", "DHCB_ATTR_INCREMENT" => "AttributeIncrement",
             "DHCB_LAYER_MAP" => "CadLayerMap", _ => null,
         };

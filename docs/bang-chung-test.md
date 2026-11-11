@@ -76,6 +76,7 @@
 - §71 — [Đối chiếu `relation` của `partOf` với IfcTester trên chính file IFC — 13/13 khớp sau khi sửa một chỗ báo nhầm (2026-09-07)](#71-đối-chiếu-relation-của-partof-với-ifctester-trên-chính-file-ifc-1313-khớp-sau-khi-sửa-một-chỗ-báo-nhầm-2026-09-07)
 - §72 — [Đường Revit của `partOf`/`relation` — không có lỗi "phần của tổ hợp" mà §71 vừa sửa ở đường IFC (2026-09-07)](#72-đường-revit-của-partofrelation-không-có-lỗi-phần-của-tổ-hợp-mà-71-vừa-sửa-ở-đường-ifc-2026-09-07)
 - §73 — [`AsBuiltStamp` — dấu bản vẽ hoàn công (Phụ lục IIb, NĐ 207/2026/NĐ-CP) chạy thật lần đầu, khép mục 11.6 (2026-09-07)](#73-asbuiltstamp-dấu-bản-vẽ-hoàn-công-phụ-lục-iib-nđ-2072026nđ-cp-chạy-thật-lần-đầu-khép-mục-116-2026-09-07)
+- §74 — [Hai tính năng học từ GRAVITY TOOL — `DrawingCombine` (AutoCAD) chạy thật, `ElementRename` (Revit) chưa chạy thật (2026-11-12)](#74-hai-tính-năng-học-từ-gravity-tool-drawingcombine-autocad-chạy-thật-elementrename-revit-chưa-chạy-thật-2026-11-12)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
@@ -3742,3 +3743,54 @@ trượt / 1 bỏ qua trên 44 ca**. Toàn bộ `revit-write`: **19 đạt / 0 t
   `chiHuyTruongHoacGiamDocDuAn`/`chiHuyTruongNhaThauChinh` chưa hỗ trợ ghi cứng vào tham số dự án (mới điền
   vào chính khuôn dấu trên sheet) — DHCB không giữ "ai đã ký" như một dữ liệu có cấu trúc riêng, đúng ranh
   giới "doanh nghiệp chịu trách nhiệm nội dung" đã đặt từ đầu mục 11.6.
+
+## 74. Hai tính năng học từ GRAVITY TOOL — `DrawingCombine` (AutoCAD) chạy thật, `ElementRename` (Revit) chưa chạy thật (2026-11-12)
+
+Phân tích bộ add-in GRAVITY TOOL 1.0.0 cài trên máy (chỉ đọc metadata .NET, không dịch ngược mã), đối chiếu
+với danh mục DHCB rồi lấy hai khoảng trống hợp với kiến trúc "xem trước rồi mới ghi":
+
+- **`DrawingCombine`** (AutoCAD, `DHCB_DRAWING_COMBINE`): gộp nhiều DWG vào bản vẽ hiện tại như lệnh
+  `GRAVITY_COMBINE_LAYOUT`. Khác Gravity: Model Space mỗi file thành **một block** mang tên file (xoá/dời/EXPLODE
+  cả bản dễ), quy đổi đơn vị theo INSUNITS như `INSERT`, viewport của layout chép theo được dời và phóng cùng
+  block nên vẫn nhìn đúng vùng hình với cùng tỉ lệ in; xem trước mặc định.
+- **`ElementRename`** (Revit): đổi tên hàng loạt view template, filter, type (gồm loại ống/ống gió — việc
+  `RenameDuctPipe`/`RenameFilters`/`RenameViewTemplate` của Gravity làm thành nhiều lệnh), material. Chống trùng
+  theo phạm vi (type theo family, template theo loại view, tính cả view thường cùng loại), hoán đổi tên đi qua
+  tên tạm, Types bắt buộc lọc `categories`/`nameContains`.
+
+### AutoCAD 2026.1 thật (accoreconsole)
+
+| Lượt | Kết quả |
+|---|---|
+| `autocad-smoke` | **20 đạt / 0 trượt** trên 20 ca — 2 ca mới: xem trước gộp fixture `tuyen-ong.dwg` (bỏ đúng chính bản vẽ đang mở và file không tồn tại, không phát sự kiện ghi), báo lỗi khi không còn file nào |
+| `autocad-write` | **13 đạt / 0 trượt** trên 13 ca — ca mới "Gộp DWG ghi thật": `Đã gộp 1/1 bản vẽ thành block (Row), chép 1/1 layout` |
+| Batch tay: 4 file Manufacturing + Sheet1 vào bản sao `Floor Plan Sample.dwg` | 5/5 block, 5/5 layout; hai file trùng tên ở hai thư mục ra `VW252-02-0142` và `VW252-02-0142-2` |
+| Đối chiếu viewport bằng LISP (DXF 12/17/45) | Sheet1 (inch) vào bản vẽ inch: target dời đúng tới điểm chèn `(3986.17, 736)`, tâm/chiều cao giữ nguyên. Sheet1 vào bản vẽ **mm**: block ×25,4; tâm `(6; 4,5)` → `(152,4; 114,3)`, chiều cao `9,2701` → `235,46` — tỉ lệ in không đổi. `CTAB` trước/sau giữ nguyên |
+
+Hai lỗi lộ ra khi chạy thật, đã sửa trước khi viết ca kiểm:
+1. Duyệt `DBDictionary` bằng `foreach (var …)` trên .NET 10 ra `DictionaryEntry` → `InvalidCastException`; nay khai
+   kiểu `DBDictionaryEntry` tường minh.
+2. Bản đầu chèn 1:1 khi khác đơn vị — bản vẽ mm gộp vào bản vẽ inch to gấp 25,4 lần. Nay quy đổi như `INSERT`
+   (một bên không khai INSUNITS thì giữ 1:1 và báo).
+
+### Revit
+
+Máy **không còn Revit** (đã gỡ; `run-in-revit-tests.ps1` báo không tìm thấy model mẫu), nên `ElementRename` mới
+qua build add-in Revit 2026 (0 lỗi/0 cảnh báo), ma trận build và test thuần. Ca kiểm đã viết sẵn chờ máy có Revit:
+`revit-smoke` (xem trước đổi tên view template; kind lạ và Types không lọc phải báo lỗi) và `revit-write-plumbing`
+(thêm tiền tố `DHCB~` cho mọi loại ống → trả lại bằng find `^DHCB~` → lượt kiểm phải báo "Không có type nào khớp").
+
+### Kiểm thử thuần
+
+- `DrawingCombinePlannerTests` (tên block/layout hợp lệ, không trùng, cắt độ dài; danh sách nguồn gộp tay +
+  thư mục, bỏ trùng, bỏ bản vẽ đích một lần; quy đổi đơn vị; xếp hàng không chồng) và `RenamePlannerTests`
+  (chống trùng theo phạm vi, đếm lại mỗi phạm vi, regex hỏng, phát hiện hoán đổi).
+- Shared.Logic: **2282 đạt / 0 trượt**, phủ 100% dòng. Python: 340/341 đạt, phủ 2822/2822 câu lệnh — ca trượt
+  `test_installer` trượt cả trên `main` trước thay đổi (installer trả mã 7 trên máy này), CI không báo.
+
+### Còn mở
+
+- `ElementRename` chưa chạy trong Revit thật — chạy `revit-smoke` + `revit-write-plumbing` khi có máy cài Revit.
+- `DrawingCombine` chưa chạy trong AutoCAD GUI (mới accoreconsole); layout chưa từng mở ở file nguồn có thể
+  không có danh sách viewport — khi đó viewport đầu tiên gặp được coi là viewport tổng.
+- Nhóm nối ống kiểu `1Y3E`/refnet VRV của Gravity chưa làm — cần Revit thật để kiểm hình học.

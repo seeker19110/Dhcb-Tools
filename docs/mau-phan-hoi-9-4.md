@@ -28,7 +28,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 
 ---
 
-## Revit — 53 lệnh
+## Revit — 54 lệnh
 
 | Lệnh | Việc nó làm | Tuần | Bỏ | Chưa | Nếu bỏ: vì sao |
 |---|---|:--:|:--:|:--:|---|
@@ -69,6 +69,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 | `StylePurge` | Liệt kê và xoá style không được tham chiếu | ☐ | ☐ | ☐ | |
 | `ColorByParameter` | Tô màu phần tử theo giá trị tham số + chú giải CSV | ☐ | ☐ | ☐ | |
 | `FamilyAudit` | Kiểm kê family/type ra CSV; đổi tên theo mẫu | ☐ | ☐ | ☐ | |
+| `ElementRename` | Đổi tên hàng loạt view template, filter, type (ống, ống gió…), material | ☐ | ☐ | ☐ | |
 | `WarningsExport` | Xuất warning ra CSV kèm ElementId/category, đếm theo loại | ☐ | ☐ | ☐ | |
 | `SlopePipes` | Đặt hoặc kiểm tra dốc ống thoát nước theo % hoặc bảng DN | ☐ | ☐ | ☐ | |
 | `PipeKick` | Kick/jog một ống bằng hai cút 45° hoặc 90° | ☐ | ☐ | ☐ | |
@@ -86,7 +87,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 | `SpecToConfig` | AI offline: trích tầng/cao độ/hệ từ thuyết minh → config | ☐ | ☐ | ☐ | |
 | `DictionaryLearn` | AI offline: soi tên tham số thật của dự án → dictionary.json | ☐ | ☐ | ☐ | |
 
-## AutoCAD — 15 lệnh
+## AutoCAD — 16 lệnh
 
 | Lệnh | Việc nó làm | Tuần | Bỏ | Chưa | Nếu bỏ: vì sao |
 |---|---|:--:|:--:|:--:|---|
@@ -102,6 +103,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 | `XrefAudit` | Liệt kê xref, đường dẫn thiếu, xref chưa load | ☐ | ☐ | ☐ | |
 | `LayerTranslate` | Map layer cũ → layer chuẩn theo CSV (như LAYTRANS) | ☐ | ☐ | ☐ | |
 | `DrawingCompare` | So bản vẽ với DWG khác ở mức layer → CSV/HTML | ☐ | ☐ | ☐ | |
+| `DrawingCombine` | Gộp nhiều DWG vào bản vẽ hiện tại: mỗi file một block, chép layout | ☐ | ☐ | ☐ | |
 | `BlockQuantity` | Đếm block theo tên (nhóm theo attribute) → CSV BOM | ☐ | ☐ | ☐ | |
 | `AttributeIncrement` | Gán attribute tăng dần theo mẫu {n:000} theo vị trí | ☐ | ☐ | ☐ | |
 | `CadLayerMap` | AI offline: gợi ý map layer → Revit type từ danh sách type | ☐ | ☐ | ☐ | |

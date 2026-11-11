@@ -157,7 +157,9 @@ public sealed class App : IExternalApplication
             ("DhcbStylePurge", "Dọn style", "StylePurgeRibbonCommand",
                 "Xoá text style, dimension style, line pattern không dùng."),
             ("DhcbFamilyAudit", "Kiểm kê family", "FamilyAuditRibbonCommand",
-                "Rà soát family: trùng lặp, nặng, in-place, không dùng."));
+                "Rà soát family: trùng lặp, nặng, in-place, không dùng."),
+            ("DhcbElementRename", "Đổi tên hàng loạt", "ElementRenameRibbonCommand",
+                "Đổi tên view template, filter, type (ống, ống gió…) hoặc material theo mẫu, có xem trước."));
 
         // ── Panel 6: Kiểm tra & AI ────────────────────────────────
         var checks = application.CreateRibbonPanel(TabName, "Kiểm tra & AI");
@@ -364,6 +366,7 @@ public sealed class App : IExternalApplication
             => RibbonIcons.Init,
         "DhcbSheetTools" or "DhcbSheetRename" or "DhcbRevisionOnSheets" or "DhcbViewportCopy" or "DhcbSheetIndex"
             or "DhcbAsBuiltStamp" or "DhcbColorByParameter" or "DhcbStyleTools" or "DhcbStylePurge" or "DhcbFamilyAudit"
+            or "DhcbElementRename"
             => RibbonIcons.Sheets,
         "DhcbFamilyStarter" => RibbonIcons.Mepf,
         "DhcbFamilyUpgrade" => RibbonIcons.Mepf,

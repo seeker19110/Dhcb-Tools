@@ -33,6 +33,7 @@ namespace DhcbTools.AutoCAD.Commands;
 ///   DHCB_XREF_AUDIT         ↔ XrefAudit
 ///   DHCB_LAYER_TRANSLATE    ↔ LayerTranslate
 ///   DHCB_DRAWING_COMPARE    ↔ DrawingCompare
+///   DHCB_DRAWING_COMBINE    ↔ DrawingCombine
 ///   DHCB_BLOCK_QUANTITY     ↔ BlockQuantity
 ///   DHCB_ATTR_INCREMENT     ↔ AttributeIncrement
 ///   DHCB_LAYER_MAP          ↔ CadLayerMap
@@ -484,6 +485,51 @@ public sealed class DhcbCommands
         };
 
         var command = new DrawingCompareCommand();
+        var result = ExecuteWithPreview(doc, command.CommandName, config);
+
+        PrintResult(ed, result);
+    }
+
+    // ──────────────────────────────────────────────
+    // Lệnh 12b: Gộp nhiều DWG (Model Space → block, kèm layout)
+    // ──────────────────────────────────────────────
+    [CommandMethod("DHCB_DRAWING_COMBINE", CommandFlags.Modal)]
+    public void DrawingCombine() => Run("DHCB_DRAWING_COMBINE", DrawingCombineCore);
+
+    private static void DrawingCombineCore()
+    {
+        var doc = Application.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+
+        var ed = doc.Editor;
+
+        var folderOpt = new PromptStringOptions("\nThư mục chứa các DWG cần gộp (lấy mọi *.dwg, không đệ quy): ") { AllowSpaces = true };
+        var folderResult = ed.GetString(folderOpt);
+        if (folderResult.Status != PromptStatus.OK || string.IsNullOrWhiteSpace(folderResult.StringResult)) return;
+
+        var arrangeOpt = new PromptKeywordOptions("\nCách đặt [Row/Original] <Row>: ");
+        arrangeOpt.Keywords.Add("Row");
+        arrangeOpt.Keywords.Add("Original");
+        arrangeOpt.AllowNone = true;
+        var arrangeResult = ed.GetKeywords(arrangeOpt);
+        var arrangement = arrangeResult.Status == PromptStatus.OK && arrangeResult.StringResult == "Original" ? "Original" : "Row";
+
+        var layoutOpt = new PromptKeywordOptions("\nChép cả layout của từng file? [Co/Khong] <Co>: ");
+        layoutOpt.Keywords.Add("Co");
+        layoutOpt.Keywords.Add("Khong");
+        layoutOpt.AllowNone = true;
+        var layoutResult = ed.GetKeywords(layoutOpt);
+        var includeLayouts = !(layoutResult.Status == PromptStatus.OK && layoutResult.StringResult == "Khong");
+
+        var config = new DrawingCombineConfig
+        {
+            InputFolder = folderResult.StringResult.Trim().Trim('"'),
+            Arrangement = arrangement,
+            IncludeLayouts = includeLayouts,
+            DryRun = AskDryRun(ed),
+        };
+
+        var command = new DrawingCombineCommand();
         var result = ExecuteWithPreview(doc, command.CommandName, config);
 
         PrintResult(ed, result);

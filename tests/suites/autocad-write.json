@@ -226,6 +226,32 @@
         ]
       },
       "allowWrite": true
+    },
+    {
+      "name": "Gộp DWG ghi thật — block + layout của file nguồn",
+      "command": "DrawingCombine",
+      "config": {
+        "inputPaths": [
+          "{suiteFolder}/fixtures/tuyen-ong.dwg"
+        ],
+        "gapMm": 5000,
+        "dryRun": false
+      },
+      "//": "Chay tren ban chep. Block tuyen-ong chua co trong ban mau nen phai gop du 1/1.",
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 1,
+        "maxMs": 120000,
+        "noErrors": true,
+        "summaryContains": [
+          "Đã gộp 1/1 bản vẽ"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
     }
   ]
 }

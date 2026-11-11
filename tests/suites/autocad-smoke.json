@@ -299,6 +299,50 @@
           "Exception"
         ]
       }
+    },
+    {
+      "name": "Xem trước gộp DWG — bỏ chính bản vẽ đang mở và file không có",
+      "command": "DrawingCombine",
+      "config": {
+        "inputPaths": [
+          "{suiteFolder}/fixtures/tuyen-ong.dwg",
+          "{sourceFile}",
+          "{suiteFolder}/fixtures/khong-co.dwg"
+        ],
+        "dryRun": true
+      },
+      "//": "Xem truoc chi doc file nguon; ban ve dang mo khong duoc doi (maxChangeEvents 0).",
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxChangeEvents": 0,
+        "maxMs": 60000,
+        "summaryContains": [
+          "Xem trước: gộp 1 bản vẽ"
+        ],
+        "messagesContain": [
+          "block \"tuyen-ong\"",
+          "là chính bản vẽ đang gộp vào",
+          "không tìm thấy file"
+        ]
+      }
+    },
+    {
+      "name": "Báo lỗi rõ khi không có DWG nào để gộp",
+      "command": "DrawingCombine",
+      "config": {
+        "inputPaths": [
+          "{sourceFile}"
+        ],
+        "dryRun": true
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "Không có file DWG nào để gộp"
+        ],
+        "maxMs": 30000
+      }
     }
   ]
 }

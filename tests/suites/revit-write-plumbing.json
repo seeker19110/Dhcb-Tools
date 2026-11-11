@@ -95,6 +95,81 @@
         "success": true,
         "summaryContains": ["Kiểm 1 ống: 0 chưa đạt dốc"]
       }
+    },
+    {
+      "name": "Đổi tên loại ống — GHI THẬT thêm tiền tố",
+      "command": "ElementRename",
+      "config": {
+        "kind": "Types",
+        "categories": [
+          "Pipes"
+        ],
+        "namePattern": "DHCB~{Name}",
+        "dryRun": false
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 1,
+        "maxMs": 60000,
+        "noErrors": true,
+        "summaryContains": [
+          "Đã đổi tên"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "Trả tên loại ống về như cũ — GHI THẬT",
+      "command": "ElementRename",
+      "config": {
+        "kind": "Types",
+        "categories": [
+          "Pipes"
+        ],
+        "nameContains": "DHCB~",
+        "find": "^DHCB~",
+        "replace": "",
+        "dryRun": false
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 1,
+        "maxMs": 60000,
+        "noErrors": true,
+        "summaryContains": [
+          "Đã đổi tên"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      },
+      "allowWrite": true
+    },
+    {
+      "name": "Kiểm lại — không còn loại ống nào mang tiền tố",
+      "command": "ElementRename",
+      "config": {
+        "kind": "Types",
+        "categories": [
+          "Pipes"
+        ],
+        "nameContains": "DHCB~",
+        "find": "^DHCB~",
+        "replace": ""
+      },
+      "//": "Bao loi 'khong co type nao khop' la bang chung buoc tra ten DA GHI THAT.",
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "Không có type nào khớp bộ lọc"
+        ],
+        "maxMs": 30000
+      }
     }
   ]
 }

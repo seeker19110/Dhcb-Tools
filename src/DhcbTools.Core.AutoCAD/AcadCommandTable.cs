@@ -47,6 +47,7 @@ public static class AcadCommandTable
                 "XREFAUDIT" => new XrefAuditCommand().Execute(db, Deserialize<XrefAuditConfig>(configJson)),
                 "LAYERTRANSLATE" => new LayerTranslateCommand().Execute(db, Deserialize<LayerTranslateConfig>(configJson)),
                 "DRAWINGCOMPARE" => new DrawingCompareCommand().Execute(db, Deserialize<DrawingCompareConfig>(configJson)),
+                "DRAWINGCOMBINE" => new DrawingCombineCommand().Execute(db, Deserialize<DrawingCombineConfig>(configJson)),
                 "BLOCKQUANTITY" => new BlockQuantityCommand().Execute(db, Deserialize<BlockQuantityConfig>(configJson)),
                 "ATTRIBUTEINCREMENT" => new AttributeIncrementCommand().Execute(db, Deserialize<AttributeIncrementConfig>(configJson)),
                 "CADLAYERMAP" => new CadLayerMapCommand().Execute(db, Deserialize<CadLayerMapConfig>(configJson)),
