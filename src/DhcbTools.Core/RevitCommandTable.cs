@@ -80,6 +80,7 @@ public static class RevitCommandTable
                 "STYLEPURGE" => new StylePurgeCommand().Execute(doc, Deserialize<StylePurgeConfig>(configJson)),
                 "COLORBYPARAMETER" => new ColorByParameterCommand().Execute(doc, Deserialize<ColorByParameterConfig>(configJson)),
                 "FAMILYAUDIT" => new FamilyAuditCommand().Execute(doc, Deserialize<FamilyAuditConfig>(configJson)),
+                "ELEMENTRENAME" => new ElementRenameCommand().Execute(doc, Deserialize<ElementRenameConfig>(configJson)),
 
                 "SLOPEPIPES" => new SlopePipesCommand().Execute(doc, Deserialize<SlopePipesConfig>(configJson)),
                 "PIPEKICK" => new PipeKickCommand().Execute(doc, Deserialize<PipeKickConfig>(configJson)),

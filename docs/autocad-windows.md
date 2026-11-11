@@ -8,7 +8,7 @@ AutoCAD Core Console là chương trình Windows riêng cho batch; vẫn dùng v
 Gõ **`DHCB_TOOLS`** hoặc chọn **Bảng công cụ** trên Ribbon. Các nút nghiệp vụ trên Ribbon mở đúng form
 qua `DHCB_FORM`; các lệnh gõ tay cũ vẫn có luồng command line cho script.
 
-- Tìm 15 công cụ theo tên, bí danh hoặc tiếng Việt có/không dấu.
+- Tìm 16 công cụ theo tên, bí danh hoặc tiếng Việt có/không dấu.
 - Chỉnh đầy đủ thuộc tính config: số bắt đầu, bước nhảy, số chữ số, hướng đánh số, dung sai gom hàng,
   tùy chọn dọn bản vẽ, lọc text và phạm vi xử lý. Editor lấy đúng kiểu và mặc định từ config Core.
 - Chọn file bằng hộp thoại Windows; cấu hình hợp lệ được nhớ theo lệnh tại `%APPDATA%\DHCB\configs\autocad`.

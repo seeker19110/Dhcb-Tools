@@ -136,7 +136,7 @@ Ribbon/dòng lệnh, HTTP Bridge, batch runner, lớp AI. Danh mục đầy đ�
 | Kiểm tra | `ParameterRuleCheck`, `ClashDetection` (+ `clash-accepted.json`), `ConnectorChecker`, `IdsValidate` (IDS 1.0 buildingSMART, [`docs/kiem-ids.md`](docs/kiem-ids.md)) | `LayerStandardCheck`, `TextReplace` |
 | Dự án & hồ sơ | `ProjectFromTemplate`, `TransferStandards`, `LevelSetup`, `GridSetup`, `GridFromCsv`, `FamilyLoader`, `ProjectInfo`, `SheetBatchCreate`, `CadLink` (link DWG/DXF vào view của một tầng) | `GridExtract` (layer AXIS → CSV cho `GridFromCsv`) |
 | MEPF | `FamilyStarter` (family mẫu sleeve/hanger), `FamilyUpgrade` (nâng cấp .rfa hàng loạt theo phiên bản Revit), `SleeveAuto`, `ElevationTag`, `HangerAuto`, `PipeSplitter`, `ModelLinesFromCad` (CAD đã link → model line), `RouteFromLines`, `DevicePlacement`, `SizingProposal` / `ApplySizing`, `SystemColor`, `SystemName` | — |
-| Hồ sơ & style (giai đoạn 7) | `SheetRename`, `RevisionOnSheets`, `SheetIndex`, `StylePurge`, `ColorByParameter`, `FamilyAudit`, `WarningsExport`, `ScheduleExport`, `ViewportCopy` | `LayerTranslate`, `DrawingCompare`, `BlockQuantity`, `AttributeIncrement` |
+| Hồ sơ & style (giai đoạn 7) | `SheetRename`, `RevisionOnSheets`, `SheetIndex`, `StylePurge`, `ColorByParameter`, `FamilyAudit`, `ElementRename` (đổi tên hàng loạt view template, filter, type, material), `WarningsExport`, `ScheduleExport`, `ViewportCopy` | `LayerTranslate`, `DrawingCompare`, `DrawingCombine` (gộp nhiều DWG: Model Space thành block, chép layout), `BlockQuantity`, `AttributeIncrement` |
 | MEPF nâng cao (P2) | `SlopePipes`, `PipeKick`, `SystemBom`, `AutoRoute` (mức C → mức A) | — |
 | Thi công & hoàn công | `ConstructionStatus`, `ProgressReport` (tiến độ theo tầng/hệ, % theo số lượng và chiều dài, [`docs/tien-do-thi-cong.md`](docs/tien-do-thi-cong.md)), `AsBuiltStamp` (dấu bản vẽ hoàn công theo Phụ lục IIb NĐ 207/2026/NĐ-CP) | — |
 | AI offline | `CadLayerMap`, `SpecToConfig`, `DictionaryLearn`, nút *Ra lệnh tiếng Việt* | `CadLayerMap` (`DHCB_LAYER_MAP`); ra lệnh tiếng Việt qua Bridge `POST /chat` |
@@ -144,7 +144,7 @@ Ribbon/dòng lệnh, HTTP Bridge, batch runner, lớp AI. Danh mục đầy đ�
 Lệnh AutoCAD trên dòng lệnh — đúng các `[CommandMethod]` có trong `src/DhcbTools.AutoCAD`:
 `DHCB_LAYER_EXPORT`, `DHCB_LAYER_IMPORT`, `DHCB_CLEANUP`, `DHCB_AUTONUMBER`, `DHCB_ATTR_EXPORT`,
 `DHCB_ATTR_IMPORT`, `DHCB_ATTR_INCREMENT`, `DHCB_TEXT_REPLACE`, `DHCB_LAYER_CHECK`, `DHCB_LAYER_MAP`,
-`DHCB_LAYER_TRANSLATE`, `DHCB_GRID_EXTRACT`, `DHCB_XREF_AUDIT`, `DHCB_DRAWING_COMPARE`,
+`DHCB_LAYER_TRANSLATE`, `DHCB_GRID_EXTRACT`, `DHCB_XREF_AUDIT`, `DHCB_DRAWING_COMPARE`, `DHCB_DRAWING_COMBINE`,
 `DHCB_BLOCK_QUANTITY`, `DHCB_BRIDGE` (bật/tắt HTTP Bridge).
 `DHCB_RUN` (batch qua accoreconsole) nằm ở vỏ **core-only** `DhcbTools.AutoCAD.Core`, không có trong vỏ đầy đủ.
 

@@ -298,6 +298,15 @@ public sealed class FamilyAuditRibbonCommand : IExternalCommand
         => CommandRunner.Run(commandData, "FamilyAudit");
 }
 
+/// <summary>Đổi tên hàng loạt view template, filter, type hoặc material theo mẫu.</summary>
+[Transaction(TransactionMode.Manual)]
+[Regeneration(RegenerationOption.Manual)]
+public sealed class ElementRenameRibbonCommand : IExternalCommand
+{
+    public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        => CommandRunner.Run(commandData, "ElementRename");
+}
+
 /// <summary>Copy bố trí viewport từ sheet mẫu sang các sheet khác.</summary>
 [Transaction(TransactionMode.Manual)]
 [Regeneration(RegenerationOption.Manual)]

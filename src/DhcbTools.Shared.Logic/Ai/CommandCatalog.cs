@@ -287,6 +287,14 @@ namespace DhcbTools.Shared.Logic.Ai
             new CommandDescriptor("FamilyAudit", Revit, "Kiểm kê family/type (instance, in-place, không dùng) ra CSV; đổi tên theo mẫu", true, "FamilyReviser")
                 .Field("outputPath", "CSV kiểm kê").Field("renamePattern", "mẫu tên family, ví dụ DHCB_{Category:upper}_{Name}").Field("categories", "lọc").Field("dryRun", "xem trước")
                 .Words("kiểm kê family", "đổi tên family", "family audit", "family reviser", "family không dùng"),
+            new CommandDescriptor("ElementRename", Revit, "Đổi tên hàng loạt view template, filter, type (ống, ống gió, máng cáp…) hoặc material theo mẫu + tìm/thay, chống trùng", true, "RenameTypes", "RenameTemplates", "RenameFilters", "RenameMaterials")
+                .Field("kind", "ViewTemplates | Filters | Types | Materials", FieldKind.Text)
+                .Field("namePattern", "mẫu tên, token {Name} {Category} {Family} {ViewType} {n:00}")
+                .Field("find", "chuỗi/regex tìm").Field("replace", "thay bằng").Field("findIsRegex", "find là regex", FieldKind.Bool)
+                .Field("nameContains", "chỉ đổi phần tử có tên chứa chuỗi này")
+                .Field("categories", "chỉ với Types: category, ví dụ Pipes; Ducts", FieldKind.TextList)
+                .Field("counterStart", "số bắt đầu của {n}", FieldKind.Number).Field("dryRun", "xem trước")
+                .Words("đổi tên type", "đổi tên view template", "đổi tên filter", "đổi tên vật liệu", "đổi tên loại ống", "đổi tên ống gió", "rename type", "rename filter"),
             new CommandDescriptor("WarningsExport", Revit, "Xuất toàn bộ warning ra CSV kèm ElementId/category, đếm theo loại", false, "ExportWarnings")
                 .Field("outputPath", "file CSV")
                 .Words("xuất warning", "danh sách warning", "warning csv", "review warnings").Endorsed(),
@@ -463,6 +471,12 @@ namespace DhcbTools.Shared.Logic.Ai
             new CommandDescriptor("DrawingCompare", AutoCad, "So bản vẽ hiện tại với DWG khác ở mức layer (đếm entity theo layer) → CSV/HTML", false, "Compare")
                 .Field("otherPath", "DWG so sánh").Field("outputPath", "CSV hoặc HTML").Field("moveToleranceMm", "dung sai dời")
                 .Words("so sánh bản vẽ", "drawing compare", "khác nhau giữa hai bản"),
+            new CommandDescriptor("DrawingCombine", AutoCad, "Gộp nhiều DWG vào bản vẽ hiện tại: Model Space mỗi file thành block, chép cả layout", true, "CombineDwg", "MergeDwg")
+                .Field("inputPaths", "danh sách file DWG", FieldKind.TextList).Field("inputFolder", "thư mục chứa DWG (lấy mọi *.dwg, không đệ quy)")
+                .Field("arrangement", "Row = xếp hàng ngang bên phải nội dung hiện có; Original = giữ toạ độ gốc", FieldKind.Text)
+                .Field("gapMm", "khoảng cách giữa các bản khi xếp hàng, mm").Field("includeLayouts", "chép cả layout thành tab mới", FieldKind.Bool)
+                .Field("dryRun", "xem trước")
+                .Words("gộp bản vẽ", "gộp dwg", "gộp file cad", "combine dwg", "merge dwg", "gộp layout"),
             new CommandDescriptor("BlockQuantity", AutoCad, "Đếm block theo tên (và nhóm theo attribute) → CSV BOM", false, "BlockCount", "Bom")
                 .Field("outputPath", "file CSV").Field("groupByAttribute", "tag attribute để nhóm").Field("blockNameContains", "lọc")
                 .Words("đếm block", "thống kê block", "bom block", "block quantity").Endorsed(),

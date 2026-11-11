@@ -6,7 +6,7 @@ Chạy Windows PowerShell 5.1 hoặc 7, .NET SDK 10 và Windows Desktop Runtime 
 .\tools\ui-acceptance\run-ui.ps1
 ```
 
-Bộ kiểm dựng các control WPF thật cho cả 15 công cụ, kiểm xem trước/ghi một lần, đổi cấu hình,
+Bộ kiểm dựng các control WPF thật cho cả 16 công cụ, kiểm xem trước/ghi một lần, đổi cấu hình,
 đổi revision/document, file đầu vào đổi nội dung dù giữ mtime/kích thước, số không hợp lệ,
 dấu phẩy thập phân trên locale tiếng Việt, tìm không dấu và lưu/khôi phục cấu hình.
 `workspace.png` render giao diện bằng WPF trên Windows; `ui.json` chứa kết quả từng ca.

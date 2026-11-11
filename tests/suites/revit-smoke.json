@@ -854,6 +854,56 @@
       "expect": {
         "maxMs": 30000
       }
+    },
+    {
+      "name": "Xem trước đổi tên view template theo mẫu",
+      "command": "ElementRename",
+      "config": {
+        "kind": "ViewTemplates",
+        "namePattern": "DHCB - {Name}"
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxChangeEvents": 0,
+        "maxMs": 30000,
+        "summaryContains": [
+          "Xem trước",
+          "view template"
+        ]
+      }
+    },
+    {
+      "name": "Báo lỗi rõ khi kind không hỗ trợ",
+      "command": "ElementRename",
+      "config": {
+        "kind": "Families",
+        "namePattern": "X-{Name}"
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "ViewTemplates, Filters, Types, Materials"
+        ],
+        "maxMs": 10000
+      }
+    },
+    {
+      "name": "Báo lỗi rõ khi đổi tên Types không có bộ lọc",
+      "command": "ElementRename",
+      "config": {
+        "kind": "Types",
+        "find": "a",
+        "replace": "b"
+      },
+      "//": "Khong loc thi se dung toi hang nghin type he thong — phai chan, khong duoc xem truoc tran lan.",
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "categories hoặc nameContains"
+        ],
+        "maxMs": 10000
+      }
     }
   ]
 }

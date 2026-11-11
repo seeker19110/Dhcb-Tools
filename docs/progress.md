@@ -34,7 +34,7 @@
 > DLL đã cài đạt **105/105 ca AutoCAD và 5 tình huống PDF**, doctor 0 lỗi; 132 file trạng thái
 > và một task đêm được giữ nguyên. [Bằng chứng và giới hạn](bang-chung/2026-10-08/trien-khai.md).
 > Máy triển khai hiện tại không có Revit.exe; các mô tả máy có Revit và số lệnh ở những vòng trước
-> là bằng chứng lịch sử. Danh mục hiện có 53 lệnh Revit và 15 lệnh AutoCAD công khai;
+> là bằng chứng lịch sử. Danh mục hiện có 54 lệnh Revit và 16 lệnh AutoCAD công khai;
 > `UsageReport`/`RunTests` là công cụ nội bộ.
 
 > Lượt nâng chất lượng 2026-10-07: [kế hoạch, thay đổi và kiểm chứng](ke-hoach-chat-luong-2026-10-07.md).
@@ -174,14 +174,14 @@ HttpBridgeServer, BridgeTokenStore, AuthLockout, BridgeWorkItem) ← `Core` (Rev
 ProjectInfo, LevelSetup, GridSetup, FamilyLoader, FamilyStarter, FamilyUpgrade, SleeveAuto, ElevationTag, HangerAuto, PipeSplitter, ConnectorChecker,
 RouteFromLines, DevicePlacement, SizingProposal, ApplySizing, SystemColor, SystemName, FlowNumbering,
 ProjectFromTemplate, TransferStandards, GridFromCsv, SheetBatchCreate, **SheetRename, RevisionOnSheets, StylePurge,
-ColorByParameter, FamilyAudit, WarningsExport**, **SlopePipes, PipeKick, SystemBom, AutoRoute, ScheduleExport, ViewportCopy** (P2),
+ColorByParameter, FamilyAudit, WarningsExport, ElementRename**, **SlopePipes, PipeKick, SystemBom, AutoRoute, ScheduleExport, ViewportCopy** (P2),
 ParameterRuleCheck (+ thresholds), ClashDetection, CadLayerMap, SpecToConfig.
 
-**AutoCAD (15):** LayerExport, LayerImport, DrawingCleanup, AutoNumbering, AttributeExport, AttributeImport,
-TextReplace, LayerStandardCheck, GridExtract, XrefAudit, LayerTranslate, DrawingCompare, BlockQuantity,
+**AutoCAD (16):** LayerExport, LayerImport, DrawingCleanup, AutoNumbering, AttributeExport, AttributeImport,
+TextReplace, LayerStandardCheck, GridExtract, XrefAudit, LayerTranslate, DrawingCompare, DrawingCombine, BlockQuantity,
 AttributeIncrement, CadLayerMap. Lệnh dòng lệnh: `DHCB_LAYER_EXPORT`, `DHCB_LAYER_IMPORT`, `DHCB_CLEANUP`,
 `DHCB_AUTONUMBER`, `DHCB_ATTR_EXPORT`, `DHCB_ATTR_IMPORT`, `DHCB_TEXT_REPLACE`, `DHCB_LAYER_CHECK`,
-`DHCB_GRID_EXTRACT`, `DHCB_XREF_AUDIT`, `DHCB_LAYER_TRANSLATE`, `DHCB_DRAWING_COMPARE`, `DHCB_BLOCK_QUANTITY`,
+`DHCB_GRID_EXTRACT`, `DHCB_XREF_AUDIT`, `DHCB_LAYER_TRANSLATE`, `DHCB_DRAWING_COMPARE`, `DHCB_DRAWING_COMBINE`, `DHCB_BLOCK_QUANTITY`,
 `DHCB_ATTR_INCREMENT`, `DHCB_LAYER_MAP`. Vỏ `DhcbTools.AutoCAD.Core` chỉ có `DHCB_RUN` — dùng cho accoreconsole.
 Xem [Lệnh AutoCAD — nay đã đủ 15 lệnh có mã nguồn](#lệnh-autocad--nay-đã-đủ-15-lệnh-có-mã-nguồn) cho các đơn
 giản hoá so với đặc tả gốc.
