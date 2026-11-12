@@ -40,6 +40,12 @@ public class EntityLayerAssignPlannerTests
     }
 
     [Fact]
+    public void Null_NemArgumentNull()
+    {
+        Assert.Throws<ArgumentNullException>(() => EntityLayerAssignPlanner.Plan(null!));
+    }
+
+    [Fact]
     public void ThieuLayer_BoQuaVaNoiRa()
     {
         var plan = Plan("2A81,");
