@@ -78,6 +78,7 @@
 - §73 — [`AsBuiltStamp` — dấu bản vẽ hoàn công (Phụ lục IIb, NĐ 207/2026/NĐ-CP) chạy thật lần đầu, khép mục 11.6 (2026-09-07)](#73-asbuiltstamp-dấu-bản-vẽ-hoàn-công-phụ-lục-iib-nđ-2072026nđ-cp-chạy-thật-lần-đầu-khép-mục-116-2026-09-07)
 - §74 — [Hai tính năng học từ GRAVITY TOOL — `DrawingCombine` (AutoCAD) chạy thật, `ElementRename` (Revit) chưa chạy thật (2026-11-12)](#74-hai-tính-năng-học-từ-gravity-tool-drawingcombine-autocad-chạy-thật-elementrename-revit-chưa-chạy-thật-2026-11-12)
 - §75 — [`DrawingCombine` trong AutoCAD GUI thật — hai lỗi accoreconsole không lộ ra, đã sửa (2026-11-12)](#75-drawingcombine-trong-autocad-gui-thật-hai-lỗi-accoreconsole-không-lộ-ra-đã-sửa-2026-11-12)
+- §76 — [MCP AutoCAD đọc DWG ngầm bằng accoreconsole — `query` + `dwgPath` (2026-11-12)](#76-mcp-autocad-đọc-dwg-ngầm-bằng-accoreconsole-query-dwgpath-2026-11-12)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
@@ -3820,3 +3821,26 @@ Sau sửa: Shared.Logic **2284 đạt / 0 trượt**, phủ 100% dòng; `autocad
 
 - Layout nguồn chưa từng mở (không có danh sách viewport) vẫn lấy viewport đầu tiên gặp làm viewport tổng — giống cách AutoCAD tự làm khi mở tab.
 - `ElementRename` vẫn chưa chạy trong Revit thật (§74).
+
+## 76. MCP AutoCAD đọc DWG ngầm bằng accoreconsole — `query` + `dwgPath` (2026-11-12)
+
+`scripts/dhcb_mcp_server.py autocad` chạy thật qua stdio (initialize → tools/list → tools/call) trên bản sao
+`Sample/ActiveX/ExtAttr/Assembly Sample.dwg` của AutoCAD 2026.1, **không mở AutoCAD GUI**.
+
+| Ca | DLL core | Kết quả |
+|---|---|---|
+| `query layers`, `limit 3` | bản build repo (`DHCB_ACAD_CORE_DLL`) | 3 layer (`0`, `010`, `102`), `hasMore: true`, `source: accoreconsole`, `isError: false` |
+| `query text`, `limit 3` | bản build repo | 3 DBText trên layer `TEXT` (`ARMS`, `BOTH`…) kèm toạ độ |
+| `query layers` | bundle đã cài (build 01:48, trước #204) | `isError: true`, "… là bản cũ, chưa có lệnh DHCB_QUERY — cập nhật DHCB Tools", kèm đuôi output console |
+| `dwgPath` không tồn tại | — | "Không thấy file DWG" |
+
+Gọn lại cùng lúc: mô tả `query` tách riêng Revit/AutoCAD (bản cũ trộn danh sách truy vấn Revit vào server AutoCAD,
+AutoCAD chỉ ghi "drawing_info, layers, blocks, inserts…"); ghi chú ngoại tuyến viết đúng "AutoCAD" (trước là
+"Autocad"); `tools/call` lấy danh mục **một** lần thay vì hai lần GET `/tools` mỗi lệnh.
+
+Test thuần: `test_dhcb_mcp_server.py` 51 ca (thêm 10), phủ Python 100%.
+
+### Còn mở
+
+- Bundle trên máy phải cập nhật `DhcbTools.AutoCAD.Core.dll` (từ #204) thì `dwgPath` mới chạy không cần biến môi trường.
+- `test_installer` đỏ trên máy này cả với `origin/main` (installer dò ra dấu vết AutoCAD 2025 không có runtime) — lỗi môi trường, không do thay đổi này.

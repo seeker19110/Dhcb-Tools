@@ -374,5 +374,122 @@ class StdinEncodingTests(unittest.TestCase):
         self.assertEqual([2], [json.loads(line)["id"] for line in out.getvalue().splitlines()])
 
 
+class OfflineQueryTests(unittest.TestCase):
+    """query + dwgPath (AutoCAD) chạy accoreconsole trên bản sao DWG. subprocess.run được giả lập."""
+
+    def setUp(self) -> None:
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.root = Path(folder.name)
+        self.dwg = self.root / "goc.dwg"
+        self.dwg.write_bytes(b"AC1032")
+        self.console = self.root / "accoreconsole.exe"
+        self.console.write_bytes(b"")
+        self.plugin = self.root / "DhcbTools.AutoCAD.Core.dll"
+        self.plugin.write_bytes(b"")
+        env = mock.patch.dict("os.environ", {"DHCB_ACCORECONSOLE": str(self.console),
+                                             "DHCB_ACAD_CORE_DLL": str(self.plugin)})
+        env.start()
+        self.addCleanup(env.stop)
+
+    @staticmethod
+    def _fake_run(result=None, stdout=b""):
+        """Giả accoreconsole: đọc .scr, kiểm truy vấn, ghi result.json (nếu có) vào dòng sau DHCB_QUERY."""
+        seen = {}
+
+        def run(args, **kwargs):
+            lines = Path(args[args.index("/s") + 1]).read_text(encoding="utf-8").splitlines()
+            query_path, out_path = lines[lines.index("DHCB_QUERY") + 1:lines.index("DHCB_QUERY") + 3]
+            seen["query"] = json.loads(Path(query_path).read_text(encoding="utf-8"))
+            seen["args"] = args
+            seen["script"] = lines
+            if result is not None:
+                Path(out_path).write_text(json.dumps(result), encoding="utf-8")
+            return mock.Mock(stdout=stdout, stderr=b"")
+
+        return run, seen
+
+    def test_autocad_query_co_dwgPath_tra_ket_qua_tu_ban_sao(self) -> None:
+        run, seen = self._fake_run({"layers": [{"name": "0"}]})
+        with load(("autocad",)) as (module, agent), mock.patch.object(module.subprocess, "run", side_effect=run):
+            result = module.call_tool("query", {"query": "layers", "dwgPath": str(self.dwg), "params": {"limit": 2}})
+            agent.request.assert_not_called()
+
+        self.assertEqual({"layers": [{"name": "0"}], "source": "accoreconsole"}, result)
+        self.assertEqual({"query": "layers", "params": {"limit": 2}}, seen["query"])
+        self.assertNotEqual(str(self.dwg), seen["args"][seen["args"].index("/i") + 1])  # chỉ mở bản sao
+        self.assertIn(f'NETLOAD "{self.plugin}"', seen["script"])
+
+    def test_ket_qua_khong_phai_object_tra_nguyen(self) -> None:
+        run, _seen = self._fake_run([1, 2])
+        with load(("autocad",)) as (module, _), mock.patch.object(module.subprocess, "run", side_effect=run):
+            self.assertEqual([1, 2], module.call_tool("query", {"query": "stats", "dwgPath": str(self.dwg)}))
+
+    def test_tham_so_sai_kieu_bi_tu_choi(self) -> None:
+        with load(("autocad",)) as (module, _):
+            for args in ({"dwgPath": 5}, {"dwgPath": str(self.dwg), "params": "x"}):
+                with self.subTest(args=args):
+                    self.assertFalse(module.call_tool("query", {"query": "layers", **args})["success"])
+
+    def test_revit_bo_qua_dwgPath_va_hoi_bridge(self) -> None:
+        with load(("revit",)) as (module, agent):
+            module.call_tool("query", {"query": "levels", "dwgPath": str(self.dwg)})
+            self.assertEqual(("revit", "POST", "/query"), agent.request.call_args[0][:3])
+
+    def test_thieu_file_dwg(self) -> None:
+        with load(("autocad",)) as (module, _):
+            result = module._offline_query(str(self.root / "khong-co.dwg"), "layers", {})
+        self.assertIn("Không thấy file DWG", result["summary"])
+
+    def test_thieu_accoreconsole_hoac_dll(self) -> None:
+        with load(("autocad",)) as (module, _), \
+                mock.patch.dict("os.environ", {"DHCB_ACCORECONSOLE": str(self.root / "khong.exe")}):
+            result = module._offline_query(str(self.dwg), "layers", {})
+        self.assertIn("Không tìm thấy accoreconsole", result["summary"])
+
+    def test_tim_host_theo_nam_trong_program_files_va_bundle(self) -> None:
+        console = self.root / "pf" / "Autodesk" / "AutoCAD 2026" / "accoreconsole.exe"
+        plugin = self.root / "ad" / "Autodesk" / "ApplicationPlugins" / "DhcbTools.bundle" / "Contents" / "2026" \
+            / "DhcbTools.AutoCAD.Core.dll"
+        for path in (console, plugin):
+            path.parent.mkdir(parents=True)
+            path.write_bytes(b"")
+        env = {"ProgramFiles": str(self.root / "pf"), "APPDATA": str(self.root / "ad")}
+        with load(("autocad",)) as (module, _), mock.patch.dict("os.environ", env):
+            del module.os.environ["DHCB_ACCORECONSOLE"], module.os.environ["DHCB_ACAD_CORE_DLL"]
+            self.assertEqual((str(console), str(plugin)), module._offline_host())
+
+    def test_qua_thoi_gian(self) -> None:
+        with load(("autocad",)) as (module, _), mock.patch.object(
+                module.subprocess, "run", side_effect=module.subprocess.TimeoutExpired("acc", 1)):
+            result = module._offline_query(str(self.dwg), "layers", {})
+        self.assertIn("quá", result["summary"])
+
+    def test_khong_co_ket_qua_thi_giai_thich_tu_output_console(self) -> None:
+        cases = {
+            'Command: DHCB_QUERY Unknown command "DHCB_QUERY".': "bản cũ",
+            "Unable to load the assembly.": "không NETLOAD",
+            "Command: QUIT": "không tạo file kết quả",
+        }
+        for output, expected in cases.items():
+            run, _seen = self._fake_run(None, output.encode("utf-16-le"))
+            with self.subTest(output=output), load(("autocad",)) as (module, _), \
+                    mock.patch.object(module.subprocess, "run", side_effect=run):
+                result = module._offline_query(str(self.dwg), "layers", {})
+                self.assertIn(expected, result["summary"])
+                self.assertIn(output.split()[0], result["consoleTail"])
+
+    def test_mo_ta_query_rieng_tung_ung_dung(self) -> None:
+        with load(("autocad",)) as (module, _):
+            acad = [t for t in module.tool_list() if t["name"] == "query"][0]
+        with load(("revit",)) as (module, _):
+            revit = [t for t in module.tool_list() if t["name"] == "query"][0]
+
+        self.assertIn("dwgPath", acad["inputSchema"]["properties"])
+        self.assertIn("block_contents", acad["description"])
+        self.assertNotIn("dwgPath", revit["inputSchema"]["properties"])
+        self.assertNotIn("AutoCAD", revit["description"])
+
+
 if __name__ == "__main__":
     unittest.main()
