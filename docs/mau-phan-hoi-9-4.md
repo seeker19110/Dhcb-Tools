@@ -87,7 +87,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 | `SpecToConfig` | AI offline: trích tầng/cao độ/hệ từ thuyết minh → config | ☐ | ☐ | ☐ | |
 | `DictionaryLearn` | AI offline: soi tên tham số thật của dự án → dictionary.json | ☐ | ☐ | ☐ | |
 
-## AutoCAD — 16 lệnh
+## AutoCAD — 17 lệnh
 
 | Lệnh | Việc nó làm | Tuần | Bỏ | Chưa | Nếu bỏ: vì sao |
 |---|---|:--:|:--:|:--:|---|
@@ -102,6 +102,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 | `GridExtract` | Trích trục từ layer AXIS ra CSV cho Revit GridFromCsv | ☐ | ☐ | ☐ | |
 | `XrefAudit` | Liệt kê xref, đường dẫn thiếu, xref chưa load | ☐ | ☐ | ☐ | |
 | `LayerTranslate` | Map layer cũ → layer chuẩn theo CSV (như LAYTRANS) | ☐ | ☐ | ☐ | |
+| `EntityLayerAssign` | Chuyển từng đối tượng (handle) sang layer đích — tách hệ | ☐ | ☐ | ☐ | |
 | `DrawingCompare` | So bản vẽ với DWG khác ở mức layer → CSV/HTML | ☐ | ☐ | ☐ | |
 | `DrawingCombine` | Gộp nhiều DWG vào bản vẽ hiện tại: mỗi file một block, chép layout | ☐ | ☐ | ☐ | |
 | `BlockQuantity` | Đếm block theo tên (nhóm theo attribute) → CSV BOM | ☐ | ☐ | ☐ | |

@@ -46,6 +46,7 @@ public static class AcadCommandTable
                 "GRIDEXTRACT" => new GridExtractCommand().Execute(db, Deserialize<GridExtractConfig>(configJson)),
                 "XREFAUDIT" => new XrefAuditCommand().Execute(db, Deserialize<XrefAuditConfig>(configJson)),
                 "LAYERTRANSLATE" => new LayerTranslateCommand().Execute(db, Deserialize<LayerTranslateConfig>(configJson)),
+                "ENTITYLAYERASSIGN" => new EntityLayerAssignCommand().Execute(db, Deserialize<EntityLayerAssignConfig>(configJson)),
                 "DRAWINGCOMPARE" => new DrawingCompareCommand().Execute(db, Deserialize<DrawingCompareConfig>(configJson)),
                 "DRAWINGCOMBINE" => new DrawingCombineCommand().Execute(db, Deserialize<DrawingCombineConfig>(configJson)),
                 "BLOCKQUANTITY" => new BlockQuantityCommand().Execute(db, Deserialize<BlockQuantityConfig>(configJson)),
