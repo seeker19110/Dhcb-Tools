@@ -136,7 +136,7 @@ Ribbon/dòng lệnh, HTTP Bridge, batch runner, lớp AI. Danh mục đầy đ�
 | Kiểm tra | `ParameterRuleCheck`, `ClashDetection` (+ `clash-accepted.json`), `ConnectorChecker`, `IdsValidate` (IDS 1.0 buildingSMART, [`docs/kiem-ids.md`](docs/kiem-ids.md)) | `LayerStandardCheck`, `TextReplace` |
 | Dự án & hồ sơ | `ProjectFromTemplate`, `TransferStandards`, `LevelSetup`, `GridSetup`, `GridFromCsv`, `FamilyLoader`, `ProjectInfo`, `SheetBatchCreate`, `CadLink` (link DWG/DXF vào view của một tầng) | `GridExtract` (layer AXIS → CSV cho `GridFromCsv`) |
 | MEPF | `FamilyStarter` (family mẫu sleeve/hanger), `FamilyUpgrade` (nâng cấp .rfa hàng loạt theo phiên bản Revit), `SleeveAuto`, `ElevationTag`, `HangerAuto`, `PipeSplitter`, `ModelLinesFromCad` (CAD đã link → model line), `RouteFromLines`, `DevicePlacement`, `SizingProposal` / `ApplySizing`, `SystemColor`, `SystemName` | — |
-| Hồ sơ & style (giai đoạn 7) | `SheetRename`, `RevisionOnSheets`, `SheetIndex`, `StylePurge`, `ColorByParameter`, `FamilyAudit`, `ElementRename` (đổi tên hàng loạt view template, filter, type, material), `WarningsExport`, `ScheduleExport`, `ViewportCopy` | `LayerTranslate`, `EntityLayerAssign` (chuyển từng đối tượng theo handle sang layer đích — tách tag/DIM lẫn hệ), `DrawingCompare`, `DrawingCombine` (gộp nhiều DWG: Model Space thành block, chép layout), `BlockQuantity`, `AttributeIncrement` |
+| Hồ sơ & style (giai đoạn 7) | `SheetRename`, `RevisionOnSheets`, `SheetIndex`, `StylePurge`, `ColorByParameter`, `FamilyAudit`, `ElementRename` (đổi tên hàng loạt view template, filter, type, material), `WarningsExport`, `ScheduleExport`, `ViewportCopy` | `LayerTranslate`, `EntityLayerAssign` (chuyển từng đối tượng theo handle sang layer đích — tách tag/DIM lẫn hệ), `PolylineImport` (vẽ polyline từ CSV — tim ống bóc khối lượng), `DrawingCompare`, `DrawingCombine` (gộp nhiều DWG: Model Space thành block, chép layout), `BlockQuantity`, `AttributeIncrement` |
 | MEPF nâng cao (P2) | `SlopePipes`, `PipeKick`, `SystemBom`, `AutoRoute` (mức C → mức A) | — |
 | Thi công & hoàn công | `ConstructionStatus`, `ProgressReport` (tiến độ theo tầng/hệ, % theo số lượng và chiều dài, [`docs/tien-do-thi-cong.md`](docs/tien-do-thi-cong.md)), `AsBuiltStamp` (dấu bản vẽ hoàn công theo Phụ lục IIb NĐ 207/2026/NĐ-CP) | — |
 | AI offline | `CadLayerMap`, `SpecToConfig`, `DictionaryLearn`, nút *Ra lệnh tiếng Việt* | `CadLayerMap` (`DHCB_LAYER_MAP`); ra lệnh tiếng Việt qua Bridge `POST /chat` |
@@ -194,7 +194,7 @@ còn phần đủ để agent **nhìn, chỉ và kiểm** được kết quả: 
 config không phải đoán), `element_geometry` (hộp bao, đường tâm, connector kèm tình trạng nối — toạ độ mm),
 `schedule_rows`, `snapshot` (ảnh PNG base64 của view), `selection` (đọc và **đặt** lựa chọn),
 `show_elements` (zoom cho kỹ sư nhìn), `active_view`. Phía AutoCAD là bộ đối xứng — `entity_geometry`,
-`attributes_of`, `selection`, `show_entities`, `active_layout`, `snapshot` (ảnh PNG — render off-screen sống hoặc ảnh xem trước trong DWG, kết quả ghi rõ `source`) — định danh bằng **handle** hex.
+`attributes_of`, `block_contents` (chữ/nét bên trong block, toạ độ thật), `selection`, `show_entities`, `active_layout`, `snapshot` (ảnh PNG — render off-screen sống hoặc ảnh xem trước trong DWG, kết quả ghi rõ `source`) — định danh bằng **handle** hex.
 Mọi `CommandResult` mang theo `changedIds` nên agent kiểm lại được đúng phần tử vừa đổi.
 Chi tiết: [`docs/agent-khep-vong.md`](docs/agent-khep-vong.md).
 

@@ -143,6 +143,7 @@ ElementId. `HandleText` nhận cả `1A3`, `0x1A3`, `(1A3)` — agent copy từ 
 | Query | Ở đâu | Trả về |
 |---|---|---|
 | `entity_geometry` | Core (chỉ cần `Database`) | hộp bao, layer, linetype + chi tiết theo loại; block: tên **thật** của block động, vị trí, góc, tỉ lệ, thuộc tính |
+| `block_contents` | Core | chữ, line, polyline bên trong block reference (đệ quy 8 cấp), toạ độ thật — đọc tên phòng/tường của nền kiến trúc bind |
 | `attributes_of` | Core | tag, prompt, giá trị mặc định, **ghi được không** (thuộc tính hằng thì không), kèm giá trị mẫu từ 3 insert |
 | `selection` | Vỏ (cần `Editor`) | entity đang chọn; kèm `handles` thì **đặt** lựa chọn |
 | `show_entities` | Vỏ | zoom ôm trọn + chọn; không có entity hợp lệ thì **giữ nguyên khung nhìn** |

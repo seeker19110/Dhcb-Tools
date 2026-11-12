@@ -32,7 +32,7 @@ public sealed class CadCommandWindow : Window
         ["AttributeExport"] = typeof(AttributeExportConfig), ["AttributeImport"] = typeof(AttributeImportConfig),
         ["TextReplace"] = typeof(TextReplaceConfig), ["LayerStandardCheck"] = typeof(LayerStandardCheckConfig),
         ["GridExtract"] = typeof(GridExtractConfig), ["XrefAudit"] = typeof(XrefAuditConfig),
-        ["LayerTranslate"] = typeof(LayerTranslateConfig), ["EntityLayerAssign"] = typeof(EntityLayerAssignConfig), ["DrawingCompare"] = typeof(DrawingCompareConfig),
+        ["LayerTranslate"] = typeof(LayerTranslateConfig), ["EntityLayerAssign"] = typeof(EntityLayerAssignConfig), ["PolylineImport"] = typeof(PolylineImportConfig), ["DrawingCompare"] = typeof(DrawingCompareConfig),
         ["DrawingCombine"] = typeof(DrawingCombineConfig),
         ["BlockQuantity"] = typeof(BlockQuantityConfig), ["AttributeIncrement"] = typeof(AttributeIncrementConfig),
         ["CadLayerMap"] = typeof(CadLayerMapConfig),

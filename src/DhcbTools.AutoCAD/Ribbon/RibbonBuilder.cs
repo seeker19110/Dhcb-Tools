@@ -83,6 +83,8 @@ internal static class RibbonBuilder
                 "Đổi layer của entity theo bảng chuẩn (kiểu LAYTRANS)."),
             ("DHCB_ENTITY_LAYER", "Chuyển đối tượng sang layer", "CL", RibbonIcons.Layer,
                 "Chuyển từng đối tượng (theo handle trong CSV) sang layer đích — tách tag/DIM lẫn hệ."),
+            ("DHCB_PLINE_IMPORT", "Vẽ polyline từ CSV", "PL", RibbonIcons.Layer,
+                "Vẽ polyline (layer, bề rộng, đỉnh) từ file CSV — vẽ lại tim ống bóc khối lượng."),
             ("DHCB_LAYER_MAP", "Gợi ý map layer → type", "AI", RibbonIcons.Layer,
                 "Gợi ý map layer CAD sang type Revit bằng lớp AI chạy offline."));
 
@@ -177,7 +179,7 @@ internal static class RibbonBuilder
             "DHCB_ATTR_EXPORT" => "AttributeExport", "DHCB_ATTR_IMPORT" => "AttributeImport",
             "DHCB_TEXT_REPLACE" => "TextReplace", "DHCB_LAYER_CHECK" => "LayerStandardCheck",
             "DHCB_GRID_EXTRACT" => "GridExtract", "DHCB_XREF_AUDIT" => "XrefAudit",
-            "DHCB_LAYER_TRANSLATE" => "LayerTranslate", "DHCB_ENTITY_LAYER" => "EntityLayerAssign", "DHCB_DRAWING_COMPARE" => "DrawingCompare",
+            "DHCB_LAYER_TRANSLATE" => "LayerTranslate", "DHCB_ENTITY_LAYER" => "EntityLayerAssign", "DHCB_PLINE_IMPORT" => "PolylineImport", "DHCB_DRAWING_COMPARE" => "DrawingCompare",
             "DHCB_DRAWING_COMBINE" => "DrawingCombine",
             "DHCB_BLOCK_QUANTITY" => "BlockQuantity", "DHCB_ATTR_INCREMENT" => "AttributeIncrement",
             "DHCB_LAYER_MAP" => "CadLayerMap", _ => null,

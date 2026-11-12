@@ -471,6 +471,9 @@ namespace DhcbTools.Shared.Logic.Ai
             new CommandDescriptor("EntityLayerAssign", AutoCad, "Chuyển từng entity (theo handle) sang layer đích theo CSV Handle,Layer,Color — tách hệ khi một layer chứa lẫn nhiều hệ", true, "MoveToLayer")
                 .Field("mapCsvPath", "Handle,Layer,Color (Color ACI chỉ dùng khi tạo layer)").Field("createMissingLayers", "tạo layer đích chưa có", FieldKind.Bool).Field("dryRun", "xem trước")
                 .Words("chuyển layer theo handle", "tách hệ", "đổi layer từng đối tượng", "move to layer"),
+            new CommandDescriptor("PolylineImport", AutoCad, "Vẽ polyline vào Model Space từ CSV Id,Layer,Width,Color,Closed,Vertices — vẽ lại tim ống bóc khối lượng, ranh khu vực", true, "DrawPolylines")
+                .Field("inputPath", "CSV Id,Layer,Width,Color,Closed,Vertices (Vertices = \"x y;x y;…\")").Field("replaceExisting", "xoá polyline cũ trên layer đích trước khi vẽ", FieldKind.Bool).Field("dryRun", "xem trước")
+                .Words("vẽ polyline từ file", "vẽ tim ống", "import polyline", "vẽ pline"),
             new CommandDescriptor("DrawingCompare", AutoCad, "So bản vẽ hiện tại với DWG khác ở mức layer (đếm entity theo layer) → CSV/HTML", false, "Compare")
                 .Field("otherPath", "DWG so sánh").Field("outputPath", "CSV hoặc HTML").Field("moveToleranceMm", "dung sai dời")
                 .Words("so sánh bản vẽ", "drawing compare", "khác nhau giữa hai bản"),

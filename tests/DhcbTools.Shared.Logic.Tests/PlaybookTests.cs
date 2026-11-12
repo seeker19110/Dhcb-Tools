@@ -25,7 +25,7 @@ public class PlaybookTests
         "selection", "show_elements", "active_view",
         // AutoCAD
         "drawing_info", "layers", "blocks", "inserts", "entities", "text", "xrefs", "layouts",
-        "entity_geometry", "attributes_of",
+        "entity_geometry", "attributes_of", "block_contents",
     };
 
     /// <summary>Danh sách AutoCAD ở trên phải khớp đúng chuỗi lỗi mà <c>AcadQueryHandler</c> trả cho truy vấn lạ.</summary>

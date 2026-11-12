@@ -177,11 +177,11 @@ ProjectFromTemplate, TransferStandards, GridFromCsv, SheetBatchCreate, **SheetRe
 ColorByParameter, FamilyAudit, WarningsExport, ElementRename**, **SlopePipes, PipeKick, SystemBom, AutoRoute, ScheduleExport, ViewportCopy** (P2),
 ParameterRuleCheck (+ thresholds), ClashDetection, CadLayerMap, SpecToConfig.
 
-**AutoCAD (17):** LayerExport, LayerImport, DrawingCleanup, AutoNumbering, AttributeExport, AttributeImport,
-TextReplace, LayerStandardCheck, GridExtract, XrefAudit, LayerTranslate, EntityLayerAssign, DrawingCompare, DrawingCombine, BlockQuantity,
+**AutoCAD (18):** LayerExport, LayerImport, DrawingCleanup, AutoNumbering, AttributeExport, AttributeImport,
+TextReplace, LayerStandardCheck, GridExtract, XrefAudit, LayerTranslate, EntityLayerAssign, PolylineImport, DrawingCompare, DrawingCombine, BlockQuantity,
 AttributeIncrement, CadLayerMap. Lệnh dòng lệnh: `DHCB_LAYER_EXPORT`, `DHCB_LAYER_IMPORT`, `DHCB_CLEANUP`,
 `DHCB_AUTONUMBER`, `DHCB_ATTR_EXPORT`, `DHCB_ATTR_IMPORT`, `DHCB_TEXT_REPLACE`, `DHCB_LAYER_CHECK`,
-`DHCB_GRID_EXTRACT`, `DHCB_XREF_AUDIT`, `DHCB_LAYER_TRANSLATE`, `DHCB_ENTITY_LAYER`, `DHCB_DRAWING_COMPARE`, `DHCB_DRAWING_COMBINE`, `DHCB_BLOCK_QUANTITY`,
+`DHCB_GRID_EXTRACT`, `DHCB_XREF_AUDIT`, `DHCB_LAYER_TRANSLATE`, `DHCB_ENTITY_LAYER`, `DHCB_PLINE_IMPORT`, `DHCB_DRAWING_COMPARE`, `DHCB_DRAWING_COMBINE`, `DHCB_BLOCK_QUANTITY`,
 `DHCB_ATTR_INCREMENT`, `DHCB_LAYER_MAP`. Vỏ `DhcbTools.AutoCAD.Core` chỉ có `DHCB_RUN` — dùng cho accoreconsole.
 Xem [Lệnh AutoCAD — nay đã đủ 15 lệnh có mã nguồn](#lệnh-autocad--nay-đã-đủ-15-lệnh-có-mã-nguồn) cho các đơn
 giản hoá so với đặc tả gốc.

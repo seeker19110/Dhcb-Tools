@@ -33,6 +33,7 @@ namespace DhcbTools.AutoCAD.Commands;
 ///   DHCB_XREF_AUDIT         ↔ XrefAudit
 ///   DHCB_LAYER_TRANSLATE    ↔ LayerTranslate
 ///   DHCB_ENTITY_LAYER       ↔ EntityLayerAssign
+///   DHCB_PLINE_IMPORT       ↔ PolylineImport
 ///   DHCB_DRAWING_COMPARE    ↔ DrawingCompare
 ///   DHCB_DRAWING_COMBINE    ↔ DrawingCombine
 ///   DHCB_BLOCK_QUANTITY     ↔ BlockQuantity
@@ -482,6 +483,42 @@ public sealed class DhcbCommands
         };
 
         var command = new EntityLayerAssignCommand();
+        var result = ExecuteWithPreview(doc, command.CommandName, config);
+
+        PrintResult(ed, result);
+    }
+
+    // ──────────────────────────────────────────────
+    // Lệnh 11c: Vẽ polyline từ CSV (tim ống bóc khối lượng, ranh khu vực)
+    // ──────────────────────────────────────────────
+    [CommandMethod("DHCB_PLINE_IMPORT", CommandFlags.Modal)]
+    public void PolylineImport() => Run("DHCB_PLINE_IMPORT", PolylineImportCore);
+
+    private static void PolylineImportCore()
+    {
+        var doc = Application.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+
+        var ed = doc.Editor;
+
+        var pathOpt = new PromptStringOptions("\nĐường dẫn file CSV (Id,Layer,Width,Color,Closed,Vertices): ") { AllowSpaces = true };
+        var pathResult = ed.GetString(pathOpt);
+        if (pathResult.Status != PromptStatus.OK || string.IsNullOrWhiteSpace(pathResult.StringResult)) return;
+
+        var replaceOpt = new PromptKeywordOptions("\nXoá polyline cũ trên các layer đích trước khi vẽ? [Co/Khong] <Khong>: ");
+        replaceOpt.Keywords.Add("Co");
+        replaceOpt.Keywords.Add("Khong");
+        replaceOpt.AllowNone = true;
+        var replaceResult = ed.GetKeywords(replaceOpt);
+
+        var config = new PolylineImportConfig
+        {
+            InputPath = pathResult.StringResult.Trim().Trim('"'),
+            ReplaceExisting = replaceResult.Status == PromptStatus.OK && replaceResult.StringResult == "Co",
+            DryRun = AskDryRun(ed),
+        };
+
+        var command = new PolylineImportCommand();
         var result = ExecuteWithPreview(doc, command.CommandName, config);
 
         PrintResult(ed, result);
