@@ -113,4 +113,18 @@ public class LayerImportPlannerTests
         Assert.Empty(plan.Notes);
         Assert.Empty(plan.Conflicts);
     }
+
+    /// <summary>Hai dòng chỉ khác cột IsFrozen vẫn là xung đột — không tự chọn đóng băng hay không.</summary>
+    [Fact]
+    public void HaiDongKhacCotDongBang_XungDot()
+    {
+        var plan = LayerImportPlanner.Plan(new[]
+        {
+            Line(2, "0 GAS,1,,,,,true,,"),
+            Line(3, "0 GAS,1,,,,,false,,"),
+        });
+
+        Assert.Empty(plan.Rows);
+        Assert.Single(plan.Conflicts);
+    }
 }

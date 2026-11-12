@@ -7,7 +7,7 @@ namespace DhcbTools.Core.AutoCAD.LayerSync;
 
 /// <summary>
 /// Xuất toàn bộ layer trong drawing ra file CSV — tương đương ParameterExportCommand của Revit.
-/// Các cột: Name, Color, Linetype, Lineweight, IsPlottable, Description.
+/// Các cột: Name, Color, Linetype, Lineweight, IsPlottable, Description, IsFrozen, IsOff, IsLocked.
 /// </summary>
 public sealed class LayerExportCommand : ICoreCommand<LayerExportConfig>
 {
@@ -16,7 +16,7 @@ public sealed class LayerExportCommand : ICoreCommand<LayerExportConfig>
     public CommandResult Execute(Database database, LayerExportConfig config)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("Name,Color,Linetype,Lineweight,IsPlottable,Description");
+        sb.AppendLine("Name,Color,Linetype,Lineweight,IsPlottable,Description,IsFrozen,IsOff,IsLocked");
 
         var count = 0;
 
@@ -50,7 +50,10 @@ public sealed class LayerExportCommand : ICoreCommand<LayerExportConfig>
               .Append(CsvText.Escape(linetype)).Append(',')
               .Append(CsvText.Escape(lineweight)).Append(',')
               .Append(plottable).Append(',')
-              .AppendLine(CsvText.Escape(description));
+              .Append(CsvText.Escape(description)).Append(',')
+              .Append(layer.IsFrozen ? "true" : "false").Append(',')
+              .Append(layer.IsOff ? "true" : "false").Append(',')
+              .AppendLine(layer.IsLocked ? "true" : "false");
 
             count++;
         }

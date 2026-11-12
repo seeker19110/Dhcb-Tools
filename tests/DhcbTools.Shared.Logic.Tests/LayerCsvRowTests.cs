@@ -5,7 +5,7 @@ using Xunit;
 namespace DhcbTools.Shared.Logic.Tests;
 
 /// <summary>
-/// Phần đọc CSV của lệnh LayerImport (cột: Name,Color,Linetype,Lineweight,IsPlottable,Description).
+/// Phần đọc CSV của lệnh LayerImport (cột: Name,Color,Linetype,Lineweight,IsPlottable,Description,IsFrozen,IsOff,IsLocked).
 /// Ô để trống = "giữ nguyên giá trị trong drawing" nên phải ra null, không được ra 0/false —
 /// đó là cách duy nhất để lệnh biết ô nào thật sự cần ghi.
 /// </summary>
@@ -172,5 +172,43 @@ public class LayerCsvRowTests
         Assert.True(row.Plottable);
         Assert.Equal("Ống gió, tầng 3", row.Description);
         Assert.Empty(row.Warnings);
+    }
+
+    [Fact]
+    public void Parse_CotTrangThai_DocDongBangTatKhoa()
+    {
+        var row = LayerCsvRow.Parse("M-HVAC-DUCT-1,2,Continuous,LineWeight000,true,,true,false,TRUE", 4);
+
+        Assert.True(row.Frozen);
+        Assert.False(row.Off);
+        Assert.True(row.Locked);
+        Assert.Equal(string.Empty, row.Description);
+        Assert.Empty(row.Warnings);
+    }
+
+    [Theory]
+    [InlineData("L,3,,,,mô tả")]           // CSV cũ 6 cột
+    [InlineData("L,3,,,,mô tả,,,")]        // cột trạng thái để trống
+    public void Parse_ThieuCotTrangThai_GiuNguyen(string line)
+    {
+        var row = LayerCsvRow.Parse(line, 2);
+
+        Assert.Null(row.Frozen);
+        Assert.Null(row.Off);
+        Assert.Null(row.Locked);
+        Assert.Empty(row.Warnings);
+    }
+
+    [Fact]
+    public void Parse_CotTrangThaiKhongHopLe_CanhBaoVaGiuNguyen()
+    {
+        var row = LayerCsvRow.Parse("L,,,,,,có,1,x", 7);
+
+        Assert.Null(row.Frozen);
+        Assert.Null(row.Off);
+        Assert.Null(row.Locked);
+        Assert.Contains(row.Warnings, w => w.Contains("Dòng 7") && w.Contains("IsFrozen"));
+        Assert.Contains(row.Warnings, w => w.Contains("IsOff"));
+        Assert.Contains(row.Warnings, w => w.Contains("IsLocked"));
     }
 }

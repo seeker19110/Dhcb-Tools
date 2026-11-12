@@ -7,7 +7,7 @@ namespace DhcbTools.Core.AutoCAD.LayerSync;
 
 /// <summary>
 /// Đọc lại file CSV do <see cref="LayerExportCommand"/> tạo ra (đã chỉnh sửa trong Excel) và ghi giá trị
-/// ngược vào drawing: color, linetype, lineweight, plottable, description.
+/// ngược vào drawing: color, linetype, lineweight, plottable, description, và trạng thái đóng băng / tắt / khoá.
 /// Tuỳ chọn tạo layer mới nếu CSV có layer chưa tồn tại (<c>createMissing</c>).
 /// <para>
 /// <b>Chỉ ghi ô đã đổi.</b> Bản trước mở MỌI layer trong CSV ở chế độ ghi rồi gán lại y nguyên giá trị
@@ -218,7 +218,7 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
     {
         var changes = new List<Action<LayerTableRecord>>();
 
-        // Cột: Name, Color, Linetype, Lineweight, IsPlottable, Description
+        // Cột: Name, Color, Linetype, Lineweight, IsPlottable, Description, IsFrozen, IsOff, IsLocked
         if (row.ColorAci.HasValue)
         {
             var aci = row.ColorAci.Value;
@@ -283,6 +283,34 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
         {
             var description = row.Description;
             changes.Add(l => l.Description = description);
+        }
+
+        if (row.Frozen.HasValue && layer.IsFrozen != row.Frozen.Value)
+        {
+            var frozen = row.Frozen.Value;
+            // AutoCAD không cho đóng băng layer hiện hành (gán IsFrozen ném eInvalidLayer giữa transaction).
+            // Layer mới tạo chưa có ObjectId lúc lập kế hoạch nên không thể là layer hiện hành.
+            if (frozen && !layer.ObjectId.IsNull && layer.ObjectId == database.Clayer)
+            {
+                notes.Add($"Layer \"{layer.Name}\" đang là layer hiện hành — AutoCAD không cho đóng băng, giữ nguyên. "
+                    + "Đổi layer hiện hành (CLAYER) rồi nhập lại.");
+            }
+            else
+            {
+                changes.Add(l => l.IsFrozen = frozen);
+            }
+        }
+
+        if (row.Off.HasValue && layer.IsOff != row.Off.Value)
+        {
+            var off = row.Off.Value;
+            changes.Add(l => l.IsOff = off);
+        }
+
+        if (row.Locked.HasValue && layer.IsLocked != row.Locked.Value)
+        {
+            var locked = row.Locked.Value;
+            changes.Add(l => l.IsLocked = locked);
         }
 
         return changes;

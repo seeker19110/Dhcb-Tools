@@ -6,7 +6,8 @@ namespace DhcbTools.Shared.Logic.Cad
 {
     /// <summary>
     /// Một dòng CSV layer đã đọc xong (định dạng do <c>LayerExportCommand</c> ghi ra:
-    /// <c>Name,Color,Linetype,Lineweight,IsPlottable,Description</c>).
+    /// <c>Name,Color,Linetype,Lineweight,IsPlottable,Description,IsFrozen,IsOff,IsLocked</c>).
+    /// CSV cũ chỉ có 6 cột vẫn đọc được: ba cột trạng thái thiếu nghĩa là giữ nguyên.
     /// <para>
     /// Đây là phần thuần của <c>LayerImportCommand</c>, tách khỏi vỏ AutoCAD để test được trên CI Windows —
     /// vỏ chỉ còn việc so sánh với drawing và ghi. Ô để trống nghĩa là "giữ nguyên giá trị đang có" nên mọi
@@ -47,6 +48,15 @@ namespace DhcbTools.Shared.Logic.Cad
         /// <summary>Cột IsPlottable.</summary>
         public bool? Plottable { get; private set; }
 
+        /// <summary>Cột IsFrozen (đóng băng toàn cục, như LAYFRZ); null = giữ nguyên.</summary>
+        public bool? Frozen { get; private set; }
+
+        /// <summary>Cột IsOff (tắt layer, như LAYOFF); null = giữ nguyên.</summary>
+        public bool? Off { get; private set; }
+
+        /// <summary>Cột IsLocked (khoá layer, như LAYLCK); null = giữ nguyên.</summary>
+        public bool? Locked { get; private set; }
+
         /// <summary>Cột Description; chuỗi rỗng vẫn có nghĩa (xoá mô tả), null = CSV không có cột này.</summary>
         public string? Description { get; private set; }
 
@@ -86,12 +96,16 @@ namespace DhcbTools.Shared.Logic.Cad
             row.ParseColor(cells, lineNumber);
             row.Linetype = Cell(cells, 2);
             row.ParseLineWeight(cells, lineNumber);
-            row.ParsePlottable(cells, lineNumber);
+            row.Plottable = row.ParseBool(cells, 4, "IsPlottable", lineNumber);
 
             if (cells.Count > 5)
             {
                 row.Description = cells[5];
             }
+
+            row.Frozen = row.ParseBool(cells, 6, "IsFrozen", lineNumber);
+            row.Off = row.ParseBool(cells, 7, "IsOff", lineNumber);
+            row.Locked = row.ParseBool(cells, 8, "IsLocked", lineNumber);
 
             return row;
         }
@@ -150,21 +164,21 @@ namespace DhcbTools.Shared.Logic.Cad
             _warnings.Add($"Dòng {lineNumber}: lineweight \"{text}\" không hợp lệ — giữ nguyên.");
         }
 
-        private void ParsePlottable(IReadOnlyList<string> cells, int lineNumber)
+        private bool? ParseBool(IReadOnlyList<string> cells, int index, string column, int lineNumber)
         {
-            var text = Cell(cells, 4);
+            var text = Cell(cells, index);
             if (text == null)
             {
-                return;
+                return null;
             }
 
-            if (bool.TryParse(text, out var plottable))
+            if (bool.TryParse(text, out var value))
             {
-                Plottable = plottable;
-                return;
+                return value;
             }
 
-            _warnings.Add($"Dòng {lineNumber}: cột IsPlottable \"{text}\" không hợp lệ — giữ nguyên.");
+            _warnings.Add($"Dòng {lineNumber}: cột {column} \"{text}\" không hợp lệ — giữ nguyên.");
+            return null;
         }
 
         private static string? Cell(IReadOnlyList<string> cells, int index)
