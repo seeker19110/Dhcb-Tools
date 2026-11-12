@@ -388,7 +388,8 @@ public static class AcadQueryHandler
     /// Nền kiến trúc thường được chèn hoặc bind thành block: tên phòng, tường, trục nằm trong định nghĩa block nên
     /// <c>text</c>/<c>entities</c> (chỉ quét thẳng Model Space) không thấy. Truy vấn này đi đệ quy vào các block
     /// reference (tối đa 8 cấp), nhân ma trận chèn để trả toạ độ thật, lọc theo layer (<c>layerContains</c>) và loại
-    /// (<c>entityType</c>: DBText, MText, Text = cả hai, Line, Polyline). Không chỉ định <c>handles</c> thì duyệt mọi
+    /// (<c>entityType</c>: DBText, MText, Attribute, Text = cả ba loại chữ, Line, Polyline). Attribute của mọi block lồng
+    /// (kể cả block gốc) được trả kèm <c>tag</c>; định nghĩa attribute (chữ mẫu) bị bỏ qua. Không chỉ định <c>handles</c> thì duyệt mọi
     /// block reference trong Model Space. Block của xref (chưa bind) không đi vào: đó là file của người khác.
     /// </summary>
     private static object GetBlockContents(Database db, AcadQueryParams p)
@@ -430,9 +431,32 @@ public static class AcadQueryHandler
         }
 
         var stop = false;
-        void Walk(BlockReference br, Matrix3d xf, string root, int depth)
+        bool Wanted(Entity ent, string type)
+        {
+            if (p.EntityType is { Length: > 0 } && !string.Equals(p.EntityType, type, StringComparison.OrdinalIgnoreCase)
+                && !(string.Equals(p.EntityType, "Text", StringComparison.OrdinalIgnoreCase) && (type is "DBText" or "MText" or "Attribute")))
+                return false;
+            if (p.LayerContains is { Length: > 0 } && ent.Layer.IndexOf(p.LayerContains, StringComparison.OrdinalIgnoreCase) < 0) return false;
+            if (page.IncludeMatch()) return true;
+            if (page.HasMore) stop = true;
+            return false;
+        }
+
+        // parentXf: ma trận đưa toạ độ của KHÔNG GIAN CHỨA br về toạ độ thật. Attribute của br nằm ở chính không gian đó
+        // (không nhân BlockTransform của br) — tên phòng của nền kiến trúc là attribute của block tag lồng bên trong.
+        void Walk(BlockReference br, Matrix3d parentXf, string root, int depth)
         {
             if (stop || depth > 8) return;
+            foreach (ObjectId attId in br.AttributeCollection)
+            {
+                if (stop) return;
+                if (tr.GetObject(attId, OpenMode.ForRead) is not AttributeReference att || att.Invisible) continue;
+                if (!Wanted(att, "Attribute")) continue;
+                var text = att.IsMTextAttribute ? att.MTextAttribute.Text : att.TextString;
+                list.Add(new { root, type = "Attribute", layer = att.Layer, tag = att.Tag, text, position = Pt(att.Position.TransformBy(parentXf)), height = att.Height });
+            }
+
+            var xf = parentXf * br.BlockTransform;
             if (tr.GetObject(br.BlockTableRecord, OpenMode.ForRead) is not BlockTableRecord btr || btr.IsFromExternalReference) return;
             foreach (ObjectId id in btr)
             {
@@ -440,21 +464,15 @@ public static class AcadQueryHandler
                 if (tr.GetObject(id, OpenMode.ForRead) is not Entity ent) continue;
                 if (ent is BlockReference inner)
                 {
-                    Walk(inner, xf * inner.BlockTransform, root, depth + 1);
+                    Walk(inner, xf, root, depth + 1);
                     continue;
                 }
 
+                // AttributeDefinition là DBText nhưng chỉ là mẫu ("Ten phong") — giá trị thật nằm ở AttributeReference.
+                if (ent is AttributeDefinition) continue;
+
                 var type = ent switch { DBText => "DBText", MText => "MText", Line => "Line", Polyline => "Polyline", _ => null };
-                if (type == null) continue;
-                if (p.EntityType is { Length: > 0 } && !string.Equals(p.EntityType, type, StringComparison.OrdinalIgnoreCase)
-                    && !(string.Equals(p.EntityType, "Text", StringComparison.OrdinalIgnoreCase) && (type == "DBText" || type == "MText")))
-                    continue;
-                if (p.LayerContains is { Length: > 0 } && ent.Layer.IndexOf(p.LayerContains, StringComparison.OrdinalIgnoreCase) < 0) continue;
-                if (!page.IncludeMatch())
-                {
-                    if (page.HasMore) stop = true;
-                    continue;
-                }
+                if (type == null || !Wanted(ent, type)) continue;
 
                 switch (ent)
                 {
@@ -479,7 +497,7 @@ public static class AcadQueryHandler
         foreach (var br in roots)
         {
             if (stop) break;
-            Walk(br, br.BlockTransform, HandleText.ToText(br.Handle.Value), 1);
+            Walk(br, Matrix3d.Identity, HandleText.ToText(br.Handle.Value), 1);
         }
 
         tr.Abort();
