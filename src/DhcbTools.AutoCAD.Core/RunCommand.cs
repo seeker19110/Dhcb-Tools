@@ -28,6 +28,37 @@ public sealed class RunCommand
     [CommandMethod("DHCB_BATCH", CommandFlags.Modal)]
     public void RunBatchStep() => RunStepCore(guarded: true);
 
+    /// <summary>
+    /// <c>DHCB_QUERY "query.json" "result.json"</c> — chạy một truy vấn chỉ đọc (cùng bảng <c>AcadQueryHandler</c> với
+    /// Bridge: layers, entities, block_contents…) trong accoreconsole và ghi kết quả JSON. Để agent đọc bản vẽ chạy
+    /// ngầm trên bản sao DWG mà không cần AutoCAD có giao diện.
+    /// </summary>
+    [CommandMethod("DHCB_QUERY", CommandFlags.Modal)]
+    public void RunQuery()
+    {
+        var doc = Application.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+        var ed = doc.Editor;
+        var queryPath = Ask(ed, "File truy vấn JSON");
+        var outPath = Ask(ed, "File kết quả JSON");
+        if (string.IsNullOrWhiteSpace(queryPath) || string.IsNullOrWhiteSpace(outPath)) return;
+        object result;
+        try
+        {
+            var request = Newtonsoft.Json.JsonConvert.DeserializeObject<DhcbTools.Core.AutoCAD.Query.QueryRequest>(File.ReadAllText(queryPath!))
+                          ?? new DhcbTools.Core.AutoCAD.Query.QueryRequest();
+            using var lock_ = doc.LockDocument();
+            result = DhcbTools.Core.AutoCAD.Query.AcadQueryHandler.Handle(doc.Database, request);
+        }
+        catch (System.Exception ex)
+        {
+            result = new { error = "Exception: " + ex.Message };
+        }
+
+        File.WriteAllText(outPath!, Newtonsoft.Json.JsonConvert.SerializeObject(result), new System.Text.UTF8Encoding(false));
+        ed.WriteMessage("\nDHCB_QUERY xong: " + outPath + "\n");
+    }
+
     private static void RunStepCore(bool guarded)
     {
         var doc = Application.DocumentManager.MdiActiveDocument;
