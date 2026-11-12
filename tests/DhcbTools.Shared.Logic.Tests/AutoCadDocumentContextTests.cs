@@ -35,6 +35,30 @@ public sealed class AutoCadDocumentContextTests
     }
 
     [Fact]
+    public void AssocNetworkReevaluatedOnCommandEndDoesNotInvalidatePreview()
+    {
+        // AutoCAD 2026 GUI đánh giá lại AcDbAssocNetwork ở cuối mỗi command context của Bridge (đo bằng
+        // DHCB_REVISION_TRACE=1): trước đây revision tăng 4 mỗi request nên mọi lệnh ghi qua MCP bị E-PREVIEW-CHANGED.
+        var database = new Database(NewPointer());
+        try
+        {
+            var context = AcadDocumentContexts.For(database);
+            for (var i = 0; i < 4; i++) database.Modify("AcDbAssocNetwork");
+            Assert.Equal(0, BridgeDocumentContext.RevisionFor(context));
+            database.Modify("AcDbLine");
+            database.Modify("AcDbLayerTableRecord");
+            database.Modify("AcDbViewportTableRecord");
+            database.Modify();
+            Assert.Equal(4, BridgeDocumentContext.RevisionFor(context));
+            // Tạo/xoá network (thêm ràng buộc, dim liên kết) là thay đổi thật, vẫn đếm.
+            database.Append("AcDbAssocNetwork");
+            database.Erase("AcDbAssocNetwork");
+            Assert.Equal(6, BridgeDocumentContext.RevisionFor(context));
+        }
+        finally { database.Destroy(); }
+    }
+
+    [Fact]
     public void DestroyedDatabaseCannotDonateIdentityOrRevisionToAReusedNativePointer()
     {
         var oldDatabase = new Database(NewPointer());

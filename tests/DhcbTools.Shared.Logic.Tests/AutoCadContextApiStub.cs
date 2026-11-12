@@ -6,9 +6,9 @@ internal sealed class Database
 {
     private sealed class NativeState
     {
-        public EventHandler? Modified;
-        public EventHandler? Appended;
-        public EventHandler? Erased;
+        public ObjectEventHandler? Modified;
+        public ObjectEventHandler? Appended;
+        public ObjectEventHandler? Erased;
         public EventHandler? Destroyed;
     }
     private readonly NativeState _state;
@@ -18,16 +18,31 @@ internal sealed class Database
         UnmanagedObject = pointer;
         _state = sameNative?._state ?? new NativeState();
     }
-    public event EventHandler ObjectModified { add => _state.Modified += value; remove => _state.Modified -= value; }
-    public event EventHandler ObjectAppended { add => _state.Appended += value; remove => _state.Appended -= value; }
-    public event EventHandler ObjectErased { add => _state.Erased += value; remove => _state.Erased -= value; }
+    public event ObjectEventHandler ObjectModified { add => _state.Modified += value; remove => _state.Modified -= value; }
+    public event ObjectEventHandler ObjectAppended { add => _state.Appended += value; remove => _state.Appended -= value; }
+    public event ObjectEventHandler ObjectErased { add => _state.Erased += value; remove => _state.Erased -= value; }
     public event EventHandler DatabaseToBeDestroyed { add => _state.Destroyed += value; remove => _state.Destroyed -= value; }
     public int ModifiedSubscriptions => _state.Modified?.GetInvocationList().Length ?? 0;
     public int AppendedSubscriptions => _state.Appended?.GetInvocationList().Length ?? 0;
     public int ErasedSubscriptions => _state.Erased?.GetInvocationList().Length ?? 0;
     public int DestroyedSubscriptions => _state.Destroyed?.GetInvocationList().Length ?? 0;
-    public void Modify() => _state.Modified?.Invoke(this, EventArgs.Empty);
-    public void Append() => _state.Appended?.Invoke(this, EventArgs.Empty);
-    public void Erase() => _state.Erased?.Invoke(this, EventArgs.Empty);
+    public void Modify(string? rxClass = null) => _state.Modified?.Invoke(this, new ObjectEventArgs(rxClass));
+    public void Append(string? rxClass = null) => _state.Appended?.Invoke(this, new ObjectEventArgs(rxClass));
+    public void Erase(string? rxClass = null) => _state.Erased?.Invoke(this, new ObjectEventArgs(rxClass));
     public void Destroy() => _state.Destroyed?.Invoke(this, EventArgs.Empty);
+}
+
+internal delegate void ObjectEventHandler(object sender, ObjectEventArgs e);
+
+internal sealed class ObjectEventArgs : EventArgs
+{
+    public ObjectEventArgs(string? rxClass) => DBObject = rxClass == null ? null : new DBObject(rxClass);
+    public DBObject? DBObject { get; }
+}
+
+internal sealed class DBObject
+{
+    private readonly Autodesk.AutoCAD.Runtime.RXClass _class;
+    public DBObject(string rxClass) => _class = new Autodesk.AutoCAD.Runtime.RXClass(rxClass);
+    public Autodesk.AutoCAD.Runtime.RXClass GetRXClass() => _class;
 }
