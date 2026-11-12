@@ -116,6 +116,118 @@
       }
     },
     {
+      "name": "Đóng băng layer hiện hành — AutoCAD cấm, phải nói ra và không ghi",
+      "//": "Layer 2 la CLAYER cua ban ve mau.",
+      "command": "LayerImport",
+      "allowWrite": true,
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/layers-dong-bang-layer-hien-hanh.csv"
+      },
+      "expect": {
+        "success": true,
+        "maxAffected": 0,
+        "noErrors": true,
+        "messagesContain": [
+          "Layer \"2\" đang là layer hiện hành"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      }
+    },
+    {
+      "name": "Đóng băng + tắt + khoá một layer — xem trước không phát sự kiện ghi tạm",
+      "command": "LayerImport",
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/layers-dong-bang.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 1,
+        "maxAffected": 1,
+        "maxChangeEvents": 0,
+        "noErrors": true,
+        "messagesContain": [
+          "Layer \"4\": 3 thuộc tính đổi"
+        ],
+        "neverContains": [
+          "hiện hành"
+        ]
+      }
+    },
+    {
+      "name": "Đóng băng + tắt + khoá một layer — GHI THẬT",
+      "command": "LayerImport",
+      "allowWrite": true,
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/layers-dong-bang.csv"
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxAffected": 1,
+        "summaryContains": [
+          "Đã nhập"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "noErrors": true
+      }
+    },
+    {
+      "name": "Nhập lại CSV đóng băng — phải ra 0 (bằng chứng đã ghi thật)",
+      "command": "LayerImport",
+      "allowWrite": true,
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/layers-dong-bang.csv"
+      },
+      "expect": {
+        "success": true,
+        "maxAffected": 0,
+        "messagesContain": [
+          "giữ nguyên"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      }
+    },
+    {
+      "name": "Rã băng bằng CSV gốc (có cột IsFrozen/IsOff/IsLocked)",
+      "command": "LayerImport",
+      "allowWrite": true,
+      "config": {
+        "inputPath": "{outputFolder}/layers-goc.csv"
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxAffected": 1,
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 30000
+      }
+    },
+    {
+      "name": "Kiểm lại sau đóng băng — bản vẽ đã về trạng thái gốc",
+      "command": "LayerImport",
+      "allowWrite": true,
+      "config": {
+        "inputPath": "{outputFolder}/layers-goc.csv"
+      },
+      "expect": {
+        "success": true,
+        "maxAffected": 0,
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "maxMs": 30000
+      }
+    },
+    {
       "name": "Dòng trùng giống nhau — xem trước tạo đúng một layer",
       "command": "LayerImport",
       "config": {

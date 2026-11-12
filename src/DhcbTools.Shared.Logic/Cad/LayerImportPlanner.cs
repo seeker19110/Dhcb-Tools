@@ -90,6 +90,9 @@ namespace DhcbTools.Shared.Logic.Cad
             && string.Equals(a.Linetype, b.Linetype, StringComparison.OrdinalIgnoreCase)
             && a.LineWeight == b.LineWeight
             && a.Plottable == b.Plottable
+            && a.Frozen == b.Frozen
+            && a.Off == b.Off
+            && a.Locked == b.Locked
             && string.Equals(a.Description, b.Description, StringComparison.Ordinal);
 
         private static string Number(int row) => row.ToString(CultureInfo.InvariantCulture);
