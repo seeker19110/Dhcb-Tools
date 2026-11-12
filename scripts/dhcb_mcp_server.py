@@ -37,7 +37,7 @@ GROUPS = {
     "query": ("query", "chat"),
     "data": ("ParameterExport", "ParameterImport", "LayerExport", "LayerImport", "AttributeExport", "AttributeImport", "WarningsExport", "BlockQuantity"),
     "sheets": ("SheetRename", "RevisionOnSheets", "SheetBatchCreate", "BatchExport", "SheetIndex"),
-    "cleanup": ("RemoveUnusedViews", "StylePurge", "DrawingCleanup", "FamilyAudit", "LayerTranslate", "EntityLayerAssign", "ElementRename"),
+    "cleanup": ("RemoveUnusedViews", "StylePurge", "DrawingCleanup", "FamilyAudit", "LayerTranslate", "EntityLayerAssign", "PolylineImport", "ElementRename"),
     "check": ("HealthReport", "ParameterRuleCheck", "ClashDetection", "ConnectorChecker", "LayerStandardCheck", "XrefAudit", "DrawingCompare"),
     "mep": ("SleeveAuto", "ElevationTag", "HangerAuto", "PipeSplitter", "RouteFromLines", "DevicePlacement", "SizingProposal", "ApplySizing", "SystemColor", "SystemName", "FlowNumbering"),
     "project": ("ProjectInfo", "LevelSetup", "GridSetup", "FamilyLoader", "ProjectFromTemplate", "TransferStandards", "GridFromCsv", "GridExtract", "DrawingCombine"),

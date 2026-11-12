@@ -442,6 +442,64 @@
           "Xem trước"
         ]
       }
+    },
+    {
+      "name": "Vẽ polyline từ CSV — xem trước: 2 polyline, dòng 1 đỉnh bị báo",
+      "command": "PolylineImport",
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/polyline-import.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 2,
+        "maxAffected": 2,
+        "maxChangeEvents": 0,
+        "messagesContain": [
+          "Sẽ tạo layer mới: \"KL-TEST-PL\" (màu 4)",
+          "2 polyline, tổng dài 7341.421",
+          "ít nhất 2 đỉnh"
+        ]
+      }
+    },
+    {
+      "name": "Vẽ polyline từ CSV — GHI THẬT",
+      "command": "PolylineImport",
+      "allowWrite": true,
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/polyline-import.csv"
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 2,
+        "maxAffected": 2,
+        "summaryContains": [
+          "Đã vẽ 2 polyline"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      }
+    },
+    {
+      "name": "Vẽ lại với replaceExisting — xoá 2 cũ, vẽ 2 mới (không chồng)",
+      "command": "PolylineImport",
+      "allowWrite": true,
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/polyline-import.csv",
+        "replaceExisting": true
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 4,
+        "maxAffected": 4,
+        "messagesContain": [
+          "Đã xoá 2 polyline cũ"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      }
     }
   ]
 }

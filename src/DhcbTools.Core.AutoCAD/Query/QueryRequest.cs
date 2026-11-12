@@ -21,6 +21,7 @@ public sealed class QueryRequest
     /// Giai đoạn 10.1 — đủ để agent nhìn, chỉ và kiểm được kết quả:
     ///   entity_geometry — hộp bao + chi tiết theo loại của entity chỉ đích danh (theo handle)
     ///   attributes_of   — thuộc tính của một block: tag, prompt, ghi được không, kèm giá trị mẫu
+    ///   block_contents  — chữ / line / polyline bên trong block reference (đệ quy), toạ độ thật — nền kiến trúc bind
     ///   selection       — entity đang chọn; kèm handles thì ĐẶT lựa chọn (vỏ AutoCAD)
     ///   show_entities   — zoom tới entity (vỏ AutoCAD)
     ///   active_layout   — kỹ sư đang ở layout nào (vỏ AutoCAD)
@@ -37,7 +38,7 @@ public sealed class AcadQueryParams
     /// <summary>[layers, entities, inserts, text] Lọc theo tên layer (substring, case-insensitive).</summary>
     public string? LayerContains { get; set; }
 
-    /// <summary>[entities] Lọc theo loại entity (Line, Arc, DBText, MText, …; Text là bí danh của DBText).</summary>
+    /// <summary>[entities, block_contents] Lọc theo loại entity (Line, Arc, DBText, MText, …; Text là bí danh của DBText).</summary>
     public string? EntityType { get; set; }
 
     /// <summary>[inserts] Lọc theo tên block (exact, case-insensitive).</summary>
@@ -52,7 +53,7 @@ public sealed class AcadQueryParams
     /// <summary>[text] Chỉ lấy văn bản hiển thị chứa chuỗi này (không phân biệt hoa/thường), trước khi phân trang.</summary>
     public string? TextContains { get; set; }
 
-    /// <summary>[entity_geometry, selection, show_entities] Handle (hex) của entity cần xem/chọn/zoom.</summary>
+    /// <summary>[entity_geometry, block_contents, selection, show_entities] Handle (hex) của entity cần xem/chọn/zoom.</summary>
     public List<string> Handles { get; set; } = new();
 
     /// <summary>Giới hạn số record trả về (0 = mặc định 2000, tối đa 10000).</summary>

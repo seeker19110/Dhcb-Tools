@@ -19,7 +19,7 @@ public static class AcadQueryHandler
     /// biết truy vấn đó tồn tại (<c>QueryCatalogTests</c> chốt cho khỏi lệch).
     /// </summary>
     public const string ValidQueries =
-        "drawing_info, layers, blocks, inserts, entities, text, xrefs, layouts, stats, entity_geometry, attributes_of, snapshot";
+        "drawing_info, layers, blocks, inserts, entities, text, xrefs, layouts, stats, entity_geometry, attributes_of, block_contents, snapshot";
 
     // Resolve known managed types before walking Model Space: reject unrelated native classes
     // without materializing managed Entity wrappers for every line in a large drawing.
@@ -53,6 +53,7 @@ public static class AcadQueryHandler
             // Giai đoạn 10.1 — đủ để agent nhìn và kiểm được đúng đối tượng vừa đụng tới.
             "ENTITY_GEOMETRY" => GetEntityGeometry(db, req.Params),
             "ATTRIBUTES_OF"   => GetAttributesOf(db, req.Params),
+            "BLOCK_CONTENTS"  => GetBlockContents(db, req.Params),
             // Tầng Core của snapshot: ảnh xem trước lưu trong DWG. Vỏ AutoCAD chặn trước để render sống.
             "SNAPSHOT"        => AcadSnapshot.Thumbnail(db),
             _ => new { error = $"Query không xác định: \"{req.Query}\". Hợp lệ: {ValidQueries}." }
@@ -377,6 +378,112 @@ public static class AcadQueryHandler
 
         tr.Abort();
         return new { count = list.Count, limit = page.Limit, offset = page.Offset, hasMore = page.HasMore, nextOffset = page.NextOffset, texts = list };
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // block_contents — chữ / line / polyline BÊN TRONG block reference, quy về toạ độ thật
+    // ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Nền kiến trúc thường được chèn hoặc bind thành block: tên phòng, tường, trục nằm trong định nghĩa block nên
+    /// <c>text</c>/<c>entities</c> (chỉ quét thẳng Model Space) không thấy. Truy vấn này đi đệ quy vào các block
+    /// reference (tối đa 8 cấp), nhân ma trận chèn để trả toạ độ thật, lọc theo layer (<c>layerContains</c>) và loại
+    /// (<c>entityType</c>: DBText, MText, Text = cả hai, Line, Polyline). Không chỉ định <c>handles</c> thì duyệt mọi
+    /// block reference trong Model Space. Block của xref (chưa bind) không đi vào: đó là file của người khác.
+    /// </summary>
+    private static object GetBlockContents(Database db, AcadQueryParams p)
+    {
+        using var tr = db.TransactionManager.StartTransaction();
+        var ms = (BlockTableRecord)tr.GetObject(SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForRead);
+        var page = new QueryPage(p.Limit, p.Offset);
+        var list = new List<object>();
+        var notFound = new List<string>();
+        var roots = new List<BlockReference>();
+
+        if (p.Handles is { Count: > 0 })
+        {
+            foreach (var text in p.Handles)
+            {
+                if (!HandleText.TryParse(text, out var raw))
+                {
+                    notFound.Add(text + " (không phải handle hex)");
+                    continue;
+                }
+
+                try
+                {
+                    var id = db.GetObjectId(false, new Handle(raw), 0);
+                    if (!id.IsNull && !id.IsErased && tr.GetObject(id, OpenMode.ForRead) is BlockReference br) roots.Add(br);
+                    else notFound.Add(text + " (không phải block reference)");
+                }
+                catch (Autodesk.AutoCAD.Runtime.Exception)
+                {
+                    notFound.Add(text + " (không có trong bản vẽ)");
+                }
+            }
+        }
+        else
+        {
+            var refClass = Autodesk.AutoCAD.Runtime.RXObject.GetClass(typeof(BlockReference));
+            foreach (ObjectId id in ms)
+                if (id.ObjectClass.IsDerivedFrom(refClass) && tr.GetObject(id, OpenMode.ForRead) is BlockReference br) roots.Add(br);
+        }
+
+        var stop = false;
+        void Walk(BlockReference br, Matrix3d xf, string root, int depth)
+        {
+            if (stop || depth > 8) return;
+            if (tr.GetObject(br.BlockTableRecord, OpenMode.ForRead) is not BlockTableRecord btr || btr.IsFromExternalReference) return;
+            foreach (ObjectId id in btr)
+            {
+                if (stop) return;
+                if (tr.GetObject(id, OpenMode.ForRead) is not Entity ent) continue;
+                if (ent is BlockReference inner)
+                {
+                    Walk(inner, xf * inner.BlockTransform, root, depth + 1);
+                    continue;
+                }
+
+                var type = ent switch { DBText => "DBText", MText => "MText", Line => "Line", Polyline => "Polyline", _ => null };
+                if (type == null) continue;
+                if (p.EntityType is { Length: > 0 } && !string.Equals(p.EntityType, type, StringComparison.OrdinalIgnoreCase)
+                    && !(string.Equals(p.EntityType, "Text", StringComparison.OrdinalIgnoreCase) && (type == "DBText" || type == "MText")))
+                    continue;
+                if (p.LayerContains is { Length: > 0 } && ent.Layer.IndexOf(p.LayerContains, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                if (!page.IncludeMatch())
+                {
+                    if (page.HasMore) stop = true;
+                    continue;
+                }
+
+                switch (ent)
+                {
+                    case DBText t:
+                        list.Add(new { root, type, layer = t.Layer, text = t.TextString, position = Pt(t.Position.TransformBy(xf)), height = t.Height });
+                        break;
+                    case MText mt:
+                        list.Add(new { root, type, layer = mt.Layer, text = mt.Text, position = Pt(mt.Location.TransformBy(xf)), height = mt.TextHeight });
+                        break;
+                    case Line ln:
+                        list.Add(new { root, type, layer = ln.Layer, start = Pt(ln.StartPoint.TransformBy(xf)), end = Pt(ln.EndPoint.TransformBy(xf)) });
+                        break;
+                    case Polyline pl:
+                        var vertices = new List<object>(pl.NumberOfVertices);
+                        for (var i = 0; i < pl.NumberOfVertices; i++) vertices.Add(Pt(pl.GetPoint3dAt(i).TransformBy(xf)));
+                        list.Add(new { root, type, layer = pl.Layer, closed = pl.Closed, vertices });
+                        break;
+                }
+            }
+        }
+
+        foreach (var br in roots)
+        {
+            if (stop) break;
+            Walk(br, br.BlockTransform, HandleText.ToText(br.Handle.Value), 1);
+        }
+
+        tr.Abort();
+        return new { count = list.Count, limit = page.Limit, offset = page.Offset, hasMore = page.HasMore, nextOffset = page.NextOffset, items = list, notFound };
     }
 
     // ──────────────────────────────────────────────────────────────
