@@ -5,6 +5,7 @@ Không dependency ngoài, chạy offline. Cho Claude Desktop / Claude Code / b�
 
   tools/list  — sinh từ GET /tools của Bridge (chính bảng CommandCatalog) + tool `query` và `chat`
   tools/call  — POST /execute (luôn ép dryRun:true trừ khi tham số confirm=true), /query, /chat
+  AutoCAD: `query` kèm dwgPath đọc bản SAO của DWG bằng accoreconsole (DHCB_QUERY) — không cần mở AutoCAD
 
 Cấu hình Claude Desktop: xem docs/ai-offline.md, mục "MCP với Claude Desktop / Claude Code"
 (hoặc dùng gói .mcpb dựng bằng scripts/pack-mcpb.ps1 — không phải sửa file cấu hình nào).
@@ -12,7 +13,10 @@ Cấu hình Claude Desktop: xem docs/ai-offline.md, mục "MCP với Claude Desk
 
 import json
 import os
+import shutil
+import subprocess
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 try:
@@ -21,7 +25,8 @@ except ImportError:  # pragma: no cover
     from scripts import dhcb_agent  # type: ignore
 
 APP = (sys.argv[1] if len(sys.argv) > 1 else "revit").lower()
-if APP not in ("revit", "autocad"):
+APP_NAMES = {"revit": "Revit", "autocad": "AutoCAD"}
+if APP not in APP_NAMES:
     sys.stderr.write("Dùng: dhcb_mcp_server.py revit|autocad [--read-only] [--group NHÓM]\n")
     sys.exit(2)
 
@@ -95,10 +100,29 @@ def _valid_catalog(catalog) -> bool:
     return True
 
 
+QUERY_HELP = {
+    "revit": (
+        "Đọc ngữ cảnh Revit (không ghi). document_context trả định danh phiên model; document_info, levels, views, "
+        "sheets, rooms, elements, families, warnings, links, stats; element_geometry (hộp bao/đường tâm/connector, "
+        "params: elementIds hoặc categories), parameters_of (tham số của category — dùng trước khi dựng config), "
+        "schedule_rows, snapshot (ảnh PNG của view), selection (truyền elementIds để ĐẶT lựa chọn), "
+        "show_elements (zoom tới phần tử), active_view."
+    ),
+    "autocad": (
+        "Đọc bản vẽ AutoCAD (không ghi): document_context, drawing_info, layers, blocks, inserts, entities, text, "
+        "xrefs, layouts, stats, entity_geometry (params.handles), attributes_of, block_contents (chữ/line trong "
+        "block lồng), selection, show_entities, active_layout, snapshot. Lọc bằng params: layerContains, "
+        "entityType, blockName, blockNameContains, textContains, limit, offset. Kèm dwgPath thì đọc ngầm bản sao "
+        "của file DWG bằng accoreconsole — không cần mở AutoCAD (bỏ qua documentId; selection/show_entities/"
+        "active_layout chỉ có khi AutoCAD mở)."
+    ),
+}
+
+
 def tool_list() -> list:
     tools = []
     catalog, live = _load_catalog()
-    offline_note = "" if live else f" [{APP.capitalize()} chưa mở — mở phần mềm rồi thử lại]"
+    offline_note = "" if live else f" [{APP_NAMES[APP]} chưa mở — mở phần mềm rồi thử lại]"
     allowed = set(n.lower() for n in GROUPS.get(GROUP, ())) if GROUP else None
     for t in catalog.get("tools", []):
         if READ_ONLY and t.get("writesModel"):
@@ -117,20 +141,17 @@ def tool_list() -> list:
                            + offline_note,
             "inputSchema": {"type": "object", "properties": props},
         })
+    query_props = {
+        "query": {"type": "string"}, "params": {"type": "object"},
+        "documentId": {"type": "string", "description": "ID từ document_context; giữ nguyên giữa các trang"},
+    }
+    if APP == "autocad":
+        query_props["dwgPath"] = {"type": "string",
+                                  "description": "file .dwg để đọc ngầm bằng accoreconsole (không cần mở AutoCAD)"}
     tools.append({
         "name": "query",
-        "description": (
-            f"Đọc ngữ cảnh {APP} (không ghi). document_context trả định danh phiên model. Revit: document_info, levels, views, sheets, rooms, elements, "
-            "families, warnings, links, stats; element_geometry (hộp bao/đường tâm/connector, params: elementIds "
-            "hoặc categories), parameters_of (tham số của category — dùng trước khi dựng config), schedule_rows "
-            "(bảng thống kê dạng hàng), snapshot (ảnh PNG base64 của view — để NHÌN kết quả), selection (đang chọn "
-            "gì; truyền elementIds để ĐẶT lựa chọn), show_elements (zoom tới phần tử cho kỹ sư nhìn), active_view. "
-            "AutoCAD: drawing_info, layers, blocks, inserts…"
-        ),
-        "inputSchema": {"type": "object", "properties": {
-            "query": {"type": "string"}, "params": {"type": "object"},
-            "documentId": {"type": "string", "description": "ID từ document_context; giữ nguyên giữa các trang AutoCAD"},
-        }, "required": ["query"]},
+        "description": QUERY_HELP[APP],
+        "inputSchema": {"type": "object", "properties": query_props, "required": ["query"]},
     })
     if allowed is not None and "chat" not in allowed:
         return tools
@@ -142,9 +163,8 @@ def tool_list() -> list:
     return tools
 
 
-def _json_field_names(name: str) -> set:
+def _json_field_names(catalog: dict, name: str) -> set:
     """Tên field JSON thô của một lệnh, lấy từ schema chuẩn do Bridge công bố."""
-    catalog, _live = _load_catalog()
     for tool in catalog.get("tools", []):
         if tool.get("name", "").lower() == name.lower():
             properties = tool.get("inputSchema", {}).get("properties", {})
@@ -152,7 +172,82 @@ def _json_field_names(name: str) -> set:
     return set()
 
 
+# ---- Đọc DWG ngầm bằng accoreconsole (AutoCAD) --------------------------------------------------
+ACAD_YEARS = (2027, 2026, 2025, 2024, 2023, 2022)
+OFFLINE_TIMEOUT_SECONDS = 300
+
+
+def _offline_host():
+    """(accoreconsole.exe, DhcbTools.AutoCAD.Core.dll) của bản AutoCAD mới nhất có đủ cặp, hoặc (None, None).
+
+    DHCB_ACCORECONSOLE / DHCB_ACAD_CORE_DLL ghi đè (ví dụ trỏ vào bản build trong repo)."""
+    console_override = os.environ.get("DHCB_ACCORECONSOLE")
+    plugin_override = os.environ.get("DHCB_ACAD_CORE_DLL")
+    program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+    for year in ACAD_YEARS:
+        console = console_override or os.path.join(program_files, "Autodesk", f"AutoCAD {year}", "accoreconsole.exe")
+        plugin = plugin_override or os.path.join(
+            os.environ["APPDATA"], "Autodesk", "ApplicationPlugins", "DhcbTools.bundle", "Contents", str(year),
+            "DhcbTools.AutoCAD.Core.dll")
+        if os.path.isfile(console) and os.path.isfile(plugin):
+            return console, plugin
+    return None, None
+
+
+def _console_text(raw: bytes) -> str:
+    """accoreconsole ghi stdout UTF-16LE (có khi lẫn ANSI); bỏ NUL là đủ để dò thông báo lỗi."""
+    return raw.decode("utf-8", errors="replace").replace("\x00", "")
+
+
+def _offline_query(dwg_path: str, query: str, params: dict) -> dict:
+    """Chạy truy vấn chỉ đọc trên BẢN SAO của DWG (file gốc không bị khoá, không bị sửa)."""
+    if not os.path.isfile(dwg_path):
+        return {"success": False, "summary": f"Không thấy file DWG: {dwg_path}"}
+    console, plugin = _offline_host()
+    if console is None:
+        return {"success": False, "summary": "Không tìm thấy accoreconsole.exe (AutoCAD 2022–2027) kèm "
+                "DhcbTools.AutoCAD.Core.dll trong bundle DHCB; cài DHCB Tools hoặc đặt DHCB_ACCORECONSOLE/"
+                "DHCB_ACAD_CORE_DLL."}
+    with tempfile.TemporaryDirectory(prefix="dhcb-query-") as work:
+        copy = os.path.join(work, "ban-sao.dwg")
+        shutil.copyfile(dwg_path, copy)
+        query_path = os.path.join(work, "query.json")
+        out_path = os.path.join(work, "result.json")
+        script_path = os.path.join(work, "query.scr")
+        with open(query_path, "w", encoding="utf-8") as f:
+            json.dump({"query": query, "params": params}, f, ensure_ascii=False)
+        # Mỗi câu trả lời prompt một dòng, không bọc nháy (DHCB_QUERY đọc GetString AllowSpaces) — như AcadScriptGen.
+        with open(script_path, "w", encoding="utf-8") as f:
+            f.write(f'FILEDIA 0\nSECURELOAD 0\nNETLOAD "{plugin}"\nDHCB_QUERY\n{query_path}\n{out_path}\nQUIT Y\n')
+        try:
+            proc = subprocess.run(
+                [console, "/i", copy, "/s", script_path, "/l", "en-US"], capture_output=True,
+                timeout=OFFLINE_TIMEOUT_SECONDS, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        except subprocess.TimeoutExpired:
+            return {"success": False, "summary": f"accoreconsole quá {OFFLINE_TIMEOUT_SECONDS} s khi đọc {dwg_path}."}
+        if not os.path.isfile(out_path):
+            output = _console_text(proc.stdout + proc.stderr)
+            if "Unknown command" in output and "DHCB_QUERY" in output:
+                reason = f"{plugin} là bản cũ, chưa có lệnh DHCB_QUERY — cập nhật DHCB Tools."
+            elif "Unable to load" in output:
+                reason = f"accoreconsole không NETLOAD được {plugin}."
+            else:
+                reason = "accoreconsole không tạo file kết quả."
+            return {"success": False, "summary": reason, "consoleTail": " ".join(output.split())[-400:]}
+        with open(out_path, encoding="utf-8-sig") as f:
+            result = json.load(f)
+    if isinstance(result, dict):
+        result.setdefault("source", "accoreconsole")
+    return result
+
+
 def call_tool(name: str, arguments: dict) -> dict:
+    if name == "query" and APP == "autocad" and arguments.get("dwgPath"):
+        dwg_path = arguments["dwgPath"]
+        params = arguments.get("params") or {}
+        if not isinstance(dwg_path, str) or not isinstance(params, dict):
+            return {"success": False, "summary": "dwgPath phải là chuỗi và params phải là object."}
+        return _offline_query(dwg_path, arguments.get("query", ""), params)
     if name == "query":
         payload = {"query": arguments.get("query", ""), "params": arguments.get("params", {})}
         if "documentId" in arguments:
@@ -163,11 +258,11 @@ def call_tool(name: str, arguments: dict) -> dict:
         return dhcb_agent.request(APP, "POST", "/query", payload)
     if name == "chat":
         return dhcb_agent.request(APP, "POST", "/chat", {"text": arguments.get("text", "")})
+    # Một lần lấy danh mục cho cả kiểm --read-only lẫn tên field JSON. Dùng _load_catalog (có cache) chứ
+    # không gọi thẳng /tools: Bridge trục trặc nhất thời làm catalog rỗng thì lệnh ghi lọt qua --read-only.
+    catalog, _live = _load_catalog()
     if READ_ONLY:
         # Chỉ chấp nhận lệnh đọc; lệnh ghi bị từ chối ngay tại server (không phụ thuộc client).
-        # Dùng _load_catalog (có cache) chứ không gọi thẳng /tools: Bridge trục trặc nhất thời làm
-        # catalog rỗng thì `writes` rỗng theo và lệnh ghi lọt qua — đúng lỗ hổng cần bịt.
-        catalog, _live = _load_catalog()
         tools = catalog.get("tools") or []
         if not tools:
             return {"success": False,
@@ -182,7 +277,7 @@ def call_tool(name: str, arguments: dict) -> dict:
         return {"success": False, "summary": "confirm phải là boolean true/false, không nhận chuỗi hoặc số."}
     # FieldKind.Json được Bridge công bố bằng jsonEncoded: true. Chỉ những field đó mới được
     # giải mã từ chuỗi JSON; text tự do như "{Discipline}-{Number}" phải đi nguyên vẹn.
-    json_fields = _json_field_names(name)
+    json_fields = _json_field_names(catalog, name)
     for key, value in list(config.items()):
         if key in json_fields and isinstance(value, str):
             try:

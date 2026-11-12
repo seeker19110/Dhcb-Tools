@@ -65,5 +65,12 @@ file cấu hình nào (xem [`../tools/mcpb/README.md`](../tools/mcpb/README.md))
 
 Thêm `"--read-only"` hoặc `"--group", "<nhóm>"` vào `args` để thu hẹp bộ tool.
 
+**Đọc DWG không cần mở AutoCAD:** tool `query` của `dhcb-autocad` nhận thêm `dwgPath`. Server chép file ra thư mục
+tạm, chạy `accoreconsole.exe` (AutoCAD 2027→2022, bản mới nhất có cả DLL) với `NETLOAD DhcbTools.AutoCAD.Core.dll`
+trong bundle DHCB rồi `DHCB_QUERY`, trả kết quả kèm `"source": "accoreconsole"`. File gốc không bị khoá hay sửa.
+Ví dụ: `{"query": "block_contents", "dwgPath": "D:/du-an/DHKK.dwg", "params": {"blockName": "KT-NEN"}}`.
+Đặt `DHCB_ACCORECONSOLE` / `DHCB_ACAD_CORE_DLL` để trỏ vào host hoặc DLL khác (ví dụ bản build trong repo).
+Truy vấn cần giao diện (`selection`, `show_entities`, `active_layout`) vẫn phải mở AutoCAD.
+
 Token Bridge đọc từ `%APPDATA%\DHCB\bridge-token.txt` hoặc `DHCB_BRIDGE_TOKEN`. Mọi tool sửa mô hình chạy xem trước
 trước; truyền `confirm: true` để chạy thật.
