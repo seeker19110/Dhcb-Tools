@@ -468,6 +468,9 @@ namespace DhcbTools.Shared.Logic.Ai
             new CommandDescriptor("LayerTranslate", AutoCad, "Map layer cũ → layer chuẩn theo CSV (đổi entity, merge, đặt thuộc tính) — như LAYTRANS", true, "LayTrans")
                 .Field("mapCsvPath", "Source,Target,Color,Linetype,Lineweight,Plottable").Field("deleteEmptySource", "xoá layer nguồn rỗng").Field("dryRun", "xem trước")
                 .Words("layer translate", "laytrans", "đổi layer theo chuẩn", "map layer chuẩn"),
+            new CommandDescriptor("EntityLayerAssign", AutoCad, "Chuyển từng entity (theo handle) sang layer đích theo CSV Handle,Layer,Color — tách hệ khi một layer chứa lẫn nhiều hệ", true, "MoveToLayer")
+                .Field("mapCsvPath", "Handle,Layer,Color (Color ACI chỉ dùng khi tạo layer)").Field("createMissingLayers", "tạo layer đích chưa có", FieldKind.Bool).Field("dryRun", "xem trước")
+                .Words("chuyển layer theo handle", "tách hệ", "đổi layer từng đối tượng", "move to layer"),
             new CommandDescriptor("DrawingCompare", AutoCad, "So bản vẽ hiện tại với DWG khác ở mức layer (đếm entity theo layer) → CSV/HTML", false, "Compare")
                 .Field("otherPath", "DWG so sánh").Field("outputPath", "CSV hoặc HTML").Field("moveToleranceMm", "dung sai dời")
                 .Words("so sánh bản vẽ", "drawing compare", "khác nhau giữa hai bản"),

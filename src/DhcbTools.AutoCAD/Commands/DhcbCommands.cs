@@ -32,6 +32,7 @@ namespace DhcbTools.AutoCAD.Commands;
 ///   DHCB_GRID_EXTRACT       ↔ GridExtract
 ///   DHCB_XREF_AUDIT         ↔ XrefAudit
 ///   DHCB_LAYER_TRANSLATE    ↔ LayerTranslate
+///   DHCB_ENTITY_LAYER       ↔ EntityLayerAssign
 ///   DHCB_DRAWING_COMPARE    ↔ DrawingCompare
 ///   DHCB_DRAWING_COMBINE    ↔ DrawingCombine
 ///   DHCB_BLOCK_QUANTITY     ↔ BlockQuantity
@@ -452,6 +453,35 @@ public sealed class DhcbCommands
         };
 
         var command = new LayerTranslateCommand();
+        var result = ExecuteWithPreview(doc, command.CommandName, config);
+
+        PrintResult(ed, result);
+    }
+
+    // ──────────────────────────────────────────────
+    // Lệnh 11b: Chuyển từng entity sang layer theo handle (tách hệ)
+    // ──────────────────────────────────────────────
+    [CommandMethod("DHCB_ENTITY_LAYER", CommandFlags.Modal)]
+    public void EntityLayerAssign() => Run("DHCB_ENTITY_LAYER", EntityLayerAssignCore);
+
+    private static void EntityLayerAssignCore()
+    {
+        var doc = Application.DocumentManager.MdiActiveDocument;
+        if (doc is null) return;
+
+        var ed = doc.Editor;
+
+        var mapOpt = new PromptStringOptions("\nĐường dẫn file CSV (Handle,Layer,Color): ") { AllowSpaces = true };
+        var mapResult = ed.GetString(mapOpt);
+        if (mapResult.Status != PromptStatus.OK || string.IsNullOrWhiteSpace(mapResult.StringResult)) return;
+
+        var config = new EntityLayerAssignConfig
+        {
+            MapCsvPath = mapResult.StringResult.Trim().Trim('"'),
+            DryRun = AskDryRun(ed),
+        };
+
+        var command = new EntityLayerAssignCommand();
         var result = ExecuteWithPreview(doc, command.CommandName, config);
 
         PrintResult(ed, result);

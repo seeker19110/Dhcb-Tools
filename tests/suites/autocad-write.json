@@ -364,6 +364,84 @@
         ]
       },
       "allowWrite": true
+    },
+    {
+      "name": "Chuyển entity theo handle — xem trước: 3 entity, handle thiếu được báo",
+      "command": "EntityLayerAssign",
+      "//": "1EBA/1EBB la Line layer 4MDUCT trong Model, 1F21 la TEXT layer 2 trong layout cua ban ve mau; FFFFFF khong ton tai.",
+      "config": {
+        "mapCsvPath": "{suiteFolder}/fixtures/entity-layer-tach-he.csv"
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": true,
+        "minAffected": 3,
+        "maxAffected": 3,
+        "maxChangeEvents": 0,
+        "messagesContain": [
+          "Sẽ tạo layer mới: \"KL-TEST-ONG\" (màu 3)",
+          "1 handle không có trong bản vẽ"
+        ]
+      }
+    },
+    {
+      "name": "Chuyển entity theo handle — GHI THẬT",
+      "command": "EntityLayerAssign",
+      "allowWrite": true,
+      "config": {
+        "mapCsvPath": "{suiteFolder}/fixtures/entity-layer-tach-he.csv"
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 3,
+        "maxAffected": 3,
+        "summaryContains": [
+          "Đã chuyển 3 entity"
+        ],
+        "messagesContain": [
+          "→ \"KL-TEST-ONG\": 2 entity"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      }
+    },
+    {
+      "name": "Chạy lại — 0 entity đổi (bằng chứng đã ghi thật)",
+      "command": "EntityLayerAssign",
+      "allowWrite": true,
+      "config": {
+        "mapCsvPath": "{suiteFolder}/fixtures/entity-layer-tach-he.csv"
+      },
+      "expect": {
+        "success": true,
+        "maxAffected": 0,
+        "messagesContain": [
+          "3 entity đã ở đúng layer đích"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      }
+    },
+    {
+      "name": "Trả entity về layer gốc",
+      "command": "EntityLayerAssign",
+      "allowWrite": true,
+      "config": {
+        "mapCsvPath": "{suiteFolder}/fixtures/entity-layer-tra-ve.csv",
+        "createMissingLayers": false
+      },
+      "expect": {
+        "success": true,
+        "partialSuccess": false,
+        "minAffected": 3,
+        "maxAffected": 3,
+        "noErrors": true,
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      }
     }
   ]
 }
