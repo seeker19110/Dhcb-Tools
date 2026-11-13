@@ -426,7 +426,7 @@ namespace DhcbTools.Shared.Logic.Ai
             new CommandDescriptor("LayerExport", AutoCad, "Xuất layer ra CSV", false)
                 .Field("outputPath", "file CSV").Field("filterNameContains", "lọc tên")
                 .Words("xuất layer", "export layer"),
-            new CommandDescriptor("LayerImport", AutoCad, "Nhập layer từ CSV", true)
+            new CommandDescriptor("LayerImport", AutoCad, "Nhập layer từ CSV — sửa được cả layer xref đã có (XREF|LAYER: đóng băng, tắt, khoá, màu), không tạo layer có '|'", true)
                 .Field("inputPath", "file CSV").Field("createMissing", "tạo layer thiếu").Field("dryRun", "xem trước")
                 .Words("nhập layer", "import layer"),
             new CommandDescriptor("DrawingCleanup", AutoCad, "Dọn layer rỗng, block/linetype/textstyle/dimstyle/regapp không dùng", true, "Cleanup", "Purge")
@@ -465,6 +465,13 @@ namespace DhcbTools.Shared.Logic.Ai
             new CommandDescriptor("XrefAudit", AutoCad, "Liệt kê xref, đường dẫn thiếu, xref chưa load", false)
                 .Field("outputPath", "file CSV (tuỳ chọn)")
                 .Words("xref", "kiểm tra xref", "xref thiếu"),
+            new CommandDescriptor("XrefAttach", AutoCad, "Gắn file DWG làm xref (overlay mặc định, hoặc attach) vào Model Space tại điểm chèn, tỉ lệ, góc, layer — như XATTACH", true, "AttachXref", "OverlayXref")
+                .Field("path", "đường dẫn đầy đủ file DWG", FieldKind.FilePath).Field("name", "tên xref (rỗng = tên file)")
+                .Field("overlay", "true = overlay, false = attach", FieldKind.Bool)
+                .Field("x", "điểm chèn X", FieldKind.Number).Field("y", "điểm chèn Y", FieldKind.Number).Field("z", "điểm chèn Z", FieldKind.Number)
+                .Field("scale", "tỉ lệ đều (mặc định 1, không tự quy đổi đơn vị)", FieldKind.Number).Field("rotation", "góc xoay, độ", FieldKind.Number)
+                .Field("layer", "layer đặt bản chèn xref (tạo nếu chưa có)").Field("dryRun", "xem trước")
+                .Words("gắn xref", "attach xref", "overlay xref", "xattach", "chèn xref"),
             new CommandDescriptor("LayerTranslate", AutoCad, "Map layer cũ → layer chuẩn theo CSV (đổi entity, merge, đặt thuộc tính) — như LAYTRANS", true, "LayTrans")
                 .Field("mapCsvPath", "Source,Target,Color,Linetype,Lineweight,Plottable").Field("deleteEmptySource", "xoá layer nguồn rỗng").Field("dryRun", "xem trước")
                 .Words("layer translate", "laytrans", "đổi layer theo chuẩn", "map layer chuẩn"),
@@ -474,10 +481,10 @@ namespace DhcbTools.Shared.Logic.Ai
             new CommandDescriptor("PolylineImport", AutoCad, "Vẽ polyline vào Model Space từ CSV Id,Layer,Width,Color,Closed,Vertices — vẽ lại tim ống bóc khối lượng, ranh khu vực", true, "DrawPolylines")
                 .Field("inputPath", "CSV Id,Layer,Width,Color,Closed,Vertices (Vertices = \"x y;x y;…\")").Field("replaceExisting", "xoá polyline cũ trên layer đích trước khi vẽ", FieldKind.Bool).Field("dryRun", "xem trước")
                 .Words("vẽ polyline từ file", "vẽ tim ống", "import polyline", "vẽ pline"),
-            new CommandDescriptor("EntityEdit", AutoCad, "Vẽ và sửa hình học bằng lô thao tác JSON: tạo line/polyline/rectangle/circle/arc/ellipse/text/mtext/hatch/point; move/copy/array/rotate/scale/mirror/offset/erase theo handle — một giao dịch, trả handle mới", true, "Draw", "EntityTransform")
-                .Field("operations", "mảng thao tác JSON, ví dụ [{\"op\":\"line\",\"from\":[0,0],\"to\":[1000,0],\"layer\":\"M-ONG\",\"id\":\"a\"},{\"op\":\"copy\",\"handles\":[\"@a\"],\"delta\":[0,500],\"count\":3}]. Toạ độ [x,y] đơn vị bản vẽ, góc tính bằng độ; text/mtext nhận \"style\" (chữ tiếng Việt cần style font Unicode)", FieldKind.Json)
+            new CommandDescriptor("EntityEdit", AutoCad, "Vẽ và sửa hình học bằng lô thao tác JSON: tạo line/polyline/rectangle/circle/arc/ellipse/text/mtext/hatch/point; move/copy/array/rotate/scale/mirror/offset/erase/explode/set/trim/replacePoints theo handle — một giao dịch, trả handle mới", true, "Draw", "EntityTransform")
+                .Field("operations", "mảng thao tác JSON, ví dụ [{\"op\":\"line\",\"from\":[0,0],\"to\":[1000,0],\"layer\":\"M-ONG\",\"id\":\"a\"},{\"op\":\"copy\",\"handles\":[\"@a\"],\"delta\":[0,500],\"count\":3}]. Toạ độ [x,y] đơn vị bản vẽ, góc tính bằng độ; text/mtext nhận \"style\" (chữ tiếng Việt cần style font Unicode). explode phá block (attribute thành chữ, \"layerMap\":{\"0\":\"M-ONG\"}, \"layer\" cho mảnh còn lại); set đổi \"layer\"/\"color\" (0 ByBlock, 256 ByLayer)/\"width\" (bề rộng đều polyline); trim cắt LWPOLYLINE/LINE giữ đoạn \"from\"→\"to\" (điểm chiếu lên đường); replacePoints thay đỉnh một LWPOLYLINE (\"points\", \"closed\", \"width\") — giữ handle", FieldKind.Json)
                 .Field("inputPath", "file JSON chứa mảng thao tác (tuỳ chọn, chạy trước operations)", FieldKind.FilePath).Field("dryRun", "xem trước")
-                .Words("vẽ line", "vẽ hình", "vẽ đường tròn", "dời đối tượng", "xoay đối tượng", "offset", "sao chép đối tượng", "mảng đối tượng", "draw entity"),
+                .Words("vẽ line", "vẽ hình", "vẽ đường tròn", "dời đối tượng", "xoay đối tượng", "offset", "sao chép đối tượng", "mảng đối tượng", "draw entity", "explode", "phá block", "cắt polyline", "đổi bề rộng polyline", "sửa đỉnh polyline"),
             new CommandDescriptor("BlockInsert", AutoCad, "Đặt block vào Model Space theo danh sách vị trí (tỉ lệ, góc, layer, attribute) — lấy định nghĩa trong bản vẽ hoặc nạp từ thư viện DWG/thư mục ký hiệu", true, "InsertBlock", "PlaceSymbols")
                 .Field("blockName", "tên block").Field("libraryPath", "DWG thư viện chứa block, DWG là ký hiệu, hoặc thư mục có <tên>.dwg", FieldKind.FilePath)
                 .Field("redefine", "nạp lại định nghĩa từ thư viện dù bản vẽ đã có", FieldKind.Bool)

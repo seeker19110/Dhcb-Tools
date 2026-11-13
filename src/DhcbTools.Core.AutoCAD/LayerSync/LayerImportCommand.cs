@@ -8,7 +8,8 @@ namespace DhcbTools.Core.AutoCAD.LayerSync;
 /// <summary>
 /// Đọc lại file CSV do <see cref="LayerExportCommand"/> tạo ra (đã chỉnh sửa trong Excel) và ghi giá trị
 /// ngược vào drawing: color, linetype, lineweight, plottable, description, và trạng thái đóng băng / tắt / khoá.
-/// Tuỳ chọn tạo layer mới nếu CSV có layer chưa tồn tại (<c>createMissing</c>).
+/// Tuỳ chọn tạo layer mới nếu CSV có layer chưa tồn tại (<c>createMissing</c>). Layer phụ thuộc xref
+/// (<c>XREF|LAYER</c>) đã có thì sửa được như layer thường (đóng băng, tắt, khoá, màu…) — không bao giờ tạo mới.
 /// <para>
 /// <b>Chỉ ghi ô đã đổi.</b> Bản trước mở MỌI layer trong CSV ở chế độ ghi rồi gán lại y nguyên giá trị
 /// cũ, nên nhập lại chính file vừa xuất vẫn báo "cập nhật 70 layer" — không phân biệt được với việc kỹ
@@ -48,6 +49,7 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
         var created = 0;
         var unchanged = 0;
         var visibilityChanged = false;
+        var xrefChanged = 0;
         var result = CommandResult.Ok(string.Empty);
 
         using var transaction = database.TransactionManager.StartTransaction();
@@ -70,8 +72,12 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
             result.Messages.AddRange(row.Warnings);
 
             // Tên có ký tự cấm (< > / \ " : ; ? * | , = `) làm LayerTableRecord.Name ném exception giữa
-            // transaction — báo dòng lỗi rồi đi tiếp thay vì sập cả lệnh.
-            if (!AcadHelpers.IsValidSymbolName(row.Name))
+            // transaction — báo dòng lỗi rồi đi tiếp thay vì sập cả lệnh. Riêng dạng XREF|LAYER là layer phụ thuộc
+            // xref: hợp lệ nếu hai phía hợp lệ — lượt 2 chỉ cho SỬA layer xref đã có, không bao giờ tạo.
+            var validName = XrefLayerName.TrySplit(row.Name, out var xrefPart, out var layerPart)
+                ? AcadHelpers.IsValidSymbolName(xrefPart) && AcadHelpers.IsValidSymbolName(layerPart)
+                : AcadHelpers.IsValidSymbolName(row.Name);
+            if (!validName)
             {
                 result.Messages.Add($"Bỏ qua dòng {i + 1}: tên layer \"{row.Name}\" không hợp lệ với AutoCAD.");
                 invalid++;
@@ -89,6 +95,20 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
         {
             var layerName = row.Name;
             var isNew = !layerTable.Has(layerName);
+            var isXref = XrefLayerName.IsDependentName(layerName);
+            if (isXref)
+            {
+                var problem = XrefLayerName.ImportProblem(
+                    layerName,
+                    !isNew,
+                    !isNew && ((LayerTableRecord)transaction.GetObject(layerTable[layerName], OpenMode.ForRead)).IsDependent);
+                if (problem != null)
+                {
+                    result.Messages.Add($"Bỏ qua dòng {rowNumber}: {problem}");
+                    continue;
+                }
+            }
+
             if (isNew && !config.CreateMissing)
             {
                 result.Messages.Add($"Bỏ qua dòng {rowNumber}: layer \"{layerName}\" không tồn tại.");
@@ -141,12 +161,19 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
             }
 
             updated++;
+            xrefChanged += isXref ? 1 : 0;
             result.Messages.Add($"Layer \"{layerName}\": {changes.Count} thuộc tính đổi.");
         }
 
         if (unchanged > 0)
         {
             result.Messages.Insert(0, $"{unchanged} layer giữ nguyên vì mọi giá trị trong CSV trùng với drawing.");
+        }
+
+        // Layer xref: VISRETAIN = 0 thì lần nạp lại xref sau ghi đè trạng thái vừa đổi — nói trước, không để kỹ sư ngỡ lệnh hỏng.
+        if (xrefChanged > 0 && !database.Visretain)
+        {
+            result.Messages.Insert(0, XrefLayerName.VisretainWarning(xrefChanged));
         }
 
         if (invalid > 0)

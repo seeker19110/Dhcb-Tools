@@ -3910,3 +3910,29 @@ cách gốc 0,125) nên 20 lần vẫn chỉ 2,5 mm — đúng hành vi AutoCAD,
   trong phiên AutoCAD đó nên dừng thao tác GUI. `gui-test.dwg` (bản chép, có thay đổi chưa lưu) vẫn mở trong AutoCAD:
   đóng không lưu.
 - Bundle đang chạy chưa có trường `style` (thêm sau khi chép DLL) — có hiệu lực ở lần cập nhật bundle sau.
+
+## 79. Bridge bớt phải vòng qua COM: layer xref, `explode`/`set`/`trim`/`replacePoints`, `XrefAttach` (2026-11-13)
+
+Phiên bóc khối lượng ngày 13/11 phải dùng COM cho bốn việc mà Bridge chưa làm được: đóng băng layer xref (`LayerImport`
+từ chối tên `1F|M-HVAC-DUCT-1` vì `|` là ký tự cấm), phá block TG, đổi `ConstantWidth` của pline, cắt đầu pline (xoá
+rồi vẽ lại). Thêm `XrefAttach` vì gắn overlay mặt bằng cũng phải dùng COM.
+
+Chạy trong AutoCAD 2026 thật (accoreconsole, bản chép bản vẽ mẫu, `run-in-autocad-tests.ps1 -Suite write -AllowWrites`):
+**45 đạt / 0 trượt / 45 ca**.
+
+| Ca | Kết quả |
+|---|---|
+| `XrefAttach` `{sourceFile}` | chặn: "Không gắn bản vẽ vào chính nó" |
+| `XrefAttach` overlay `fixtures/tuyen-ong.dwg` tên `XR-TUYEN-ONG`, layer mới — xem trước rồi ghi thật | xem trước 0 sự kiện ghi; ghi thật bản chèn 9193, tạo layer `KL-TEST-XREF` |
+| `LayerImport` `layers-xref.csv`: `XR-TUYEN-ONG\|TUYEN-ONG` màu 1 + đóng băng; `XR-KHONG-CO\|TUYEN-ONG` với `createMissing` | 1 cập nhật (2 thuộc tính), 0 tạo mới — dòng thứ hai báo "không tạo layer có '\|'"; nhập lại ra 0 |
+| `EntityEdit` pline → `set` width 20 → `trim` from lệch 5 → `replacePoints` 4 đỉnh kín → `set` layer → `explode` (`layerMap`) → `erase` | trim "còn 3 đỉnh… đã chiếu lên đường", "3 → 4 đỉnh", "phá 1 đối tượng → 4 mảnh", tự dọn: "tạo 0, sửa 0, xoá 5" |
+
+Ngoài bộ ca (BatchRunner, lưu ra bản chép rồi đọc lại bằng `query` + `dwgPath`):
+
+- Phá `AMB006` 8A56 với `layerMap {"0": "KL-MANH-0"}`: 2 mảnh (polyline kín + line) khớp từng đỉnh với `block_contents`
+  của block gốc, cả hai trên `KL-MANH-0`. Năm attribute của AMB006 đều `invisible` nên không thành chữ — lần chạy đầu
+  bỏ im lặng, đã sửa để báo "bỏ 5 attribute ẩn (REF=R2; MAKE/MODEL=HOLYOAKE HI-35; …) — xuất bằng AttributeExport trước".
+- Phá block fixture `DHCB-QA-ENGINEERING` (attribute hiện): 2 DBText mang **giá trị** ("UNSET", "plain-two") chứ không
+  phải tên tag, giữ vị trí, cỡ chữ 10 và layer của attribute.
+
+Test .NET 2402/2402, Python 354/354.
