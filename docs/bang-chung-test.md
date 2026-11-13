@@ -81,6 +81,7 @@
 - §76 — [MCP AutoCAD đọc DWG ngầm bằng accoreconsole — `query` + `dwgPath` (2026-11-12)](#76-mcp-autocad-đọc-dwg-ngầm-bằng-accoreconsole-query-dwgpath-2026-11-12)
 - §77 — [Học từ autocad-mcp (puran-water / bản dịch ks40-academy): `EntityEdit`, `BlockInsert`, snapshot plot ngầm, ảnh MCP (2026-11-13)](#77-học-từ-autocad-mcp-puran-water-bản-dịch-ks40-academy-entityedit-blockinsert-snapshot-plot-ngầm-ảnh-mcp-2026-11-13)
 - §78 — [`EntityEdit`, `BlockInsert`, snapshot trong AutoCAD 2026 GUI thật qua Bridge (2026-11-13)](#78-entityedit-blockinsert-snapshot-trong-autocad-2026-gui-thật-qua-bridge-2026-11-13)
+- §79 — [MCP AutoCAD nhanh hơn — gộp truy vấn, nhiều DWG song song, nhớ kết quả (2026-11-13)](#79-mcp-autocad-nhanh-hơn-gộp-truy-vấn-nhiều-dwg-song-song-nhớ-kết-quả-2026-11-13)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
@@ -3910,3 +3911,32 @@ cách gốc 0,125) nên 20 lần vẫn chỉ 2,5 mm — đúng hành vi AutoCAD,
   trong phiên AutoCAD đó nên dừng thao tác GUI. `gui-test.dwg` (bản chép, có thay đổi chưa lưu) vẫn mở trong AutoCAD:
   đóng không lưu.
 - Bundle đang chạy chưa có trường `style` (thêm sau khi chép DLL) — có hiệu lực ở lần cập nhật bundle sau.
+
+## 79. MCP AutoCAD nhanh hơn — gộp truy vấn, nhiều DWG song song, nhớ kết quả (2026-11-13)
+
+Đo trên máy 20 nhân, AutoCAD 2026 GUI đang mở bản vẽ dự án (23.981 entity), accoreconsole 2026 + bundle đã cài;
+29 DWG thật của một thư mục dự án (161 KB → 63 MB, tổng 383 MB, 248.143 entity). Mọi lượt đọc ngầm chạy trên bản sao.
+
+**Trước khi sửa** — Bridge không phải chỗ chậm: `/health` 6 ms, `/tools` 1,6 ms, `document_context` trung vị 27 ms
+(20 lượt), `stats`/`layers` 68–85 ms, `entities` 2.000 dòng 113 ms. Chỗ chậm nằm ở lớp MCP:
+
+| Việc | Trước | Sau |
+|---|---|---|
+| 4 truy vấn (`stats`, `layers`, `drawing_info`, `layouts`) trên DWG 63 MB | 4 phiên accoreconsole, ~10 s mỗi phiên (đo 10,0 s và 10,1 s) | 1 phiên, **10,2 s** (`queries`) |
+| Hỏi lại đúng 4 truy vấn đó, file chưa đổi | như trên | **< 0,01 s** (`cached: true`) |
+| `stats` của cả 29 DWG | **92,2 s** (một tiến trình một lúc) | **15,3 s** (`dwgPaths`, 10 accoreconsole cùng lúc), 0 lỗi |
+| 6 `tools/call` đọc ngầm + 1 lần gọi Bridge gộp 3 truy vấn, gửi cùng lúc | xếp hàng, từng cái một | **3,2 s**, 7/7 `isError: false` |
+| Bridge đóng: `tools/list` rồi một lệnh | mỗi lần nối bị từ chối ~2,0 s, lấy danh mục lại mỗi lệnh | danh mục nhớ 5 s |
+| Nội dung trả về, `entities` 2.000 dòng | 643.876 ký tự (thụt lề) | 430.150 ký tự (gọn) |
+
+Lệnh qua Bridge vẫn đi một luồng theo đúng thứ tự gửi (hai lệnh ghi không đổi chỗ); chỉ đọc ngầm mới song song.
+Bản cài `%LOCALAPPDATA%\Programs\DHCB Tools\scripts\dhcb_mcp_server.py` đã thay bằng bản này (bản cũ ở
+`%USERPROFILE%\DHCB-Backups\mcp-server-20261113`), chạy thử qua stdio: `serverInfo.version` 1.2.0, `queries` qua Bridge trả đủ.
+
+Test thuần: `test_dhcb_mcp_server.py` 74 ca (thêm 10 ca tốc độ), toàn bộ Python 554 ca đạt, phủ 100% (3.054 câu lệnh).
+
+### Còn mở
+
+- Sàn ~1,9 s mỗi phiên accoreconsole (khởi động + NETLOAD) và ~10 s mở DWG 63 MB vẫn còn ở lần hỏi đầu tiên.
+- Bộ nhớ kết quả nằm trong tiến trình server: khởi động lại MCP là mất.
+- Không đổi DLL: Bridge và `DHCB_QUERY` giữ nguyên.

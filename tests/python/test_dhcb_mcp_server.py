@@ -491,6 +491,162 @@ class OfflineQueryTests(unittest.TestCase):
         self.assertNotIn("AutoCAD", revit["description"])
 
 
+class SpeedTests(OfflineQueryTests):
+    """Nâng cấp tốc độ: gộp truy vấn, nhiều file song song, nhớ kết quả, tools/call song song."""
+
+    @staticmethod
+    def _fake_console(answer, calls):
+        """Giả accoreconsole cho script nhiều DHCB_QUERY: answer(query) -> kết quả, None = không ghi file."""
+
+        def run(args, **kwargs):
+            lines = Path(args[args.index("/s") + 1]).read_text(encoding="utf-8").splitlines()
+            queries = []
+            for index, line in enumerate(lines):
+                if line != "DHCB_QUERY":
+                    continue
+                request = json.loads(Path(lines[index + 1]).read_text(encoding="utf-8"))
+                queries.append(request["query"])
+                result = answer(request["query"])
+                if result is not None:
+                    Path(lines[index + 2]).write_text(json.dumps(result), encoding="utf-8")
+            calls.append(queries)
+            return mock.Mock(stdout=b"Command: QUIT", stderr=b"")
+
+        return run
+
+    def test_queries_gop_vao_mot_phien_va_lan_sau_lay_tu_bo_nho(self) -> None:
+        calls = []
+        run = self._fake_console(lambda q: {"q": q} if q != "list" else [1], calls)
+        with load(("autocad",)) as (module, _), mock.patch.object(module.subprocess, "run", side_effect=run):
+            args = {"dwgPath": str(self.dwg), "queries": ["stats", {"query": "layers", "params": {"limit": 1}}, "list"]}
+            first = module.call_tool("query", args)
+            second = module.call_tool("query", args)
+            single = module.call_tool("query", {"dwgPath": str(self.dwg), "query": "stats"})
+            self.dwg.write_bytes(b"AC1032-doi-noi-dung")
+            changed = module.call_tool("query", {"dwgPath": str(self.dwg), "query": "stats"})
+
+        self.assertEqual([["stats", "layers", "list"], ["stats"]], calls)  # một phiên cho ba truy vấn; file đổi mới chạy lại
+        self.assertEqual(["stats", "layers", "list"], [r["query"] for r in first["results"]])
+        self.assertNotIn("cached", first["results"][0]["result"])
+        self.assertTrue(second["results"][0]["result"]["cached"])
+        self.assertEqual([1], second["results"][2]["result"])
+        self.assertTrue(single["cached"])
+        self.assertNotIn("cached", changed)
+
+    def test_truy_van_hong_khong_duoc_nho_va_duoc_dem(self) -> None:
+        calls = []
+        run = self._fake_console(lambda q: {"q": q} if q == "stats" else None, calls)
+        with load(("autocad",)) as (module, _), mock.patch.object(module.subprocess, "run", side_effect=run):
+            args = {"dwgPath": str(self.dwg), "queries": ["stats", "hong", "hong2"]}
+            first = module.call_tool("query", args)
+            module.call_tool("query", args)
+            all_bad = module.call_tool("query", {"dwgPath": str(self.dwg), "queries": ["hong"]})
+
+        self.assertEqual(2, first["failed"])
+        self.assertNotIn("success", first)
+        self.assertEqual("accoreconsole không tạo file kết quả.", first["results"][2]["result"]["summary"])
+        self.assertEqual(["hong", "hong2"], calls[1])  # chỉ chạy lại phần hỏng
+        self.assertFalse(all_bad["success"])
+
+    def test_qua_thoi_gian_thi_moi_truy_van_deu_bao_loi(self) -> None:
+        with load(("autocad",)) as (module, _), mock.patch.object(
+                module.subprocess, "run", side_effect=module.subprocess.TimeoutExpired("acc", 1)):
+            result = module.call_tool("query", {"dwgPath": str(self.dwg), "queries": ["a", "b"]})
+        self.assertEqual(2, result["failed"])
+
+    def test_dwgPaths_doc_nhieu_file(self) -> None:
+        other = self.root / "khac.dwg"
+        other.write_bytes(b"AC1032")
+        calls = []
+        run = self._fake_console(lambda q: {"q": q}, calls)
+        with load(("autocad",)) as (module, _), mock.patch.object(module.subprocess, "run", side_effect=run):
+            one = module.call_tool("query", {"query": "stats", "dwgPaths": [str(self.dwg), str(other)]})
+            many = module.call_tool("query", {"queries": ["stats", "layers"], "dwgPaths": [str(self.dwg), str(self.root / "khong-co.dwg")]})
+            bad = module.call_tool("query", {"query": "stats", "dwgPaths": "khong-phai-mang"})
+
+        self.assertEqual([str(self.dwg), str(other)], [f["dwgPath"] for f in one["files"]])
+        self.assertEqual("stats", one["files"][1]["result"]["q"])
+        self.assertEqual(2, many["failed"])
+        self.assertEqual(2, len(many["files"][0]["results"]))
+        self.assertFalse(bad["success"])
+
+    def test_queries_sai_dang_bi_tu_choi(self) -> None:
+        with load(("autocad",)) as (module, agent):
+            for queries in ("stats", [], [5], [{"query": "a", "params": "x"}], ["a"] * 33):
+                with self.subTest(queries=queries):
+                    self.assertFalse(module.call_tool("query", {"queries": queries})["success"])
+            agent.request.assert_not_called()
+
+    def test_queries_qua_bridge_chay_lan_luot_giu_documentId(self) -> None:
+        with load(("autocad",)) as (module, agent):
+            agent.request.side_effect = [{"n": 1}, {"error": "hỏng"}]
+            result = module.call_tool("query", {"queries": ["stats", "layers"], "documentId": "abc"})
+            bad_id = module.call_tool("query", {"query": "stats", "documentId": ""})
+
+        self.assertEqual({"query": "layers", "params": {}, "documentId": "abc"}, agent.request.call_args[0][3])
+        self.assertEqual(1, result["failed"])
+        self.assertFalse(bad_id["success"])
+
+    def test_bo_nho_co_tran_va_bo_muc_cu(self) -> None:
+        with load(("autocad",)) as (module, _):
+            module.CACHE_MAX_BYTES = 100
+            module._cache_put("a", {"v": "x" * 10})
+            module._cache_put("a", {"v": "y" * 10})          # ghi đè: không cộng dồn byte
+            module._cache_put("b", {"v": "z" * 15})
+            module._cache_put("to", {"v": "x" * 60})          # quá 1/4 trần: không nhớ
+            module._cache_put(None, {"v": 1})
+            for name in "cdef":
+                module._cache_put(name, {"v": name * 15})
+            self.assertIsNone(module._cache_get("a"))         # bị đẩy ra vì lâu chưa dùng
+            self.assertIsNone(module._cache_get("to"))
+            self.assertIsNone(module._cache_get(None))
+            self.assertEqual("f" * 15, module._cache_get("f")["v"])
+            self.assertLessEqual(module._cache_bytes, 100)
+            self.assertIsNone(module._cache_key(str(self.root / "khong-co.dwg"), str(self.plugin), "q", {}))
+
+    def test_so_tien_trinh_song_song(self) -> None:
+        with load(("autocad",)) as (module, _):
+            with mock.patch.dict("os.environ", {"DHCB_OFFLINE_PARALLEL": "3"}):
+                self.assertEqual(3, module._parallel_default())
+            with mock.patch.dict("os.environ", {"DHCB_OFFLINE_PARALLEL": "nhieu"}), \
+                    mock.patch.object(module.os, "cpu_count", return_value=None):
+                self.assertEqual(2, module._parallel_default())
+
+    def test_danh_muc_duoc_nho_ngan_han(self) -> None:
+        with load(("autocad",)) as (module, agent):
+            module.tool_list()
+            module.tool_list()
+            self.assertEqual(1, agent.request.call_count)
+            module._catalog_memo = None
+            module.tool_list()
+            self.assertEqual(2, agent.request.call_count)
+
+    def test_doc_ngam_song_song_con_lenh_bridge_giu_thu_tu(self) -> None:
+        import threading
+        gate = threading.Barrier(2, timeout=10)
+        order = []
+
+        def call(name, arguments):
+            if name == "query":
+                gate.wait()          # chỉ qua được khi HAI truy vấn đọc ngầm cùng đang chạy
+                return {"ok": True}
+            order.append(name)
+            return {"success": True, "summary": name}
+
+        messages = [{"jsonrpc": "2.0", "id": i, "method": "tools/call", "params": {"name": n, "arguments": a}}
+                    for i, (n, a) in enumerate([("query", {"dwgPath": "a.dwg"}), ("query", {"dwgPaths": ["b.dwg"]}),
+                                                ("Lenh1", {}), ("Lenh2", {}), ("Lenh3", {})])]
+        with load(("autocad",)) as (module, _), mock.patch.object(module, "call_tool", side_effect=call), \
+                mock.patch.object(module.sys, "stdin", io.StringIO("\n".join(json.dumps(m) for m in messages) + "\n")), \
+                redirect_stdout(io.StringIO()) as out:
+            module.main()
+
+        replies = [json.loads(line) for line in out.getvalue().splitlines()]
+        self.assertEqual([0, 1, 2, 3, 4], sorted(r["id"] for r in replies))
+        self.assertEqual(["Lenh1", "Lenh2", "Lenh3"], order)
+        self.assertTrue(all("\n" not in r["result"]["content"][0]["text"] for r in replies))  # JSON gọn, không thụt lề
+
+
 class ImageContentTests(unittest.TestCase):
     """Snapshot đi thành khối MCP ``image`` để mô hình NHÌN được ảnh, không phải đọc chuỗi base64."""
 
