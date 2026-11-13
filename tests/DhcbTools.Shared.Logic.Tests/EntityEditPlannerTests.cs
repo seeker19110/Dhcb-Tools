@@ -154,5 +154,61 @@ public class EntityEditPlannerTests
         Assert.Equal(0, EntityEditPlanner.Z(new[] { 1.0, 2 }));
         Assert.False(EntityEditPlanner.IsPoint(new[] { 1.0 }));
         Assert.Contains("erase", EntityEditPlanner.ValidOps);
+        Assert.Contains("explode", EntityEditPlanner.ValidOps);
+        Assert.Contains("replacepoints", EntityEditPlanner.ValidOps);
+    }
+
+    /// <summary>
+    /// Bốn op thêm sau phiên bóc khối lượng 2026-11-13 (khi đó phải vòng qua COM): phá block, đổi layer/màu/bề rộng
+    /// đều, cắt đầu pline và thay đỉnh pline tại chỗ.
+    /// </summary>
+    [Fact]
+    public void OpMoi_ExplodeSetTrimReplacePoints_HopLe()
+    {
+        var plan = Plan("""
+            [
+              {"op":"explode","handles":["2A1"],"layerMap":{"0":"M-ONG-GIO"},"layer":"M-PHU-KIEN","id":"manh"},
+              {"op":"set","handles":["@manh"],"color":256},
+              {"op":"set","handles":["3B"],"layer":"M-ONG","color":0,"width":0},
+              {"op":"trim","handles":["3B"],"from":[100,0]},
+              {"op":"trim","handles":["3C"],"from":[0,0],"to":[50,0]},
+              {"op":"replacePoints","handles":["3D"],"points":[[0,0],[10,0],[10,10]],"closed":false,"width":2}
+            ]
+            """);
+
+        Assert.Empty(plan.Errors);
+        Assert.Equal(new[] { EntityOpKind.Explode, EntityOpKind.Set, EntityOpKind.Set, EntityOpKind.Trim, EntityOpKind.Trim, EntityOpKind.ReplacePoints },
+            plan.Steps.Select(s => s.Kind));
+        Assert.True(plan.Steps[0].Produces);
+        Assert.False(plan.Steps[0].Creates);
+        Assert.False(plan.Steps[1].Produces);
+        Assert.False(plan.Steps[3].Produces);
+        Assert.Equal("M-ONG-GIO", plan.Steps[0].Source.LayerMap!["0"]);
+    }
+
+    [Theory]
+    [InlineData("""{"op":"set","handles":["1F"]}""", "ít nhất một")]
+    [InlineData("""{"op":"set","handles":["1F"],"color":300}""", "0–256")]
+    [InlineData("""{"op":"set","handles":["1F"],"width":-1}""", "width")]
+    [InlineData("""{"op":"set","handles":["1F"],"layer":" "}""", "layer rỗng")]
+    [InlineData("""{"op":"set","handles":["1F"],"color":1,"id":"x"}""", "\"id\"")]
+    [InlineData("""{"op":"explode","handles":["1F"],"color":1}""", "\"set\"")]
+    [InlineData("""{"op":"explode","handles":["1F"],"layerMap":{}}""", "layerMap rỗng")]
+    [InlineData("""{"op":"explode","handles":["1F"],"layerMap":{"0":" "}}""", "tên layer rỗng")]
+    [InlineData("""{"op":"explode"}""", "thiếu \"handles\"")]
+    [InlineData("""{"op":"move","handles":["1F"],"delta":[1,0],"layerMap":{"0":"A"}}""", "chỉ dùng cho explode")]
+    [InlineData("""{"op":"trim","handles":["1F"]}""", "from (đầu mới)")]
+    [InlineData("""{"op":"trim","handles":["1F"],"from":[1]}""", "dạng [x, y]")]
+    [InlineData("""{"op":"trim","handles":["1F"],"from":[1,1],"to":[1,1]}""", "from trùng to")]
+    [InlineData("""{"op":"trim","handles":["1F"],"from":[1,1],"layer":"A"}""", "\"set\"")]
+    [InlineData("""{"op":"replacePoints","handles":["1F","20"],"points":[[0,0],[1,0]]}""", "đúng một polyline")]
+    [InlineData("""{"op":"replacepoints","handles":["1F"],"points":[[0,0]]}""", "points ≥ 2")]
+    [InlineData("""{"op":"replacePoints","handles":["1F"],"points":[[0,0],[1,0]],"width":-2}""", "width")]
+    public void OpMoi_GiaTriSai_BaoDungTruong(string op, string expected)
+    {
+        var plan = Plan("[" + op + "]");
+
+        Assert.False(plan.IsValid);
+        Assert.Contains(plan.Errors, e => e.Contains(expected, StringComparison.Ordinal));
     }
 }

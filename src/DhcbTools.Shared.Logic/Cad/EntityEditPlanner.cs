@@ -13,17 +13,22 @@ namespace DhcbTools.Shared.Logic.Cad
     public sealed class EntityOperation
     {
         /// <summary>line, polyline, rectangle, circle, arc, ellipse, text, mtext, hatch, point (tạo) —
-        /// move, copy, array, rotate, scale, mirror, offset, erase (sửa theo handle).</summary>
+        /// move, copy, array, rotate, scale, mirror, offset, erase, explode, set, trim, replacePoints (sửa theo handle).</summary>
         public string Op { get; set; } = string.Empty;
 
         /// <summary>Nhãn đặt cho đối tượng tạo ra (kể cả bản sao) — op sau trỏ lại bằng <c>"@nhãn"</c> trong <see cref="Handles"/>.</summary>
         public string? Id { get; set; }
 
-        /// <summary>Layer cho đối tượng tạo ra (tạo layer nếu chưa có). Rỗng = layer hiện hành.</summary>
+        /// <summary>Layer cho đối tượng tạo ra (tạo layer nếu chưa có). Rỗng = layer hiện hành. <c>set</c>: layer mới của
+        /// đối tượng; <c>explode</c>: layer cho mọi mảnh không khớp <see cref="LayerMap"/>.</summary>
         public string? Layer { get; set; }
 
-        /// <summary>Màu ACI 1–255 cho đối tượng tạo ra (rỗng = ByLayer).</summary>
+        /// <summary>Màu ACI 1–255 cho đối tượng tạo ra (rỗng = ByLayer). <c>set</c> nhận thêm 0 = ByBlock, 256 = ByLayer.</summary>
         public short? Color { get; set; }
+
+        /// <summary>Explode: layer gốc → layer đích cho các mảnh (vd <c>{"0": "M-PIPE"}</c>); layer không có trong bảng
+        /// thì theo <see cref="Layer"/>, không có <see cref="Layer"/> thì giữ nguyên.</summary>
+        public Dictionary<string, string>? LayerMap { get; set; }
 
         public List<string>? Handles { get; set; }
 
@@ -116,6 +121,10 @@ namespace DhcbTools.Shared.Logic.Cad
         Mirror,
         Offset,
         Erase,
+        Explode,
+        Set,
+        Trim,
+        ReplacePoints,
     }
 
     /// <summary>Một op đã kiểm: số thứ tự (1-based), loại, và bản gốc để vỏ AutoCAD đọc giá trị.</summary>
@@ -138,6 +147,7 @@ namespace DhcbTools.Shared.Logic.Cad
 
         /// <summary>Op này sinh đối tượng mới (tạo hoặc sao chép) — nhãn <see cref="EntityOperation.Id"/> có nghĩa.</summary>
         public bool Produces => Creates || Kind == EntityOpKind.Copy || Kind == EntityOpKind.Array || Kind == EntityOpKind.Offset
+                                || Kind == EntityOpKind.Explode
                                 || (Kind == EntityOpKind.Mirror && Source.KeepOriginal != false);
 
         public string Label => $"#{Index} {Kind.ToString().ToLowerInvariant()}";
@@ -189,6 +199,10 @@ namespace DhcbTools.Shared.Logic.Cad
             ["offset"] = EntityOpKind.Offset,
             ["erase"] = EntityOpKind.Erase,
             ["delete"] = EntityOpKind.Erase,
+            ["explode"] = EntityOpKind.Explode,
+            ["set"] = EntityOpKind.Set,
+            ["trim"] = EntityOpKind.Trim,
+            ["replacePoints"] = EntityOpKind.ReplacePoints,
         };
 
         /// <summary>Tên op hợp lệ (tên chính, không kể bí danh) — dùng trong thông báo lỗi.</summary>
@@ -237,7 +251,7 @@ namespace DhcbTools.Shared.Logic.Cad
                     var label = op.Id!.Trim();
                     if (!step.Produces)
                     {
-                        plan.Errors.Add($"{step.Label}: \"id\" chỉ dùng cho op sinh đối tượng mới (tạo, copy, array, offset, mirror giữ gốc).");
+                        plan.Errors.Add($"{step.Label}: \"id\" chỉ dùng cho op sinh đối tượng mới (tạo, copy, array, offset, mirror giữ gốc, explode).");
                     }
                     else if (label.StartsWith("@", StringComparison.Ordinal) || label.Length > 64)
                     {
@@ -283,7 +297,14 @@ namespace DhcbTools.Shared.Logic.Cad
             }
             else
             {
-                Need(op.Layer == null && op.Color == null, "op sửa không đặt layer/color — dùng EntityLayerAssign để đổi layer.");
+                var takesLayer = step.Kind == EntityOpKind.Set || step.Kind == EntityOpKind.Explode;
+                var takesColor = step.Kind == EntityOpKind.Set;
+                Need((op.Layer == null || takesLayer) && (op.Color == null || takesColor),
+                    "op này không đặt layer/color — dùng op \"set\" (hoặc EntityLayerAssign) để đổi layer/màu.");
+                if (takesLayer && op.Layer != null && op.Layer.Trim().Length == 0)
+                {
+                    errors.Add($"{name}: layer rỗng — bỏ trường nếu không đổi layer.");
+                }
                 if (op.Handles == null || op.Handles.Count == 0)
                 {
                     errors.Add($"{name}: thiếu \"handles\" (handle hex hoặc @nhãn của op trước).");
@@ -382,6 +403,35 @@ namespace DhcbTools.Shared.Logic.Cad
                     break;
                 case EntityOpKind.Erase:
                     break;
+                case EntityOpKind.Explode:
+                    if (op.LayerMap != null)
+                    {
+                        Need(op.LayerMap.Count > 0, "layerMap rỗng — bỏ trường nếu không ánh xạ layer.");
+                        Need(op.LayerMap.All(p => p.Key.Trim().Length > 0 && !string.IsNullOrWhiteSpace(p.Value)),
+                            "layerMap có tên layer rỗng (cả khoá lẫn giá trị phải có chữ).");
+                    }
+
+                    break;
+                case EntityOpKind.Set:
+                    Need(op.Layer != null || op.Color != null || op.Width != null, "cần ít nhất một trong layer, color, width.");
+                    Need(op.Color == null || (op.Color >= 0 && op.Color <= 256), "color phải là ACI 0–256 (0 = ByBlock, 256 = ByLayer).");
+                    Need(op.Width == null || (IsFinite(op.Width.Value) && op.Width >= 0), "width (bề rộng đều polyline) phải ≥ 0.");
+                    break;
+                case EntityOpKind.Trim:
+                    Need(op.From != null || op.To != null, "cần from (đầu mới) và/hoặc to (cuối mới) dạng [x, y].");
+                    Need((op.From == null || IsPoint(op.From)) && (op.To == null || IsPoint(op.To)), "from/to phải dạng [x, y].");
+                    Need(!IsPoint(op.From) || !IsPoint(op.To) || Distance(op.From!, op.To!) > 0, "from trùng to — không còn gì để giữ.");
+                    break;
+                case EntityOpKind.ReplacePoints:
+                    Need(op.Handles == null || op.Handles.Count == 1, "replacePoints sửa đúng một polyline mỗi op (handles một phần tử).");
+                    Need(op.Points != null && op.Points.Count >= 2 && op.Points.All(IsPoint), "cần points ≥ 2 đỉnh dạng [[x, y], …].");
+                    Need(op.Width == null || (IsFinite(op.Width.Value) && op.Width >= 0), "width phải ≥ 0.");
+                    break;
+            }
+
+            if (step.Kind != EntityOpKind.Explode && op.LayerMap != null)
+            {
+                errors.Add($"{name}: \"layerMap\" chỉ dùng cho explode.");
             }
         }
 

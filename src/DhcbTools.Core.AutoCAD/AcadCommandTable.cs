@@ -45,6 +45,7 @@ public static class AcadCommandTable
                 "LAYERSTANDARDCHECK" => new LayerStandardCheckCommand().Execute(db, Deserialize<LayerStandardCheckConfig>(configJson)),
                 "GRIDEXTRACT" => new GridExtractCommand().Execute(db, Deserialize<GridExtractConfig>(configJson)),
                 "XREFAUDIT" => new XrefAuditCommand().Execute(db, Deserialize<XrefAuditConfig>(configJson)),
+                "XREFATTACH" => new XrefAttachCommand().Execute(db, Deserialize<XrefAttachConfig>(configJson)),
                 "LAYERTRANSLATE" => new LayerTranslateCommand().Execute(db, Deserialize<LayerTranslateConfig>(configJson)),
                 "ENTITYLAYERASSIGN" => new EntityLayerAssignCommand().Execute(db, Deserialize<EntityLayerAssignConfig>(configJson)),
                 "ENTITYEDIT" => new EntityEditCommand().Execute(db, Deserialize<EntityEditConfig>(configJson)),

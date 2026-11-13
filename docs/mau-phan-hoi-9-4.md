@@ -87,12 +87,12 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 | `SpecToConfig` | AI offline: trích tầng/cao độ/hệ từ thuyết minh → config | ☐ | ☐ | ☐ | |
 | `DictionaryLearn` | AI offline: soi tên tham số thật của dự án → dictionary.json | ☐ | ☐ | ☐ | |
 
-## AutoCAD — 20 lệnh
+## AutoCAD — 21 lệnh
 
 | Lệnh | Việc nó làm | Tuần | Bỏ | Chưa | Nếu bỏ: vì sao |
 |---|---|:--:|:--:|:--:|---|
 | `LayerExport` | Xuất layer ra CSV | ☐ | ☐ | ☐ | |
-| `LayerImport` | Nhập layer từ CSV | ☐ | ☐ | ☐ | |
+| `LayerImport` | Nhập layer từ CSV (sửa được cả layer xref `XREF\|LAYER` đã có) | ☐ | ☐ | ☐ | |
 | `DrawingCleanup` | Dọn layer rỗng, block/linetype/textstyle/dimstyle không dùng | ☐ | ☐ | ☐ | |
 | `AutoNumbering` | Đánh số Block Reference theo attribute | ☐ | ☐ | ☐ | |
 | `AttributeExport` | Xuất attribute của block ra CSV | ☐ | ☐ | ☐ | |
@@ -101,10 +101,11 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 | `LayerStandardCheck` | Kiểm tra layer theo bộ quy tắc đặt tên → HTML | ☐ | ☐ | ☐ | |
 | `GridExtract` | Trích trục từ layer AXIS ra CSV cho Revit GridFromCsv | ☐ | ☐ | ☐ | |
 | `XrefAudit` | Liệt kê xref, đường dẫn thiếu, xref chưa load | ☐ | ☐ | ☐ | |
+| `XrefAttach` | Gắn DWG làm xref (overlay/attach) tại điểm chèn, tỉ lệ, góc, layer | ☐ | ☐ | ☐ | |
 | `LayerTranslate` | Map layer cũ → layer chuẩn theo CSV (như LAYTRANS) | ☐ | ☐ | ☐ | |
 | `EntityLayerAssign` | Chuyển từng đối tượng (handle) sang layer đích — tách hệ | ☐ | ☐ | ☐ | |
 | `PolylineImport` | Vẽ polyline từ CSV (tim ống bóc khối lượng) | ☐ | ☐ | ☐ | |
-| `EntityEdit` | Vẽ/sửa hình học theo lô JSON (line, tròn, text, hatch; dời, xoay, sao chép, offset, xoá) | ☐ | ☐ | ☐ | |
+| `EntityEdit` | Vẽ/sửa hình học theo lô JSON (line, tròn, text, hatch; dời, xoay, sao chép, offset, xoá; phá block, đổi layer/màu/bề rộng, cắt/sửa đỉnh polyline) | ☐ | ☐ | ☐ | |
 | `BlockInsert` | Đặt block từ thư viện DWG/thư mục ký hiệu theo danh sách vị trí | ☐ | ☐ | ☐ | |
 | `DrawingCompare` | So bản vẽ với DWG khác ở mức layer → CSV/HTML | ☐ | ☐ | ☐ | |
 | `DrawingCombine` | Gộp nhiều DWG vào bản vẽ hiện tại: mỗi file một block, chép layout | ☐ | ☐ | ☐ | |

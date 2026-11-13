@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "DHCB — đường ghi thật trong AutoCAD",
   "model": "Data Extraction and Multileaders Sample.dwg",
   "//": [
@@ -1269,6 +1269,228 @@
         ],
         "summaryNotContains": [
           "Xem trước"
+        ]
+      }
+    },
+    {
+      "name": "Gắn xref — tự gắn chính mình bị chặn",
+      "command": "XrefAttach",
+      "config": {
+        "path": "{sourceFile}"
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "Không gắn xref",
+          "chính nó"
+        ]
+      }
+    },
+    {
+      "name": "Gắn xref overlay — xem trước",
+      "command": "XrefAttach",
+      "config": {
+        "path": "{suiteFolder}/fixtures/tuyen-ong.dwg",
+        "name": "XR-TUYEN-ONG",
+        "x": -40000,
+        "y": 0,
+        "layer": "KL-TEST-XREF"
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxAffected": 1,
+        "maxChangeEvents": 0,
+        "summaryContains": [
+          "Xem trước",
+          "overlay \"XR-TUYEN-ONG\"",
+          "layer sẽ được tạo"
+        ]
+      }
+    },
+    {
+      "name": "Gắn xref overlay — GHI THẬT",
+      "command": "XrefAttach",
+      "allowWrite": true,
+      "config": {
+        "path": "{suiteFolder}/fixtures/tuyen-ong.dwg",
+        "name": "XR-TUYEN-ONG",
+        "x": -40000,
+        "y": 0,
+        "layer": "KL-TEST-XREF",
+        "dryRun": false
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxAffected": 1,
+        "summaryContains": [
+          "Đã gắn overlay \"XR-TUYEN-ONG\""
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "messagesContain": [
+          "Đã tạo layer \"KL-TEST-XREF\"",
+          "XR-TUYEN-ONG|"
+        ]
+      }
+    },
+    {
+      "name": "Đóng băng + đổi màu layer của xref vừa gắn — GHI THẬT; layer xref chưa có thì không tạo",
+      "command": "LayerImport",
+      "allowWrite": true,
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/layers-xref.csv",
+        "createMissing": true,
+        "dryRun": false
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxAffected": 1,
+        "summaryContains": [
+          "1 cập nhật, 0 tạo mới"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "messagesContain": [
+          "Layer \"XR-TUYEN-ONG|TUYEN-ONG\": 2 thuộc tính đổi",
+          "không tạo layer có '|'"
+        ]
+      }
+    },
+    {
+      "name": "Nhập lại CSV layer xref — phải ra 0 (bằng chứng đã ghi thật)",
+      "command": "LayerImport",
+      "allowWrite": true,
+      "config": {
+        "inputPath": "{suiteFolder}/fixtures/layers-xref.csv",
+        "dryRun": false
+      },
+      "expect": {
+        "success": true,
+        "maxAffected": 0,
+        "summaryContains": [
+          "0 cập nhật, 0 tạo mới"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      }
+    },
+    {
+      "name": "Sửa polyline tại chỗ và phá — set/trim/replacePoints/explode, tự dọn — GHI THẬT",
+      "command": "EntityEdit",
+      "allowWrite": true,
+      "config": {
+        "dryRun": false,
+        "operations": [
+          {
+            "op": "pline",
+            "points": [
+              [
+                -60000,
+                0
+              ],
+              [
+                -59000,
+                0
+              ],
+              [
+                -59000,
+                500
+              ]
+            ],
+            "layer": "KL-TEST-SUA",
+            "id": "p"
+          },
+          {
+            "op": "set",
+            "handles": [
+              "@p"
+            ],
+            "width": 20,
+            "color": 3
+          },
+          {
+            "op": "trim",
+            "handles": [
+              "@p"
+            ],
+            "from": [
+              -59800,
+              5
+            ]
+          },
+          {
+            "op": "replacePoints",
+            "handles": [
+              "@p"
+            ],
+            "points": [
+              [
+                -60000,
+                0
+              ],
+              [
+                -59500,
+                0
+              ],
+              [
+                -59500,
+                500
+              ],
+              [
+                -60000,
+                500
+              ]
+            ],
+            "closed": true
+          },
+          {
+            "op": "set",
+            "handles": [
+              "@p"
+            ],
+            "layer": "KL-TEST-SUA-2",
+            "color": 256
+          },
+          {
+            "op": "explode",
+            "handles": [
+              "@p"
+            ],
+            "layerMap": {
+              "KL-TEST-SUA-2": "KL-TEST-MANH"
+            },
+            "id": "m"
+          },
+          {
+            "op": "erase",
+            "handles": [
+              "@m"
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "success": true,
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "summaryContains": [
+          "tạo 0 đối tượng, sửa 0, xoá 5"
+        ],
+        "messagesContain": [
+          "#3 trim",
+          "còn 3 đỉnh",
+          "đã chiếu lên đường",
+          "#4 replacepoints",
+          "3 → 4 đỉnh",
+          "#6 explode: phá 1 đối tượng → 4 mảnh",
+          "Đã tạo layer \"KL-TEST-MANH\""
         ]
       }
     }

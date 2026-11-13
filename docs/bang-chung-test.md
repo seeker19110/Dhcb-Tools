@@ -82,6 +82,7 @@
 - §77 — [Học từ autocad-mcp (puran-water / bản dịch ks40-academy): `EntityEdit`, `BlockInsert`, snapshot plot ngầm, ảnh MCP (2026-11-13)](#77-học-từ-autocad-mcp-puran-water-bản-dịch-ks40-academy-entityedit-blockinsert-snapshot-plot-ngầm-ảnh-mcp-2026-11-13)
 - §78 — [`EntityEdit`, `BlockInsert`, snapshot trong AutoCAD 2026 GUI thật qua Bridge (2026-11-13)](#78-entityedit-blockinsert-snapshot-trong-autocad-2026-gui-thật-qua-bridge-2026-11-13)
 - §79 — [MCP AutoCAD nhanh hơn — gộp truy vấn, nhiều DWG song song, nhớ kết quả (2026-11-13)](#79-mcp-autocad-nhanh-hơn-gộp-truy-vấn-nhiều-dwg-song-song-nhớ-kết-quả-2026-11-13)
+- §80 — [Bridge bớt phải vòng qua COM: layer xref, `explode`/`set`/`trim`/`replacePoints`, `XrefAttach` (2026-11-13)](#80-bridge-bớt-phải-vòng-qua-com-layer-xref-explodesettrimreplacepoints-xrefattach-2026-11-13)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
@@ -3940,3 +3941,29 @@ Test thuần: `test_dhcb_mcp_server.py` 74 ca (thêm 10 ca tốc độ), toàn b
 - Sàn ~1,9 s mỗi phiên accoreconsole (khởi động + NETLOAD) và ~10 s mở DWG 63 MB vẫn còn ở lần hỏi đầu tiên.
 - Bộ nhớ kết quả nằm trong tiến trình server: khởi động lại MCP là mất.
 - Không đổi DLL: Bridge và `DHCB_QUERY` giữ nguyên.
+
+## 80. Bridge bớt phải vòng qua COM: layer xref, `explode`/`set`/`trim`/`replacePoints`, `XrefAttach` (2026-11-13)
+
+Phiên bóc khối lượng ngày 13/11 phải dùng COM cho bốn việc mà Bridge chưa làm được: đóng băng layer xref (`LayerImport`
+từ chối tên `1F|M-HVAC-DUCT-1` vì `|` là ký tự cấm), phá block TG, đổi `ConstantWidth` của pline, cắt đầu pline (xoá
+rồi vẽ lại). Thêm `XrefAttach` vì gắn overlay mặt bằng cũng phải dùng COM.
+
+Chạy trong AutoCAD 2026 thật (accoreconsole, bản chép bản vẽ mẫu, `run-in-autocad-tests.ps1 -Suite write -AllowWrites`):
+**45 đạt / 0 trượt / 45 ca**.
+
+| Ca | Kết quả |
+|---|---|
+| `XrefAttach` `{sourceFile}` | chặn: "Không gắn bản vẽ vào chính nó" |
+| `XrefAttach` overlay `fixtures/tuyen-ong.dwg` tên `XR-TUYEN-ONG`, layer mới — xem trước rồi ghi thật | xem trước 0 sự kiện ghi; ghi thật bản chèn 9193, tạo layer `KL-TEST-XREF` |
+| `LayerImport` `layers-xref.csv`: `XR-TUYEN-ONG\|TUYEN-ONG` màu 1 + đóng băng; `XR-KHONG-CO\|TUYEN-ONG` với `createMissing` | 1 cập nhật (2 thuộc tính), 0 tạo mới — dòng thứ hai báo "không tạo layer có '\|'"; nhập lại ra 0 |
+| `EntityEdit` pline → `set` width 20 → `trim` from lệch 5 → `replacePoints` 4 đỉnh kín → `set` layer → `explode` (`layerMap`) → `erase` | trim "còn 3 đỉnh… đã chiếu lên đường", "3 → 4 đỉnh", "phá 1 đối tượng → 4 mảnh", tự dọn: "tạo 0, sửa 0, xoá 5" |
+
+Ngoài bộ ca (BatchRunner, lưu ra bản chép rồi đọc lại bằng `query` + `dwgPath`):
+
+- Phá `AMB006` 8A56 với `layerMap {"0": "KL-MANH-0"}`: 2 mảnh (polyline kín + line) khớp từng đỉnh với `block_contents`
+  của block gốc, cả hai trên `KL-MANH-0`. Năm attribute của AMB006 đều `invisible` nên không thành chữ — lần chạy đầu
+  bỏ im lặng, đã sửa để báo "bỏ 5 attribute ẩn (REF=R2; MAKE/MODEL=HOLYOAKE HI-35; …) — xuất bằng AttributeExport trước".
+- Phá block fixture `DHCB-QA-ENGINEERING` (attribute hiện): 2 DBText mang **giá trị** ("UNSET", "plain-two") chứ không
+  phải tên tag, giữ vị trí, cỡ chữ 10 và layer của attribute.
+
+Test .NET 2402/2402, Python 354/354.

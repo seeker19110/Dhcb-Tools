@@ -31,7 +31,7 @@ public sealed class CadCommandWindow : Window
         ["DrawingCleanup"] = typeof(CleanupConfig), ["AutoNumbering"] = typeof(AutoNumberingConfig),
         ["AttributeExport"] = typeof(AttributeExportConfig), ["AttributeImport"] = typeof(AttributeImportConfig),
         ["TextReplace"] = typeof(TextReplaceConfig), ["LayerStandardCheck"] = typeof(LayerStandardCheckConfig),
-        ["GridExtract"] = typeof(GridExtractConfig), ["XrefAudit"] = typeof(XrefAuditConfig),
+        ["GridExtract"] = typeof(GridExtractConfig), ["XrefAudit"] = typeof(XrefAuditConfig), ["XrefAttach"] = typeof(XrefAttachConfig),
         ["LayerTranslate"] = typeof(LayerTranslateConfig), ["EntityLayerAssign"] = typeof(EntityLayerAssignConfig), ["PolylineImport"] = typeof(PolylineImportConfig), ["EntityEdit"] = typeof(EntityEditConfig), ["BlockInsert"] = typeof(BlockInsertConfig), ["DrawingCompare"] = typeof(DrawingCompareConfig),
         ["DrawingCombine"] = typeof(DrawingCombineConfig),
         ["BlockQuantity"] = typeof(BlockQuantityConfig), ["AttributeIncrement"] = typeof(AttributeIncrementConfig),
