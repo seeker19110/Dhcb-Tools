@@ -22,3 +22,6 @@ TestResults/
 
 # Không commit family sinh ra khi chạy scripts/dung-family.ps1 (nhị phân, dựng lại được).
 out/
+
+# Nhật ký plot của AutoCAD (snapshot plot chạy trong accoreconsole/BatchRunner ghi vào thư mục hiện hành)
+plot.log

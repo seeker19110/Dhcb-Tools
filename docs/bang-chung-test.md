@@ -80,6 +80,7 @@
 - §75 — [`DrawingCombine` trong AutoCAD GUI thật — hai lỗi accoreconsole không lộ ra, đã sửa (2026-11-12)](#75-drawingcombine-trong-autocad-gui-thật-hai-lỗi-accoreconsole-không-lộ-ra-đã-sửa-2026-11-12)
 - §76 — [MCP AutoCAD đọc DWG ngầm bằng accoreconsole — `query` + `dwgPath` (2026-11-12)](#76-mcp-autocad-đọc-dwg-ngầm-bằng-accoreconsole-query-dwgpath-2026-11-12)
 - §77 — [Học từ autocad-mcp (puran-water / bản dịch ks40-academy): `EntityEdit`, `BlockInsert`, snapshot plot ngầm, ảnh MCP (2026-11-13)](#77-học-từ-autocad-mcp-puran-water-bản-dịch-ks40-academy-entityedit-blockinsert-snapshot-plot-ngầm-ảnh-mcp-2026-11-13)
+- §78 — [`EntityEdit`, `BlockInsert`, snapshot trong AutoCAD 2026 GUI thật qua Bridge (2026-11-13)](#78-entityedit-blockinsert-snapshot-trong-autocad-2026-gui-thật-qua-bridge-2026-11-13)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
@@ -3879,7 +3880,33 @@ Test thuần: Shared.Logic **2346 đạt**, phủ 100% (planner `EntityEdit` 27 
 
 ### Còn mở
 
-- Chưa chạy trong **AutoCAD GUI**: render sống có vùng (`RenderOffScreen` + `window`/`handles`), plot từ GUI đổi tab
-  layout tạm thời, nút Ribbon/form của hai lệnh mới. Bundle trên máy cần cập nhật DLL mới có hiệu lực.
+- ~~Chưa chạy trong AutoCAD GUI~~ — đã chạy, xem §78 (trừ nút Ribbon/form).
 - `mirror` text theo ma trận gương nên chữ bị lật (như MIRRTEXT=1); `offset` hướng theo dấu `distance` của AutoCAD.
 - `test_installer` vẫn đỏ trên máy này vì môi trường (như §76).
+
+## 78. `EntityEdit`, `BlockInsert`, snapshot trong AutoCAD 2026 GUI thật qua Bridge (2026-11-13)
+
+Cập nhật bundle `%APPDATA%\Autodesk\ApplicationPlugins\DhcbTools.bundle\Contents\2026` bằng bản build của PR #207
+(bản cũ giữ ở `Contents\backup-2026-20261113-135010`). AutoCAD đang mở bản vẽ dự án thật có 61 thay đổi chưa lưu:
+chép một bản sao file trên đĩa, QSAVE (DBMOD về 0), đóng qua COM, chép DLL, mở AutoCAD với **bản chép bản vẽ mẫu**
+(`gui-test.dwg`) — mọi lệnh ghi chỉ vào bản chép đó. Bridge 8766 lên sau khi mở, `/tools` có đủ 20 lệnh.
+
+| Ca (Bridge, xem trước → previewToken → ghi thật) | Kết quả |
+|---|---|
+| `EntityEdit` 8 thao tác (rectangle, text, offset `@phong`, circle, copy ×2, hatch, line, rotate `@cheo`) | xem trước "tạo 8", 0 handle giả; ghi thật handle 913F–9146, `@phong → 913F`… |
+| `snapshot` `live` + `handles` | 1200×900, ôm đúng các đối tượng vừa vẽ ([ảnh](bang-chung/2026-11-13/gui-live-handles.png)) |
+| `snapshot` `plot` + `handles` khi kỹ sư đang ở **Layout1** | 1152×900 ([ảnh](bang-chung/2026-11-13/gui-plot-handles.png)); `active_layout` trước/sau đều `Layout1` — tab được trả lại |
+| `snapshot` `live` toàn bộ; `plot` + `window` | 1600×1200; 1152×900 |
+| `BlockInsert` 2 × `AMB006` (scale 200, góc 0°/30°, layer mới `KL-GUI-BI`) | `inserts` đọc lại: `REF` GUI-01/GUI-02, `SERVICE` "CẤP GIÓ TƯƠI", tag không truyền giữ mặc định "XX", góc 30° |
+
+Lộ ra một thiếu sót: chữ "PHÒNG BƠM" hiện "B?M" — text đi theo style hiện hành mà font SHX của style đó không có "Ơ".
+Đã thêm trường `style` cho text/mtext (kiểm ngay từ xem trước, sai tên thì liệt kê style có sẵn); `autocad-write`
+39/39 (thêm ca style). Hatch ANSI31 `patternScale` 20 hiện như tô đặc: bản vẽ mẫu dùng `acad.pat` hệ inch (khoảng
+cách gốc 0,125) nên 20 lần vẫn chỉ 2,5 mm — đúng hành vi AutoCAD, chỉnh bằng `patternScale`.
+
+### Còn mở
+
+- Chưa bấm thử nút Ribbon "Vẽ/sửa theo lô JSON", "Đặt block từ thư viện" và form — người dùng đã mở lại bản vẽ dự án
+  trong phiên AutoCAD đó nên dừng thao tác GUI. `gui-test.dwg` (bản chép, có thay đổi chưa lưu) vẫn mở trong AutoCAD:
+  đóng không lưu.
+- Bundle đang chạy chưa có trường `style` (thêm sau khi chép DLL) — có hiệu lực ở lần cập nhật bundle sau.

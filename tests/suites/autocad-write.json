@@ -800,6 +800,31 @@
       }
     },
     {
+      "name": "Vẽ theo lô JSON — text style không có: báo danh sách style, ngay từ xem trước",
+      "command": "EntityEdit",
+      "config": {
+        "operations": [
+          {
+            "op": "text",
+            "position": [
+              0,
+              0
+            ],
+            "text": "Ơ",
+            "style": "KL-KHONG-CO-STYLE"
+          }
+        ]
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "#1 text",
+          "KL-KHONG-CO-STYLE",
+          "Standard"
+        ]
+      }
+    },
+    {
       "name": "Vẽ theo lô JSON — GHI THẬT",
       "command": "EntityEdit",
       "allowWrite": true,
@@ -827,7 +852,8 @@
             ],
             "text": "PHÒNG BƠM",
             "height": 250,
-            "layer": "KL-TEST-VE"
+            "layer": "KL-TEST-VE",
+            "style": "Standard"
           },
           {
             "op": "offset",
