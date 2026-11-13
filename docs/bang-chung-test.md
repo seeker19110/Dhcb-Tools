@@ -82,6 +82,7 @@
 - §77 — [Học từ autocad-mcp (puran-water / bản dịch ks40-academy): `EntityEdit`, `BlockInsert`, snapshot plot ngầm, ảnh MCP (2026-11-13)](#77-học-từ-autocad-mcp-puran-water-bản-dịch-ks40-academy-entityedit-blockinsert-snapshot-plot-ngầm-ảnh-mcp-2026-11-13)
 - §78 — [`EntityEdit`, `BlockInsert`, snapshot trong AutoCAD 2026 GUI thật qua Bridge (2026-11-13)](#78-entityedit-blockinsert-snapshot-trong-autocad-2026-gui-thật-qua-bridge-2026-11-13)
 - §79 — [MCP AutoCAD nhanh hơn — gộp truy vấn, nhiều DWG song song, nhớ kết quả (2026-11-13)](#79-mcp-autocad-nhanh-hơn-gộp-truy-vấn-nhiều-dwg-song-song-nhớ-kết-quả-2026-11-13)
+- §80 — [Bridge bớt phải vòng qua COM: layer xref, `explode`/`set`/`trim`/`replacePoints`, `XrefAttach` (2026-11-13)](#80-bridge-bớt-phải-vòng-qua-com-layer-xref-explodesettrimreplacepoints-xrefattach-2026-11-13)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
