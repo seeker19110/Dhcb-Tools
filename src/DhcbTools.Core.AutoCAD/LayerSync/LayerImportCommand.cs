@@ -47,6 +47,7 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
         var updated = 0;
         var created = 0;
         var unchanged = 0;
+        var visibilityChanged = false;
         var result = CommandResult.Ok(string.Empty);
 
         using var transaction = database.TransactionManager.StartTransaction();
@@ -112,7 +113,7 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
                 var newLayer = new LayerTableRecord { Name = layerName };
                 ltWrite.Add(newLayer);
                 transaction.AddNewlyCreatedDBObject(newLayer, true);
-                foreach (var apply in PlanChanges(transaction, database, newLayer, row, result.Messages))
+                foreach (var apply in PlanChanges(transaction, database, newLayer, row, result.Messages, out _))
                 {
                     apply(newLayer);
                 }
@@ -123,7 +124,7 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
 
             // Mở ở chế độ ĐỌC trước để so sánh; chỉ nâng lên ghi khi thật sự có ô khác.
             var layer = (LayerTableRecord)transaction.GetObject(layerTable[layerName], OpenMode.ForRead);
-            var changes = PlanChanges(transaction, database, layer, row, result.Messages);
+            var changes = PlanChanges(transaction, database, layer, row, result.Messages, out var hidesOrShows);
             if (changes.Count == 0)
             {
                 unchanged++;
@@ -136,6 +137,7 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
             {
                 layer.UpgradeOpen();
                 foreach (var apply in changes) apply(layer);
+                visibilityChanged |= hidesOrShows;
             }
 
             updated++;
@@ -167,6 +169,14 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
             $"Đã nhập {updated + created} layer từ \"{config.InputPath}\" ({updated} cập nhật, {created} tạo mới).",
             updated + created);
         final.Messages.AddRange(result.Messages);
+
+        // Gán IsFrozen/IsOff qua API không tự vẽ lại màn hình: không Regen thì kỹ sư thấy bản vẽ y như cũ
+        // dù lệnh báo thành công (2026-11-13, rã băng 30 layer mà "chưa thấy hiện"). Phải sau Commit.
+        if (visibilityChanged && !AcadDisplay.RequestRegen(database))
+        {
+            final.Messages.Add("Đã đổi trạng thái đóng băng/tắt layer — nếu màn hình chưa đổi, gõ REGEN để vẽ lại.");
+        }
+
         return WithConflicts(final, plan);
     }
 
@@ -211,12 +221,15 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
 
     /// <summary>
     /// Danh sách thay đổi thật sự cần ghi cho một layer. Rỗng = dòng CSV trùng khớp hoàn toàn với
-    /// drawing, không đụng vào bản ghi.
+    /// drawing, không đụng vào bản ghi. <paramref name="changesVisibility"/> = có đổi đóng băng/tắt, tức là
+    /// sau khi ghi phải vẽ lại màn hình.
     /// </summary>
     private static List<Action<LayerTableRecord>> PlanChanges(
-        Transaction transaction, Database database, LayerTableRecord layer, LayerCsvRow row, List<string> notes)
+        Transaction transaction, Database database, LayerTableRecord layer, LayerCsvRow row, List<string> notes,
+        out bool changesVisibility)
     {
         var changes = new List<Action<LayerTableRecord>>();
+        changesVisibility = false;
 
         // Cột: Name, Color, Linetype, Lineweight, IsPlottable, Description, IsFrozen, IsOff, IsLocked
         if (row.ColorAci.HasValue)
@@ -298,6 +311,7 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
             else
             {
                 changes.Add(l => l.IsFrozen = frozen);
+                changesVisibility = true;
             }
         }
 
@@ -305,6 +319,7 @@ public sealed class LayerImportCommand : ICoreCommand<LayerImportConfig>
         {
             var off = row.Off.Value;
             changes.Add(l => l.IsOff = off);
+            changesVisibility = true;
         }
 
         if (row.Locked.HasValue && layer.IsLocked != row.Locked.Value)
