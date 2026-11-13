@@ -6,17 +6,23 @@ Không dependency ngoài, chạy offline. Cho Claude Desktop / Claude Code / b�
   tools/list  — sinh từ GET /tools của Bridge (chính bảng CommandCatalog) + tool `query` và `chat`
   tools/call  — POST /execute (luôn ép dryRun:true trừ khi tham số confirm=true), /query, /chat
   AutoCAD: `query` kèm dwgPath đọc bản SAO của DWG bằng accoreconsole (DHCB_QUERY) — không cần mở AutoCAD
+  Tốc độ: `queries` gộp nhiều truy vấn vào MỘT lần mở DWG, `dwgPaths` đọc nhiều file song song, kết quả đọc ngầm
+  được nhớ theo (file, mtime, cỡ), tools/call đọc ngầm chạy song song; lệnh qua Bridge vẫn tuần tự đúng thứ tự gửi.
 
 Cấu hình Claude Desktop: xem docs/ai-offline.md, mục "MCP với Claude Desktop / Claude Code"
 (hoặc dùng gói .mcpb dựng bằng scripts/pack-mcpb.ps1 — không phải sửa file cấu hình nào).
 """
 
+import collections
 import json
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 try:
@@ -84,6 +90,27 @@ def _load_catalog() -> tuple:
     return ({**catalog, "tools": []} if "tools" in catalog else catalog) if isinstance(catalog, dict) else {"tools": []}, False
 
 
+CATALOG_TTL_SECONDS = 5.0
+_catalog_memo = None  # (hạn monotonic, catalog, còn sống)
+_catalog_lock = threading.Lock()
+
+
+def _catalog() -> tuple:
+    """`_load_catalog` có nhớ ngắn hạn.
+
+    Bridge chưa mở thì mỗi lần nối 127.0.0.1 bị từ chối mất ~2 s trên Windows; không nhớ thì tools/list và MỖI lệnh
+    đều trả thêm 2 s đó chỉ để biết lại điều vừa biết. Hạn ngắn nên mở AutoCAD xong vài giây là thấy danh mục mới.
+    """
+    global _catalog_memo
+    with _catalog_lock:
+        memo = _catalog_memo
+        if memo is not None and time.monotonic() < memo[0]:
+            return memo[1], memo[2]
+        catalog, live = _load_catalog()
+        _catalog_memo = (time.monotonic() + CATALOG_TTL_SECONDS, catalog, live)
+        return catalog, live
+
+
 def _valid_catalog(catalog) -> bool:
     """Cache lỗi/cũ không được làm mất tools/list hoặc đoán lệnh ghi là lệnh đọc."""
     if not isinstance(catalog, dict) or not isinstance(catalog.get("tools"), list):
@@ -116,14 +143,16 @@ QUERY_HELP = {
         "đúng trạng thái hiện tại). Lọc bằng params: layerContains, "
         "entityType, blockName, blockNameContains, textContains, limit, offset. Kèm dwgPath thì đọc ngầm bản sao "
         "của file DWG bằng accoreconsole — không cần mở AutoCAD (bỏ qua documentId; selection/show_entities/"
-        "active_layout chỉ có khi AutoCAD mở)."
+        "active_layout chỉ có khi AutoCAD mở). NHANH: cần nhiều truy vấn thì gửi một lần bằng queries "
+        "[{query, params}] (đọc ngầm chỉ mở DWG một lần); nhiều file thì dwgPaths [..] chạy song song; kết quả đọc "
+        "ngầm được nhớ tới khi file đổi."
     ),
 }
 
 
 def tool_list() -> list:
     tools = []
-    catalog, live = _load_catalog()
+    catalog, live = _catalog()
     offline_note = "" if live else f" [{APP_NAMES[APP]} chưa mở — mở phần mềm rồi thử lại]"
     allowed = set(n.lower() for n in GROUPS.get(GROUP, ())) if GROUP else None
     for t in catalog.get("tools", []):
@@ -145,15 +174,19 @@ def tool_list() -> list:
         })
     query_props = {
         "query": {"type": "string"}, "params": {"type": "object"},
+        "queries": {"type": "array", "description": "nhiều truy vấn trong một lần gọi: tên truy vấn hoặc {query, params}",
+                    "items": {"type": ["string", "object"]}},
         "documentId": {"type": "string", "description": "ID từ document_context; giữ nguyên giữa các trang"},
     }
     if APP == "autocad":
         query_props["dwgPath"] = {"type": "string",
                                   "description": "file .dwg để đọc ngầm bằng accoreconsole (không cần mở AutoCAD)"}
+        query_props["dwgPaths"] = {"type": "array", "items": {"type": "string"},
+                                   "description": "nhiều file .dwg, đọc ngầm song song"}
     tools.append({
         "name": "query",
         "description": QUERY_HELP[APP],
-        "inputSchema": {"type": "object", "properties": query_props, "required": ["query"]},
+        "inputSchema": {"type": "object", "properties": query_props},
     })
     if allowed is not None and "chat" not in allowed:
         return tools
@@ -201,69 +234,228 @@ def _console_text(raw: bytes) -> str:
     return raw.decode("utf-8", errors="replace").replace("\x00", "")
 
 
-def _offline_query(dwg_path: str, query: str, params: dict) -> dict:
-    """Chạy truy vấn chỉ đọc trên BẢN SAO của DWG (file gốc không bị khoá, không bị sửa)."""
-    if not os.path.isfile(dwg_path):
-        return {"success": False, "summary": f"Không thấy file DWG: {dwg_path}"}
-    console, plugin = _offline_host()
-    if console is None:
-        return {"success": False, "summary": "Không tìm thấy accoreconsole.exe (AutoCAD 2022–2027) kèm "
-                "DhcbTools.AutoCAD.Core.dll trong bundle DHCB; cài DHCB Tools hoặc đặt DHCB_ACCORECONSOLE/"
-                "DHCB_ACAD_CORE_DLL."}
-    with tempfile.TemporaryDirectory(prefix="dhcb-query-") as work:
-        copy = os.path.join(work, "ban-sao.dwg")
-        shutil.copyfile(dwg_path, copy)
-        query_path = os.path.join(work, "query.json")
-        out_path = os.path.join(work, "result.json")
-        script_path = os.path.join(work, "query.scr")
-        with open(query_path, "w", encoding="utf-8") as f:
-            json.dump({"query": query, "params": params}, f, ensure_ascii=False)
-        # Mỗi câu trả lời prompt một dòng, không bọc nháy (DHCB_QUERY đọc GetString AllowSpaces) — như AcadScriptGen.
-        with open(script_path, "w", encoding="utf-8") as f:
-            f.write(f'FILEDIA 0\nSECURELOAD 0\nNETLOAD "{plugin}"\nDHCB_QUERY\n{query_path}\n{out_path}\nQUIT Y\n')
-        try:
-            proc = subprocess.run(
-                # cwd = thư mục tạm: snapshot plot ghi plot.log vào thư mục hiện hành — không rải ra chỗ người dùng.
-                [console, "/i", copy, "/s", script_path, "/l", "en-US"], capture_output=True, cwd=work,
-                timeout=OFFLINE_TIMEOUT_SECONDS, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        except subprocess.TimeoutExpired:
-            return {"success": False, "summary": f"accoreconsole quá {OFFLINE_TIMEOUT_SECONDS} s khi đọc {dwg_path}."}
-        if not os.path.isfile(out_path):
-            output = _console_text(proc.stdout + proc.stderr)
-            if "Unknown command" in output and "DHCB_QUERY" in output:
-                reason = f"{plugin} là bản cũ, chưa có lệnh DHCB_QUERY — cập nhật DHCB Tools."
-            elif "Unable to load" in output:
-                reason = f"accoreconsole không NETLOAD được {plugin}."
-            else:
-                reason = "accoreconsole không tạo file kết quả."
-            return {"success": False, "summary": reason, "consoleTail": " ".join(output.split())[-400:]}
-        with open(out_path, encoding="utf-8-sig") as f:
-            result = json.load(f)
+MAX_BATCH_QUERIES = 32
+MAX_BATCH_FILES = 64
+
+
+def _parallel_default() -> int:
+    """Số accoreconsole chạy cùng lúc: nửa số nhân, tối đa 10 (file lớn ăn ~1 GB RAM mỗi tiến trình)."""
+    try:
+        wanted = int(os.environ.get("DHCB_OFFLINE_PARALLEL", "0"))
+    except ValueError:
+        wanted = 0
+    return wanted if wanted > 0 else max(2, min((os.cpu_count() or 4) // 2, 10))
+
+
+OFFLINE_PARALLEL = _parallel_default()
+_console_slots = threading.BoundedSemaphore(OFFLINE_PARALLEL)
+
+# Kết quả đọc ngầm nhớ theo (file, mtime, cỡ, DLL, truy vấn): hỏi lại cùng câu trên file chưa đổi thì trả ngay thay vì
+# mở lại DWG (2–10 s). Giữ chuỗi JSON nên mỗi lần trả là một bản riêng; trần theo byte, bỏ mục lâu chưa dùng nhất.
+CACHE_MAX_BYTES = 64 * 1024 * 1024
+_cache = collections.OrderedDict()
+_cache_bytes = 0
+_cache_lock = threading.Lock()
+
+
+def _cache_key(dwg_path: str, plugin: str, query: str, params: dict):
+    try:
+        stat = os.stat(dwg_path)
+        return (os.path.normcase(os.path.abspath(dwg_path)), stat.st_mtime_ns, stat.st_size,
+                plugin, os.stat(plugin).st_mtime_ns, query, json.dumps(params, sort_keys=True, ensure_ascii=False))
+    except (OSError, TypeError, ValueError):
+        return None
+
+
+def _cache_get(key):
+    if key is None:
+        return None
+    with _cache_lock:
+        text = _cache.get(key)
+        if text is None:
+            return None
+        _cache.move_to_end(key)
+    result = json.loads(text)
     if isinstance(result, dict):
-        result.setdefault("source", "accoreconsole")
+        result["cached"] = True
     return result
 
 
-def call_tool(name: str, arguments: dict) -> dict:
-    if name == "query" and APP == "autocad" and arguments.get("dwgPath"):
-        dwg_path = arguments["dwgPath"]
+def _cache_put(key, result) -> None:
+    global _cache_bytes
+    if key is None or _failed(result):
+        return
+    text = json.dumps(result, ensure_ascii=False)
+    if len(text) > CACHE_MAX_BYTES // 4:
+        return
+    with _cache_lock:
+        old = _cache.pop(key, None)
+        if old is not None:
+            _cache_bytes -= len(old)
+        _cache[key] = text
+        _cache_bytes += len(text)
+        while _cache_bytes > CACHE_MAX_BYTES:
+            _key, dropped = _cache.popitem(last=False)
+            _cache_bytes -= len(dropped)
+
+
+def _failed(result) -> bool:
+    return isinstance(result, dict) and (result.get("success") is False or "error" in result)
+
+
+def _run_console(dwg_path: str, console: str, plugin: str, requests: list) -> list:
+    """Một phiên accoreconsole trên BẢN SAO của DWG, chạy lần lượt mọi truy vấn; trả kết quả theo đúng thứ tự."""
+    with tempfile.TemporaryDirectory(prefix="dhcb-query-") as work:
+        copy = os.path.join(work, "ban-sao.dwg")
+        shutil.copyfile(dwg_path, copy)
+        script_path = os.path.join(work, "query.scr")
+        # Mỗi câu trả lời prompt một dòng, không bọc nháy (DHCB_QUERY đọc GetString AllowSpaces) — như AcadScriptGen.
+        script = ["FILEDIA 0", "SECURELOAD 0", f'NETLOAD "{plugin}"']
+        out_paths = []
+        for index, (query, params) in enumerate(requests):
+            suffix = f"-{index}" if index else ""
+            query_path = os.path.join(work, f"query{suffix}.json")
+            out_path = os.path.join(work, f"result{suffix}.json")
+            with open(query_path, "w", encoding="utf-8") as f:
+                json.dump({"query": query, "params": params}, f, ensure_ascii=False)
+            script += ["DHCB_QUERY", query_path, out_path]
+            out_paths.append(out_path)
+        with open(script_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(script + ["QUIT Y"]) + "\n")
+        try:
+            with _console_slots:
+                proc = subprocess.run(
+                    # cwd = thư mục tạm: snapshot plot ghi plot.log vào thư mục hiện hành — không rải ra chỗ người dùng.
+                    [console, "/i", copy, "/s", script_path, "/l", "en-US"], capture_output=True, cwd=work,
+                    timeout=OFFLINE_TIMEOUT_SECONDS, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        except subprocess.TimeoutExpired:
+            failure = {"success": False, "summary": f"accoreconsole quá {OFFLINE_TIMEOUT_SECONDS} s khi đọc {dwg_path}."}
+            return [dict(failure) for _ in requests]
+        results = []
+        failure = None
+        for out_path in out_paths:
+            if os.path.isfile(out_path):
+                with open(out_path, encoding="utf-8-sig") as f:
+                    result = json.load(f)
+                if isinstance(result, dict):
+                    result.setdefault("source", "accoreconsole")
+                results.append(result)
+                continue
+            if failure is None:
+                output = _console_text(proc.stdout + proc.stderr)
+                if "Unknown command" in output and "DHCB_QUERY" in output:
+                    reason = f"{plugin} là bản cũ, chưa có lệnh DHCB_QUERY — cập nhật DHCB Tools."
+                elif "Unable to load" in output:
+                    reason = f"accoreconsole không NETLOAD được {plugin}."
+                else:
+                    reason = "accoreconsole không tạo file kết quả."
+                failure = {"success": False, "summary": reason, "consoleTail": " ".join(output.split())[-400:]}
+            results.append(dict(failure))
+    return results
+
+
+def _offline_batch(dwg_path: str, requests: list) -> list:
+    """Kết quả của từng (query, params) trên một DWG: lấy từ bộ nhớ nếu file chưa đổi, phần còn lại chạy MỘT phiên."""
+    if not os.path.isfile(dwg_path):
+        return [{"success": False, "summary": f"Không thấy file DWG: {dwg_path}"} for _ in requests]
+    console, plugin = _offline_host()
+    if console is None:
+        return [{"success": False, "summary": "Không tìm thấy accoreconsole.exe (AutoCAD 2022–2027) kèm "
+                 "DhcbTools.AutoCAD.Core.dll trong bundle DHCB; cài DHCB Tools hoặc đặt DHCB_ACCORECONSOLE/"
+                 "DHCB_ACAD_CORE_DLL."} for _ in requests]
+    keys = [_cache_key(dwg_path, plugin, query, params) for query, params in requests]
+    results = [_cache_get(key) for key in keys]
+    missing = [i for i, result in enumerate(results) if result is None]
+    if missing:
+        fresh = _run_console(dwg_path, console, plugin, [requests[i] for i in missing])
+        for i, result in zip(missing, fresh):
+            results[i] = result
+            _cache_put(keys[i], result)
+    return results
+
+
+def _offline_query(dwg_path: str, query: str, params: dict) -> dict:
+    """Chạy truy vấn chỉ đọc trên BẢN SAO của DWG (file gốc không bị khoá, không bị sửa)."""
+    return _offline_batch(dwg_path, [(query, params)])[0]
+
+
+def _query_requests(arguments: dict):
+    """Danh sách (query, params) từ `queries` (gộp) hoặc `query`/`params` (đơn); chuỗi = thông báo lỗi."""
+    queries = arguments.get("queries")
+    if queries is None:
         params = arguments.get("params") or {}
-        if not isinstance(dwg_path, str) or not isinstance(params, dict):
-            return {"success": False, "summary": "dwgPath phải là chuỗi và params phải là object."}
-        return _offline_query(dwg_path, arguments.get("query", ""), params)
+        if not isinstance(params, dict):
+            return "params phải là object."
+        return [(arguments.get("query", ""), params)]
+    if not isinstance(queries, list) or not 0 < len(queries) <= MAX_BATCH_QUERIES:
+        return f"queries phải là mảng 1–{MAX_BATCH_QUERIES} phần tử."
+    requests = []
+    for item in queries:
+        if isinstance(item, str):
+            item = {"query": item}
+        if not isinstance(item, dict) or not isinstance(item.get("query"), str) \
+                or not isinstance(item.get("params") or {}, dict):
+            return "Mỗi phần tử của queries là tên truy vấn hoặc {query, params}."
+        requests.append((item["query"], item.get("params") or {}))
+    return requests
+
+
+def _pack(requests: list, results: list) -> dict:
+    return {"results": [{"query": query, "result": result} for (query, _params), result in zip(requests, results)]}
+
+
+def _summarize(payload: dict, results: list) -> dict:
+    """Ghi số truy vấn hỏng; hỏng TẤT CẢ thì cả lần gọi là lỗi (client đánh dấu isError)."""
+    failed = sum(1 for result in results if _failed(result))
+    if failed:
+        payload["failed"] = failed
+    if results and failed == len(results):
+        payload["success"] = False
+        payload["summary"] = "Mọi truy vấn đều lỗi — xem từng mục."
+    return payload
+
+
+def _query(arguments: dict) -> dict:
+    requests = _query_requests(arguments)
+    if isinstance(requests, str):
+        return {"success": False, "summary": requests}
+    batch = arguments.get("queries") is not None
+    paths = arguments.get("dwgPaths") if APP == "autocad" else None
+    single = arguments.get("dwgPath") if APP == "autocad" else None
+    if paths or single:
+        if paths is None:
+            paths = [single]
+        if not isinstance(paths, list) or len(paths) > MAX_BATCH_FILES \
+                or not all(isinstance(path, str) and path for path in paths):
+            return {"success": False, "summary": f"dwgPath phải là chuỗi; dwgPaths là mảng tối đa {MAX_BATCH_FILES} đường dẫn."}
+        if arguments.get("dwgPaths") is None:
+            results = _offline_batch(single, requests)
+            return _summarize({"source": "accoreconsole", **_pack(requests, results)}, results) if batch else results[0]
+        with ThreadPoolExecutor(max_workers=min(len(paths), OFFLINE_PARALLEL)) as pool:
+            per_file = list(pool.map(lambda path: _offline_batch(path, requests), paths))
+        files = [{"dwgPath": path, **(_pack(requests, results) if batch else {"result": results[0]})}
+                 for path, results in zip(paths, per_file)]
+        return _summarize({"source": "accoreconsole", "files": files}, [r for results in per_file for r in results])
+
+    extra = {}
+    if "documentId" in arguments:
+        document_id = arguments["documentId"]
+        if not isinstance(document_id, str) or not document_id.strip() or len(document_id) > 4096:
+            return {"success": False, "summary": "documentId phải là chuỗi không rỗng, tối đa 4096 ký tự."}
+        extra["documentId"] = document_id
+    results = [dhcb_agent.request(APP, "POST", "/query", {"query": query, "params": params, **extra})
+               for query, params in requests]
+    return _summarize(_pack(requests, results), results) if batch else results[0]
+
+
+def call_tool(name: str, arguments: dict) -> dict:
     if name == "query":
-        payload = {"query": arguments.get("query", ""), "params": arguments.get("params", {})}
-        if "documentId" in arguments:
-            document_id = arguments["documentId"]
-            if not isinstance(document_id, str) or not document_id.strip() or len(document_id) > 4096:
-                return {"success": False, "summary": "documentId phải là chuỗi không rỗng, tối đa 4096 ký tự."}
-            payload["documentId"] = document_id
-        return dhcb_agent.request(APP, "POST", "/query", payload)
+        return _query(arguments)
     if name == "chat":
         return dhcb_agent.request(APP, "POST", "/chat", {"text": arguments.get("text", "")})
     # Một lần lấy danh mục cho cả kiểm --read-only lẫn tên field JSON. Dùng _load_catalog (có cache) chứ
     # không gọi thẳng /tools: Bridge trục trặc nhất thời làm catalog rỗng thì lệnh ghi lọt qua --read-only.
-    catalog, _live = _load_catalog()
+    catalog, _live = _catalog()
     if READ_ONLY:
         # Chỉ chấp nhận lệnh đọc; lệnh ghi bị từ chối ngay tại server (không phụ thuộc client).
         tools = catalog.get("tools") or []
@@ -333,7 +525,8 @@ def _split_images(result):
 def tool_content(result):
     """Nội dung ``tools/call``: khối text JSON (đã bỏ base64) rồi tới các khối ảnh."""
     stripped, images = _split_images(result)
-    return [{"type": "text", "text": json.dumps(stripped, ensure_ascii=False, indent=2)}] + images
+    # JSON gọn: bản thụt lề dài hơn ~50% (2.000 entity: 644 KB so với 430 KB) — mô hình trả tiền bằng ngữ cảnh và thời gian.
+    return [{"type": "text", "text": json.dumps(stripped, ensure_ascii=False, separators=(",", ":"))}] + images
 
 
 def respond(msg_id, result=None, error=None):
@@ -342,8 +535,28 @@ def respond(msg_id, result=None, error=None):
         payload["error"] = error
     else:
         payload["result"] = result
-    sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    sys.stdout.flush()
+    line = json.dumps(payload, ensure_ascii=False) + "\n"
+    with _write_lock:
+        sys.stdout.write(line)
+        sys.stdout.flush()
+
+
+_write_lock = threading.Lock()
+
+
+def _is_offline_call(name, arguments: dict) -> bool:
+    return name == "query" and APP == "autocad" and bool(arguments.get("dwgPath") or arguments.get("dwgPaths"))
+
+
+def _answer_call(msg_id, name, arguments: dict) -> None:
+    try:
+        result = call_tool(name, arguments)
+        is_error = isinstance(result, dict) and (("success" in result and (
+            not result["success"] or bool(result.get("partialSuccess")) or bool(result.get("errors"))
+        )) or "error" in result)
+        respond(msg_id, {"content": tool_content(result), "isError": is_error})
+    except Exception as ex:  # noqa: BLE001
+        respond(msg_id, error={"code": -32000, "message": str(ex)})
 
 
 def _stdin_lines():
@@ -367,6 +580,20 @@ def _stdin_lines():
 
 
 def main():
+    # Đọc ngầm (accoreconsole) chạy song song: 5 câu hỏi trên 5 DWG xong trong thời gian của câu chậm nhất.
+    # Lệnh qua Bridge đi MỘT luồng, đúng thứ tự gửi — AutoCAD đằng nào cũng chạy tuần tự trên luồng UI, và
+    # hai lệnh ghi không được đổi chỗ cho nhau. Vòng đọc stdin không bị chặn nên ping/tools/list vẫn trả ngay.
+    offline_pool = ThreadPoolExecutor(max_workers=OFFLINE_PARALLEL, thread_name_prefix="dhcb-offline")
+    bridge_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="dhcb-bridge")
+    try:
+        _serve(offline_pool, bridge_pool)
+    finally:
+        # stdin đóng: chờ việc đã nhận trả lời xong rồi mới thoát, không bỏ rơi kết quả lệnh ghi.
+        bridge_pool.shutdown(wait=True)
+        offline_pool.shutdown(wait=True)
+
+
+def _serve(offline_pool, bridge_pool):
     for line in _stdin_lines():
         line = line.strip()
         if not line:
@@ -389,7 +616,7 @@ def main():
             respond(msg_id, {
                 "protocolVersion": PROTOCOL_VERSION,
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": f"dhcb-{APP}" + ("-readonly" if READ_ONLY else "") + (f"-{GROUP}" if GROUP else ""), "version": "1.1.0"},
+                "serverInfo": {"name": f"dhcb-{APP}" + ("-readonly" if READ_ONLY else "") + (f"-{GROUP}" if GROUP else ""), "version": "1.2.0"},
             })
         elif method == "notifications/initialized":
             continue
@@ -405,14 +632,10 @@ def main():
             if not isinstance(params.get("arguments", {}), dict):
                 respond(msg_id, error={"code": -32602, "message": "arguments phải là JSON object."})
                 continue
-            try:
-                result = call_tool(params.get("name", ""), params.get("arguments") or {})
-                is_error = ("success" in result and (
-                    not result["success"] or bool(result.get("partialSuccess")) or bool(result.get("errors"))
-                )) or "error" in result
-                respond(msg_id, {"content": tool_content(result), "isError": is_error})
-            except Exception as ex:  # noqa: BLE001
-                respond(msg_id, error={"code": -32000, "message": str(ex)})
+            name = params.get("name", "")
+            arguments = params.get("arguments") or {}
+            pool = offline_pool if _is_offline_call(name, arguments) else bridge_pool
+            pool.submit(_answer_call, msg_id, name, arguments)
         elif method == "ping":
             respond(msg_id, {})
         elif msg_id is not None:

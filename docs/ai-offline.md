@@ -72,5 +72,18 @@ Ví dụ: `{"query": "block_contents", "dwgPath": "D:/du-an/DHKK.dwg", "params":
 Đặt `DHCB_ACCORECONSOLE` / `DHCB_ACAD_CORE_DLL` để trỏ vào host hoặc DLL khác (ví dụ bản build trong repo).
 Truy vấn cần giao diện (`selection`, `show_entities`, `active_layout`) vẫn phải mở AutoCAD.
 
+**Gọi cho nhanh** (từ server 1.2.0):
+
+- `queries` — nhiều truy vấn trong một lần gọi, mỗi phần tử là tên truy vấn hoặc `{query, params}` (tối đa 32).
+  Kèm `dwgPath` thì cả lô chạy trong **một** phiên accoreconsole (DWG chỉ mở một lần); không kèm thì chạy lần lượt
+  qua Bridge. Kết quả: `{"results": [{"query", "result"}], "failed": n}`.
+  Ví dụ: `{"dwgPath": "D:/du-an/DHKK.dwg", "queries": ["stats", "layers", {"query": "text", "params": {"textContains": "FCU"}}]}`.
+- `dwgPaths` — nhiều file DWG (tối đa 64), đọc ngầm song song; kết quả `{"files": [{"dwgPath", "result" | "results"}]}`.
+  Số accoreconsole chạy cùng lúc = nửa số nhân CPU, tối đa 10; đổi bằng `DHCB_OFFLINE_PARALLEL`.
+- Kết quả đọc ngầm được nhớ trong tiến trình server theo (file, giờ sửa, cỡ, DLL, truy vấn): hỏi lại trên file chưa
+  đổi thì trả ngay kèm `"cached": true`. Lưu file là bộ nhớ của file đó tự hết hiệu lực. Kết quả lỗi không được nhớ.
+- Nhiều `tools/call` đọc ngầm gửi cùng lúc chạy song song. Lệnh qua Bridge vẫn đi một luồng, đúng thứ tự gửi.
+- Nội dung trả về là JSON gọn (không thụt lề) — ngắn hơn khoảng một phần ba.
+
 Token Bridge đọc từ `%APPDATA%\DHCB\bridge-token.txt` hoặc `DHCB_BRIDGE_TOKEN`. Mọi tool sửa mô hình chạy xem trước
 trước; truyền `confirm: true` để chạy thật.
