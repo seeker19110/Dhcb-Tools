@@ -500,6 +500,751 @@
           "Xem trước"
         ]
       }
+    },
+    {
+      "name": "Vẽ theo lô JSON — xem trước: 17 thao tác, nhãn @id, chưa ghi",
+      "command": "EntityEdit",
+      "config": {
+        "operations": [
+          {
+            "op": "rectangle",
+            "from": [
+              0,
+              0
+            ],
+            "to": [
+              6000,
+              4000
+            ],
+            "layer": "KL-TEST-VE",
+            "color": 3,
+            "id": "phong"
+          },
+          {
+            "op": "text",
+            "position": [
+              200,
+              200
+            ],
+            "text": "PHÒNG BƠM",
+            "height": 250,
+            "layer": "KL-TEST-VE"
+          },
+          {
+            "op": "offset",
+            "handles": [
+              "@phong"
+            ],
+            "distance": -200,
+            "id": "trong"
+          },
+          {
+            "op": "circle",
+            "center": [
+              3000,
+              2000
+            ],
+            "radius": 500,
+            "layer": "KL-TEST-VE",
+            "id": "tron"
+          },
+          {
+            "op": "copy",
+            "handles": [
+              "@tron"
+            ],
+            "delta": [
+              1200,
+              0
+            ],
+            "count": 2,
+            "id": "bansao"
+          },
+          {
+            "op": "hatch",
+            "points": [
+              [
+                0,
+                0
+              ],
+              [
+                600,
+                0
+              ],
+              [
+                600,
+                600
+              ],
+              [
+                0,
+                600
+              ]
+            ],
+            "pattern": "ANSI31",
+            "patternScale": 20,
+            "layer": "KL-TEST-VE"
+          },
+          {
+            "op": "array",
+            "handles": [
+              "@tron"
+            ],
+            "rows": 2,
+            "columns": 2,
+            "rowSpacing": -1500,
+            "columnSpacing": -1500
+          },
+          {
+            "op": "rotate",
+            "handles": [
+              "@bansao"
+            ],
+            "basePoint": [
+              3000,
+              2000
+            ],
+            "angle": 90
+          },
+          {
+            "op": "mirror",
+            "handles": [
+              "@phong"
+            ],
+            "from": [
+              0,
+              0
+            ],
+            "to": [
+              0,
+              1
+            ],
+            "id": "doixung"
+          },
+          {
+            "op": "line",
+            "from": [
+              0,
+              0
+            ],
+            "to": [
+              6000,
+              4000
+            ],
+            "layer": "KL-TEST-VE",
+            "id": "cheo"
+          },
+          {
+            "op": "scale",
+            "handles": [
+              "@cheo"
+            ],
+            "basePoint": [
+              0,
+              0
+            ],
+            "factor": 0.5
+          },
+          {
+            "op": "arc",
+            "center": [
+              0,
+              0
+            ],
+            "radius": 800,
+            "startAngle": 0,
+            "endAngle": 90,
+            "layer": "KL-TEST-VE"
+          },
+          {
+            "op": "ellipse",
+            "center": [
+              -3000,
+              2000
+            ],
+            "majorAxis": [
+              1000,
+              0
+            ],
+            "ratio": 0.4,
+            "layer": "KL-TEST-VE"
+          },
+          {
+            "op": "mtext",
+            "position": [
+              0,
+              -500
+            ],
+            "text": "Ghi chú\\PDòng 2",
+            "width": 3000,
+            "layer": "KL-TEST-VE"
+          },
+          {
+            "op": "polyline",
+            "points": [
+              [
+                0,
+                -1000
+              ],
+              [
+                2000,
+                -1000
+              ],
+              [
+                2000,
+                -2000
+              ]
+            ],
+            "width": 20,
+            "layer": "KL-TEST-VE"
+          },
+          {
+            "op": "point",
+            "position": [
+              0,
+              -3000
+            ],
+            "layer": "KL-TEST-VE"
+          },
+          {
+            "op": "erase",
+            "handles": [
+              "@doixung"
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "success": true,
+        "summaryContains": [
+          "[Xem trước]",
+          "tạo 16 đối tượng",
+          "xoá 1"
+        ],
+        "maxChangeEvents": 0,
+        "messagesContain": [
+          "Sẽ tạo layer \"KL-TEST-VE\"",
+          "@phong → 1 đối tượng",
+          "#3 offset: tạo 1 đối tượng",
+          "#7 array: tạo 3 đối tượng",
+          "#17 erase: xoá 1 đối tượng"
+        ]
+      }
+    },
+    {
+      "name": "Vẽ theo lô JSON — lô sai bị chặn trước khi đụng bản vẽ",
+      "command": "EntityEdit",
+      "config": {
+        "operations": [
+          {
+            "op": "circle",
+            "center": [
+              0,
+              0
+            ],
+            "radius": -5
+          },
+          {
+            "op": "move",
+            "handles": [
+              "@chuaco"
+            ],
+            "delta": [
+              1,
+              0
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "không hợp lệ (2 lỗi)"
+        ]
+      }
+    },
+    {
+      "name": "Vẽ theo lô JSON — handle không có: huỷ cả lô",
+      "command": "EntityEdit",
+      "config": {
+        "operations": [
+          {
+            "op": "line",
+            "from": [
+              0,
+              0
+            ],
+            "to": [
+              1,
+              0
+            ],
+            "layer": "KL-TEST-VE"
+          },
+          {
+            "op": "move",
+            "handles": [
+              "FFFFFF0"
+            ],
+            "delta": [
+              1,
+              0
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "#2 move",
+          "đã huỷ cả lô"
+        ]
+      }
+    },
+    {
+      "name": "Vẽ theo lô JSON — GHI THẬT",
+      "command": "EntityEdit",
+      "allowWrite": true,
+      "config": {
+        "operations": [
+          {
+            "op": "rectangle",
+            "from": [
+              0,
+              0
+            ],
+            "to": [
+              6000,
+              4000
+            ],
+            "layer": "KL-TEST-VE",
+            "color": 3,
+            "id": "phong"
+          },
+          {
+            "op": "text",
+            "position": [
+              200,
+              200
+            ],
+            "text": "PHÒNG BƠM",
+            "height": 250,
+            "layer": "KL-TEST-VE"
+          },
+          {
+            "op": "offset",
+            "handles": [
+              "@phong"
+            ],
+            "distance": -200,
+            "id": "trong"
+          },
+          {
+            "op": "circle",
+            "center": [
+              3000,
+              2000
+            ],
+            "radius": 500,
+            "layer": "KL-TEST-VE",
+            "id": "tron"
+          },
+          {
+            "op": "copy",
+            "handles": [
+              "@tron"
+            ],
+            "delta": [
+              1200,
+              0
+            ],
+            "count": 2,
+            "id": "bansao"
+          },
+          {
+            "op": "hatch",
+            "points": [
+              [
+                0,
+                0
+              ],
+              [
+                600,
+                0
+              ],
+              [
+                600,
+                600
+              ],
+              [
+                0,
+                600
+              ]
+            ],
+            "pattern": "ANSI31",
+            "patternScale": 20,
+            "layer": "KL-TEST-VE"
+          },
+          {
+            "op": "array",
+            "handles": [
+              "@tron"
+            ],
+            "rows": 2,
+            "columns": 2,
+            "rowSpacing": -1500,
+            "columnSpacing": -1500
+          },
+          {
+            "op": "rotate",
+            "handles": [
+              "@bansao"
+            ],
+            "basePoint": [
+              3000,
+              2000
+            ],
+            "angle": 90
+          },
+          {
+            "op": "mirror",
+            "handles": [
+              "@phong"
+            ],
+            "from": [
+              0,
+              0
+            ],
+            "to": [
+              0,
+              1
+            ],
+            "id": "doixung"
+          },
+          {
+            "op": "line",
+            "from": [
+              0,
+              0
+            ],
+            "to": [
+              6000,
+              4000
+            ],
+            "layer": "KL-TEST-VE",
+            "id": "cheo"
+          },
+          {
+            "op": "scale",
+            "handles": [
+              "@cheo"
+            ],
+            "basePoint": [
+              0,
+              0
+            ],
+            "factor": 0.5
+          },
+          {
+            "op": "arc",
+            "center": [
+              0,
+              0
+            ],
+            "radius": 800,
+            "startAngle": 0,
+            "endAngle": 90,
+            "layer": "KL-TEST-VE"
+          },
+          {
+            "op": "ellipse",
+            "center": [
+              -3000,
+              2000
+            ],
+            "majorAxis": [
+              1000,
+              0
+            ],
+            "ratio": 0.4,
+            "layer": "KL-TEST-VE"
+          },
+          {
+            "op": "mtext",
+            "position": [
+              0,
+              -500
+            ],
+            "text": "Ghi chú\\PDòng 2",
+            "width": 3000,
+            "layer": "KL-TEST-VE"
+          },
+          {
+            "op": "polyline",
+            "points": [
+              [
+                0,
+                -1000
+              ],
+              [
+                2000,
+                -1000
+              ],
+              [
+                2000,
+                -2000
+              ]
+            ],
+            "width": 20,
+            "layer": "KL-TEST-VE"
+          },
+          {
+            "op": "point",
+            "position": [
+              0,
+              -3000
+            ],
+            "layer": "KL-TEST-VE"
+          },
+          {
+            "op": "erase",
+            "handles": [
+              "@doixung"
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "success": true,
+        "summaryContains": [
+          "Đã chạy",
+          "tạo 16 đối tượng"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "messagesContain": [
+          "Đã tạo layer \"KL-TEST-VE\""
+        ]
+      }
+    },
+    {
+      "name": "Đặt block có sẵn trong bản vẽ — xem trước",
+      "command": "BlockInsert",
+      "config": {
+        "blockName": "AMB013",
+        "insertions": [
+          {
+            "position": [
+              0,
+              0
+            ]
+          },
+          {
+            "position": [
+              500,
+              0
+            ],
+            "rotation": 45,
+            "scale": 2,
+            "layer": "KL-TEST-BI"
+          }
+        ]
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 2,
+        "maxAffected": 2,
+        "maxChangeEvents": 0,
+        "messagesContain": [
+          "có sẵn trong bản vẽ",
+          "Sẽ tạo layer \"KL-TEST-BI\""
+        ]
+      }
+    },
+    {
+      "name": "Đặt block — tag attribute lạ bị chặn",
+      "command": "BlockInsert",
+      "config": {
+        "blockName": "AMB013",
+        "insertions": [
+          {
+            "position": [
+              0,
+              0
+            ],
+            "attributes": {
+              "KHONG_CO": "x"
+            }
+          }
+        ]
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "block không có attribute"
+        ]
+      }
+    },
+    {
+      "name": "Đặt block — chưa có, thiếu thư viện",
+      "command": "BlockInsert",
+      "config": {
+        "blockName": "KL-KHONG-CO",
+        "insertions": [
+          {
+            "position": [
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "cần libraryPath"
+        ]
+      }
+    },
+    {
+      "name": "Đặt block từ CSV — GHI THẬT",
+      "command": "BlockInsert",
+      "allowWrite": true,
+      "config": {
+        "blockName": "AMB013",
+        "inputPath": "{suiteFolder}/fixtures/block-insert.csv"
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 2,
+        "maxAffected": 2,
+        "summaryContains": [
+          "Đã đặt 2 block \"AMB013\""
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      }
+    },
+    {
+      "name": "Định nghĩa lại block từ thư mục ký hiệu (cả file là ký hiệu) — GHI THẬT",
+      "command": "BlockInsert",
+      "allowWrite": true,
+      "config": {
+        "blockName": "tuyen-ong",
+        "libraryPath": "{suiteFolder}/fixtures",
+        "insertions": [
+          {
+            "position": [
+              -20000,
+              0
+            ],
+            "layer": "KL-TEST-BI"
+          }
+        ],
+        "redefine": true
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxAffected": 1,
+        "messagesContain": [
+          "lấy từ cả file",
+          "(định nghĩa lại)"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      }
+    },
+    {
+      "name": "Định nghĩa lại block từ DWG thư viện chứa block cùng tên — GHI THẬT",
+      "command": "BlockInsert",
+      "allowWrite": true,
+      "config": {
+        "blockName": "WHB",
+        "libraryPath": "{sourceFile}",
+        "redefine": true,
+        "insertions": [
+          {
+            "position": [
+              -25000,
+              0
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxAffected": 1,
+        "messagesContain": [
+          "lấy từ block cùng tên",
+          "định nghĩa lại"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      }
+    },
+    {
+      "name": "Đặt block — tag lạ trên block có attribute: báo danh sách tag có",
+      "command": "BlockInsert",
+      "config": {
+        "blockName": "AMB006",
+        "insertions": [
+          {
+            "position": [
+              0,
+              0
+            ],
+            "attributes": {
+              "REF": "KL-01",
+              "KHONG_CO": "x"
+            }
+          }
+        ]
+      },
+      "expect": {
+        "success": false,
+        "summaryContains": [
+          "tag có:",
+          "REF",
+          "SERVICE"
+        ]
+      }
+    },
+    {
+      "name": "Đặt block kèm giá trị attribute — GHI THẬT",
+      "command": "BlockInsert",
+      "allowWrite": true,
+      "config": {
+        "blockName": "AMB006",
+        "insertions": [
+          {
+            "position": [
+              -30000,
+              0
+            ],
+            "scale": 200,
+            "layer": "KL-TEST-BI",
+            "attributes": {
+              "REF": "KL-01",
+              "SERVICE": "CẤP GIÓ TƯƠI"
+            }
+          }
+        ]
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxAffected": 1,
+        "summaryContains": [
+          "Đã đặt 1 block \"AMB006\""
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ]
+      }
     }
   ]
 }

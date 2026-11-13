@@ -79,6 +79,7 @@
 - §74 — [Hai tính năng học từ GRAVITY TOOL — `DrawingCombine` (AutoCAD) chạy thật, `ElementRename` (Revit) chưa chạy thật (2026-11-12)](#74-hai-tính-năng-học-từ-gravity-tool-drawingcombine-autocad-chạy-thật-elementrename-revit-chưa-chạy-thật-2026-11-12)
 - §75 — [`DrawingCombine` trong AutoCAD GUI thật — hai lỗi accoreconsole không lộ ra, đã sửa (2026-11-12)](#75-drawingcombine-trong-autocad-gui-thật-hai-lỗi-accoreconsole-không-lộ-ra-đã-sửa-2026-11-12)
 - §76 — [MCP AutoCAD đọc DWG ngầm bằng accoreconsole — `query` + `dwgPath` (2026-11-12)](#76-mcp-autocad-đọc-dwg-ngầm-bằng-accoreconsole-query-dwgpath-2026-11-12)
+- §77 — [Học từ autocad-mcp (puran-water / bản dịch ks40-academy): `EntityEdit`, `BlockInsert`, snapshot plot ngầm, ảnh MCP (2026-11-13)](#77-học-từ-autocad-mcp-puran-water-bản-dịch-ks40-academy-entityedit-blockinsert-snapshot-plot-ngầm-ảnh-mcp-2026-11-13)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
@@ -3844,3 +3845,41 @@ Test thuần: `test_dhcb_mcp_server.py` 51 ca (thêm 10), phủ Python 100%.
 
 - Bundle trên máy phải cập nhật `DhcbTools.AutoCAD.Core.dll` (từ #204) thì `dwgPath` mới chạy không cần biến môi trường.
 - `test_installer` đỏ trên máy này cả với `origin/main` (installer dò ra dấu vết AutoCAD 2025 không có runtime) — lỗi môi trường, không do thay đổi này.
+
+## 77. Học từ autocad-mcp (puran-water / bản dịch ks40-academy): `EntityEdit`, `BlockInsert`, snapshot plot ngầm, ảnh MCP (2026-11-13)
+
+So bộ MCP AutoCAD "cầm bút" kia với dự án, lấy bốn thứ đáng học; bỏ `execute_lisp`, gửi phím vào cửa sổ, thư viện
+ký hiệu CTO trả phí (lý do trong [agent-khep-vong.md](agent-khep-vong.md#vòng-khép-bên-autocad-vẽ--nhìn)).
+
+| Học | Làm thành |
+|---|---|
+| Vẽ/sửa entity thô (line, circle, hatch… move/rotate/offset) | `EntityEdit` — lô thao tác JSON, nhãn `@id`, một giao dịch; xem trước chỉ đọc |
+| Thư viện ký hiệu P&ID (chèn block theo tên) | `BlockInsert` — DWG thư viện / cả file là ký hiệu / thư mục `<tên>.dwg`, attribute, CSV |
+| Chụp ảnh khi không có GUI (ezdxf + matplotlib), zoom_window | `snapshot` `source:"plot"` qua `PublishToWeb PNG.pc3`, `window`/`handles` + `margin` |
+| Trả ảnh cho mô hình nhìn | MCP `tools/call` tách ảnh thành khối `image` (trước là base64 trong text) |
+
+**accoreconsole AutoCAD 2026.1, bản chép bản vẽ mẫu** (`Data Extraction and Multileaders Sample.dwg`):
+
+- `autocad-write` **38/38** (thêm 12 ca): lô 17 thao tác (rectangle, text, offset `@phong`, circle, copy ×2, hatch ANSI31,
+  array 2×2, rotate, mirror giữ gốc, line + scale, arc, ellipse, mtext, polyline, point, erase `@doixung`) xem trước
+  rồi ghi thật — "tạo 16, xoá 1"; lô sai bị chặn "(2 lỗi)"; handle không có thì huỷ cả lô; `BlockInsert` block có sẵn,
+  từ CSV, từ thư mục ký hiệu (định nghĩa lại `tuyen-ong`), từ DWG chứa block cùng tên (`WHB`, WblockClone Replace),
+  tag lạ báo "tag có: REF, MAKE/MODEL, SIZE, TYPE, SERVICE", ghi `AMB006` kèm `REF`/`SERVICE`.
+- `autocad-smoke` 20/20.
+- Lượt đầu 33/36 lộ hai lỗi thật: xem trước của cả hai lệnh tạo đối tượng/layer trong giao dịch rồi huỷ → **54** và **3**
+  sự kiện ghi tạm (quy ước dự án: xem trước = 0). Đã đổi sang xem trước chỉ đọc (đếm, đối tượng "sẽ tạo" là `ObjectId.Null`).
+- Snapshot plot ngầm (`_offline_query` + DLL build, 4 accoreconsole song song): toàn bộ 1600×1280; `window`
+  [42000,48000,47000,52000] 1152×900 ([ảnh](bang-chung/2026-11-13/snapshot-plot-window.png)); `handles` 8A56, 8A5D
+  600×800 ([ảnh](bang-chung/2026-11-13/snapshot-plot-handles.png)) — giữ màu layer; window suy biến bị báo. Lượt đầu
+  lỗi `eLayoutNotCurrent` (bản vẽ lưu ở tab giấy) → chuyển tạm sang Model rồi trả lại; khi plot hỏng vẫn rơi về thumbnail
+  và vẫn ra khối ảnh.
+
+Test thuần: Shared.Logic **2346 đạt**, phủ 100% (planner `EntityEdit` 27 ca, `BlockInsert` 9 ca); Python 100%
+(thêm 3 ca khối ảnh MCP). Build vỏ AutoCAD 2024 (net48), 2025 (net8), 2026 (net10) sạch.
+
+### Còn mở
+
+- Chưa chạy trong **AutoCAD GUI**: render sống có vùng (`RenderOffScreen` + `window`/`handles`), plot từ GUI đổi tab
+  layout tạm thời, nút Ribbon/form của hai lệnh mới. Bundle trên máy cần cập nhật DLL mới có hiệu lực.
+- `mirror` text theo ma trận gương nên chữ bị lật (như MIRRTEXT=1); `offset` hướng theo dấu `distance` của AutoCAD.
+- `test_installer` vẫn đỏ trên máy này vì môi trường (như §76).

@@ -42,7 +42,7 @@ GROUPS = {
     "query": ("query", "chat"),
     "data": ("ParameterExport", "ParameterImport", "LayerExport", "LayerImport", "AttributeExport", "AttributeImport", "WarningsExport", "BlockQuantity"),
     "sheets": ("SheetRename", "RevisionOnSheets", "SheetBatchCreate", "BatchExport", "SheetIndex"),
-    "cleanup": ("RemoveUnusedViews", "StylePurge", "DrawingCleanup", "FamilyAudit", "LayerTranslate", "EntityLayerAssign", "PolylineImport", "ElementRename"),
+    "cleanup": ("RemoveUnusedViews", "StylePurge", "DrawingCleanup", "FamilyAudit", "LayerTranslate", "EntityLayerAssign", "PolylineImport", "EntityEdit", "BlockInsert", "ElementRename"),
     "check": ("HealthReport", "ParameterRuleCheck", "ClashDetection", "ConnectorChecker", "LayerStandardCheck", "XrefAudit", "DrawingCompare"),
     "mep": ("SleeveAuto", "ElevationTag", "HangerAuto", "PipeSplitter", "RouteFromLines", "DevicePlacement", "SizingProposal", "ApplySizing", "SystemColor", "SystemName", "FlowNumbering"),
     "project": ("ProjectInfo", "LevelSetup", "GridSetup", "FamilyLoader", "ProjectFromTemplate", "TransferStandards", "GridFromCsv", "GridExtract", "DrawingCombine"),
@@ -111,7 +111,9 @@ QUERY_HELP = {
     "autocad": (
         "Đọc bản vẽ AutoCAD (không ghi): document_context, drawing_info, layers, blocks, inserts, entities, text, "
         "xrefs, layouts, stats, entity_geometry (params.handles), attributes_of, block_contents (chữ/line trong "
-        "block lồng), selection, show_entities, active_layout, snapshot. Lọc bằng params: layerContains, "
+        "block lồng), selection, show_entities, active_layout, snapshot (ảnh PNG trả về dạng ảnh xem được; params.window "
+        "[x1,y1,x2,y2] hoặc params.handles để khoanh vùng, imageWidth, source live|plot|thumbnail — chạy ngầm thì plot "
+        "đúng trạng thái hiện tại). Lọc bằng params: layerContains, "
         "entityType, blockName, blockNameContains, textContains, limit, offset. Kèm dwgPath thì đọc ngầm bản sao "
         "của file DWG bằng accoreconsole — không cần mở AutoCAD (bỏ qua documentId; selection/show_entities/"
         "active_layout chỉ có khi AutoCAD mở)."
@@ -221,7 +223,8 @@ def _offline_query(dwg_path: str, query: str, params: dict) -> dict:
             f.write(f'FILEDIA 0\nSECURELOAD 0\nNETLOAD "{plugin}"\nDHCB_QUERY\n{query_path}\n{out_path}\nQUIT Y\n')
         try:
             proc = subprocess.run(
-                [console, "/i", copy, "/s", script_path, "/l", "en-US"], capture_output=True,
+                # cwd = thư mục tạm: snapshot plot ghi plot.log vào thư mục hiện hành — không rải ra chỗ người dùng.
+                [console, "/i", copy, "/s", script_path, "/l", "en-US"], capture_output=True, cwd=work,
                 timeout=OFFLINE_TIMEOUT_SECONDS, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         except subprocess.TimeoutExpired:
             return {"success": False, "summary": f"accoreconsole quá {OFFLINE_TIMEOUT_SECONDS} s khi đọc {dwg_path}."}
@@ -295,6 +298,42 @@ def call_tool(name: str, arguments: dict) -> dict:
     if "previewToken" in config:
         context["preview_token"] = config.pop("previewToken")
     return dhcb_agent.send(APP, name, config, timeout_seconds=timeout_seconds, **context)
+
+
+MAX_IMAGE_BLOCKS = 4
+
+
+def _split_images(result):
+    """Tách ảnh (dict có ``base64`` + ``mimeType`` image/*) ra khối MCP ``image`` để client NHÌN được ảnh.
+
+    Trước đây snapshot trả base64 nằm trong chuỗi JSON của khối ``text``: mô hình chỉ thấy một chuỗi ký tự dài
+    vài trăm KB (tốn ngữ cảnh mà không "nhìn" được gì). Khối ``image`` theo đặc tả MCP được client đưa vào mô hình
+    dưới dạng ảnh thật. Bản JSON giữ lại ``path``/``width``/``height`` và ghi chú thay cho base64 đã tách.
+    """
+    images = []
+
+    def walk(node):
+        if isinstance(node, dict):
+            mime = node.get("mimeType")
+            data = node.get("base64")
+            if isinstance(mime, str) and mime.startswith("image/") and isinstance(data, str) and data:
+                if len(images) < MAX_IMAGE_BLOCKS:
+                    images.append({"type": "image", "data": data, "mimeType": mime})
+                    node = dict(node, base64=None, imageBlock=len(images))
+                return node
+            return {k: walk(v) for k, v in node.items()}
+        if isinstance(node, list):
+            return [walk(v) for v in node]
+        return node
+
+    stripped = walk(result)
+    return stripped, images
+
+
+def tool_content(result):
+    """Nội dung ``tools/call``: khối text JSON (đã bỏ base64) rồi tới các khối ảnh."""
+    stripped, images = _split_images(result)
+    return [{"type": "text", "text": json.dumps(stripped, ensure_ascii=False, indent=2)}] + images
 
 
 def respond(msg_id, result=None, error=None):
@@ -371,7 +410,7 @@ def main():
                 is_error = ("success" in result and (
                     not result["success"] or bool(result.get("partialSuccess")) or bool(result.get("errors"))
                 )) or "error" in result
-                respond(msg_id, {"content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False, indent=2)}], "isError": is_error})
+                respond(msg_id, {"content": tool_content(result), "isError": is_error})
             except Exception as ex:  # noqa: BLE001
                 respond(msg_id, error={"code": -32000, "message": str(ex)})
         elif method == "ping":

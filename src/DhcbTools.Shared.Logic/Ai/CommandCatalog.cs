@@ -474,6 +474,16 @@ namespace DhcbTools.Shared.Logic.Ai
             new CommandDescriptor("PolylineImport", AutoCad, "Vẽ polyline vào Model Space từ CSV Id,Layer,Width,Color,Closed,Vertices — vẽ lại tim ống bóc khối lượng, ranh khu vực", true, "DrawPolylines")
                 .Field("inputPath", "CSV Id,Layer,Width,Color,Closed,Vertices (Vertices = \"x y;x y;…\")").Field("replaceExisting", "xoá polyline cũ trên layer đích trước khi vẽ", FieldKind.Bool).Field("dryRun", "xem trước")
                 .Words("vẽ polyline từ file", "vẽ tim ống", "import polyline", "vẽ pline"),
+            new CommandDescriptor("EntityEdit", AutoCad, "Vẽ và sửa hình học bằng lô thao tác JSON: tạo line/polyline/rectangle/circle/arc/ellipse/text/mtext/hatch/point; move/copy/array/rotate/scale/mirror/offset/erase theo handle — một giao dịch, trả handle mới", true, "Draw", "EntityTransform")
+                .Field("operations", "mảng thao tác JSON, ví dụ [{\"op\":\"line\",\"from\":[0,0],\"to\":[1000,0],\"layer\":\"M-ONG\",\"id\":\"a\"},{\"op\":\"copy\",\"handles\":[\"@a\"],\"delta\":[0,500],\"count\":3}]. Toạ độ [x,y] đơn vị bản vẽ, góc tính bằng độ", FieldKind.Json)
+                .Field("inputPath", "file JSON chứa mảng thao tác (tuỳ chọn, chạy trước operations)", FieldKind.FilePath).Field("dryRun", "xem trước")
+                .Words("vẽ line", "vẽ hình", "vẽ đường tròn", "dời đối tượng", "xoay đối tượng", "offset", "sao chép đối tượng", "mảng đối tượng", "draw entity"),
+            new CommandDescriptor("BlockInsert", AutoCad, "Đặt block vào Model Space theo danh sách vị trí (tỉ lệ, góc, layer, attribute) — lấy định nghĩa trong bản vẽ hoặc nạp từ thư viện DWG/thư mục ký hiệu", true, "InsertBlock", "PlaceSymbols")
+                .Field("blockName", "tên block").Field("libraryPath", "DWG thư viện chứa block, DWG là ký hiệu, hoặc thư mục có <tên>.dwg", FieldKind.FilePath)
+                .Field("redefine", "nạp lại định nghĩa từ thư viện dù bản vẽ đã có", FieldKind.Bool)
+                .Field("insertions", "mảng JSON [{\"position\":[x,y],\"rotation\":0,\"scale\":1,\"layer\":\"..\",\"attributes\":{\"TAG\":\"giá trị\"}}]", FieldKind.Json)
+                .Field("inputPath", "CSV X,Y[,Z],Rotation,Scale,Layer,<TAG>… (tuỳ chọn)", FieldKind.FilePath).Field("dryRun", "xem trước")
+                .Words("chèn block", "đặt block", "insert block", "đặt ký hiệu", "chèn ký hiệu thư viện"),
             new CommandDescriptor("DrawingCompare", AutoCad, "So bản vẽ hiện tại với DWG khác ở mức layer (đếm entity theo layer) → CSV/HTML", false, "Compare")
                 .Field("otherPath", "DWG so sánh").Field("outputPath", "CSV hoặc HTML").Field("moveToleranceMm", "dung sai dời")
                 .Words("so sánh bản vẽ", "drawing compare", "khác nhau giữa hai bản"),
