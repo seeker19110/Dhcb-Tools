@@ -142,19 +142,14 @@ namespace DhcbTools.Shared.Logic.Cad
             result.Start = start;
             result.End = end;
 
-            // Chuẩn hoá: from nằm ở cuối đoạn i = đầu đoạn i+1; to nằm ở đầu đoạn i = cuối đoạn i-1.
+            // Chuẩn hoá: from nằm ở cuối đoạn i = đầu đoạn i+1 (Project gặp hoà ở đỉnh thì chọn đoạn TRƯỚC với f = 1).
+            // Chiều ngược lại không cần: cũng vì quy tắc hoà đó, to không bao giờ ra f = 0 trên đoạn i > 0.
             int i0 = start.Segment, i1 = end.Segment;
             double f0 = start.Fraction, f1 = end.Fraction;
             if (f0 >= 1 - Eps && i0 < last)
             {
                 i0++;
                 f0 = 0;
-            }
-
-            if (f1 <= Eps && i1 > 0)
-            {
-                i1--;
-                f1 = 1;
             }
 
             if (i0 > i1 || (i0 == i1 && f1 - f0 <= Eps))
