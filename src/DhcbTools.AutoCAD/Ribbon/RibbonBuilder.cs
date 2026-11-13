@@ -99,7 +99,9 @@ internal static class RibbonBuilder
             ("DHCB_ATTR_INCREMENT", "Tăng số attribute", "+1", RibbonIcons.Block,
                 "Tăng dần giá trị một attribute cho các block đã chọn."),
             ("DHCB_BLOCK_QUANTITY", "Đếm block ra CSV", "ĐB", RibbonIcons.Block,
-                "Đếm số lượng block theo nhóm, xuất CSV."));
+                "Đếm số lượng block theo nhóm, xuất CSV."),
+            ("DHCB_BLOCK_INSERT", "Đặt block từ thư viện", "ĐK", RibbonIcons.Block,
+                "Đặt block (trong bản vẽ hoặc nạp từ DWG/thư mục ký hiệu) theo danh sách vị trí, kèm attribute."));
 
         // ── Nội dung bản vẽ: dọn → sửa text → soi xref → so bản vẽ ──
         Panel(tab, "Bản vẽ",
@@ -112,7 +114,9 @@ internal static class RibbonBuilder
             ("DHCB_DRAWING_COMPARE", "So sánh bản vẽ", "SS", RibbonIcons.Drawing,
                 "So layer giữa bản vẽ hiện tại và một file khác."),
             ("DHCB_DRAWING_COMBINE", "Gộp nhiều bản vẽ", "GP", RibbonIcons.Drawing,
-                "Gộp các DWG trong một thư mục vào bản vẽ này: mỗi file thành một block, chép cả layout."));
+                "Gộp các DWG trong một thư mục vào bản vẽ này: mỗi file thành một block, chép cả layout."),
+            ("DHCB_ENTITY_EDIT", "Vẽ/sửa theo lô JSON", "VS", RibbonIcons.Drawing,
+                "Vẽ line, polyline, tròn, cung, text, hatch… và dời/xoay/sao chép/offset/xoá theo handle bằng một lô JSON."));
 
         // ── Nối sang Revit / agent ──
         Panel(tab, "Revit & agent",
@@ -179,7 +183,7 @@ internal static class RibbonBuilder
             "DHCB_ATTR_EXPORT" => "AttributeExport", "DHCB_ATTR_IMPORT" => "AttributeImport",
             "DHCB_TEXT_REPLACE" => "TextReplace", "DHCB_LAYER_CHECK" => "LayerStandardCheck",
             "DHCB_GRID_EXTRACT" => "GridExtract", "DHCB_XREF_AUDIT" => "XrefAudit",
-            "DHCB_LAYER_TRANSLATE" => "LayerTranslate", "DHCB_ENTITY_LAYER" => "EntityLayerAssign", "DHCB_PLINE_IMPORT" => "PolylineImport", "DHCB_DRAWING_COMPARE" => "DrawingCompare",
+            "DHCB_LAYER_TRANSLATE" => "LayerTranslate", "DHCB_ENTITY_LAYER" => "EntityLayerAssign", "DHCB_PLINE_IMPORT" => "PolylineImport", "DHCB_ENTITY_EDIT" => "EntityEdit", "DHCB_BLOCK_INSERT" => "BlockInsert", "DHCB_DRAWING_COMPARE" => "DrawingCompare",
             "DHCB_DRAWING_COMBINE" => "DrawingCombine",
             "DHCB_BLOCK_QUANTITY" => "BlockQuantity", "DHCB_ATTR_INCREMENT" => "AttributeIncrement",
             "DHCB_LAYER_MAP" => "CadLayerMap", _ => null,

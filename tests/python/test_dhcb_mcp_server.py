@@ -491,5 +491,42 @@ class OfflineQueryTests(unittest.TestCase):
         self.assertNotIn("AutoCAD", revit["description"])
 
 
+class ImageContentTests(unittest.TestCase):
+    """Snapshot đi thành khối MCP ``image`` để mô hình NHÌN được ảnh, không phải đọc chuỗi base64."""
+
+    def test_anh_trong_ket_qua_tach_thanh_khoi_image(self) -> None:
+        with load(("autocad",)) as (module, _):
+            result = {"source": "plot", "path": "C:/t/a.png", "mimeType": "image/png", "base64": "QUJD", "width": 10}
+
+            content = module.tool_content(result)
+
+            self.assertEqual(["text", "image"], [c["type"] for c in content])
+            self.assertEqual({"type": "image", "data": "QUJD", "mimeType": "image/png"}, content[1])
+            meta = json.loads(content[0]["text"])
+            self.assertIsNone(meta["base64"])
+            self.assertEqual(1, meta["imageBlock"])
+            self.assertEqual("C:/t/a.png", meta["path"])
+            self.assertEqual("QUJD", result["base64"])  # không sửa object gốc
+
+    def test_anh_long_trong_fallback_va_gioi_han_so_khoi(self) -> None:
+        with load(("autocad",)) as (module, _):
+            images = [{"mimeType": "image/png", "base64": str(i)} for i in range(6)]
+            nested = {"fallbackFrom": "plot", "reasons": ["x"], "result": {"items": images}}
+
+            content = module.tool_content(nested)
+
+            self.assertEqual(module.MAX_IMAGE_BLOCKS, sum(c["type"] == "image" for c in content))
+            items = json.loads(content[0]["text"])["result"]["items"]
+            self.assertEqual("5", items[5]["base64"])  # quá trần thì giữ nguyên trong text
+
+    def test_khong_phai_anh_thi_giu_nguyen(self) -> None:
+        with load(("autocad",)) as (module, _):
+            for result in ({"success": True, "summary": "xong"}, {"mimeType": "text/csv", "base64": "eA=="},
+                           {"mimeType": "image/png", "base64": ""}):
+                content = module.tool_content(result)
+                self.assertEqual(1, len(content))
+                self.assertEqual(result, json.loads(content[0]["text"]))
+
+
 if __name__ == "__main__":
     unittest.main()

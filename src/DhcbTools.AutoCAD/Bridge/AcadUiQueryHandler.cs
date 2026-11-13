@@ -187,9 +187,12 @@ internal static class AcadUiQueryHandler
     /// xuống mức sau và <b>nói rõ trong kết quả</b> ảnh thuộc mức nào:
     /// <list type="number">
     ///   <item><c>live</c> — render lại model space bằng thiết bị off-screen của GraphicsSystem, đúng cỡ
-    ///   <c>imageWidth</c> agent xin, ôm trọn extents. Không đụng khung nhìn kỹ sư đang xem.</item>
+    ///   <c>imageWidth</c> agent xin, ôm trọn extents (hoặc vùng <c>window</c>/<c>handles</c>). Không đụng khung nhìn
+    ///   kỹ sư đang xem.</item>
+    ///   <item><c>plot</c> — plot PNG qua <see cref="AcadPlotSnapshot"/> (tầng Core, dùng chung với accoreconsole);
+    ///   <c>source="plot"</c> thì đi thẳng mức này.</item>
     ///   <item><c>screen</c> — chụp thẳng khung nhìn hiện tại (<see cref="Manager.GetCurrentAcGsView"/>):
-    ///   đúng thứ kỹ sư đang thấy, nhưng cỡ ảnh là cỡ cửa sổ, không phải cỡ agent xin.</item>
+    ///   đúng thứ kỹ sư đang thấy, nhưng cỡ ảnh là cỡ cửa sổ và không khoanh vùng được.</item>
     ///   <item><c>thumbnail</c> — ảnh xem trước lưu trong DWG lúc save (tầng Core, dùng chung với
     ///   accoreconsole).</item>
     /// </list>
@@ -202,40 +205,62 @@ internal static class AcadUiQueryHandler
             return AcadSnapshot.Thumbnail(document.Database);
         }
 
+        var region = AcadPlotSnapshot.Region(document.Database, p, out var regionError, out var regionNote);
+        if (regionError != null)
+        {
+            return new { error = regionError };
+        }
+
         var reasons = new List<string>();
         var width = Math.Max(200, Math.Min(p.ImageWidth, 4000));
+        var plotFirst = string.Equals(p.Source, "plot", StringComparison.OrdinalIgnoreCase);
 
-        try
+        if (!plotFirst)
         {
-            using var bitmap = RenderOffScreen(document, width);
-            return AcadSnapshot.Package(bitmap, source: "live", note: null);
-        }
-        catch (System.Exception ex)
-        {
-            reasons.Add("off-screen: " + ex.Message);
+            try
+            {
+                using var bitmap = RenderOffScreen(document, width, region);
+                return AcadSnapshot.Package(bitmap, source: "live", note: regionNote);
+            }
+            catch (System.Exception ex)
+            {
+                reasons.Add("off-screen: " + ex.Message);
+            }
         }
 
-        try
+        var plotted = AcadPlotSnapshot.Render(document.Database, region, width, regionNote);
+        if (plotted.GetType().GetProperty("error") is null)
         {
-            using var bitmap = SnapshotCurrentView(document, width);
-            return AcadSnapshot.Package(bitmap, source: "screen",
-                note: "Không render off-screen được (" + reasons[0] + ") — đây là ảnh chụp khung nhìn đang mở, cỡ theo cửa sổ.");
+            return plotted;
         }
-        catch (System.Exception ex)
+
+        reasons.Add("plot: " + plotted.GetType().GetProperty("error")!.GetValue(plotted));
+
+        // Chụp khung nhìn đang mở không khoanh vùng được — chỉ dùng khi agent không xin vùng nào.
+        if (region == null)
         {
-            reasons.Add("khung nhìn hiện tại: " + ex.Message);
+            try
+            {
+                using var bitmap = SnapshotCurrentView(document, width);
+                return AcadSnapshot.Package(bitmap, source: "screen",
+                    note: "Không render off-screen/plot được (" + string.Join("; ", reasons) + ") — đây là ảnh chụp khung nhìn đang mở, cỡ theo cửa sổ.");
+            }
+            catch (System.Exception ex)
+            {
+                reasons.Add("khung nhìn hiện tại: " + ex.Message);
+            }
         }
 
         var fallback = AcadSnapshot.Thumbnail(document.Database);
         // Thumbnail trả object ẩn danh; ghép lý do rơi xuống vào để agent biết vì sao không có ảnh sống.
-        return new { fallbackFrom = "live", reasons, result = fallback };
+        return new { fallbackFrom = plotFirst ? "plot" : "live", reasons, result = fallback };
     }
 
     /// <summary>
     /// Render model space vào thiết bị off-screen, khung hình 4:3 theo <paramref name="width"/>.
     /// Extents của DWG chưa từng zoom là số rác (±1e20) — khi đó lấy theo khung nhìn hiện tại.
     /// </summary>
-    private static System.Drawing.Bitmap RenderOffScreen(Document document, int width)
+    private static System.Drawing.Bitmap RenderOffScreen(Document document, int width, Extents3d? region)
     {
         var database = document.Database;
         var height = width * 3 / 4;
@@ -260,7 +285,7 @@ internal static class AcadUiQueryHandler
             view.Add(modelSpace, model);
             device.Add(view);
 
-            var (min, max) = UsableExtents(document);
+            var (min, max) = region is { } r ? (r.MinPoint, r.MaxPoint) : UsableExtents(document);
             view.ZoomExtents(min, max);
             device.Update();
 

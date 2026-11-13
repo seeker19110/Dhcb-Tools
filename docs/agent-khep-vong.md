@@ -88,6 +88,31 @@ python scripts/dhcb_agent.py revit query show_elements `
 python scripts/dhcb_agent.py revit query snapshot --params '{"imageWidth":1600}'
 ```
 
+## Vòng khép bên AutoCAD: vẽ → nhìn
+
+Học từ các MCP AutoCAD "cầm bút" (puran-water/autocad-mcp): agent cần vẽ/sửa được hình học thô và **tự nhìn**
+kết quả. Bộ công cụ nay có đủ ba mảnh, vẫn đi qua Bridge/`dryRun` như mọi lệnh khác:
+
+| Mảnh | Dùng |
+|---|---|
+| `EntityEdit` | Lô thao tác JSON: tạo `line`, `polyline`, `rectangle`, `circle`, `arc`, `ellipse`, `text`, `mtext`, `hatch`, `point`; sửa theo handle `move`, `copy` (kèm `count`), `array`, `rotate`, `scale`, `mirror`, `offset`, `erase`. Đặt `"id"` cho op tạo/sao chép rồi op sau trỏ lại bằng `"@id"`. Cả lô một giao dịch — op nào hỏng thì huỷ hết. Kết quả có `changedIds` (giá trị handle) và dòng `@id → handle` |
+| `BlockInsert` | Đặt block theo danh sách vị trí + attribute; định nghĩa lấy trong bản vẽ hoặc nạp từ DWG thư viện / thư mục mỗi ký hiệu một file `<tên>.dwg` (cách tổ chức của thư viện P&ID, thiết bị MEP) |
+| `query snapshot` | Ảnh PNG. `params.window` `[x1,y1,x2,y2]` hoặc `params.handles` (ôm các đối tượng, lề `margin` 0.15) để khoanh vùng; `source`: `live` (render khung nhìn, cần GUI), `plot` (plot bằng `PublishToWeb PNG.pc3` — trạng thái hiện tại, **chạy ngầm được**), `thumbnail`. Qua MCP, ảnh đi thành khối `image` nên mô hình nhìn thấy ảnh thật thay vì chuỗi base64 |
+
+```json
+{"operations": [
+  {"op": "rectangle", "from": [0, 0], "to": [6000, 4000], "layer": "M-PHONG", "id": "p"},
+  {"op": "text", "position": [200, 200], "text": "PHÒNG BƠM", "height": 250, "layer": "M-TEXT"},
+  {"op": "offset", "handles": ["@p"], "distance": -200, "id": "tuong"}
+]}
+```
+
+rồi `query snapshot` với `{"handles": ["<handle vừa tạo>"], "imageWidth": 1600}`. Đọc ngầm bản sao DWG thì gửi
+kèm `dwgPath` — accoreconsole plot đúng trạng thái file, không cần mở AutoCAD.
+
+Không học: `execute_lisp` (chạy LISP tuỳ ý — phá rào `dryRun`/token), gửi phím vào cửa sổ AutoCAD (vỡ khi AutoCAD
+đang chờ lệnh khác), bộ ký hiệu CTO (thư viện trả phí, đường dẫn cứng `C:/PIDv4-CTO`).
+
 ## An toàn giữ nguyên
 
 Không có gì trong giai đoạn 10 nới lỏng các rào đã có:

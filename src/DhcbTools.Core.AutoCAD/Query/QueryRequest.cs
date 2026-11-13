@@ -66,8 +66,15 @@ public sealed class AcadQueryParams
     public int ImageWidth { get; set; } = 1200;
 
     /// <summary>
-    /// [snapshot] "live" (mặc định) = render khung nhìn hiện tại, cần AutoCAD đang mở; "thumbnail" = ảnh xem
-    /// trước lưu trong DWG lúc save, chạy được cả trong accoreconsole. Kết quả luôn nói rõ nó là loại nào.
+    /// [snapshot] "live" (mặc định) = render sống trong AutoCAD đang mở (chạy ngầm bằng accoreconsole thì tự đổi sang
+    /// "plot"); "plot" = plot PNG bằng PublishToWeb PNG.pc3 — trạng thái hiện tại của database, không cần GUI;
+    /// "thumbnail" = ảnh xem trước lưu trong DWG lúc save. Kết quả luôn nói rõ nó là loại nào.
     /// </summary>
     public string Source { get; set; } = "live";
+
+    /// <summary>[snapshot] Chỉ chụp vùng [x1, y1, x2, y2] (toạ độ WCS). Bỏ trống + có <see cref="Handles"/> = ôm các đối tượng đó.</summary>
+    public List<double> Window { get; set; } = new();
+
+    /// <summary>[snapshot] Lề quanh các đối tượng khi chụp theo <see cref="Handles"/>, tỉ lệ theo cạnh lớn (mặc định 0.15).</summary>
+    public double Margin { get; set; } = 0.15;
 }

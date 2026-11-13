@@ -47,6 +47,8 @@ public static class AcadCommandTable
                 "XREFAUDIT" => new XrefAuditCommand().Execute(db, Deserialize<XrefAuditConfig>(configJson)),
                 "LAYERTRANSLATE" => new LayerTranslateCommand().Execute(db, Deserialize<LayerTranslateConfig>(configJson)),
                 "ENTITYLAYERASSIGN" => new EntityLayerAssignCommand().Execute(db, Deserialize<EntityLayerAssignConfig>(configJson)),
+                "ENTITYEDIT" => new EntityEditCommand().Execute(db, Deserialize<EntityEditConfig>(configJson)),
+                "BLOCKINSERT" => new BlockInsertCommand().Execute(db, Deserialize<BlockInsertConfig>(configJson)),
                 "POLYLINEIMPORT" => new PolylineImportCommand().Execute(db, Deserialize<PolylineImportConfig>(configJson)),
                 "DRAWINGCOMPARE" => new DrawingCompareCommand().Execute(db, Deserialize<DrawingCompareConfig>(configJson)),
                 "DRAWINGCOMBINE" => new DrawingCombineCommand().Execute(db, Deserialize<DrawingCombineConfig>(configJson)),

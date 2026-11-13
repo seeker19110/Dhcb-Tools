@@ -54,10 +54,37 @@ public static class AcadQueryHandler
             "ENTITY_GEOMETRY" => GetEntityGeometry(db, req.Params),
             "ATTRIBUTES_OF"   => GetAttributesOf(db, req.Params),
             "BLOCK_CONTENTS"  => GetBlockContents(db, req.Params),
-            // Tầng Core của snapshot: ảnh xem trước lưu trong DWG. Vỏ AutoCAD chặn trước để render sống.
-            "SNAPSHOT"        => AcadSnapshot.Thumbnail(db),
+            // Tầng Core của snapshot (accoreconsole): plot PNG trạng thái hiện tại, hoặc ảnh xem trước lưu trong DWG.
+            // Vỏ AutoCAD chặn trước để render sống khung nhìn.
+            "SNAPSHOT"        => CoreSnapshot(db, req.Params),
             _ => new { error = $"Query không xác định: \"{req.Query}\". Hợp lệ: {ValidQueries}." }
         };
+    }
+
+    /// <summary>
+    /// Snapshot khi không có GUI: mặc định plot PNG (đúng trạng thái hiện tại, khoanh vùng được), rơi về ảnh xem
+    /// trước trong DWG nếu plot hỏng; <c>source="thumbnail"</c> thì lấy thẳng ảnh xem trước.
+    /// </summary>
+    private static object CoreSnapshot(Database db, AcadQueryParams p)
+    {
+        if (string.Equals(p.Source, "thumbnail", StringComparison.OrdinalIgnoreCase))
+        {
+            return AcadSnapshot.Thumbnail(db);
+        }
+
+        var region = AcadPlotSnapshot.Region(db, p, out var error, out var note);
+        if (error != null)
+        {
+            return new { error };
+        }
+
+        var plotted = AcadPlotSnapshot.Render(db, region, Math.Max(200, Math.Min(p.ImageWidth, 4000)), note);
+        if (plotted.GetType().GetProperty("error") is null)
+        {
+            return plotted;
+        }
+
+        return new { fallbackFrom = "plot", reasons = new[] { plotted }, result = AcadSnapshot.Thumbnail(db) };
     }
 
     // ──────────────────────────────────────────────────────────────
