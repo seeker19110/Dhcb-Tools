@@ -57,6 +57,9 @@ namespace DhcbTools.Shared.Logic.Cad
 
         public double? Height { get; set; }
 
+        /// <summary>Text/MText: tên text style (rỗng = style hiện hành). Chữ tiếng Việt cần style có font Unicode (Arial…).</summary>
+        public string? Style { get; set; }
+
         /// <summary>Text/MText: góc xoay (độ). Rotate: dùng <see cref="Angle"/>.</summary>
         public double? Rotation { get; set; }
 
@@ -338,6 +341,7 @@ namespace DhcbTools.Shared.Logic.Cad
                     Need(op.Height == null || Positive(op.Height), "height phải > 0.");
                     Need(op.Rotation == null || Finite(op.Rotation), "rotation phải là số.");
                     Need(op.Width == null || (step.Kind == EntityOpKind.MText && Positive(op.Width)), "width chỉ dùng cho mtext và phải > 0.");
+                    Need(op.Style == null || op.Style.Trim().Length > 0, "style rỗng — bỏ trường để dùng style hiện hành.");
                     break;
                 case EntityOpKind.Hatch:
                     Need(op.Points != null && op.Points.Count >= 3 && op.Points.All(IsPoint), "cần points ≥ 3 đỉnh của biên kín.");

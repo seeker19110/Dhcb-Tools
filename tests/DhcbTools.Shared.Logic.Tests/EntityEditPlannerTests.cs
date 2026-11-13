@@ -119,6 +119,7 @@ public class EntityEditPlannerTests
     [InlineData("""{"op":"scale","handles":["1F"],"basePoint":[0,0],"factor":0}""", "factor")]
     [InlineData("""{"op":"rectangle","from":[0,0],"to":[0,5]}""", "khác nhau")]
     [InlineData("""{"op":"text","position":[0,0],"text":"a","width":5}""", "mtext")]
+    [InlineData("""{"op":"mtext","position":[0,0],"text":"a","style":" "}""", "style rỗng")]
     [InlineData("""{"op":"line","from":[0,"NaN"],"to":[1,0]}""", "from")]
     public void GiaTriSai_BaoDungTruong(string op, string expected)
     {

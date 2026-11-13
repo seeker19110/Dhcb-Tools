@@ -179,6 +179,11 @@ public sealed class EntityEditCommand : ICoreCommand<EntityEditConfig>
             var op = step.Source;
             if (step.Creates)
             {
+                if (step.Kind is EntityOpKind.Text or EntityOpKind.MText)
+                {
+                    TextStyle(tr, step); // kiểm tên style ngay từ xem trước
+                }
+
                 Report.Add($"{step.Label} → (mới) trên layer \"{PreviewLayer(tr, step, op.Layer)}\".");
                 return new List<ObjectId> { ObjectId.Null };
             }
@@ -278,14 +283,14 @@ public sealed class EntityEditCommand : ICoreCommand<EntityEditConfig>
                 {
                     var text = new DBText { TextString = op.Text, Position = P(op.Position!), Rotation = EntityEditPlanner.Radians(op.Rotation ?? 0) };
                     text.Height = op.Height ?? _db.Textsize;
-                    text.TextStyleId = _db.Textstyle;
+                    text.TextStyleId = TextStyle(tr, step);
                     return text;
                 }
                 case EntityOpKind.MText:
                 {
                     var mtext = new MText { Contents = op.Text, Location = P(op.Position!), Rotation = EntityEditPlanner.Radians(op.Rotation ?? 0) };
                     mtext.TextHeight = op.Height ?? _db.Textsize;
-                    mtext.TextStyleId = _db.Textstyle;
+                    mtext.TextStyleId = TextStyle(tr, step);
                     if (op.Width is double width) mtext.Width = width;
                     return mtext;
                 }
@@ -296,6 +301,30 @@ public sealed class EntityEditCommand : ICoreCommand<EntityEditConfig>
                 default:
                     throw new StepException(step, "op không phải op tạo.");
             }
+        }
+
+        /// <summary>Text style theo tên (rỗng = hiện hành); không có thì dừng lô và liệt kê style có sẵn.</summary>
+        private ObjectId TextStyle(Transaction tr, EntityEditStep step)
+        {
+            var name = step.Source.Style?.Trim();
+            if (string.IsNullOrEmpty(name))
+            {
+                return _db.Textstyle;
+            }
+
+            var table = (TextStyleTable)tr.GetObject(_db.TextStyleTableId, OpenMode.ForRead);
+            if (table.Has(name))
+            {
+                return table[name];
+            }
+
+            var known = new List<string>();
+            foreach (ObjectId id in table)
+            {
+                known.Add(((TextStyleTableRecord)tr.GetObject(id, OpenMode.ForRead)).Name);
+            }
+
+            throw new StepException(step, $"text style \"{name}\" không có trong bản vẽ (có: {string.Join(", ", known.Where(n => n.Length > 0).Take(30))}).");
         }
 
         /// <summary>Hatch phải nằm trong database rồi mới nạp mẫu và biên — thứ tự bắt buộc của API AutoCAD.</summary>
