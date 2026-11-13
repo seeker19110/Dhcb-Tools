@@ -51,6 +51,10 @@ public sealed class App : IExtensionApplication
 
         StartBridge(pid);
 
+        // Core chỉ có Database (để còn chạy trong accoreconsole); vỏ GUI mới có Editor để vẽ lại màn hình.
+        Core.AutoCAD.AcadDisplay.RegenRequested = database =>
+            AcApp.DocumentManager.GetDocument(database)?.Editor.Regen();
+
         Flush();
         if (_pending.Count > 0)
         {
@@ -97,6 +101,7 @@ public sealed class App : IExtensionApplication
     public void Terminate()
     {
         AcApp.Idle -= OnIdle;
+        Core.AutoCAD.AcadDisplay.RegenRequested = null;
         _bridge?.Stop();
         _bridge?.Dispose();
     }
