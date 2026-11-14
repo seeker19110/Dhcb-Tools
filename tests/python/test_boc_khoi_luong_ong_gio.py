@@ -351,7 +351,8 @@ class SectionTests(unittest.TestCase):
         self.assertEqual(rows[0][:4], ["TT", "MÃ", "QUY CÁCH ỐNG", "W"])
         self.assertEqual(rows[1][2], "TRỤC HÚT KHÓI 700X1300 T/A")
         self.assertEqual((rows[2][0], rows[2][2], rows[2][12], rows[2][14]), ("1", "Co vuông 90 độ 700x300", "cái", None))
-        self.assertEqual(rows[2][17], "ỐNG EI30; DT co theo công thức của đơn vị bóc")
+        self.assertEqual(rows[2][17], "ỐNG EI60; DT co theo công thức của đơn vị bóc")
+        self.assertEqual(rows[2][15], 0.75)  # ống hút khói bọc EI: luôn 0.75
         self.assertEqual(rows[3][:5] + [rows[3][9], rows[3][13], rows[3][14]],
                          ["2~3", "T", "Ống 700x300xL1110", 700, 300, 1110, 2, "ROUND((2*(D4+E4)*J4)*N4/10^6,3)"])
         self.assertEqual((rows[4][0], rows[4][2], rows[4][14], rows[4][16]),
@@ -427,6 +428,10 @@ class XlsxTests(unittest.TestCase):
             self.assertEqual((det["B6"], det["J6"], det["N6"]), ("SEAD-003", "Box bít đầu", "=ROUND(L6*M6+F6*G6/1000000,3)"))
             self.assertEqual(det["S10"], "có chân rẽ/miệng gió bên hông")
             self.assertEqual(det["L13"], "=SUM(L4:L12)")
+            self.assertEqual((det["T3"], det["U3"], det["T4"], det["U4"]), ("Bọc / ghi thêm (tag)", "Độ dày tole (mm)", "EI60", 0.75))
+            row = next(r for r in range(14, 30) if tot.get(f"B{r}") == "Tole dày 0.75 mm")
+            self.assertEqual(tot[f"M{row}"], "=SUMIFS('Chi tiết'!N:N,'Chi tiết'!U:U,0.75)")
+            self.assertEqual(tot[f"Q{row}"], "=SUMIFS(Co!L:L,Co!R:R,0.75)")
             self.assertEqual([fill[f"E{r}"] for r in range(4, 9)], [1400.0, 640.0, 1300.0, 930.0, 1070.0])
             self.assertEqual(fill["B4"], "Box bít đầu")
             self.assertEqual((co["B4"], co["C4"], co["J4"]), ("CO-001", "Co 90°", "=ROUND(F4*TAN(RADIANS(H4/2))/1000,3)"))
@@ -515,3 +520,55 @@ class LiveAndMainTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TagSpecAndToleTests(unittest.TestCase):
+    def test_duoi_tag_va_nhieu_tag_trong_mot_chu(self) -> None:
+        tags = bog.parse_tags([text(r"{\fArial;SEAD- 700x300+ EI120\PBOD=FFL+2730}", 0, 0),
+                               text(r"FAD- 450x250+\PTIÊU ÂM TRONG 50mm\PBOD=FFL+2880", 10, 0),
+                               text("PAD- 800x250 BOD=FFL+4270 SEAD- 800x250", 20, 0)])
+        self.assertEqual([(t["sys"], t["W"], t["H"], t["spec"]) for t in tags],
+                         [("SEAD", 700, 300, "EI120"), ("FAD", 450, 250, "TIÊU ÂM TRONG 50MM"),
+                          ("PAD", 800, 250, ""), ("SEAD", 800, 250, "")])
+
+    def test_cap_chong_chay_va_do_day_tole(self) -> None:
+        self.assertEqual((bog.ei_class("SEAD"), bog.ei_class("SEAD", "EI120"), bog.ei_class("FAD"), bog.ei_class("PAD", "EI 30")),
+                         ("EI60", "EI120", "", "EI30"))
+        self.assertEqual([bog.tole_thickness(d) for d in ((1300, 700), (1250, 400), (600, 300), (500, 400), (150, 150))],
+                         [0.95, 0.75, 0.75, 0.58, 0.58])
+        self.assertEqual(bog.tole_thickness((300, 200), "EI60"), 0.75)
+        self.assertEqual(bog.tole_thickness((1350, 550), "EI120"), 0.75)
+
+    def test_canh_ve_theo_mep_bich_van_khop_tag_nhung_uu_tien_khop_dung(self) -> None:
+        pair = {"w": 740, "mid": (0, 0)}
+        tags = [{"sys": "SEAD", "W": 700, "H": 300, "x": 100, "y": 0, "spec": "EI120"},
+                {"sys": "PAD", "W": 750, "H": 400, "x": 3000, "y": 0, "spec": ""}]
+        got = bog.assign_sizes([pair], tags)[0]
+        self.assertEqual((got["sys"], got["W"], got["spec"]), ("PAD", 750, ""))  # khớp đúng ±30 thắng khớp nhờ bích
+        got = bog.assign_sizes([pair], tags[:1])[0]
+        self.assertEqual((got["sys"], got["W"], got["spec"]), ("SEAD", 700, "EI120"))
+        self.assertIsNone(bog.assign_sizes([{"w": 800, "mid": (0, 0)}], tags[:1])[0]["sys"])  # rộng hơn 60 mm: không nhận
+
+    def test_bich_ve_bang_net_thanh_moi_noi(self) -> None:
+        # ống 700x300 vẽ theo mép bích (cạnh cách 740), bích TDC = 3 nét dọc cách 20 mm tại x = 1110 và 2220
+        segs = [line("s1", 0, 0, 3330, 0), line("s2", 0, 740, 3330, 740)]
+        for k, x in enumerate((1110, 2220)):
+            segs += [line(f"f{k}{i}", x + d, 0, x + d, 740) for i, d in enumerate((-20, 0, 20))]
+        joints, rest = bog.flange_joints(bog.duct_segments(segs))
+        self.assertEqual([(round(x), round(y), k) for x, y, k in joints], [(1110, 370, "TDC"), (2220, 370, "TDC")])
+        self.assertEqual(sorted(s["handle"] for s in rest), ["s1", "s2"])
+        runs = bog.build_runs(bog.assign_sizes(bog.pair_segments(rest), bog.parse_tags([text("SEAD - 700x300+ EI120", 1500, 1200)])), joints)
+        pieces = bog.split_runs(runs, joints)
+        self.assertEqual([(p["len"], p["W"], p["ei"], p["tole"]) for p in pieces],
+                         [(1110, 700, "EI120", 0.75)] * 3)
+
+    def test_net_vuong_goc_cung_chieu_dai_khong_phai_bich(self) -> None:
+        segs = bog.duct_segments([line("v", 0, 0, 0, 740), line("h", 10, 0, 750, 0)])
+        joints, rest = bog.flange_joints(segs)
+        self.assertEqual((joints, sorted(s["handle"] for s in rest)), ([], ["h", "v"]))
+
+    def test_thu_tu_cum_trai_phai(self) -> None:
+        runs, pieces, elbows = pipeline()
+        secs = bog.build_sections(runs, pieces, elbows, bog.fitting_boxes(GEOMETRY, BBOX), LABELS, order="trai-phai")
+        firsts = [min(it["x"] for it in c) for _, cl in secs for c in cl]
+        self.assertEqual(firsts, sorted(firsts))
