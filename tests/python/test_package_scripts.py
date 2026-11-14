@@ -130,8 +130,8 @@ class PackageScriptsTests(unittest.TestCase):
         """Kiểm tra installer gỡ DLL/bundle cũ khi bỏ chọn thành phần và lọc PackageContents.xml."""
         text = INSTALLER.read_text(encoding="utf-8")
         self.assertIn("[InstallDelete]", text)
-        self.assertIn("not revit2024", text)
-        self.assertIn("not acad2024", text)
+        self.assertIn("not revit2027", text)
+        self.assertIn("not acad2025", text)
         self.assertIn("procedure UpdatePackageContents", text)
         self.assertIn("procedure ReplaceXmlBlock", text)
 
@@ -142,10 +142,10 @@ class PackageScriptsTests(unittest.TestCase):
         # Parse XML gốc
         root = ET.fromstring(xml_text)
         components_before = root.findall("Components")
-        self.assertEqual(len(components_before), 6)
+        self.assertEqual(len(components_before), 3)
 
-        # Mô phỏng xoá block AutoCAD 2024
-        marker = '<Components Description="AutoCAD 2024">'
+        # Mô phỏng xoá block AutoCAD 2025
+        marker = '<Components Description="AutoCAD 2025">'
         p1 = xml_text.find(marker)
         self.assertGreater(p1, -1)
         substr = xml_text[p1:]
@@ -155,10 +155,10 @@ class PackageScriptsTests(unittest.TestCase):
 
         root_after = ET.fromstring(filtered_xml)
         components_after = root_after.findall("Components")
-        self.assertEqual(len(components_after), 5)
+        self.assertEqual(len(components_after), 2)
         descriptions = [c.attrib.get("Description") for c in components_after]
-        self.assertNotIn("AutoCAD 2024", descriptions)
-        self.assertIn("AutoCAD 2025", descriptions)
+        self.assertNotIn("AutoCAD 2025", descriptions)
+        self.assertIn("AutoCAD 2026", descriptions)
 
 
 if __name__ == "__main__":

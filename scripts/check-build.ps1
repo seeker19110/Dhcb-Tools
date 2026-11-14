@@ -6,9 +6,9 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet(2022, 2023, 2024, 2025, 2026, 2027)] [int]$RevitVersion = 2025,
-    [ValidateSet(2022, 2023, 2024, 2025, 2026, 2027)] [int]$AcadVersion = 2025,
-    [ValidateSet('Auto', 'net48', 'net8', 'net10')] [string]$AcadRuntime = 'Auto',
+    [ValidateSet(2027)] [int]$RevitVersion = 2027,
+    [ValidateSet(2025, 2026, 2027)] [int]$AcadVersion = 2026,
+    [ValidateSet('Auto', 'net10')] [string]$AcadRuntime = 'Auto',
     [ValidateSet('Debug', 'Release')] [string]$Configuration = 'Release',
     [switch]$SkipTests
 )

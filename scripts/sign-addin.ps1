@@ -16,13 +16,13 @@
 
 .EXAMPLE
     .\scripts\sign-addin.ps1
-    .\scripts\sign-addin.ps1 -RevitVersion 2024
+    .\scripts\sign-addin.ps1 -RevitVersion 2027
     .\scripts\sign-addin.ps1 -PfxPath C:\certs\dhcb.pfx -PfxPassword (Read-Host -AsSecureString)
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet(2022, 2023, 2024, 2025, 2026, 2027)]
-    [int]$RevitVersion = 2024,
+    [ValidateSet(2027)]
+    [int]$RevitVersion = 2027,
 
     # Thư mục chứa DLL cần ký; mặc định là thư mục add-in đã cài của người dùng.
     [string]$Path,

@@ -10,7 +10,7 @@
 
 .EXAMPLE
     .\scripts\run-in-revit-tests.ps1
-    .\scripts\run-in-revit-tests.ps1 -Suite mep -RevitVersion 2024
+    .\scripts\run-in-revit-tests.ps1 -Suite mep -RevitVersion 2027
 #>
 [CmdletBinding()]
 param(
@@ -28,8 +28,8 @@ param(
     # Không dọn DHCB-test-results sau khi chạy (mặc định dọn: bản chép model chỉ giữ ở lượt mới nhất mỗi bộ).
     [switch]$NoPrune,
 
-    [ValidateSet(2022, 2023, 2024, 2025, 2026, 2027)]
-    [int]$RevitVersion = 2024,
+    [ValidateSet(2027)]
+    [int]$RevitVersion = 2027,
 
     # Model .rvt để chạy; không đặt thì lấy model mẫu kèm Revit theo bộ ca kiểm.
     [string]$Model,

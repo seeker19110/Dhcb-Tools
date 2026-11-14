@@ -27,20 +27,16 @@ class HostCompatibilityTests(unittest.TestCase):
         return json.loads(result.stdout)["Properties"]
 
     def test_autocad_each_year_uses_its_own_sdk_and_isolated_restore(self):
+        # Chỉ hỗ trợ .NET 10: AutoCAD 2025/2026 (profile net10) và 2027.
         profiles = [
-            (2022, "net48", "24.1.51000", "24.1.51000"),
-            (2023, "net48", "24.2.0", "24.2.0"),
-            (2024, "net48", "24.3.0", "24.3.0"),
-            (2025, "net8", "25.0.1", "25.0.0"),
             (2025, "net10", "25.0.2", "25.0.2"),
-            (2026, "net8", "25.1.0", "25.1.0"),
             (2026, "net10", "25.1.1", "25.1.1"),
             (2027, "net10", "26.0.0", "26.0.0"),
         ]
         for year, runtime, api, core in profiles:
             with self.subTest(year=year, runtime=runtime):
                 profile = self.profile("AutoCAD", AcadVersion=year, AcadRuntime=runtime)
-                tfm = "net48" if runtime == "net48" else runtime + ".0-windows"
+                tfm = runtime + ".0-windows"
                 self.assertEqual(profile["TargetFramework"], tfm)
                 self.assertEqual(profile["AcadNetVersion"], api)
                 self.assertEqual(profile["AcadCoreNetVersion"], core)
@@ -48,12 +44,13 @@ class HostCompatibilityTests(unittest.TestCase):
                     self.assertEqual(profile[key].replace(chr(92), "/"), f"{prefix}/{year}/{runtime}/")
 
     def test_revit_api_and_runtime_matrix(self):
-        apis = {2022: "2022.1.80", 2023: "2023.1.90", 2024: "2024.3.60", 2025: "2025.4.60", 2026: "2026.4.10", 2027: "2027.2.0"}
+        # Chỉ còn Revit 2027 (.NET 10).
+        apis = {2027: "2027.2.0"}
         for year, api in apis.items():
             with self.subTest(year=year):
                 profile = self.profile("Revit", RevitVersion=year)
-                runtime = "net48" if year <= 2024 else "net8" if year <= 2026 else "net10"
-                self.assertEqual(profile["TargetFramework"], "net48" if year <= 2024 else runtime + ".0-windows")
+                runtime = "net10"
+                self.assertEqual(profile["TargetFramework"], runtime + ".0-windows")
                 self.assertEqual(profile["RevitApiVersion"], api)
                 self.assertEqual(profile["BaseOutputPath"].replace(chr(92), "/"), f"bin/{year}/{runtime}/")
                 self.assertEqual(profile["BaseIntermediateOutputPath"].replace(chr(92), "/"), f"obj/{year}/{runtime}/")
@@ -69,9 +66,9 @@ class HostCompatibilityTests(unittest.TestCase):
                 self.assertNotIn("Page Remove", project)
 
     def test_defaults_preserve_existing_host_policy(self):
-        self.assertEqual(self.profile("Revit")["RevitApiVersion"], "2024.3.60")
-        self.assertEqual(self.profile("AutoCAD")["AcadNetVersion"], "24.3.0")
-        self.assertEqual(self.profile("AutoCAD", AcadVersion=2025)["TargetFramework"], "net8.0-windows")
+        self.assertEqual(self.profile("Revit")["RevitApiVersion"], "2027.2.0")
+        self.assertEqual(self.profile("AutoCAD")["AcadNetVersion"], "25.1.1")
+        self.assertEqual(self.profile("AutoCAD", AcadVersion=2025)["TargetFramework"], "net10.0-windows")
         self.assertEqual(self.profile("AutoCAD", AcadVersion=2026)["TargetFramework"], "net10.0-windows")
 
     def test_unsupported_or_mismatched_profiles_fail_before_restore(self):
@@ -79,18 +76,20 @@ class HostCompatibilityTests(unittest.TestCase):
             ("AutoCAD", {"AcadVersion": 2021}),
             ("AutoCAD", {"AcadVersion": 2028}),
             ("AutoCAD", {"AcadVersion": "unexpected"}),
-            ("AutoCAD", {"AcadVersion": 2022, "AcadNetVersion": "24.3.0"}),
-            ("AutoCAD", {"AcadVersion": 2023, "AcadRuntime": "net8"}),
+            ("AutoCAD", {"AcadVersion": 2022}),
+            ("AutoCAD", {"AcadVersion": 2024}),
+            ("AutoCAD", {"AcadVersion": 2025, "AcadRuntime": "net8"}),
             ("AutoCAD", {"AcadVersion": 2027, "AcadRuntime": "net8"}),
-            ("AutoCAD", {"AcadVersion": 2025, "AcadRuntime": "net8", "AcadNetVersion": "25.0.2"}),
-            ("AutoCAD", {"AcadVersion": 2026, "AcadRuntime": "net10", "AcadNetVersion": "25.1.0"}),
+            ("AutoCAD", {"AcadVersion": 2026, "AcadRuntime": "net48"}),
+            ("AutoCAD", {"AcadVersion": 2026, "AcadNetVersion": "25.1.0"}),
             ("AutoCAD", {"AcadVersion": 2025, "AcadCoreNetVersion": "25.1.0"}),
-            ("AutoCAD", {"AcadVersion": 2025, "TargetFramework": "net10.0-windows"}),
+            ("AutoCAD", {"AcadVersion": 2025, "TargetFramework": "net8.0-windows"}),
             ("Revit", {"RevitVersion": 2021}),
             ("Revit", {"RevitVersion": 2028}),
             ("Revit", {"RevitVersion": "unexpected"}),
-            ("Revit", {"RevitVersion": 2022, "RevitApiVersion": "2024.3.60"}),
-            ("Revit", {"RevitVersion": 2025, "RevitRuntime": "net10"}),
+            ("Revit", {"RevitVersion": 2024}),
+            ("Revit", {"RevitVersion": 2026}),
+            ("Revit", {"RevitVersion": 2027, "RevitApiVersion": "2026.4.10"}),
             ("Revit", {"RevitVersion": 2027, "TargetFramework": "net8.0-windows"}),
         ]
         for host, properties in invalid:

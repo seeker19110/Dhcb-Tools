@@ -15,7 +15,7 @@
     trong thư mục nguồn.
 
 .EXAMPLE
-    .\scripts\dung-family.ps1 -RevitVersions 2024,2026
+    .\scripts\dung-family.ps1 -RevitVersions 2027
 
 .EXAMPLE
     .\scripts\dung-family.ps1 -RevitVersions 2026 -Mode Upgrade -SourceFolder D:\ThuVienFamily
@@ -23,8 +23,8 @@
 [CmdletBinding()]
 param(
     # Các phiên bản Revit cần dựng. Máy phải có đúng bản đó và add-in build được cho nó.
-    [ValidateSet(2022, 2023, 2024, 2025, 2026, 2027)]
-    [int[]]$RevitVersions = @(2024),
+    [ValidateSet(2027)]
+    [int[]]$RevitVersions = @(2027),
 
     # Starter = dựng family mẫu DHCB_Sleeve/DHCB_Hanger từ template kèm Revit (cách 1).
     # Upgrade = mở .rfa trong -SourceFolder rồi lưu lại theo định dạng phiên bản đang chạy (cách 2).

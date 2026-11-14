@@ -77,23 +77,23 @@ class DoctorTests(unittest.TestCase):
                 "tfm": runtime or dhcb_doctor.expected_runtime("revit", year)}}), encoding="utf-8")
         return addins, host
 
-    def test_all_six_years_profiles_and_custom_autocad_year(self):
+    def test_supported_years_profiles_and_custom_autocad_year(self):
         self.make_bundle(dhcb_doctor.YEARS)
         for year in dhcb_doctor.YEARS:
-            self.make_host(year, dhcb_doctor.expected_runtime("autocad", year) if year >= 2025 else None)
+            self.make_host(year, dhcb_doctor.expected_runtime("autocad", year))
         self.assertTrue(all(c["status"] == "ok" for c in self.installation()))
         host = self.make_host(2027, "net10.0")
         checks = dhcb_doctor.inspect_autocad_installation(host, 2027)
         self.assertTrue(all(c["status"] == "ok" for c in checks), checks)
         self.assertFalse(any("2026" in c["name"] for c in checks))
-        self.assertEqual(14, len(dhcb_doctor.compatibility_profiles()))
+        self.assertEqual(4, len(dhcb_doctor.compatibility_profiles()))
         self.assertTrue(all(p["verification"] == "requires_host_acceptance" for p in dhcb_doctor.compatibility_profiles()))
         self.make_bundle((2026,))
         self.assertEqual("error", dhcb_doctor.inspect_autocad_installation(year=2027)[-1]["status"])
 
     def test_installed_runtime_profile_matches_autocad_variants_and_cannot_lie_about_year(self):
         bundle = self.make_bundle((2025, 2026))
-        for year, tfm in ((2025, "net10.0"), (2026, "net8.0")):
+        for year, tfm in ((2025, "net10.0"), (2026, "net10.0")):
             profile = bundle / "Contents" / str(year) / "dhcb-host-profile.json"
             profile.write_text(json.dumps({"product": "autocad", "year": year, "runtime": tfm}), encoding="utf-8")
             self.make_host(year, tfm)
@@ -110,7 +110,7 @@ class DoctorTests(unittest.TestCase):
         self.assertTrue(any(c["status"] == "warning" and c["name"].endswith("profile")
                             for c in dhcb_doctor.inspect_autocad_installation(year=2026)))
 
-    def test_revit_all_six_years_and_custom_directory(self):
+    def test_revit_supported_years_and_custom_directory(self):
         self.assertEqual("warning", dhcb_doctor.inspect_revit_installation()[0]["status"])
         for year in dhcb_doctor.YEARS:
             addins, host = self.make_revit(year)
@@ -121,20 +121,20 @@ class DoctorTests(unittest.TestCase):
         self.assertEqual("error", dhcb_doctor.inspect_revit_installation(self.base / "missing", 2027)[-1]["status"])
 
     def test_revit_shadowed_manifest_missing_dependency_bad_manifest_and_modern_runtime(self):
-        addins, host = self.make_revit(2026, "net10.0")
-        self.assertEqual("warning", dhcb_doctor.inspect_revit_installation(year=2026)[-1]["status"])
-        self.make_revit(2026, "net8.0", machine=True)
-        checks = dhcb_doctor.inspect_revit_installation(year=2026)
+        addins, host = self.make_revit(2027, "net10.0")
+        self.assertEqual("ok", dhcb_doctor.inspect_revit_installation(year=2027)[-1]["status"])
+        self.make_revit(2027, machine=True)
+        checks = dhcb_doctor.inspect_revit_installation(year=2027)
         self.assertTrue(any(c["status"] == "warning" and "che manifest" in c["detail"] for c in checks))
-        machine_manifest = self.base / "Machine" / "Autodesk" / "Revit" / "Addins" / "2026" / "DhcbTools.Revit.addin"
+        machine_manifest = self.base / "Machine" / "Autodesk" / "Revit" / "Addins" / "2027" / "DhcbTools.Revit.addin"
         machine_manifest.write_text("<invalid", encoding="utf-8")
-        checks = dhcb_doctor.inspect_revit_installation(year=2026)
+        checks = dhcb_doctor.inspect_revit_installation(year=2027)
         self.assertFalse(any(c["status"] == "error" for c in checks), checks)
         (addins / "Newtonsoft.Json.dll").unlink()
         self.assertTrue(any("Thiếu assembly: Newtonsoft.Json.dll" in c["detail"]
-                            for c in dhcb_doctor.inspect_revit_installation(year=2026)))
+                            for c in dhcb_doctor.inspect_revit_installation(year=2027)))
         (addins / "DhcbTools.Revit.addin").write_text('<bad private="secret"/>', encoding="utf-8")
-        checks = dhcb_doctor.inspect_revit_installation(year=2026)
+        checks = dhcb_doctor.inspect_revit_installation(year=2027)
         self.assertTrue(any(c["status"] == "error" and "Manifest" in c["detail"] for c in checks))
         self.assertNotIn("secret", json.dumps(checks))
         addins, host = self.make_revit(2027, "net8.0")
@@ -206,9 +206,9 @@ class DoctorTests(unittest.TestCase):
         self.assertIn("Component trùng", self.installation()[-1]["detail"])
 
     def test_installation_matches_host_runtime_for_each_supported_year(self):
-        self.make_bundle((2024, 2025, 2026))
-        self.make_host(2024)
-        self.make_host(2025, "net8.0")
+        self.make_bundle((2025, 2026, 2027))
+        self.make_host(2025, "net10.0")
+        self.make_host(2027, "net10.0")
         host = self.make_host(2026, "net10.0")
         checks = self.installation()
         self.assertTrue(all(c["status"] == "ok" for c in checks), checks)

@@ -13,8 +13,8 @@ namespace DhcbTools.BatchRunner;
 
 /// <summary>
 /// DhcbTools.BatchRunner.exe --job jobs/nightly.json [--dry-run] [--log-dir logs] [--max-minutes 480]
-///                           [--revit-exe "C:\Program Files\Autodesk\Revit 2024\Revit.exe"]
-///                           [--accoreconsole "C:\Program Files\Autodesk\AutoCAD 2024\accoreconsole.exe"] [--plugin-dll path]
+///                           [--revit-exe "C:\Program Files\Autodesk\Revit 2027\Revit.exe"]
+///                           [--accoreconsole "C:\Program Files\Autodesk\AutoCAD 2026\accoreconsole.exe"] [--plugin-dll path]
 ///                           [--report-only] [--analyze]
 ///                           [--verify-log logs/2026-09-04/run-013000.jsonl]
 ///                           [--verify-ifc xuat/toa-a.ifc [--ifc-spec configs/ifc-check.json]]

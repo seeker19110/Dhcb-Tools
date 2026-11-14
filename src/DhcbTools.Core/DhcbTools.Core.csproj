@@ -26,8 +26,6 @@
   <ItemGroup>
     <!-- CommandResult dùng chung nằm ở Shared.Hosting; global using để code hiện có không phải đổi. -->
     <Using Include="DhcbTools.Shared.Hosting" />
-    <!-- Polyfill init/required cho net48 — một file duy nhất, link từ Shared.Hosting (lỗi #9). -->
-    <Compile Include="..\DhcbTools.Shared.Hosting\Polyfills.cs" Link="Polyfills.cs" Condition="'$(TargetFramework)'=='net48'" />
   </ItemGroup>
 
 </Project>

@@ -87,7 +87,7 @@ public class DocReleaseClaimTests
     public void Khoang_phien_ban_o_tieu_de_agent_khep_vong_bang_ma_tran_release()
     {
         var revit = ReleaseMatrix("revit");
-        var expected = $"Revit {revit.Min()}–{revit.Max()}";
+        var expected = revit.Min() == revit.Max() ? $"Revit {revit.Max()}" : $"Revit {revit.Min()}–{revit.Max()}";
         Assert.Contains($"# Agent khép vòng cho {expected}", Doc("docs/agent-khep-vong.md"));
         Assert.Contains($"Agent khép vòng cho {expected}", Doc("docs/roadmap.md"));
     }

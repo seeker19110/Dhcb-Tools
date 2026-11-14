@@ -26,7 +26,6 @@
 
   <ItemGroup>
     <Using Include="DhcbTools.Shared.Hosting" />
-    <Compile Include="..\DhcbTools.Shared.Hosting\Polyfills.cs" Link="Polyfills.cs" Condition="'$(TargetFramework)'=='net48'" />
   </ItemGroup>
 
 </Project>

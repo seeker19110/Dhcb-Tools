@@ -15,7 +15,7 @@ hiện trạng ở [`docs/progress.md`](docs/progress.md).
 Kế hoạch nâng chất lượng và kết quả kiểm chứng của lượt 2026-10-07:
 [`docs/ke-hoach-chat-luong-2026-10-07.md`](docs/ke-hoach-chat-luong-2026-10-07.md).
 [Bằng chứng triển khai và phần nghiệm thu còn lại](docs/bang-chung/2026-10-08/trien-khai.md).
-[Ma trận 2022–2027 và các điểm yếu đã sửa](docs/tuong-thich-2022-2027.md).
+[Ma trận tương thích (chỉ .NET 10 từ 2026-11-14)](docs/tuong-thich-2022-2027.md).
 [Audit 2026-10-09: chính sách batch, bảo toàn đầu ra, PDF có dấu cách và bằng chứng kiểm thử](docs/audit-2026-10-09.md).
 [Audit toàn bộ 2026-10-10: giao dịch Revit, đơn vị CAD, MEP, Bridge/MCP và bàn giao](docs/audit-toan-bo-2026-10-10.md).
 [Hoàn thiện 2026-11-05: BatchRunner, MCP, ký PFX và kiểm chứng AutoCAD thật](docs/hoan-thien-2026-11-05.md).
@@ -53,9 +53,9 @@ phải bước bắt buộc để bắt đầu dùng.
 | Thành phần | Bản | Bắt buộc khi |
 |---|---|---|
 | Windows | 10/11 x64 | Build, kiểm thử và chạy add-in trên Windows |
-| .NET SDK | 8.0.x **+ 10.0.x** | SDK 10 cho BatchRunner và nhánh net10; SDK 8/10 build được nhánh net48/net8 |
-| Revit | 2022–2027 | Build và gói riêng từng năm; nghiệm thu trên host theo [ma trận tương thích](docs/tuong-thich-2022-2027.md) |
-| AutoCAD | 2022–2027 | 2022–2024: net48; 2025/2026: gói net8 hoặc net10 theo host; 2027: net10. Installer kiểm runtime trước khi chọn DLL |
+| .NET SDK | **10.0.x** | Mọi host và BatchRunner đều build .NET 10 |
+| Revit | 2027 | Chỉ còn Revit 2027 (.NET 10); nghiệm thu trên host theo [ma trận tương thích](docs/tuong-thich-2022-2027.md) |
+| AutoCAD | 2025–2027 | Chỉ .NET 10 (2025.1.4+, 2026.1.2+, 2027). Installer từ chối host .NET 8 |
 | Python | 3.9+ | Dùng `scripts/*.py` (client Bridge, MCP server, AI offline) |
 | Node/npx | bất kỳ LTS | **Chỉ** khi đóng gói `.mcpb` bằng `scripts/pack-mcpb.ps1` |
 | Hermes CLI | — | **Chỉ** cho panel web AutoCAD (`tools/autocad-mcp-server`) |
@@ -276,8 +276,7 @@ Chi tiết: [`docs/kiem-thu-trong-revit.md`](docs/kiem-thu-trong-revit.md), bằ
 [`docs/bang-chung-test.md`](docs/bang-chung-test.md), [`docs/bang-chung-test-autocad-live.md`](docs/bang-chung-test-autocad-live.md).
 
 Packages: Revit `Nice3point.Revit.Api.RevitAPI/RevitAPIUI`, AutoCAD `AutoCAD.NET` (vỏ đầy đủ) và `AutoCAD.NET.Core/.Model`
-(Core + vỏ core-only). Revit/AutoCAD 2022–2024 dùng net48; Revit 2025–2026 dùng API baseline net8,
-Revit 2027 dùng net10. AutoCAD 2025/2026 có hai profile `-p:AcadRuntime=net8` hoặc `net10`;
+(Core + vỏ core-only). Chỉ hỗ trợ .NET 10: Revit 2027 và AutoCAD 2025/2026/2027 (`-p:AcadRuntime=net10`);
 AutoCAD 2027 dùng net10. `Directory.Build.props` chọn SDK/TFM; `Directory.Build.targets` chặn
 yêu cầu sai năm/runtime/SDK. Mỗi host có output riêng `bin/<năm>/<profile>/Release/<TFM>/`,
 `release.yml` hỏi MSBuild để lấy đường dẫn. Xem [ma trận và giới hạn nghiệm thu](docs/tuong-thich-2022-2027.md).
@@ -286,7 +285,7 @@ yêu cầu sai năm/runtime/SDK. Mỗi host có output riêng `bin/<năm>/<profi
 
 - **CI** (`.github/workflows/tests.yml`, windows-latest, mọi push/PR): test `Shared.Logic` và CLI với cổng phủ 100%, build đầy đủ Core/WPF/Core Console cho 8 profile SDK; kiểm Python, panel JavaScript, PowerShell 5.1, giao diện WPF và installer trong thư mục tạm.
 - **CD** (`.github/workflows/release.yml`, windows-latest, khi đẩy tag `vX.Y.Z` hoặc chạy tay): build **Release thật**
-  (đủ WPF) cho Revit/AutoCAD 2022–2027 + vỏ core-only, gồm hai runtime AutoCAD 2025/2026, đóng gói zip kèm hướng dẫn cài đặt, và tạo
+  (đủ WPF) cho Revit 2027 và AutoCAD 2025–2027 (.NET 10) + vỏ core-only, đóng gói zip kèm hướng dẫn cài đặt, và tạo
   GitHub Release đính kèm toàn bộ gói.
 
 ```powershell
@@ -342,7 +341,7 @@ Tra không ra thì lệnh **báo lỗi `E-PARAM-MISSING` kèm danh sách tên đ
 Toàn bộ giai đoạn 0–6 của [`docs/dac-ta-tinh-nang.md`](docs/dac-ta-tinh-nang.md) và cả P1 lẫn P2 giai đoạn 7
 ([`docs/nghien-cuu-tool-thi-truong-va-ke-hoach.md`](docs/nghien-cuu-tool-thi-truong-va-ke-hoach.md) — khoảng trống so với
 pyRevit, DiRoots, Ideate, Colour Splasher, LAYTRANS, Drawing Compare, RevitBatchProcessor) đã có mã nguồn và biên dịch xanh
-với API Revit/AutoCAD 2022–2027 (ma trận CI, gồm cả đường .NET 10); số test thuần xem output CI (`tests.yml` → artifact `test-results`).
+với API Revit 2027 và AutoCAD 2025–2027 (ma trận CI .NET 10); số test thuần xem output CI (`tests.yml` → artifact `test-results`).
 
 **Đã chạy trên phần mềm thật:** 43/43 lệnh Revit *của vòng 2026-09-04* (nay 53 lệnh; `SuiteCoverageTests` khoá 53/53 có ca kiểm) có ít nhất một ca kiểm chạy bên trong Revit 2024.3
 và 15/15 lệnh AutoCAD có ca kiểm qua `accoreconsole`, cộng một đêm batch trên **dự án thật** — bằng chứng và số liệu từng vòng:

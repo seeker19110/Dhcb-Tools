@@ -208,7 +208,7 @@ def _json_field_names(catalog: dict, name: str) -> set:
 
 
 # ---- Đọc DWG ngầm bằng accoreconsole (AutoCAD) --------------------------------------------------
-ACAD_YEARS = (2027, 2026, 2025, 2024, 2023, 2022)
+ACAD_YEARS = (2027, 2026, 2025)
 OFFLINE_TIMEOUT_SECONDS = 300
 
 
@@ -360,7 +360,7 @@ def _offline_batch(dwg_path: str, requests: list) -> list:
         return [{"success": False, "summary": f"Không thấy file DWG: {dwg_path}"} for _ in requests]
     console, plugin = _offline_host()
     if console is None:
-        return [{"success": False, "summary": "Không tìm thấy accoreconsole.exe (AutoCAD 2022–2027) kèm "
+        return [{"success": False, "summary": "Không tìm thấy accoreconsole.exe (AutoCAD 2025–2027) kèm "
                  "DhcbTools.AutoCAD.Core.dll trong bundle DHCB; cài DHCB Tools hoặc đặt DHCB_ACCORECONSOLE/"
                  "DHCB_ACAD_CORE_DLL."} for _ in requests]
     keys = [_cache_key(dwg_path, plugin, query, params) for query, params in requests]

@@ -86,6 +86,7 @@
 - §81 — [`LayoutViewport` — tạo khung bản vẽ (layout giấy) từ layout mẫu qua Bridge/MCP (2026-11-14)](#81-layoutviewport-tạo-khung-bản-vẽ-layout-giấy-từ-layout-mẫu-qua-bridgemcp-2026-11-14)
 - §82 — [`EntityEdit` op `dimension` — tạo DIM thẳng hàng qua Bridge/MCP (2026-11-14)](#82-entityedit-op-dimension-tạo-dim-thẳng-hàng-qua-bridgemcp-2026-11-14)
 - §83 — [`query` trả dim style và hình học của DIM (2026-11-14)](#83-query-trả-dim-style-và-hình-học-của-dim-2026-11-14)
+- §84 — [Chỉ hỗ trợ .NET 10: AutoCAD 2025–2027 và Revit 2027 (2026-11-14)](#84-chỉ-hỗ-trợ-net-10-autocad-20252027-và-revit-2027-2026-11-14)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
@@ -4051,4 +4052,20 @@ mà không phải đoán từ khung bao.
 Build `Core.AutoCAD` và vỏ AutoCAD 2026 đạt (0 lỗi). Chưa chứng minh: đọc các trường mới trên bản vẽ có DIM — bản
 vẽ mẫu kèm AutoCAD không có kích thước và MCP đọc ngầm dùng bản DLL đã cài; sẽ kiểm trên bản vẽ PODIUM trong AutoCAD
 GUI sau khi thay bundle.
+
+## 84. Chỉ hỗ trợ .NET 10: AutoCAD 2025–2027 và Revit 2027 (2026-11-14)
+
+Theo quyết định của người dùng, gỡ toàn bộ profile net48 (Revit/AutoCAD 2022–2024) và net8 (Revit 2025/2026,
+AutoCAD 2025/2026 bản RTM): `Directory.Build.props/targets` chỉ nhận AutoCAD 2025/2026/2027 net10 và Revit 2027
+(mặc định Revit 2027, AutoCAD 2026); csproj bỏ tham chiếu `System.Drawing`/`System.Drawing.Common 8.0` và polyfill
+net48; `release.yml` còn Revit 2027 và AutoCAD 2025/2026/2027 (một gói mỗi năm); installer chỉ còn 4 thành phần host
+và từ chối AutoCAD có runtime khác `net10.0`; `AutoCadInstallationResolver` (BatchRunner), `dhcb_doctor.py`, MCP
+server và các script PowerShell chỉ nhận các năm trên. `Shared.Logic`/`Shared.Hosting` giữ `netstandard2.0`.
+
+Kiểm: `check-build.ps1 -RevitVersion 2027 -AcadVersion 2025|2026|2027 -AcadRuntime net10` đạt cả 3 hàng; test .NET
+2440/2440 (Shared.Logic) và 96/96 (BatchRunner, ca resolver viết lại cho .NET 10); Python 374 ca đạt, phủ 100%, gồm
+installer thật (Inno Setup 6) 17/17 với ca mới "host .NET 8 bị từ chối"; pyflakes sạch.
+
+Chưa chứng minh: chạy `release.yml` đầy đủ (chỉ chạy khi tạo tag) và cài gói mới trên máy có AutoCAD 2025/2027,
+Revit 2027.
 
