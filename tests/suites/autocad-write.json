@@ -1493,6 +1493,182 @@
           "Đã tạo layer \"KL-TEST-MANH\""
         ]
       }
+    },
+    {
+      "name": "Tạo khung bản vẽ — mẫu không có thì báo lỗi, không tạo gì",
+      "command": "LayoutViewport",
+      "config": {
+        "sheets": [
+          {
+            "name": "KL-TEST-KHUNG 01",
+            "template": "KHONG-CO",
+            "viewCenter": [
+              100,
+              200
+            ],
+            "scale": 50
+          }
+        ]
+      },
+      "expect": {
+        "success": false,
+        "maxChangeEvents": 0,
+        "summaryContains": [
+          "Danh sách khung không hợp lệ",
+          "chưa tạo layout nào"
+        ]
+      }
+    },
+    {
+      "name": "Tạo khung bản vẽ — titleMatch không khớp MText nào trong layout mẫu",
+      "command": "LayoutViewport",
+      "config": {
+        "sheets": [
+          {
+            "name": "KL-TEST-KHUNG 01",
+            "template": "Layout1",
+            "viewCenter": [
+              100,
+              200
+            ],
+            "scale": 50,
+            "title": "MẶT BẰNG",
+            "titleMatch": "KHÔNG CÓ CHỮ NÀY"
+          }
+        ]
+      },
+      "expect": {
+        "success": false,
+        "maxChangeEvents": 0,
+        "summaryContains": [
+          "Không dựng được 1 khung"
+        ]
+      }
+    },
+    {
+      "name": "Tạo khung bản vẽ — xem trước chọn viewport nổi lớn nhất (bỏ viewport tổng)",
+      "command": "LayoutViewport",
+      "config": {
+        "sheets": [
+          {
+            "name": "KL-TEST-KHUNG 01",
+            "template": "Layout1",
+            "viewCenter": [
+              100,
+              200
+            ],
+            "scale": 50
+          }
+        ]
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxAffected": 1,
+        "maxChangeEvents": 0,
+        "summaryContains": [
+          "Xem trước",
+          "Sẽ tạo 1 layout"
+        ],
+        "messagesContain": [
+          "\"KL-TEST-KHUNG 01\" ← \"Layout1\": viewport 4AE",
+          "tâm (100, 200) tỉ lệ 1:50, khoá"
+        ]
+      }
+    },
+    {
+      "name": "Tạo khung bản vẽ — GHI THẬT",
+      "command": "LayoutViewport",
+      "allowWrite": true,
+      "config": {
+        "sheets": [
+          {
+            "name": "KL-TEST-KHUNG 01",
+            "template": "Layout1",
+            "viewCenter": [
+              100,
+              200
+            ],
+            "scale": 50
+          }
+        ],
+        "dryRun": false
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxAffected": 1,
+        "summaryContains": [
+          "Đã tạo 1 layout: \"KL-TEST-KHUNG 01\""
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "messagesContain": [
+          "tâm (100, 200) tỉ lệ 1:50 (CustomScale 0.02), khoá"
+        ]
+      }
+    },
+    {
+      "name": "Tạo khung bản vẽ — trùng tên mà không replaceExisting thì từ chối",
+      "command": "LayoutViewport",
+      "config": {
+        "sheets": [
+          {
+            "name": "KL-TEST-KHUNG 01",
+            "template": "Layout1",
+            "viewCenter": [
+              100,
+              200
+            ],
+            "scale": 50
+          }
+        ]
+      },
+      "expect": {
+        "success": false,
+        "maxChangeEvents": 0,
+        "summaryContains": [
+          "Danh sách khung không hợp lệ"
+        ]
+      }
+    },
+    {
+      "name": "Tạo khung bản vẽ — replaceExisting + viewportHandle — GHI THẬT",
+      "command": "LayoutViewport",
+      "allowWrite": true,
+      "config": {
+        "sheets": [
+          {
+            "name": "KL-TEST-KHUNG 01",
+            "template": "Layout1",
+            "viewCenter": [
+              -500,
+              300
+            ],
+            "scale": 20,
+            "viewportHandle": "3A51",
+            "lock": false
+          }
+        ],
+        "replaceExisting": true,
+        "dryRun": false
+      },
+      "expect": {
+        "success": true,
+        "minAffected": 1,
+        "maxAffected": 1,
+        "summaryContains": [
+          "Đã tạo 1 layout"
+        ],
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "messagesContain": [
+          "Đã xoá layout cũ \"KL-TEST-KHUNG 01\"",
+          "tâm (-500, 300) tỉ lệ 1:20 (CustomScale 0.05)"
+        ]
+      }
     }
   ]
 }

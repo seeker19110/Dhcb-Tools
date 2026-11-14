@@ -117,6 +117,8 @@ internal static class RibbonBuilder
                 "So layer giữa bản vẽ hiện tại và một file khác."),
             ("DHCB_DRAWING_COMBINE", "Gộp nhiều bản vẽ", "GP", RibbonIcons.Drawing,
                 "Gộp các DWG trong một thư mục vào bản vẽ này: mỗi file thành một block, chép cả layout."),
+            ("DHCB_LAYOUT_VIEWPORT", "Tạo khung bản vẽ", "KV", RibbonIcons.Drawing,
+                "Chép layout mẫu thành khung mới, canh viewport theo tâm + tỉ lệ 1:N, khoá viewport, thay tiêu đề."),
             ("DHCB_ENTITY_EDIT", "Vẽ/sửa theo lô JSON", "VS", RibbonIcons.Drawing,
                 "Vẽ line, polyline, tròn, cung, text, hatch… và dời/xoay/sao chép/offset/xoá theo handle bằng một lô JSON."));
 
@@ -186,7 +188,7 @@ internal static class RibbonBuilder
             "DHCB_TEXT_REPLACE" => "TextReplace", "DHCB_LAYER_CHECK" => "LayerStandardCheck",
             "DHCB_GRID_EXTRACT" => "GridExtract", "DHCB_XREF_AUDIT" => "XrefAudit", "DHCB_XREF_ATTACH" => "XrefAttach",
             "DHCB_LAYER_TRANSLATE" => "LayerTranslate", "DHCB_ENTITY_LAYER" => "EntityLayerAssign", "DHCB_PLINE_IMPORT" => "PolylineImport", "DHCB_ENTITY_EDIT" => "EntityEdit", "DHCB_BLOCK_INSERT" => "BlockInsert", "DHCB_DRAWING_COMPARE" => "DrawingCompare",
-            "DHCB_DRAWING_COMBINE" => "DrawingCombine",
+            "DHCB_DRAWING_COMBINE" => "DrawingCombine", "DHCB_LAYOUT_VIEWPORT" => "LayoutViewport",
             "DHCB_BLOCK_QUANTITY" => "BlockQuantity", "DHCB_ATTR_INCREMENT" => "AttributeIncrement",
             "DHCB_LAYER_MAP" => "CadLayerMap", _ => null,
         };

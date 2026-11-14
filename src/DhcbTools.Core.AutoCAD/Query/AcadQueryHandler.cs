@@ -828,6 +828,8 @@ public static class AcadQueryHandler
                 IsModelSpace = layout.ModelType,
                 PaperSizeX   = layout.PlotPaperSize.X,
                 PaperSizeY   = layout.PlotPaperSize.Y,
+                Handle       = layout.Handle.Value,
+                Viewports    = layout.ModelType ? new List<object>() : LayoutViewports(tr, layout),
             });
         }
 
@@ -840,10 +842,43 @@ public static class AcadQueryHandler
                 tabOrder     = l.TabOrder,
                 isModelSpace = l.IsModelSpace,
                 plotPaperSize = new { x = l.PaperSizeX, y = l.PaperSizeY },
+                handle       = Shared.Logic.Cad.HandleText.ToText(l.Handle),
+                viewports    = l.Viewports,
             })
             .ToList();
 
         return new { count = sorted.Count, layouts = sorted };
+    }
+
+    /// <summary>
+    /// Viewport trong paper space của một layout (kể cả viewport tổng — <c>number</c> 1 khi layout đã kích hoạt, chưa
+    /// kích hoạt thì là cái đầu tiên): tâm/kích thước trên giấy, tâm nhìn Model Space, tỉ lệ — để kiểm lại khung do
+    /// <c>LayoutViewport</c> tạo mà không cần mở tab.
+    /// </summary>
+    private static List<object> LayoutViewports(Transaction tr, Layout layout)
+    {
+        var list = new List<object>();
+        foreach (ObjectId id in (BlockTableRecord)tr.GetObject(layout.BlockTableRecordId, OpenMode.ForRead))
+        {
+            if (tr.GetObject(id, OpenMode.ForRead) is not Viewport vp) continue;
+            list.Add(new
+            {
+                handle      = AcadHelpers.HandleOf(id),
+                number      = vp.Number,
+                center      = new[] { vp.CenterPoint.X, vp.CenterPoint.Y },
+                width       = vp.Width,
+                height      = vp.Height,
+                viewTarget  = new[] { vp.ViewTarget.X, vp.ViewTarget.Y, vp.ViewTarget.Z },
+                viewCenter  = new[] { vp.ViewCenter.X, vp.ViewCenter.Y },
+                viewHeight  = vp.ViewHeight,
+                customScale = vp.CustomScale,
+                twistAngle  = vp.TwistAngle,
+                locked      = vp.Locked,
+                on          = vp.On,
+            });
+        }
+
+        return list;
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -914,5 +949,7 @@ public static class AcadQueryHandler
         public bool IsModelSpace;
         public double PaperSizeX;
         public double PaperSizeY;
+        public long Handle;
+        public List<object> Viewports;
     }
 }
