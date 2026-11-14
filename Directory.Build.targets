@@ -1,10 +1,10 @@
 <Project>
   <Target Name="ValidateDhcbHostProfile" BeforeTargets="CollectPackageReferences;PrepareForBuild">
-    <Error Condition="'$(DhcbIsRevitProject)'=='true' And '$(RevitVersion)'!='2027'" Text="Unsupported RevitVersion '$(RevitVersion)'. Chỉ hỗ trợ Revit 2027 (.NET 10)." />
+    <Error Condition="'$(DhcbIsRevitProject)'=='true' And '$(RevitVersion)'!='2027'" Text="Unsupported RevitVersion '$(RevitVersion)'. Supported: Revit 2027 (.NET 10) only." />
     <Error Condition="'$(DhcbIsRevitProject)'=='true' And '$(RevitRuntime)'!='net10'" Text="Revit 2027 requires RevitRuntime=net10." />
     <Error Condition="'$(DhcbIsRevitProject)'=='true' And !$(RevitApiVersion.StartsWith('$(RevitVersion).'))" Text="RevitApiVersion must match RevitVersion $(RevitVersion)." />
-    <Error Condition="'$(DhcbIsAcadProject)'=='true' And '$(AcadVersion)'!='2025' And '$(AcadVersion)'!='2026' And '$(AcadVersion)'!='2027'" Text="Unsupported AcadVersion '$(AcadVersion)'. Chỉ hỗ trợ AutoCAD 2025–2027 (.NET 10)." />
-    <Error Condition="'$(DhcbIsAcadProject)'=='true' And '$(AcadRuntime)'!='net10'" Text="AutoCAD $(AcadVersion) requires AcadRuntime=net10 (đã bỏ net48/net8)." />
+    <Error Condition="'$(DhcbIsAcadProject)'=='true' And '$(AcadVersion)'!='2025' And '$(AcadVersion)'!='2026' And '$(AcadVersion)'!='2027'" Text="Unsupported AcadVersion '$(AcadVersion)'. Supported: AutoCAD 2025-2027 (.NET 10) only." />
+    <Error Condition="'$(DhcbIsAcadProject)'=='true' And '$(AcadRuntime)'!='net10'" Text="AutoCAD $(AcadVersion) requires AcadRuntime=net10." />
     <Error Condition="'$(DhcbHostBuildPath)'!='' And '$(TargetFramework)'!='net10.0-windows'" Text="This host profile requires TargetFramework=net10.0-windows." />
     <Error Condition="'$(DhcbIsAcadProject)'=='true' And '$(AcadVersion)'=='2025' And '$(AcadNetVersion)'!='25.0.2'" Text="AutoCAD 2025 net10 uses SDK 25.0.2 (2025.1.4+)." />
     <Error Condition="'$(DhcbIsAcadProject)'=='true' And '$(AcadVersion)'=='2026' And '$(AcadNetVersion)'!='25.1.1'" Text="AutoCAD 2026 net10 uses SDK 25.1.1 (2026.1.2+)." />
