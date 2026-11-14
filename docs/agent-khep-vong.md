@@ -1,4 +1,4 @@
-# Agent khép vòng cho Revit 2022–2027
+# Agent khép vòng cho Revit 2027
 
 Giai đoạn 10 của [`roadmap.md`](roadmap.md) — hướng khác biệt lớn nhất của dự án.
 

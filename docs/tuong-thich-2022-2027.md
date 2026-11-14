@@ -1,26 +1,31 @@
-# Tương thích Revit và AutoCAD 2022–2027
+# Tương thích Revit và AutoCAD — chỉ .NET 10
 
-Cập nhật 2026-10-08. Ma trận dưới đây mô tả SDK, build và gói cài được triển khai trong mã nguồn.
-Kết quả chạy host được ghi riêng: một DLL build được chưa chứng nhận hành vi trên tất cả phiên bản.
+Cập nhật 2026-11-14: **chỉ hỗ trợ .NET 10.** Đã gỡ Revit 2022–2026 và AutoCAD 2022–2024 (net48) cùng các
+profile net8 khỏi mã build, CI, gói phát hành và installer. Tên file giữ nguyên để không gãy liên kết; phần
+lịch sử bên dưới (2022–2026, net48/net8) chỉ còn giá trị tham khảo.
 
 ## Ma trận build và gói
 
 | Phần mềm | Năm/mức cập nhật | Profile build | SDK/API ghim |
 |---|---|---|---|
-| Revit | 2022 | net48 | 2022.1.80 |
-| Revit | 2023 | net48 | 2023.1.90 |
-| Revit | 2024 | net48 | 2024.3.60 |
-| Revit | 2025 | net8 | 2025.4.60 |
-| Revit | 2026 | net8 | 2026.4.10 |
 | Revit | 2027 | net10 | 2027.2.0 |
-| AutoCAD | 2022 | net48 | 24.1.51000 |
-| AutoCAD | 2023 | net48 | 24.2.0 |
-| AutoCAD | 2024 | net48 | 24.3.0 |
-| AutoCAD | 2025 đến 2025.1.3 | net8 (mặc định) | 25.0.1; Core/Model 25.0.0 |
 | AutoCAD | 2025.1.4 trở lên | net10 | 25.0.2 |
-| AutoCAD | 2026 đến 2026.1.1 | net8 | 25.1.0 |
-| AutoCAD | 2026.1.2 trở lên | net10 (mặc định) | 25.1.1 |
+| AutoCAD | 2026.1.2 trở lên | net10 | 25.1.1 |
 | AutoCAD | 2027 | net10 | 26.0.0 |
+
+AutoCAD 2025 bản trước 2025.1.4 và AutoCAD 2026 bản trước 2026.1.2 chạy .NET 8 nên **không còn được hỗ trợ**:
+installer và BatchRunner từ chối host có `acdbmgd.runtimeconfig.json` khác `net10.0`. Cập nhật AutoCAD rồi cài lại.
+Revit 2025/2026 (kể cả bản .5 đã chuyển .NET 10) không còn gói riêng.
+
+### Lịch sử (trước 2026-11-14)
+
+| Phần mềm | Năm/mức cập nhật | Profile build | SDK/API ghim |
+|---|---|---|---|
+| Revit | 2022–2024 | net48 | 2022.1.80 / 2023.1.90 / 2024.3.60 |
+| Revit | 2025 / 2026 | net8 | 2025.4.60 / 2026.4.10 |
+| AutoCAD | 2022–2024 | net48 | 24.1.51000 / 24.2.0 / 24.3.0 |
+| AutoCAD | 2025 đến 2025.1.3 | net8 | 25.0.1; Core/Model 25.0.0 |
+| AutoCAD | 2026 đến 2026.1.1 | net8 | 25.1.0 |
 
 Revit 2025.5/2026.5 chuyển runtime sang .NET 10. Gói DHCB cho 2025/2026 giữ API baseline net8:
 Autodesk cho biết phần lớn add-in net8 tiếp tục dùng được, nhưng đây là kỳ vọng tương thích cần kiểm

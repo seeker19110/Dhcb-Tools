@@ -91,7 +91,7 @@ Bốn việc này phải xong **trước** mọi hướng mới; bỏ qua thì h
 
 ---
 
-## Giai đoạn 10 — Agent khép vòng cho Revit 2022–2027 🟡 (tuần 5–8) — **hướng khác biệt lớn nhất**
+## Giai đoạn 10 — Agent khép vòng cho Revit 2027 🟡 (tuần 5–8) — **hướng khác biệt lớn nhất**
 
 Autodesk Revit 2027 MCP Server chỉ **đọc** và chỉ chạy trên **2027**; các dự án revit-mcp mã mở có 100+ tool nhưng
 không có `dryRun`, token, batch, AutoCAD song hành hay tiếng Việt. DHCB đã có Bridge, token, `ExternalEvent`,

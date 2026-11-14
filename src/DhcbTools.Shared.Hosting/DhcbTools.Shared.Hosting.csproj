@@ -4,7 +4,7 @@
     Phần hạ tầng dùng chung giữa vỏ Revit và vỏ AutoCAD (mục 0.2 đặc tả tính năng, lỗi #9):
     CommandResult, ICoreCommand<TConfig, TDocument>, và HttpBridgeServer (vòng lặp HttpListener,
     phân giải route, xác thực token, timeout có cờ Abandoned). KHÔNG tham chiếu Revit/AutoCAD.
-    netstandard2.0 để nạp được trong cả net48 lẫn net8.0-windows.
+    netstandard2.0 (giữ nguyên dù host chỉ còn .NET 10 — nạp được trong net10.0-windows).
   -->
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
