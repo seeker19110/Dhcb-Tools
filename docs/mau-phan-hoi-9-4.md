@@ -87,7 +87,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 | `SpecToConfig` | AI offline: trích tầng/cao độ/hệ từ thuyết minh → config | ☐ | ☐ | ☐ | |
 | `DictionaryLearn` | AI offline: soi tên tham số thật của dự án → dictionary.json | ☐ | ☐ | ☐ | |
 
-## AutoCAD — 21 lệnh
+## AutoCAD — 22 lệnh
 
 | Lệnh | Việc nó làm | Tuần | Bỏ | Chưa | Nếu bỏ: vì sao |
 |---|---|:--:|:--:|:--:|---|
@@ -109,6 +109,7 @@ Mốc của roadmap: **≥ 5 kỹ sư dùng hằng tuần không cần hỏi** s
 | `BlockInsert` | Đặt block từ thư viện DWG/thư mục ký hiệu theo danh sách vị trí | ☐ | ☐ | ☐ | |
 | `DrawingCompare` | So bản vẽ với DWG khác ở mức layer → CSV/HTML | ☐ | ☐ | ☐ | |
 | `DrawingCombine` | Gộp nhiều DWG vào bản vẽ hiện tại: mỗi file một block, chép layout | ☐ | ☐ | ☐ | |
+| `LayoutViewport` | Tạo khung bản vẽ từ layout mẫu: canh viewport theo tâm + tỉ lệ 1:N, khoá, thay tiêu đề | ☐ | ☐ | ☐ | |
 | `BlockQuantity` | Đếm block theo tên (nhóm theo attribute) → CSV BOM | ☐ | ☐ | ☐ | |
 | `AttributeIncrement` | Gán attribute tăng dần theo mẫu {n:000} theo vị trí | ☐ | ☐ | ☐ | |
 | `CadLayerMap` | AI offline: gợi ý map layer → Revit type từ danh sách type | ☐ | ☐ | ☐ | |

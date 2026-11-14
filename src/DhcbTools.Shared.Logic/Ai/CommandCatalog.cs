@@ -491,6 +491,11 @@ namespace DhcbTools.Shared.Logic.Ai
                 .Field("insertions", "mảng JSON [{\"position\":[x,y],\"rotation\":0,\"scale\":1,\"layer\":\"..\",\"attributes\":{\"TAG\":\"giá trị\"}}]", FieldKind.Json)
                 .Field("inputPath", "CSV X,Y[,Z],Rotation,Scale,Layer,<TAG>… (tuỳ chọn)", FieldKind.FilePath).Field("dryRun", "xem trước")
                 .Words("chèn block", "đặt block", "insert block", "đặt ký hiệu", "chèn ký hiệu thư viện"),
+            new CommandDescriptor("LayoutViewport", AutoCad, "Tạo khung bản vẽ (layout giấy) từ layout mẫu: chép thiết lập in, khung tên, viewport; canh viewport về mặt bằng tại tâm Model Space với tỉ lệ 1:N, khoá viewport, thay tiêu đề MText, thêm dòng tỉ lệ", true, "CreateSheets", "SheetFromTemplate")
+                .Field("sheets", "mảng JSON [{\"name\":\"VP-01 MB B1\",\"template\":\"B2\",\"viewCenter\":[-74300,156300],\"scale\":75,\"viewportHandle\":null,\"title\":\"MẶT BẰNG HẦM B1\",\"titleMatch\":\"CHI TIẾT LẮP ĐẶT\",\"scaleText\":\"TỶ LỆ 1:75\",\"lock\":true}]. viewportHandle = handle viewport của layout MẪU (bỏ trống = viewport nổi lớn nhất); titleMatch = chuỗi con nhận ra MText tiêu đề trong layout mẫu, title thay phần chữ (giữ mã định dạng)", FieldKind.Json)
+                .Field("inputPath", "file JSON chứa mảng khung hoặc {\"sheets\":[...]} (tuỳ chọn, ghép trước sheets)", FieldKind.FilePath)
+                .Field("replaceExisting", "layout trùng tên đã có thì xoá rồi tạo lại (mặc định báo lỗi)", FieldKind.Bool).Field("dryRun", "xem trước")
+                .Words("tạo layout", "tạo khung bản vẽ", "khung view", "tạo viewport", "layout từ mẫu", "create layout", "tạo sheet cad"),
             new CommandDescriptor("DrawingCompare", AutoCad, "So bản vẽ hiện tại với DWG khác ở mức layer (đếm entity theo layer) → CSV/HTML", false, "Compare")
                 .Field("otherPath", "DWG so sánh").Field("outputPath", "CSV hoặc HTML").Field("moveToleranceMm", "dung sai dời")
                 .Words("so sánh bản vẽ", "drawing compare", "khác nhau giữa hai bản"),

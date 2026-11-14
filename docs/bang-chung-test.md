@@ -83,6 +83,7 @@
 - §78 — [`EntityEdit`, `BlockInsert`, snapshot trong AutoCAD 2026 GUI thật qua Bridge (2026-11-13)](#78-entityedit-blockinsert-snapshot-trong-autocad-2026-gui-thật-qua-bridge-2026-11-13)
 - §79 — [MCP AutoCAD nhanh hơn — gộp truy vấn, nhiều DWG song song, nhớ kết quả (2026-11-13)](#79-mcp-autocad-nhanh-hơn-gộp-truy-vấn-nhiều-dwg-song-song-nhớ-kết-quả-2026-11-13)
 - §80 — [Bridge bớt phải vòng qua COM: layer xref, `explode`/`set`/`trim`/`replacePoints`, `XrefAttach` (2026-11-13)](#80-bridge-bớt-phải-vòng-qua-com-layer-xref-explodesettrimreplacepoints-xrefattach-2026-11-13)
+- §81 — [`LayoutViewport` — tạo khung bản vẽ (layout giấy) từ layout mẫu qua Bridge/MCP (2026-11-14)](#81-layoutviewport-tạo-khung-bản-vẽ-layout-giấy-từ-layout-mẫu-qua-bridgemcp-2026-11-14)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
@@ -3967,3 +3968,55 @@ Ngoài bộ ca (BatchRunner, lưu ra bản chép rồi đọc lại bằng `quer
   phải tên tag, giữ vị trí, cỡ chữ 10 và layer của attribute.
 
 Test .NET 2402/2402, Python 354/354.
+
+## 81. `LayoutViewport` — tạo khung bản vẽ (layout giấy) từ layout mẫu qua Bridge/MCP (2026-11-14)
+
+Trước lệnh này Bridge/MCP chỉ sửa được Model Space; ra khung bản vẽ phải làm tay hoặc qua COM — mà COM
+`Layouts.Add` + `CopyObjects` không tạo viewport tổng nên `MSpace` sau đó hỏng. Lệnh mới dùng
+`LayoutManager.CopyLayout` (giữ thiết lập in, khung tên, viewport tổng, không đổi tab hiện hành), rồi canh viewport
+nổi: `ViewDirection` (0,0,1), `TwistAngle` 0, `ViewTarget` = tâm Model Space, `ViewCenter` (0,0), `CustomScale` = 1/N,
+`Locked`. Tuỳ chọn thay chữ MText tiêu đề (giữ mã định dạng `\pxqc;{\W0.9;…}`) và thêm dòng "TỶ LỆ 1:N" bên dưới
+(cùng style/layer/căn lề/bề rộng, cao ×0,8). `query layouts` nay trả cả `viewports` (handle, `viewTarget`,
+`viewCenter`, `customScale`, `locked`…) để kiểm lại mà không cần mở tab.
+
+**Bộ ca** (accoreconsole 2026, bản chép bản vẽ mẫu, `run-in-autocad-tests.ps1 -Suite write -AllowWrites`):
+**51 đạt / 0 trượt / 51 ca** — 6 ca mới:
+
+| Ca `LayoutViewport` (mẫu `Layout1` có viewport tổng 55 + 4 viewport nổi) | Kết quả |
+|---|---|
+| mẫu `KHONG-CO` | chặn trước khi đọc bản vẽ, 0 sự kiện ghi |
+| `titleMatch` không khớp MText nào | "Không dựng được 1 khung", 0 sự kiện ghi |
+| xem trước, không `viewportHandle` | chọn viewport nổi lớn nhất 4AE (257,7×184,1) — không lấy viewport tổng 894,9×599,5 |
+| ghi thật `KL-TEST-KHUNG 01` tâm (100, 200) tỉ lệ 1:50 | "CustomScale 0.02, khoá" |
+| tạo lại cùng tên không `replaceExisting` | từ chối "layout đã có" |
+| `replaceExisting` + `viewportHandle` 3A51, tỉ lệ 1:20, `lock` false | "Đã xoá layout cũ", "CustomScale 0.05" |
+
+**Bản vẽ dự án thật** (bản chép trong thư mục tạm của một DWG ống uPVC hầm đang mở trong AutoCAD GUI — file gốc
+và GUI không bị đụng). Layout mẫu `B2`: khung tên A3, MText tiêu đề 9E344 `\pxqc;{\W0.9;CHI TIẾT LẮP ĐẶT}`,
+viewport tổng 9E341 (674,7×315,7 — lớn hơn viewport nổi, nên phải loại theo vị trí chứ không theo kích thước) và
+viewport nổi 9E3B0 (343,07×279,92). Một phiên accoreconsole: xem trước → ghi 2 khung → tạo trùng (bị chặn) →
+`replaceExisting` → `SAVEAS`; phiên thứ hai đọc lại file đã lưu bằng `DHCB_QUERY layouts` + `entity_geometry`:
+
+| Layout | Viewport | `viewTarget` | `viewCenter` | `customScale` | `locked` | Tab |
+|---|---|---|---|---|---|---|
+| `TEST-01` (11C615) | 11C611 343,07×279,92 | (−74300, 156300, 0) | (0, 0) | 0,0133333 (1:75) | true | 3 |
+| `TEST 02 VP` (11C63A, tạo lại) | 11C636 343,07×279,92 | (−50000, 150000, 0) | (0, 0) | 0,02 (1:50) | true | 4 |
+| `B2` (mẫu) | 9E3B0 — giữ nguyên | (−97454,9, −133084,7, 0) | (1407,95, −7884,95) | 0,0134429 | true | 1 |
+
+- Mỗi layout mới có viewport tổng riêng (11C608, 11C62D) chép từ mẫu.
+- Tiêu đề 11C60B: `\pxqc;{\W0.9;MẶT BẰNG HẦM B1 - TEST}` (giữ mã định dạng); dòng tỉ lệ 11C617
+  `\pxqc;{\W0.9;TỶ LỆ 1:75}` cùng layer, cùng bề rộng 37,27, đỉnh dưới đáy tiêu đề 0,64 (= nửa chiều cao chữ mới).
+- `-PLOT` layout `TEST-01` ra PDF (bản chép thứ ba): mặt bằng hầm hiện trong viewport, khung tên mang tiêu đề mới và
+  dòng "TỶ LỆ 1:75"; ô số trang (field tên layout) tự ra `TEST-01`. Ảnh không đưa vào repo vì khung tên có tên dự án.
+
+Hai điều lộ ra khi chạy thật, đã xử lý trong lệnh:
+
+- `CopyLayout` gán tab mới cùng `TabOrder` với mẫu (B2 và hai bản chép đều 1) — lệnh đẩy tab mới về cuối.
+- Layout chưa kích hoạt thì `Viewport.On` đọc ra false và gán `On = true` ném `eNotInPaperspace` — viewport giữ cờ
+  bật/tắt của mẫu; kết quả ghi "bật/tắt theo mẫu (layout chưa kích hoạt)".
+
+Chưa chứng minh: chạy qua Bridge trong AutoCAD GUI (cần thay bundle; GUI đang mở bản vẽ thật nên không đụng), và
+huỷ giữa chừng (`CopyLayout` trong giao dịch bị `Abort`) chưa có ca ép lỗi để quan sát.
+
+Test .NET 2431/2431 (phủ 100%), Python 553 đạt — 1 ca `test_installer` đỏ vì máy (installer không xác định được
+runtime AutoCAD 2025), không liên quan thay đổi này.
