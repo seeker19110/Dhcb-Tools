@@ -562,6 +562,11 @@ class TagSpecAndToleTests(unittest.TestCase):
         self.assertEqual([(p["len"], p["W"], p["ei"], p["tole"]) for p in pieces],
                          [(1110, 700, "EI120", 0.75)] * 3)
 
+    def test_net_vuong_goc_cung_chieu_dai_khong_phai_bich(self) -> None:
+        segs = bog.duct_segments([line("v", 0, 0, 0, 740), line("h", 10, 0, 750, 0)])
+        joints, rest = bog.flange_joints(segs)
+        self.assertEqual((joints, sorted(s["handle"] for s in rest)), ([], ["h", "v"]))
+
     def test_thu_tu_cum_trai_phai(self) -> None:
         runs, pieces, elbows = pipeline()
         secs = bog.build_sections(runs, pieces, elbows, bog.fitting_boxes(GEOMETRY, BBOX), LABELS, order="trai-phai")
