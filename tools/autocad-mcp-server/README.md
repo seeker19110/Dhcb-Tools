@@ -156,7 +156,7 @@ một lệnh chưa biết đã ghi hay chưa.
 ## Truy vấn nhiều trang và tác vụ dài
 
 `autocad_query` nhận `params` với các bộ lọc `layerContains`, `entityType`, `blockName`,
-`blockNameContains`, `textLayer`, `textContains`; `textContains` tìm trên chữ hiển thị của DBText/MText,
+`blockNameContains`, `textLayer`, `textContains`; `textContains` tìm trên chữ hiển thị của DBText/MText/MLeader (`text` trả cả chữ của MLeader, `type` = `MLeader`),
 không phân biệt hoa thường. `limit` từ 0 đến 10000 (0 dùng mặc định 2000), `offset` lấy từ `nextOffset`.
 Đặt `as_json=true` để nhận đầy đủ dữ liệu và `hasMore`/`nextOffset`, kể cả khi đọc layers.
 Các truy vấn `entity_geometry` nhận `params.handles` (tối đa 200 handle hex), `attributes_of` nhận

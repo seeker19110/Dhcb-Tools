@@ -376,15 +376,25 @@ public static class AcadQueryHandler
         var page = new QueryPage(p.Limit, p.Offset);
         var textClass = Autodesk.AutoCAD.Runtime.RXObject.GetClass(typeof(DBText));
         var mtextClass = Autodesk.AutoCAD.Runtime.RXObject.GetClass(typeof(MText));
+        var leaderClass = Autodesk.AutoCAD.Runtime.RXObject.GetClass(typeof(MLeader));
         foreach (ObjectId entId in ms)
         {
             var cls = entId.ObjectClass;
-            if (!cls.IsDerivedFrom(textClass) && !cls.IsDerivedFrom(mtextClass)) continue;
+            if (!cls.IsDerivedFrom(textClass) && !cls.IsDerivedFrom(mtextClass) && !cls.IsDerivedFrom(leaderClass)) continue;
             if (tr.GetObject(entId, OpenMode.ForRead) is not Entity entity) continue;
             if ((p.TextLayer is { Length: > 0 } && entity.Layer.IndexOf(p.TextLayer, StringComparison.OrdinalIgnoreCase) < 0)
                 || (p.LayerContains is { Length: > 0 } && entity.Layer.IndexOf(p.LayerContains, StringComparison.OrdinalIgnoreCase) < 0))
                 continue;
-            var display = entity is MText mtDisplay ? mtDisplay.Text : ((DBText)entity).TextString;
+            // Tag ống/thiết bị hay ghi bằng MLeader: chữ nằm trong MText của leader. MLeader.MText trả bản sao
+            // ngoài database — đọc xong huỷ ngay trên luồng này (để GC huỷ trên luồng finalizer làm sập AutoCAD).
+            LeaderText? leaderText = null;
+            if (entity is MLeader leader)
+            {
+                if (leader.ContentType != ContentType.MTextContent) continue;
+                using var copy = leader.MText;
+                leaderText = new LeaderText(copy.Contents, copy.Text, copy.Location, copy.Width);
+            }
+            var display = leaderText?.Display ?? (entity is MText mtDisplay ? mtDisplay.Text : ((DBText)entity).TextString);
             if (p.TextContains is { Length: > 0 } && display.IndexOf(p.TextContains, StringComparison.OrdinalIgnoreCase) < 0)
                 continue;
             if (!page.IncludeMatch())
@@ -403,12 +413,19 @@ public static class AcadQueryHandler
                     list.Add(new { handle, type = "MText", layer = mt.Layer, text = mt.Contents, displayText = display,
                                    x = mt.Location.X, y = mt.Location.Y, z = mt.Location.Z, width = mt.Width });
                     break;
+                case MLeader when leaderText != null:
+                    list.Add(new { handle, type = "MLeader", layer = entity.Layer, text = leaderText.Contents, displayText = display,
+                                   x = leaderText.Location.X, y = leaderText.Location.Y, z = leaderText.Location.Z, width = leaderText.Width });
+                    break;
             }
         }
 
         tr.Abort();
         return new { count = list.Count, limit = page.Limit, offset = page.Offset, hasMore = page.HasMore, nextOffset = page.NextOffset, texts = list };
     }
+
+    /// <summary>Chữ đã đọc từ MText của MLeader (giữ giá trị, không giữ đối tượng AutoCAD).</summary>
+    private sealed record LeaderText(string Contents, string Display, Point3d Location, double Width);
 
     // ──────────────────────────────────────────────────────────────
     // block_contents — chữ / line / polyline BÊN TRONG block reference, quy về toạ độ thật
@@ -464,7 +481,7 @@ public static class AcadQueryHandler
         bool Wanted(Entity ent, string type)
         {
             if (p.EntityType is { Length: > 0 } && !string.Equals(p.EntityType, type, StringComparison.OrdinalIgnoreCase)
-                && !(string.Equals(p.EntityType, "Text", StringComparison.OrdinalIgnoreCase) && (type is "DBText" or "MText" or "Attribute")))
+                && !(string.Equals(p.EntityType, "Text", StringComparison.OrdinalIgnoreCase) && (type is "DBText" or "MText" or "MLeader" or "Attribute")))
                 return false;
             if (p.LayerContains is { Length: > 0 } && ent.Layer.IndexOf(p.LayerContains, StringComparison.OrdinalIgnoreCase) < 0) return false;
             if (page.IncludeMatch()) return true;
@@ -501,7 +518,12 @@ public static class AcadQueryHandler
                 // AttributeDefinition là DBText nhưng chỉ là mẫu ("Ten phong") — giá trị thật nằm ở AttributeReference.
                 if (ent is AttributeDefinition) continue;
 
-                var type = ent switch { DBText => "DBText", MText => "MText", Line => "Line", Polyline => "Polyline", _ => null };
+                var type = ent switch
+                {
+                    DBText => "DBText", MText => "MText", Line => "Line", Polyline => "Polyline",
+                    MLeader { ContentType: ContentType.MTextContent } => "MLeader",
+                    _ => null,
+                };
                 if (type == null || !Wanted(ent, type)) continue;
 
                 switch (ent)
@@ -511,6 +533,10 @@ public static class AcadQueryHandler
                         break;
                     case MText mt:
                         list.Add(new { root, type, layer = mt.Layer, text = mt.Text, position = Pt(mt.Location.TransformBy(xf)), height = mt.TextHeight });
+                        break;
+                    case MLeader ml:
+                        using (var lt = ml.MText)
+                            list.Add(new { root, type, layer = ml.Layer, text = lt.Text, position = Pt(lt.Location.TransformBy(xf)), height = lt.TextHeight });
                         break;
                     case Line ln:
                         list.Add(new { root, type, layer = ln.Layer, start = Pt(ln.StartPoint.TransformBy(xf)), end = Pt(ln.EndPoint.TransformBy(xf)) });

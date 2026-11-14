@@ -38,6 +38,14 @@ query text { "limit": 5000 }
 `SEAD - 700x300`, `RAD - 400x250` nhất. Lấy hộp bao cụm đó, nới mỗi phía vài mét → `--bbox xmin,ymin,xmax,ymax`.
 Không chắc thì chụp cho kỹ sư nhìn: `query snapshot`.
 
+**Ống/tag nằm trong block** (bản vẽ gộp nhiều tầng hay chèn cả hệ thành một block, ví dụ `3F_SAED` chứa toàn
+bộ hệ SEAD một tầng; tag Revit gom trong block `A$C…`): script chỉ đọc entity Model Space nên sẽ **bỏ sót cả
+hệ**. Dò trước bằng `query inserts` + `entity_geometry` (block lớn hơn vài mét trên layer hệ/`0`) rồi
+`query block_contents { "handles": ["C0502"] }` xem bên trong có Line/Polyline ống hay MText tag không. Có thì
+phá block bằng `EntityEdit` op `explode` (xem trước rồi xác nhận ngay; block lồng `*U…` phá tiếp một lượt,
+`layerMap {"0": "<layer hệ>"}`) **sau khi kỹ sư đồng ý**, rồi mới chạy script. Block nhỏ có chữ `W875x H200` là
+dàn FCU/IDU, block có mũi tên ở trục là louver/MFD — không phải ống, không phá, không tính.
+
 ### 2. Chạy script
 
 ```powershell
@@ -51,12 +59,18 @@ nên đã chia lô 25 handle và thử lại — để yên cho nó chạy. Bả
 
 Cách script chia đốt (để giải thích khi kỹ sư hỏi):
 
-- cắt tuyến tại **tâm block mối nối**; loại nẹp theo tên block, tuyến không có mối nối lấy theo tuyến cùng
+- cắt tuyến tại **tâm block mối nối**; bản vẽ không có block mối nối (ống vẽ tay, block đã phá) thì nhận **bích TDC
+  vẽ bằng 2–3 nét ngang cách nhau ~20 mm** làm mối nối (các nét bích không bị ghép thành ống); loại nẹp theo tên block, tuyến không có mối nối lấy theo tuyến cùng
   kích thước → cùng hệ → cạnh lớn (< 2000 TDC, ≥ 2000 V);
 - khoảng dài hơn L max quá 80 mm → chia L max từ đầu khoảng; đoạn cuối < 300 mm → cộng đốt trước rồi chia đôi;
   khoảng có chân rẽ/miệng gió bên hông được dài tới 1400 mm;
 - khoảng cuối ở **đầu kín** (nắp bịt, hoặc không nối gì) dài hơn L max tới 1400 mm → **box bít đầu**;
 - chiều dài làm tròn 10 mm gần nhất như số dim; từ L max − 10 tới L max + 80 tính bằng L max (đốt chuẩn);
+- **kích thước** theo tag gần nhất có một cạnh khớp bề rộng (±30 mm); cạnh vẽ theo mép bích rộng hơn tag tới
+  60 mm vẫn nhận (tag khớp đúng luôn ưu tiên). Phần ghi sau dấu `+` của tag (`+ EI120`, `+ TIÊU ÂM TRONG 50mm`,
+  `+ ISC`) theo cả tuyến, ghi vào cột **Bọc / ghi thêm**; ống hút khói SEAD không ghi gì mặc định **EI60**;
+- **độ dày tole**: ống bọc EI luôn 0.75 mm; còn lại theo cạnh lớn nhất > 1250 → 0.95, > 500 → 0.75, ≤ 500 → 0.58
+  (cột cuối trang Chi tiết, Co và Theo mẫu; Tổng hợp có bảng DT theo độ dày tole);
 - **co**: Revit xuất một co vuông 90° thành **hai nửa block co 45°** nối nhau bằng đoạn chéo ngắn — script gộp
   thành một co, đoạn chéo là cổ co (ghi ở cột "Cổ co", không tính thành ống); góc theo hướng hai tuyến cùng R×C
   nối vào (tên family `Elbow_45` không đáng tin), chỉ một tuyến thì theo tên; R×C và nẹp theo tuyến nối vào,
@@ -82,7 +96,7 @@ Dòng cuối script in: số đốt chuẩn, đoạn bù, box, co, mét ống, m
 
 Nói tổng mét ống và m² (có và không hao hụt), số đốt chuẩn / đoạn bù / box / co, và **mét chưa xác định** kèm
 lý do có thể. File Excel có 8 trang: Tổng hợp (công thức sống theo hệ + kích thước, ô hao hụt S3), **Theo mẫu**
-(đúng cột Sheet1 của bản bóc tay: theo trục/cụm, TT chạy liên tục từ đầu gần van chặn lửa — cửa trục — ra ngoài,
+(đúng cột Sheet1 của bản bóc tay: cụm xếp **trái → phải trên mặt bằng** — `--order truc` để gom theo trục/hệ như cũ —, TT chạy liên tục từ đầu gần van chặn lửa — cửa trục — ra ngoài,
 xuyên qua co, giảm và gót giày, mỗi cụm đánh lại từ 1, mục giống nhau liền nhau gộp `12~19`), Chi tiết (STT, mã đốt `SEAD-001`, tuyến, nẹp, loại), Đoạn bù & box, Co, Phụ kiện, Chưa xác
 định, Ghi chú.
 
@@ -110,7 +124,11 @@ hồ sơ dự án vào đó.
 
 ## Giới hạn cần nói với kỹ sư
 
-- Ống vẽ bằng polyline/spline, ống tròn, và ống nằm trong block không được tính.
+- Ống vẽ bằng polyline/spline, ống tròn, box bít đầu vẽ bằng polyline kín, và ống còn nằm trong block (chưa phá)
+  không được tính.
+- Đuôi tag (EI120…) áp cho **cả tuyến** cùng kích thước gần tag nhất; đoạn bọc EI chỉ một phần tuyến (hatch) thì
+  kiểm tay theo vùng hatch.
+- Tag ghi bằng MLeader: Bridge từ bản này trả chữ MLeader trong `query text`; Bridge cũ thì phá MLeader trước.
 - Côn, tê, chân rẽ, van chỉ đếm số lượng (trang Phụ kiện), chưa tính m².
 - Đây là bóc từ hình vẽ 2D — số dùng để đối chiếu/ước lượng, không thay bóc theo mô hình Revit khi có.
 
