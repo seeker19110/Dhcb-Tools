@@ -85,6 +85,7 @@
 - §80 — [Bridge bớt phải vòng qua COM: layer xref, `explode`/`set`/`trim`/`replacePoints`, `XrefAttach` (2026-11-13)](#80-bridge-bớt-phải-vòng-qua-com-layer-xref-explodesettrimreplacepoints-xrefattach-2026-11-13)
 - §81 — [`LayoutViewport` — tạo khung bản vẽ (layout giấy) từ layout mẫu qua Bridge/MCP (2026-11-14)](#81-layoutviewport-tạo-khung-bản-vẽ-layout-giấy-từ-layout-mẫu-qua-bridgemcp-2026-11-14)
 - §82 — [`EntityEdit` op `dimension` — tạo DIM thẳng hàng qua Bridge/MCP (2026-11-14)](#82-entityedit-op-dimension-tạo-dim-thẳng-hàng-qua-bridgemcp-2026-11-14)
+- §83 — [`query` trả dim style và hình học của DIM (2026-11-14)](#83-query-trả-dim-style-và-hình-học-của-dim-2026-11-14)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
@@ -4038,4 +4039,16 @@ tim có `height` 60, một `distance` 150), layer `KL-TEST-DIM` được tạo, 
 Test .NET 2440/2440 (8 ca sai giá trị + 1 ca hợp lệ mới cho `dimension`).
 
 Chưa chứng minh: chạy qua Bridge trong AutoCAD GUI (cần thay bundle sau khi hợp nhất).
+
+## 83. `query` trả dim style và hình học của DIM (2026-11-14)
+
+Đặt DIM mới cho khớp DIM có sẵn (cùng dim style) cần biết tên dim style của chúng, mà `entities`/`entity_geometry`
+trước đây chỉ trả handle, layer, màu và khung bao của kích thước. Nay với mọi `Dimension` cả hai truy vấn trả thêm
+`dimStyle` (tên dim style), `dimText` (chữ ghi đè), `dimtxt`, `dimscale`, `textPosition`; với DIM thẳng hàng/xoay thêm
+`xLine1Point`, `xLine2Point`, `dimLinePoint`, `measurement` (và `rotationDeg` cho DIM xoay) — đủ để quét ống thiếu DIM
+mà không phải đoán từ khung bao.
+
+Build `Core.AutoCAD` và vỏ AutoCAD 2026 đạt (0 lỗi). Chưa chứng minh: đọc các trường mới trên bản vẽ có DIM — bản
+vẽ mẫu kèm AutoCAD không có kích thước và MCP đọc ngầm dùng bản DLL đã cài; sẽ kiểm trên bản vẽ PODIUM trong AutoCAD
+GUI sau khi thay bundle.
 

@@ -351,6 +351,9 @@ public static class AcadQueryHandler
                     row["location"] = Pt(mt.Location);
                     row["width"]    = mt.Width;
                     break;
+                case Dimension dim:
+                    AddDimensionDetails(row, dim);
+                    break;
             }
 
             list.Add(row);
@@ -652,12 +655,44 @@ public static class AcadQueryHandler
                 row["location"] = Pt(mt.Location);
                 row["width"]    = mt.Width;
                 break;
+            case Dimension dim:
+                AddDimensionDetails(row, dim);
+                break;
             case BlockReference br:
                 row["blockName"]   = BlockNameOf(br, tr);
                 row["position"]    = Pt(br.Position);
                 row["rotationDeg"] = Math.Round(br.Rotation * 180 / Math.PI, 4);
                 row["scale"]       = new { x = br.ScaleFactors.X, y = br.ScaleFactors.Y, z = br.ScaleFactors.Z };
                 row["attributes"]  = AttributeValues(br, tr);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Kích thước (DIM): tên dim style (để agent đặt DIM mới cùng style với DIM có sẵn), cỡ chữ riêng, chữ ghi đè và
+    /// số đo; với DIM thẳng hàng/xoay thêm hai điểm gốc đường gióng và điểm đặt đường kích thước.
+    /// </summary>
+    private static void AddDimensionDetails(Dictionary<string, object?> row, Dimension dim)
+    {
+        row["dimStyle"]     = dim.DimensionStyleName;
+        row["dimText"]      = dim.DimensionText;
+        row["dimtxt"]       = dim.Dimtxt;
+        row["dimscale"]     = dim.Dimscale;
+        row["textPosition"] = Pt(dim.TextPosition);
+        switch (dim)
+        {
+            case AlignedDimension ad:
+                row["xLine1Point"]   = Pt(ad.XLine1Point);
+                row["xLine2Point"]   = Pt(ad.XLine2Point);
+                row["dimLinePoint"]  = Pt(ad.DimLinePoint);
+                row["measurement"]   = Math.Round(ad.Measurement, 6);
+                break;
+            case RotatedDimension rd:
+                row["xLine1Point"]   = Pt(rd.XLine1Point);
+                row["xLine2Point"]   = Pt(rd.XLine2Point);
+                row["dimLinePoint"]  = Pt(rd.DimLinePoint);
+                row["rotationDeg"]   = Math.Round(rd.Rotation * 180 / Math.PI, 4);
+                row["measurement"]   = Math.Round(rd.Measurement, 6);
                 break;
         }
     }
