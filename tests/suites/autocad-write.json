@@ -1495,6 +1495,66 @@
       }
     },
     {
+      "name": "Tạo DIM thẳng hàng — giữa tim và lệch vuông góc, tự dọn — GHI THẬT",
+      "command": "EntityEdit",
+      "allowWrite": true,
+      "config": {
+        "dryRun": false,
+        "operations": [
+          {
+            "op": "dimension",
+            "from": [
+              -70000,
+              0
+            ],
+            "to": [
+              -68800,
+              0
+            ],
+            "layer": "KL-TEST-DIM",
+            "color": 7,
+            "height": 60,
+            "id": "d1"
+          },
+          {
+            "op": "dim",
+            "from": [
+              -70000,
+              500
+            ],
+            "to": [
+              -70000,
+              1400
+            ],
+            "distance": 150,
+            "layer": "KL-TEST-DIM",
+            "id": "d2"
+          },
+          {
+            "op": "erase",
+            "handles": [
+              "@d1",
+              "@d2"
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "success": true,
+        "summaryNotContains": [
+          "Xem trước"
+        ],
+        "summaryContains": [
+          "tạo 0 đối tượng, sửa 0, xoá 2"
+        ],
+        "messagesContain": [
+          "#1 dimension → ",
+          "#2 dimension → ",
+          "Đã tạo layer \"KL-TEST-DIM\""
+        ]
+      }
+    },
+    {
       "name": "Tạo khung bản vẽ — mẫu không có thì báo lỗi, không tạo gì",
       "command": "LayoutViewport",
       "config": {

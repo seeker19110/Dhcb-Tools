@@ -12,7 +12,7 @@ namespace DhcbTools.Shared.Logic.Cad
     /// </summary>
     public sealed class EntityOperation
     {
-        /// <summary>line, polyline, rectangle, circle, arc, ellipse, text, mtext, hatch, point (tạo) —
+        /// <summary>line, polyline, rectangle, circle, arc, ellipse, text, mtext, hatch, dimension, point (tạo) —
         /// move, copy, array, rotate, scale, mirror, offset, erase, explode, set, trim, replacePoints (sửa theo handle).</summary>
         public string Op { get; set; } = string.Empty;
 
@@ -112,6 +112,7 @@ namespace DhcbTools.Shared.Logic.Cad
         Text,
         MText,
         Hatch,
+        Dimension,
         Point,
         Move,
         Copy,
@@ -189,6 +190,8 @@ namespace DhcbTools.Shared.Logic.Cad
             ["text"] = EntityOpKind.Text,
             ["mtext"] = EntityOpKind.MText,
             ["hatch"] = EntityOpKind.Hatch,
+            ["dimension"] = EntityOpKind.Dimension,
+            ["dim"] = EntityOpKind.Dimension,
             ["point"] = EntityOpKind.Point,
             ["move"] = EntityOpKind.Move,
             ["copy"] = EntityOpKind.Copy,
@@ -367,6 +370,16 @@ namespace DhcbTools.Shared.Logic.Cad
                 case EntityOpKind.Hatch:
                     Need(op.Points != null && op.Points.Count >= 3 && op.Points.All(IsPoint), "cần points ≥ 3 đỉnh của biên kín.");
                     Need(op.PatternScale == null || Positive(op.PatternScale), "patternScale phải > 0.");
+                    break;
+                case EntityOpKind.Dimension:
+                    Need(IsPoint(op.From) && IsPoint(op.To), "cần from và to — hai điểm gốc đường gióng [x, y].");
+                    Need(!IsPoint(op.From) || !IsPoint(op.To) || Distance(op.From!, op.To!) > 0, "from trùng to — kích thước dài 0.");
+                    Need(op.Position == null || IsPoint(op.Position), "position (điểm đặt đường kích thước) phải dạng [x, y].");
+                    Need(op.Distance == null || Finite(op.Distance), "distance phải là số.");
+                    Need(op.Position == null || op.Distance == null, "chỉ dùng một trong position hoặc distance (cả hai bỏ trống = đường kích thước đi qua trung điểm from–to).");
+                    Need(op.Height == null || Positive(op.Height), "height (cỡ chữ kích thước) phải > 0.");
+                    Need(op.Style == null || op.Style.Trim().Length > 0, "style (dim style) rỗng — bỏ trường để dùng dim style hiện hành.");
+                    Need(op.Text == null || op.Text.Length > 0, "text rỗng — bỏ trường để hiện số đo thật.");
                     break;
                 case EntityOpKind.Point:
                     Need(IsPoint(op.Position), "cần position [x, y].");
