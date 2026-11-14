@@ -204,11 +204,39 @@ public class EntityEditPlannerTests
     [InlineData("""{"op":"replacePoints","handles":["1F","20"],"points":[[0,0],[1,0]]}""", "đúng một polyline")]
     [InlineData("""{"op":"replacepoints","handles":["1F"],"points":[[0,0]]}""", "points ≥ 2")]
     [InlineData("""{"op":"replacePoints","handles":["1F"],"points":[[0,0],[1,0]],"width":-2}""", "width")]
+    [InlineData("""{"op":"dimension","from":[0,0]}""", "cần from và to")]
+    [InlineData("""{"op":"dim","from":[5,5],"to":[5,5]}""", "from trùng to")]
+    [InlineData("""{"op":"dim","from":[0,0],"to":[1000,0],"position":[1]}""", "position")]
+    [InlineData("""{"op":"dim","from":[0,0],"to":[1000,0],"position":[500,0],"distance":100}""", "một trong position hoặc distance")]
+    [InlineData("""{"op":"dim","from":[0,0],"to":[1000,0],"height":0}""", "height")]
+    [InlineData("""{"op":"dim","from":[0,0],"to":[1000,0],"style":" "}""", "dim style")]
+    [InlineData("""{"op":"dim","from":[0,0],"to":[1000,0],"text":""}""", "text rỗng")]
+    [InlineData("""{"op":"dim","handles":["1F"],"from":[0,0],"to":[1000,0]}""", "không nhận \"handles\"")]
     public void OpMoi_GiaTriSai_BaoDungTruong(string op, string expected)
     {
         var plan = Plan("[" + op + "]");
 
         Assert.False(plan.IsValid);
         Assert.Contains(plan.Errors, e => e.Contains(expected, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Dimension_TaoDuocVaLaOpSinhDoiTuong()
+    {
+        var plan = Plan("""
+            [
+              {"op":"dimension","from":[0,0],"to":[1200,0],"layer":"DHCB-KL-DIM-DOT","color":7,"height":60,"style":"Standard","id":"d"},
+              {"op":"dim","from":[0,0],"to":[0,900],"distance":150},
+              {"op":"dim","from":[0,0],"to":[300,400],"position":[150,200],"text":"<>"},
+              {"op":"move","handles":["@d"],"delta":[0,10]}
+            ]
+            """);
+
+        Assert.Empty(plan.Errors);
+        Assert.Equal(4, plan.Steps.Count);
+        Assert.All(plan.Steps.Take(3), s => Assert.Equal(EntityOpKind.Dimension, s.Kind));
+        Assert.True(plan.Steps[0].Creates);
+        Assert.True(plan.Steps[0].Produces);
+        Assert.Contains("dimension", EntityEditPlanner.ValidOps);
     }
 }

@@ -9,7 +9,7 @@ namespace DhcbTools.Core.AutoCAD.LayerTools;
 
 /// <summary>
 /// Vẽ và sửa hình học bằng một lô thao tác JSON — "cây bút" cho agent: line, polyline, rectangle, circle, arc,
-/// ellipse, text, mtext, hatch, point (tạo trong Model Space) và move, copy, array, rotate, scale, mirror, offset,
+/// ellipse, text, mtext, hatch, dimension (kích thước thẳng hàng), point (tạo trong Model Space) và move, copy, array, rotate, scale, mirror, offset,
 /// erase, explode, set, trim, replacePoints (sửa đối tượng có sẵn theo handle, hoặc đối tượng op trước vừa tạo qua
 /// <c>"@id"</c>).
 /// <para>
@@ -189,6 +189,10 @@ public sealed class EntityEditCommand : ICoreCommand<EntityEditConfig>
                 {
                     TextStyle(tr, step); // kiểm tên style ngay từ xem trước
                 }
+                else if (step.Kind == EntityOpKind.Dimension)
+                {
+                    DimStyle(tr, step);
+                }
 
                 Report.Add($"{step.Label} → (mới) trên layer \"{PreviewLayer(tr, step, op.Layer)}\".");
                 return new List<ObjectId> { ObjectId.Null };
@@ -332,6 +336,14 @@ public sealed class EntityEditCommand : ICoreCommand<EntityEditConfig>
                 }
                 case EntityOpKind.Hatch:
                     return new Hatch { Normal = Vector3d.ZAxis, Elevation = Elevation(op.Points![0]) };
+                case EntityOpKind.Dimension:
+                {
+                    var from = P(op.From!);
+                    var to = P(op.To!);
+                    var dimension = new AlignedDimension(from, to, DimLinePoint(op, from, to), op.Text ?? string.Empty, DimStyle(tr, step));
+                    if (op.Height is double textHeight) dimension.Dimtxt = textHeight;
+                    return dimension;
+                }
                 case EntityOpKind.Point:
                     return new DBPoint(P(op.Position!));
                 default:
@@ -361,6 +373,53 @@ public sealed class EntityEditCommand : ICoreCommand<EntityEditConfig>
             }
 
             throw new StepException(step, $"text style \"{name}\" không có trong bản vẽ (có: {string.Join(", ", known.Where(n => n.Length > 0).Take(30))}).");
+        }
+
+        /// <summary>
+        /// Điểm đặt đường kích thước của op <c>dimension</c>: <c>position</c> nếu có; không thì lệch <c>distance</c>
+        /// vuông góc với from→to (dấu quyết định phía, quay trái là dương); cả hai trống = trung điểm — đường kích
+        /// thước chạy đúng tim đoạn, kiểu "DIM giữa ống".
+        /// </summary>
+        private static Point3d DimLinePoint(EntityOperation op, Point3d from, Point3d to)
+        {
+            if (op.Position != null)
+            {
+                return P(op.Position);
+            }
+
+            var mid = new Point3d((from.X + to.X) / 2, (from.Y + to.Y) / 2, (from.Z + to.Z) / 2);
+            if (op.Distance is not double offset || offset == 0)
+            {
+                return mid;
+            }
+
+            var along = (to - from).GetNormal();
+            var normal = new Vector3d(-along.Y, along.X, 0);
+            return mid + (normal * offset);
+        }
+
+        /// <summary>Dim style theo tên (rỗng = hiện hành); không có thì dừng lô và liệt kê style có sẵn.</summary>
+        private ObjectId DimStyle(Transaction tr, EntityEditStep step)
+        {
+            var name = step.Source.Style?.Trim();
+            if (string.IsNullOrEmpty(name))
+            {
+                return _db.Dimstyle;
+            }
+
+            var table = (DimStyleTable)tr.GetObject(_db.DimStyleTableId, OpenMode.ForRead);
+            if (table.Has(name))
+            {
+                return table[name];
+            }
+
+            var known = new List<string>();
+            foreach (ObjectId id in table)
+            {
+                known.Add(((DimStyleTableRecord)tr.GetObject(id, OpenMode.ForRead)).Name);
+            }
+
+            throw new StepException(step, $"dim style \"{name}\" không có trong bản vẽ (có: {string.Join(", ", known.Where(n => n.Length > 0).Take(30))}).");
         }
 
         /// <summary>Hatch phải nằm trong database rồi mới nạp mẫu và biên — thứ tự bắt buộc của API AutoCAD.</summary>

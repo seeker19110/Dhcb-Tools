@@ -84,6 +84,7 @@
 - §79 — [MCP AutoCAD nhanh hơn — gộp truy vấn, nhiều DWG song song, nhớ kết quả (2026-11-13)](#79-mcp-autocad-nhanh-hơn-gộp-truy-vấn-nhiều-dwg-song-song-nhớ-kết-quả-2026-11-13)
 - §80 — [Bridge bớt phải vòng qua COM: layer xref, `explode`/`set`/`trim`/`replacePoints`, `XrefAttach` (2026-11-13)](#80-bridge-bớt-phải-vòng-qua-com-layer-xref-explodesettrimreplacepoints-xrefattach-2026-11-13)
 - §81 — [`LayoutViewport` — tạo khung bản vẽ (layout giấy) từ layout mẫu qua Bridge/MCP (2026-11-14)](#81-layoutviewport-tạo-khung-bản-vẽ-layout-giấy-từ-layout-mẫu-qua-bridgemcp-2026-11-14)
+- §82 — [`EntityEdit` op `dimension` — tạo DIM thẳng hàng qua Bridge/MCP (2026-11-14)](#82-entityedit-op-dimension-tạo-dim-thẳng-hàng-qua-bridgemcp-2026-11-14)
 <!-- muc-luc:ket-thuc -->
 
 **Khoảng thời gian:** 2026-09-02 → 2026-09-05 · **Repo:** https://github.com/seeker19110/Dhcb-Tools
@@ -4020,3 +4021,21 @@ huỷ giữa chừng (`CopyLayout` trong giao dịch bị `Abort`) chưa có ca 
 
 Test .NET 2431/2431 (phủ 100%), Python 553 đạt — 1 ca `test_installer` đỏ vì máy (installer không xác định được
 runtime AutoCAD 2025), không liên quan thay đổi này.
+
+## 82. `EntityEdit` op `dimension` — tạo DIM thẳng hàng qua Bridge/MCP (2026-11-14)
+
+Bổ sung DIM chiều dài đốt ống gió phải dùng lệnh lisp chạy trong AutoCAD vì Bridge không tạo được kích thước. Op mới
+`dimension` (bí danh `dim`) tạo `AlignedDimension`: `from`/`to` là hai điểm gốc đường gióng; đường kích thước đi qua
+trung điểm (DIM nằm giữa ống), hoặc `position` đặt thẳng, hoặc `distance` lệch vuông góc (dương = bên trái from→to);
+`height` đặt cỡ chữ riêng (`Dimtxt`), `style` là dim style (không có thì dừng lô và liệt kê style), `text` ghi đè số đo,
+`layer`/`color` như các op tạo khác. Là op tạo nên có `id` để op sau (`move`, `set`, `erase`) trỏ lại bằng `@id`; xem
+trước kiểm tên dim style mà không ghi gì.
+
+Chạy trong AutoCAD 2026 thật (accoreconsole, bản chép bản vẽ mẫu, `run-in-autocad-tests.ps1 -Suite write -AllowWrites`):
+**52 đạt / 0 trượt / 52 ca** — ca mới "Tạo DIM thẳng hàng — giữa tim và lệch vuông góc, tự dọn": hai DIM (một giữa
+tim có `height` 60, một `distance` 150), layer `KL-TEST-DIM` được tạo, rồi `erase` cả hai: "tạo 0, sửa 0, xoá 2".
+
+Test .NET 2440/2440 (8 ca sai giá trị + 1 ca hợp lệ mới cho `dimension`).
+
+Chưa chứng minh: chạy qua Bridge trong AutoCAD GUI (cần thay bundle sau khi hợp nhất).
+
