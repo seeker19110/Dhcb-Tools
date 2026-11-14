@@ -20,25 +20,21 @@ import xml.etree.ElementTree as ET
 import dhcb_agent
 
 
-YEARS = tuple(range(2022, 2028))
-AUTOCAD_SERIES = {"R24.1": 2022, "R24.2": 2023, "R24.3": 2024,
-                  "R25.0": 2025, "R25.1": 2026, "R26.0": 2027}
+# Chỉ hỗ trợ .NET 10: AutoCAD 2025/2026/2027 và Revit 2027 (đã bỏ 2022–2024 net48 và profile net8).
+YEARS = (2025, 2026, 2027)
+REVIT_YEARS = (2027,)
+AUTOCAD_SERIES = {"R25.0": 2025, "R25.1": 2026, "R26.0": 2027}
 
 
 def expected_runtime(app: str, year: int) -> str:
     # Profiles describe the DHCB build, not proof that a host loaded the add-in.
-    if year <= 2024:
-        return "net48"
-    return "net10.0" if year == 2027 or (app == "autocad" and year == 2026) else "net8.0"
+    return "net10.0"
 
 
 def compatibility_profiles() -> list:
     profiles = [{"app": app, "year": year, "targetRuntime": expected_runtime(app, year),
                  "verification": "requires_host_acceptance"}
-                for app in ("revit", "autocad") for year in YEARS]
-    profiles.extend({"app": "autocad", "year": year, "targetRuntime": runtime,
-                     "verification": "requires_host_acceptance"}
-                    for year, runtime in ((2025, "net10.0"), (2026, "net8.0")))
+                for app, years in (("revit", REVIT_YEARS), ("autocad", YEARS)) for year in years]
     return profiles
 
 
@@ -52,8 +48,6 @@ def _inspect_profile(contents: Path, app: str, year: int) -> tuple:
     try:
         profile = json.loads(path.read_text(encoding="utf-8-sig"))
         allowed = {expected_runtime(app, year)}
-        if app == "autocad" and year in (2025, 2026):
-            allowed = {"net8.0", "net10.0"}
         if not isinstance(profile, dict) or profile.get("product") != app \
                 or type(profile.get("year")) is not int or profile["year"] != year \
                 or profile.get("runtime") not in allowed:
@@ -68,9 +62,6 @@ def _inspect_profile(contents: Path, app: str, year: int) -> tuple:
 def _runtime_check(app: str, year: int, host: Path, target_runtime=None) -> dict:
     name = ("AutoCAD" if app == "autocad" else "Revit") + " " + str(year)
     expected = target_runtime or expected_runtime(app, year)
-    if expected == "net48":
-        return _check(name + " host", "ok",
-                      "Đã thấy executable; bản này dùng .NET Framework 4.8. Chưa xác nhận runtime hay add-in đã nạp.")
     filename = "acdbmgd.runtimeconfig.json" if app == "autocad" else "Revit.runtimeconfig.json"
     try:
         runtime = json.loads((host / filename).read_text(encoding="utf-8-sig"))
@@ -83,9 +74,6 @@ def _runtime_check(app: str, year: int, host: Path, target_runtime=None) -> dict
         update_advice = " AutoCAD 2025 cần Update 1.4 trở lên cho build .NET 10 này."
     else:
         update_advice = ""
-    if app == "revit" and year in (2025, 2026) and expected == "net8.0" and tfm == "net10.0":
-        return _check(name + " runtime", "warning",
-                      "Host đã chuyển sang .NET 10; gói Revit này build .NET 8. Cần kiểm nạp add-in và nghiệm thu trong host cập nhật, chưa xác nhận tương thích.")
     advice = " AutoCAD 2026 cần Update 1.2 trở lên cho build .NET 10 này." if app == "autocad" and year == 2026 and expected == "net10.0" else ""
     return _check(name + " runtime", "ok" if matches else "error",
                   "Runtime khớp " + expected + "; chưa xác nhận add-in đã nạp." if matches
@@ -176,8 +164,8 @@ def inspect_revit_installation(revit_dir=None, year=None) -> list:
     """Kiểm manifest, dependencies và host; không chạy Revit hoặc tải DLL."""
     user_base = Path(os.environ["APPDATA"]) / "Autodesk" / "Revit" / "Addins"
     machine_base = Path(os.environ.get("PROGRAMDATA") or "C:/ProgramData") / "Autodesk" / "Revit" / "Addins"
-    custom_year = year if year is not None else 2026
-    years = (year,) if year is not None else YEARS
+    custom_year = year if year is not None else 2027
+    years = (year,) if year is not None else REVIT_YEARS
     required = ("DhcbTools.Revit.dll", "DhcbTools.Core.dll", "DhcbTools.Shared.Hosting.dll",
                 "DhcbTools.Shared.Logic.dll", "Newtonsoft.Json.dll")
     checks = []
@@ -234,13 +222,13 @@ def inspect_revit_installation(revit_dir=None, year=None) -> list:
         else:
             checks.append(_runtime_check("revit", selected, host, target_runtime))
     if not found and not checks:
-        checks.append(_check("Add-in Revit", "warning", "Chưa thấy manifest DHCB cho Revit 2022–2027. Cài đúng gói của phiên bản host."))
+        checks.append(_check("Add-in Revit", "warning", "Chưa thấy manifest DHCB cho Revit 2027. Cài đúng gói của phiên bản host."))
     return checks
 
 
 def diagnose(app: str = "all", offline: bool = False, config_dir=None, acad_dir=None, *, year=None, revit_dir=None) -> dict:
     if app not in ("all", "revit", "autocad") or (year is not None and year not in YEARS):
-        raise ValueError("Chọn app hợp lệ và năm từ 2022 đến 2027.")
+        raise ValueError("Chọn app hợp lệ và năm từ 2025 đến 2027.")
     base = Path(config_dir) if config_dir is not None else Path(os.environ["APPDATA"]) / "DHCB"
     checks = [
         _check("Python", "ok" if sys.version_info >= (3, 9) else "error", "Cần Python 3.9 trở lên."),
@@ -264,7 +252,7 @@ def diagnose(app: str = "all", offline: bool = False, config_dir=None, acad_dir=
     if "autocad" in apps:
         checks.extend(inspect_autocad_installation(acad_dir) if year is None
                       else inspect_autocad_installation(acad_dir, year))
-    if "revit" in apps:
+    if "revit" in apps and (year is None or year in REVIT_YEARS):
         checks.extend(inspect_revit_installation(revit_dir, year))
     for target in apps:
         if offline or not enabled or not token_ready:
@@ -290,7 +278,7 @@ def diagnose(app: str = "all", offline: bool = False, config_dir=None, acad_dir=
     return {"checks": checks, "errors": sum(c["status"] == "error" for c in checks),
             "warnings": sum(c["status"] == "warning" for c in checks),
             "compatibilityProfiles": compatibility_profiles(),
-            "scope": "Chẩn đoán môi trường/cấu hình và Bridge; profile 2022–2027 là mục tiêu build. Cần nghiệm thu trong từng host; không xác nhận chất lượng model hay kết quả nghiệp vụ."}
+            "scope": "Chẩn đoán môi trường/cấu hình và Bridge; profile .NET 10 (AutoCAD 2025–2027, Revit 2027) là mục tiêu build. Cần nghiệm thu trong từng host; không xác nhận chất lượng model hay kết quả nghiệp vụ."}
 
 
 def main(argv=None) -> int:
@@ -298,9 +286,9 @@ def main(argv=None) -> int:
     parser.add_argument("--app", choices=("revit", "autocad", "all"), default="all")
     parser.add_argument("--offline", action="store_true", help="Chỉ kiểm môi trường/file, không kết nối Bridge")
     parser.add_argument("--json", action="store_true", help="In JSON để gửi kèm báo lỗi")
-    parser.add_argument("--year", type=int, choices=YEARS, help="Chỉ kiểm gói của phiên bản host đã chọn (2022–2027)")
+    parser.add_argument("--year", type=int, choices=YEARS, help="Chỉ kiểm gói của phiên bản host đã chọn (2025–2027)")
     parser.add_argument("--acad-dir", help="Thư mục chứa acad.exe cho --year; mặc định AutoCAD 2026 nếu không chọn năm")
-    parser.add_argument("--revit-dir", help="Thư mục chứa Revit.exe cho --year; mặc định Revit 2026 nếu không chọn năm")
+    parser.add_argument("--revit-dir", help="Thư mục chứa Revit.exe cho --year; mặc định Revit 2027 nếu không chọn năm")
     args = parser.parse_args(argv)
     options = {"acad_dir": args.acad_dir}
     if args.year is not None:

@@ -15,8 +15,9 @@ REVIT_FILES = (
     "DhcbTools.Revit.addin", "DhcbTools.Revit.dll", "DhcbTools.Core.dll",
     "DhcbTools.Shared.Logic.dll", "DhcbTools.Shared.Hosting.dll",
 )
-ACAD_YEARS = tuple(range(2022, 2028))
-REVIT_YEARS = tuple(range(2022, 2028))
+# Chỉ hỗ trợ .NET 10: AutoCAD 2025–2027 và Revit 2027.
+ACAD_YEARS = (2025, 2026, 2027)
+REVIT_YEARS = (2027,)
 
 
 @unittest.skipUnless(os.name == "nt", "ISCC và installer cần Windows")
@@ -43,14 +44,7 @@ class InstallerTests(unittest.TestCase):
             folder = stage / f"autocad-{year}"
             folder.mkdir()
             (folder / "DhcbTools.AutoCAD.dll").write_text(f"fixture {year}", encoding="utf-8")
-            runtime = "net48" if year <= 2024 else "net8.0" if year == 2025 else "net10.0"
-            (folder / "dhcb-host-profile.json").write_text(json.dumps({"product": "autocad", "year": year, "runtime": runtime}), encoding="utf-8")
-        for profile in ("2025-net10", "2026-net8"):
-            folder = stage / f"autocad-{profile}"
-            folder.mkdir()
-            (folder / "DhcbTools.AutoCAD.dll").write_text(f"fixture {profile}", encoding="utf-8")
-            year, runtime = profile.split("-")
-            (folder / "dhcb-host-profile.json").write_text(json.dumps({"product": "autocad", "year": int(year), "runtime": runtime + ".0"}), encoding="utf-8")
+            (folder / "dhcb-host-profile.json").write_text(json.dumps({"product": "autocad", "year": year, "runtime": "net10.0"}), encoding="utf-8")
         (stage / "batchrunner" / "scripts").mkdir(parents=True)
         (stage / "batchrunner" / "DhcbTools.BatchRunner.exe").write_text("fixture batch", encoding="utf-8")
         (stage / "batchrunner" / "scripts" / "dhcb_agent.py").write_text("# fixture", encoding="utf-8")
@@ -63,14 +57,14 @@ class InstallerTests(unittest.TestCase):
         cls.acad2025 = cls.work / "fake-acad2025"
         cls.acad2025.mkdir()
         (cls.acad2025 / "acad.exe").touch()
-        (cls.acad2025 / "acdbmgd.runtimeconfig.json").write_text('{"runtimeOptions":{"tfm":"net8.0"}}', encoding="utf-8")
+        (cls.acad2025 / "acdbmgd.runtimeconfig.json").write_text('{"runtimeOptions":{"tfm":"net10.0"}}', encoding="utf-8")
         cls.acad = cls.work / "fake-acad"
         cls.acad.mkdir()
         (cls.acad / "acad.exe").touch()
         (cls.acad / "acdbmgd.runtimeconfig.json").write_text('{"runtimeOptions":{"tfm":"net10.0"}}', encoding="utf-8")
 
         cls.detected = cls.work / "detected-hosts"
-        for name, executable in (("AutoCAD 2026", "acad.exe"), ("Revit 2022", "Revit.exe")):
+        for name, executable in (("AutoCAD 2026", "acad.exe"), ("Revit 2027", "Revit.exe")):
             folder = cls.detected / name
             folder.mkdir(parents=True)
             (folder / executable).touch()
@@ -105,7 +99,7 @@ class InstallerTests(unittest.TestCase):
             shutil.rmtree(self.profile)
         self.bundle = self.profile / "roaming" / "Autodesk" / "ApplicationPlugins" / "DhcbTools.bundle"
         self.addins = self.profile / "roaming" / "Autodesk" / "Revit" / "Addins"
-        (self.acad2025 / "acdbmgd.runtimeconfig.json").write_text('{"runtimeOptions":{"tfm":"net8.0"}}', encoding="utf-8")
+        (self.acad2025 / "acdbmgd.runtimeconfig.json").write_text('{"runtimeOptions":{"tfm":"net10.0"}}', encoding="utf-8")
         (self.acad / "acad.exe").touch()
         (self.acad / "acdbmgd.runtimeconfig.json").write_text('{"runtimeOptions":{"tfm":"net10.0"}}', encoding="utf-8")
 
@@ -121,7 +115,7 @@ class InstallerTests(unittest.TestCase):
                           f"/DIR={self.profile / 'app'}", f"/ACAD2026DIR={self.acad}", f"/LOG={self.work / 'default.log'}"])
         self.assert_bundle([2026])
         for year in REVIT_YEARS:
-            self.assertEqual(year == 2022, (self.addins / str(year) / "DhcbTools.Revit.addin").is_file())
+            self.assertEqual(year == 2027, (self.addins / str(year) / "DhcbTools.Revit.addin").is_file())
         self.assertTrue((self.profile / "app" / "DhcbTools.BatchRunner.exe").is_file())
         self.assertTrue((self.profile / "app" / "scripts" / "dhcb_agent.py").is_file())
 
@@ -152,12 +146,12 @@ class InstallerTests(unittest.TestCase):
             saved.rename(scripts)
 
     def test_incompatible_autocad_does_not_change_existing_install(self):
-        self.install(["revit2024", "acad2025"])
+        self.install(["revit2027", "acad2025"])
         before = {path.relative_to(self.profile): path.read_bytes()
                   for path in self.profile.rglob("*") if path.is_file()}
         runtime = self.acad / "acdbmgd.runtimeconfig.json"
         exe = self.acad / "acad.exe"
-        for fault in ("missing-exe", "missing-runtime", "unsupported", "unrelated-net10", "duplicate-tfm", "root-tfm", "malformed-json"):
+        for fault in ("missing-exe", "missing-runtime", "unsupported", "net8-host", "unrelated-net10", "duplicate-tfm", "root-tfm", "malformed-json"):
             with self.subTest(fault=fault):
                 exe.touch()
                 runtime.write_text('{"runtimeOptions":{"tfm":"net10.0"}}', encoding="utf-8")
@@ -167,6 +161,8 @@ class InstallerTests(unittest.TestCase):
                     runtime.unlink()
                 elif fault == "unsupported":
                     runtime.write_text('{"runtimeOptions":{"tfm":"net9.0"}}', encoding="utf-8")
+                elif fault == "net8-host":
+                    runtime.write_text('{"runtimeOptions":{"tfm":"net8.0"}}', encoding="utf-8")
                 elif fault == "unrelated-net10":
                     runtime.write_text('{"note":"net10.0","runtimeOptions":{"tfm":"net9.0"}}', encoding="utf-8")
                 elif fault == "duplicate-tfm":
@@ -175,26 +171,32 @@ class InstallerTests(unittest.TestCase):
                     runtime.write_text('{"tfm":"net10.0"}', encoding="utf-8")
                 else:
                     runtime.write_text('{"runtimeOptions":{"tfm":"net10.0"}', encoding="utf-8")
-                result = self.install(["revit2026", "acad2026"], expect_success=False)
+                result = self.install(["revit2027", "acad2026"], expect_success=False)
                 self.assertNotEqual(0, result.returncode)
                 after = {path.relative_to(self.profile): path.read_bytes()
                          for path in self.profile.rglob("*") if path.is_file()}
                 self.assertEqual(before, after, "Runtime không đúng phải bị chặn trước khi ghi/xoá file")
 
-    def test_autocad_runtime_profiles_selected_without_stale_binary(self):
+    def test_autocad_net10_runtime_installs_its_own_year_profile(self):
         for year, folder in ((2025, self.acad2025), (2026, self.acad)):
-            for runtime in ("net8.0", "net10.0", "net8.0"):
-                with self.subTest(year=year, runtime=runtime):
-                    (folder / "acdbmgd.runtimeconfig.json").write_text(
-                        '{"runtimeOptions":{"tfm":"' + runtime + '"}}', encoding="utf-8")
-                    self.install([f"acad{year}"])
-                    default = (year == 2025 and runtime == "net8.0") or (year == 2026 and runtime == "net10.0")
-                    profile = str(year) if default else f"{year}-{'net8' if runtime == 'net8.0' else 'net10'}"
-                    self.assertEqual(f"fixture {profile}",
-                                     (self.bundle / "Contents" / str(year) / "DhcbTools.AutoCAD.dll").read_text(encoding="utf-8"))
-                    self.assert_bundle([year])
-                    metadata = json.loads((self.bundle / "Contents" / str(year) / "dhcb-host-profile.json").read_text(encoding="utf-8-sig"))
-                    self.assertEqual({"product": "autocad", "year": year, "runtime": runtime}, metadata)
+            with self.subTest(year=year):
+                (folder / "acdbmgd.runtimeconfig.json").write_text(
+                    '{"runtimeOptions":{"tfm":"net10.0"}}', encoding="utf-8")
+                self.install([f"acad{year}"])
+                self.assertEqual(f"fixture {year}",
+                                 (self.bundle / "Contents" / str(year) / "DhcbTools.AutoCAD.dll").read_text(encoding="utf-8"))
+                self.assert_bundle([year])
+                metadata = json.loads((self.bundle / "Contents" / str(year) / "dhcb-host-profile.json").read_text(encoding="utf-8-sig"))
+                self.assertEqual({"product": "autocad", "year": year, "runtime": "net10.0"}, metadata)
+
+    def test_autocad_net8_host_is_rejected(self):
+        for year, folder in ((2025, self.acad2025), (2026, self.acad)):
+            with self.subTest(year=year):
+                (folder / "acdbmgd.runtimeconfig.json").write_text(
+                    '{"runtimeOptions":{"tfm":"net8.0"}}', encoding="utf-8")
+                result = self.install([f"acad{year}"], expect_success=False)
+                self.assertNotEqual(0, result.returncode)
+                self.assertFalse(self.bundle.exists())
 
     def test_runtimeconfig_json_supports_bom_escapes_arrays_and_numbers(self):
         config = {"runtimeOptions": {"tfm": "net10.0", "frameworks": [
@@ -238,25 +240,24 @@ class InstallerTests(unittest.TestCase):
         self.install([f"revit{year}" for year in REVIT_YEARS] + [f"acad{year}" for year in ACAD_YEARS])
         for year in REVIT_YEARS:
             (self.addins / str(year) / "DhcbTools.Custom.addin").write_text("user file", encoding="utf-8")
-        self.install(["revit2024", "acad2025"])
+        self.install(["acad2025"])
         self.assert_bundle([2025])
         for year in REVIT_YEARS:
             folder = self.addins / str(year)
             for name in REVIT_FILES:
-                self.assertEqual(year == 2024, (folder / name).exists(), f"{year}/{name}")
+                self.assertFalse((folder / name).exists(), f"{year}/{name}")
             self.assertEqual("user file", (folder / "DhcbTools.Custom.addin").read_text(encoding="utf-8"))
             self.assertTrue((folder / "Newtonsoft.Json.dll").is_file())
         # Chọn lại thành phần sau khi đã gỡ phải khôi phục DLL và manifest.
-        self.install(["revit2026", "acad2024", "acad2026"])
-        self.assert_bundle([2024, 2026])
-        self.assertTrue((self.addins / "2026" / "DhcbTools.Revit.addin").is_file())
-        self.assertFalse((self.addins / "2024" / "DhcbTools.Revit.addin").exists())
+        self.install(["revit2027", "acad2025", "acad2026"])
+        self.assert_bundle([2025, 2026])
+        self.assertTrue((self.addins / "2027" / "DhcbTools.Revit.addin").is_file())
         self.install([])
         self.assert_bundle([])
-        self.assertFalse((self.addins / "2026" / "DhcbTools.Revit.addin").exists())
+        self.assertFalse((self.addins / "2027" / "DhcbTools.Revit.addin").exists())
 
     def test_scoped_upgrade_preserves_revit_and_existing_autocad_settings(self):
-        self.install(["revit2024", "acad2024", "acad2026"])
+        self.install(["revit2027", "acad2025", "acad2027"])
         state_paths = ("roaming/DHCB/settings.json", "roaming/DHCB/bridge-token.txt", "local/DHCB/ledger.jsonl")
         for relative in state_paths:
             path = self.profile / relative
@@ -272,13 +273,13 @@ class InstallerTests(unittest.TestCase):
         component.find("ComponentEntry").set("LoadOnAutoCADStartup", "False")
         tree.write(xml, encoding="utf-8", xml_declaration=True)
         xml.write_bytes(b"\xef\xbb\xbf" + xml.read_bytes())
-        old_acad = (self.bundle / "Contents" / "2024" / "DhcbTools.AutoCAD.dll").read_bytes()
-        self.install(["acad2025", "batch", "scripts"], preserve_unselected=True)
-        self.assert_bundle([2024, 2025, 2026])
+        old_acad = (self.bundle / "Contents" / "2025" / "DhcbTools.AutoCAD.dll").read_bytes()
+        self.install(["acad2026", "batch", "scripts"], preserve_unselected=True)
+        self.assert_bundle([2025, 2026, 2027])
         self.assertEqual(before_revit, {p.relative_to(self.addins): p.read_bytes()
                                       for p in self.addins.rglob("*") if p.is_file()})
         self.assertEqual(state_before, {relative: (self.profile / relative).read_bytes() for relative in state_paths})
-        self.assertEqual(old_acad, (self.bundle / "Contents" / "2024" / "DhcbTools.AutoCAD.dll").read_bytes())
+        self.assertEqual(old_acad, (self.bundle / "Contents" / "2025" / "DhcbTools.AutoCAD.dll").read_bytes())
         retained = ET.parse(xml).getroot().findall("Components")[0]
         self.assertEqual("Thiết lập cũ — tiếng Việt", retained.attrib["Description"])
         self.assertEqual("False", retained.find("ComponentEntry").attrib["LoadOnAutoCADStartup"])
@@ -289,35 +290,35 @@ class InstallerTests(unittest.TestCase):
                                  for p in self.bundle.rglob("*") if p.is_file()})
 
     def test_scoped_fresh_install_does_not_activate_unselected_hosts(self):
-        self.install(["acad2025"], preserve_unselected=True)
-        self.assert_bundle([2025])
+        self.install(["acad2026"], preserve_unselected=True)
+        self.assert_bundle([2026])
         self.assertFalse(self.addins.exists())
 
     def test_noncanonical_and_commented_components_preserve_only_live_settings(self):
         for variant in ("no-attributes", "newline", "single-quotes", "commented-decoy"):
             with self.subTest(variant=variant):
                 self.setUp()
-                self.install(["acad2024"])
+                self.install(["acad2025"])
                 manifest = self.bundle / "PackageContents.xml"
                 original = manifest.read_text(encoding="utf-8-sig").replace('LoadOnAutoCADStartup="True"', 'LoadOnAutoCADStartup="False"')
                 if variant == "no-attributes":
-                    changed = original.replace('<Components Description="AutoCAD 2024">', '<Components>')
+                    changed = original.replace('<Components Description="AutoCAD 2025">', '<Components>')
                 elif variant == "newline":
                     changed = original.replace('<Components Description=', '<Components\n Description=')
                 else:
-                    changed = original.replace('ModuleName="./Contents/2024/DhcbTools.AutoCAD.dll"', "ModuleName='./Contents/2024/DhcbTools.AutoCAD.dll'")
+                    changed = original.replace('ModuleName="./Contents/2025/DhcbTools.AutoCAD.dll"', "ModuleName='./Contents/2025/DhcbTools.AutoCAD.dll'")
                     if variant == "commented-decoy":
-                        decoy = '<!-- <Components Description="Decoy"><ComponentEntry ModuleName="./Contents/2024/DhcbTools.AutoCAD.dll" LoadOnAutoCADStartup="True"/></Components> -->'
-                        changed = changed.replace('<Components Description="AutoCAD 2024">', decoy + '<Components Description="AutoCAD 2024">')
+                        decoy = '<!-- <Components Description="Decoy"><ComponentEntry ModuleName="./Contents/2025/DhcbTools.AutoCAD.dll" LoadOnAutoCADStartup="True"/></Components> -->'
+                        changed = changed.replace('<Components Description="AutoCAD 2025">', decoy + '<Components Description="AutoCAD 2025">')
                 manifest.write_text(changed, encoding="utf-8")
-                self.install(["acad2025"], preserve_unselected=True)
-                self.assert_bundle([2024, 2025])
+                self.install(["acad2026"], preserve_unselected=True)
+                self.assert_bundle([2025, 2026])
                 retained = ET.parse(manifest).getroot().findall("Components")[0]
                 self.assertEqual("False", retained.find("ComponentEntry").attrib["LoadOnAutoCADStartup"])
                 self.assertNotEqual("Decoy", retained.attrib.get("Description"))
 
     def test_grouped_host_entries_block_scope_changes_without_duplication(self):
-        self.install(["acad2024", "acad2025"])
+        self.install(["acad2025", "acad2026"])
         manifest = self.bundle / "PackageContents.xml"
         tree = ET.parse(manifest)
         first, second = tree.getroot().findall("Components")
@@ -325,32 +326,32 @@ class InstallerTests(unittest.TestCase):
         tree.getroot().remove(second)
         tree.write(manifest, encoding="utf-8", xml_declaration=True)
         before = {p.relative_to(self.profile): p.read_bytes() for p in self.profile.rglob("*") if p.is_file()}
-        result = self.install(["acad2026"], preserve_unselected=True, expect_success=False)
+        result = self.install(["acad2027"], preserve_unselected=True, expect_success=False)
         self.assertNotEqual(0, result.returncode)
         self.assertEqual(before, {p.relative_to(self.profile): p.read_bytes()
                                  for p in self.profile.rglob("*") if p.is_file()})
 
     def test_preserved_node_comment_cannot_activate_an_unselected_year(self):
-        self.install(["acad2024"])
+        self.install(["acad2025"])
         manifest = self.bundle / "PackageContents.xml"
         tree = ET.parse(manifest)
         component = tree.getroot().find("Components")
-        component.append(ET.Comment('<Components Description="AutoCAD 2025"><ComponentEntry ModuleName="./Contents/2025/DhcbTools.AutoCAD.dll"/></Components>'))
+        component.append(ET.Comment('<Components Description="AutoCAD 2026"><ComponentEntry ModuleName="./Contents/2026/DhcbTools.AutoCAD.dll"/></Components>'))
         tree.write(manifest, encoding="utf-8", xml_declaration=True)
-        self.install(["acad2026"], preserve_unselected=True)
-        self.assert_bundle([2024, 2026])
+        self.install(["acad2027"], preserve_unselected=True)
+        self.assert_bundle([2025, 2027])
 
     def test_invalid_existing_manifest_blocks_scoped_upgrade_without_changes(self):
-        self.install(["revit2024", "acad2024"])
+        self.install(["revit2027", "acad2025"])
         manifest = self.bundle / "PackageContents.xml"
         original = manifest.read_text(encoding="utf-8-sig")
         for content in ("broken XML", "<ApplicationPackage/>", "<!DOCTYPE x [<!ENTITY e 'x'>]><ApplicationPackage>&e;</ApplicationPackage>",
-                        original.replace('./Contents/2024/DhcbTools.AutoCAD.dll', '.\\Contents\\2024\\DhcbTools.AutoCAD.dll')):
+                        original.replace('./Contents/2025/DhcbTools.AutoCAD.dll', '.\\Contents\\2025\\DhcbTools.AutoCAD.dll')):
             with self.subTest(content=content):
                 manifest.write_text(content, encoding="utf-8")
                 before = {p.relative_to(self.profile): p.read_bytes()
                           for p in self.profile.rglob("*") if p.is_file()}
-                result = self.install(["acad2025"], preserve_unselected=True, expect_success=False)
+                result = self.install(["acad2026"], preserve_unselected=True, expect_success=False)
                 self.assertNotEqual(0, result.returncode)
                 self.assertEqual(before, {p.relative_to(self.profile): p.read_bytes()
                                          for p in self.profile.rglob("*") if p.is_file()})

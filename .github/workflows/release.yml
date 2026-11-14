@@ -53,7 +53,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        revit: [2022, 2023, 2024, 2025, 2026, 2027]
+        revit: [2027]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -116,13 +116,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { acad: 2022, runtime: net48, suffix: '' }
-          - { acad: 2023, runtime: net48, suffix: '' }
-          - { acad: 2024, runtime: net48, suffix: '' }
-          - { acad: 2025, runtime: net8, suffix: '' }
-          - { acad: 2025, runtime: net10, suffix: '-net10' }
+          - { acad: 2025, runtime: net10, suffix: '' }
           - { acad: 2026, runtime: net10, suffix: '' }
-          - { acad: 2026, runtime: net8, suffix: '-net8' }
           - { acad: 2027, runtime: net10, suffix: '' }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -130,7 +125,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          # SDK 10 build cả profile net48/net8/net10; cài SDK 8 cho các bước dùng nền tảng .NET 8.
+          # Chỉ build profile net10.
           dotnet-version: |
             8.0.x
             10.0.x
@@ -272,14 +267,11 @@ jobs:
           $stage = "dist/stage"
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
 
-          foreach ($r in 2022, 2023, 2024, 2025, 2026, 2027) {
+          foreach ($r in 2027) {
             Expand-Archive "artifacts/DhcbTools.Revit-$r-$v.zip" -DestinationPath "$stage/revit-$r" -Force
           }
-          foreach ($a in 2022, 2023, 2024, 2025, 2026, 2027) {
+          foreach ($a in 2025, 2026, 2027) {
             Expand-Archive "artifacts/DhcbTools.AutoCAD-$a-$v.zip" -DestinationPath "$stage/autocad-$a" -Force
-          }
-          foreach ($profile in "2025-net10", "2026-net8") {
-            Expand-Archive "artifacts/DhcbTools.AutoCAD-$profile-$v.zip" -DestinationPath "$stage/autocad-$profile" -Force
           }
           Expand-Archive "artifacts/DhcbTools.BatchRunner-$v.zip" -DestinationPath "$stage/batchrunner" -Force
 

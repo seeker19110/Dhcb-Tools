@@ -13,12 +13,12 @@ foreach ($name in $propertyNames) { $previous[$name] = [Environment]::GetEnviron
 $status = 0
 Push-Location (Split-Path -Parent $PSScriptRoot)
 try {
-    foreach ($hostProfile in '2022:net48', '2023:net48', '2024:net48', '2025:net8', '2025:net10', '2026:net8', '2026:net10', '2027:net10') {
+    foreach ($hostProfile in '2025:net10', '2026:net10', '2027:net10') {
         $year, $runtime = $hostProfile.Split(':')
-        $env:RevitVersion = $year
+        $env:RevitVersion = '2027'
         $env:AcadVersion = $year
         $env:AcadRuntime = $runtime
-        Write-Host "== NuGet (Revit/AutoCAD $year; AutoCAD $runtime)"
+        Write-Host "== NuGet (Revit 2027; AutoCAD $year $runtime)"
         & dotnet restore Dhcb-Tools.sln -nologo -v:q
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         $report = (& dotnet list Dhcb-Tools.sln package --no-restore --vulnerable --include-transitive --format json | Out-String)

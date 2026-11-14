@@ -17,10 +17,10 @@
 [CmdletBinding()]
 param(
     # Phiên bản và runtime của đúng host đang chạy.
-    [ValidateSet(2022, 2023, 2024, 2025, 2026, 2027)]
+    [ValidateSet(2025, 2026, 2027)]
     [int]$AcadVersion = 2026,
 
-    [ValidateSet('Auto', 'net8', 'net10')]
+    [ValidateSet('Auto', 'net10')]
     [string]$AcadRuntime = 'Auto',
 
     [string]$AcadDirectory,
@@ -62,18 +62,12 @@ if (-not (Test-Path $console)) {
 }
 
 function Get-AcadRuntime([int]$Year, [string]$Folder, [string]$Requested) {
-    if ($Year -le 2024) {
-        if ($Requested -ne 'Auto') { throw 'AutoCAD 2022–2024 chỉ dùng .NET Framework 4.8.' }
-        return 'net48'
-    }
     $configPath = Join-Path $Folder 'acdbmgd.runtimeconfig.json'
     if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) { throw "Thiếu runtimeconfig: $configPath" }
     $config = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $tfm = $config.runtimeOptions.tfm
-    if ($tfm -eq 'net8.0') { $detected = 'net8' }
-    elseif ($tfm -eq 'net10.0') { $detected = 'net10' }
-    else { throw "Runtime AutoCAD không được hỗ trợ: $tfm" }
-    if ($Year -eq 2027 -and $detected -ne 'net10') { throw 'AutoCAD 2027 cần .NET 10.' }
+    if ($tfm -ne 'net10.0') { throw "Chỉ hỗ trợ AutoCAD chạy .NET 10, host này là: $tfm" }
+    $detected = 'net10'
     if ($Requested -ne 'Auto' -and $Requested -ne $detected) { throw "AcadRuntime=$Requested khác runtime host $detected." }
     return $detected
 }

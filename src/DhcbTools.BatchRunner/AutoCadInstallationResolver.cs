@@ -7,7 +7,7 @@ namespace DhcbTools.BatchRunner;
 /// <summary>Chooses a supported host together with a compatible installed or portable plugin.</summary>
 public static class AutoCadInstallationResolver
 {
-    private static readonly int[] SupportedYears = { 2027, 2026, 2025, 2024, 2023, 2022 };
+    private static readonly int[] SupportedYears = { 2027, 2026, 2025 };
     private static readonly string[] PluginNames = { "DhcbTools.AutoCAD.Core.dll", "DhcbTools.AutoCAD.dll" };
 
     public sealed record Resolution(string? ConsolePath, string? PluginPath, string? Error, string? Warning = null)
@@ -47,7 +47,7 @@ public static class AutoCadInstallationResolver
                 var knownYear = year.HasValue;
                 if (year.HasValue && !SupportedYears.Contains(year.Value))
                 {
-                    reasons.Add("Host " + name + " chưa được hỗ trợ; chọn AutoCAD 2022–2027.");
+                    reasons.Add("Host " + name + " chưa được hỗ trợ; chỉ hỗ trợ AutoCAD 2025–2027 (.NET 10).");
                     continue;
                 }
 
@@ -75,14 +75,12 @@ public static class AutoCadInstallationResolver
                     reasons.Add("Không xác định được runtime AutoCAD " + year + "; kiểm " + runtimePath + ".");
                     continue;
                 }
-                if ((year is 2025 or 2026 && runtime is not ("net8.0" or "net10.0"))
-                    || (year == 2027 && runtime != "net10.0")
-                    || (year <= 2024 && runtime is not null && runtime != "net48"))
+                if (year.HasValue && runtime != "net10.0")
                 {
-                    reasons.Add("Runtime AutoCAD " + year + " không khớp phiên bản tại " + runtimePath + ".");
+                    reasons.Add("AutoCAD " + year + " phải chạy .NET 10 (tfm net10.0), tại " + runtimePath + " là " + (runtime ?? "không xác định") + ".");
                     continue;
                 }
-                if (runtime is not null && runtime is not ("net8.0" or "net10.0" or "net48"))
+                if (runtime is not null && runtime != "net10.0")
                 {
                     reasons.Add("Runtime " + runtime + " chưa được hỗ trợ tại " + runtimePath + ".");
                     continue;
@@ -108,19 +106,13 @@ public static class AutoCadInstallationResolver
                         reasons.Add("Không đọc được TargetFramework của DLL: " + plugin + ".");
                         continue;
                     }
-                    var expected = runtime switch
-                    {
-                        "net8.0" => ".NETCoreApp,Version=v8.0",
-                        "net10.0" => ".NETCoreApp,Version=v10.0",
-                        "net48" => ".NETFramework,Version=v4.8",
-                        _ => year <= 2024 ? ".NETFramework,Version=v4.8" : null,
-                    };
-                    if (expected is not null && framework != expected)
+                    const string expected = ".NETCoreApp,Version=v10.0";
+                    if (framework != expected)
                     {
                         reasons.Add("DLL " + plugin + " dùng " + framework + ", host AutoCAD " + year + " cần " + expected + ".");
                         continue;
                     }
-                    // The runtime alone cannot distinguish 2022 from 2024, or 2026 from 2027.
+                    // The runtime alone cannot distinguish 2025 from 2027.
                     // Check the referenced Autodesk SDK without loading any plugin code.
                     if (knownYear)
                     {
@@ -133,8 +125,7 @@ public static class AutoCadInstallationResolver
                         }
                         var release = year!.Value switch
                         {
-                            2022 => new Version(24, 1), 2023 => new Version(24, 2),
-                            2024 => new Version(24, 3), 2025 => new Version(25, 0),
+                            2025 => new Version(25, 0),
                             2026 => new Version(25, 1), _ => new Version(26, 0),
                         };
                         if (api is null || api.Major != release.Major || api.Minor > release.Minor)
@@ -151,7 +142,7 @@ public static class AutoCadInstallationResolver
                     + Path.Combine(applicationData, "Autodesk", "ApplicationPlugins", "DhcbTools.bundle", "Contents", year?.ToString() ?? "<năm>") + ".");
             }
             return Fail((foundHost ? string.Join(" ", reasons.Distinct())
-                    : "Không tìm thấy AutoCAD 2022–2027 trong " + Path.Combine(programFiles, "Autodesk") + ".")
+                    : "Không tìm thấy AutoCAD 2025–2027 trong " + Path.Combine(programFiles, "Autodesk") + ".")
                 + " Cài component AutoCAD tương ứng của DHCB hoặc chỉ định --accoreconsole và --plugin-dll đúng phiên bản.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException

@@ -10,9 +10,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 PWSH = shutil.which("powershell") or shutil.which("pwsh")
-PROFILES = [("2022", "net48"), ("2023", "net48"), ("2024", "net48"),
-            ("2025", "net8"), ("2025", "net10"), ("2026", "net8"),
-            ("2026", "net10"), ("2027", "net10")]
+PROFILES = [("2025", "net10"), ("2026", "net10"), ("2027", "net10")]
 
 
 @unittest.skipUnless(PWSH, "Windows PowerShell is required")
@@ -81,17 +79,17 @@ os.execv(sys.executable, [sys.executable, *sys.argv[1:]])
 
     def assert_profiles(self, events):
         native = [event for event in events if event["tool"] == "dotnet"]
-        self.assertEqual(16, len(native))
+        self.assertEqual(6, len(native))
         for index, (year, runtime) in enumerate(PROFILES):
             restore, listing = native[index * 2:index * 2 + 2]
             self.assertEqual("restore", restore["args"][0])
             self.assertEqual("list", listing["args"][0])
             self.assertEqual(restore["properties"], listing["properties"])
-            self.assertEqual({"RevitVersion": year, "AcadVersion": year, "AcadRuntime": runtime}, listing["properties"])
+            self.assertEqual({"RevitVersion": "2027", "AcadVersion": year, "AcadRuntime": runtime}, listing["properties"])
             self.assertIn("--no-restore", listing["args"])
             self.assertFalse(any(arg.startswith("-p:") for arg in listing["args"]))
 
-    def test_restore_and_list_audit_all_eight_identical_profiles(self):
+    def test_restore_and_list_audit_all_three_identical_profiles(self):
         result, events = self.execute()
         self.assertEqual(0, result.returncode, result.stderr)
         self.assert_profiles(events)

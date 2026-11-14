@@ -86,16 +86,18 @@ class ScriptFrameworkTests(unittest.TestCase):
                                   capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
 
     def test_autocad_detects_host_runtime_and_rejects_mismatches(self):
-        for year in (2025, 2026):
-            for runtime in ("net8", "net10"):
-                with self.subTest(year=year, runtime=runtime):
-                    config = json.dumps({"runtimeOptions": {"tfm": runtime + ".0"}})
-                    auto = self.runtime_probe(year, "Auto", config)
-                    self.assertEqual(0, auto.returncode, auto.stdout + auto.stderr)
-                    self.assertEqual(runtime, auto.stdout.strip())
-                    wrong = self.runtime_probe(year, "net10" if runtime == "net8" else "net8", config)
-                    self.assertNotEqual(0, wrong.returncode)
-                    self.assertIn("khác runtime host", wrong.stderr)
+        for year in (2025, 2026, 2027):
+            with self.subTest(year=year):
+                config = json.dumps({"runtimeOptions": {"tfm": "net10.0"}})
+                auto = self.runtime_probe(year, "Auto", config)
+                self.assertEqual(0, auto.returncode, auto.stdout + auto.stderr)
+                self.assertEqual("net10", auto.stdout.strip())
+                wrong = self.runtime_probe(year, "net8", config)
+                self.assertNotEqual(0, wrong.returncode)
+                self.assertIn("khác runtime host", wrong.stderr)
+                net8 = self.runtime_probe(year, "Auto", json.dumps({"runtimeOptions": {"tfm": "net8.0"}}))
+                self.assertNotEqual(0, net8.returncode)
+                self.assertIn(".NET 10", net8.stderr)
 
     def test_autocad_runtime_requires_real_config_and_supported_profile(self):
         for config in (None, "broken JSON", '{}', '{"tfm":"net10.0"}',
@@ -103,10 +105,8 @@ class ScriptFrameworkTests(unittest.TestCase):
             with self.subTest(config=config):
                 self.assertNotEqual(0, self.runtime_probe(2026, "Auto", config).returncode)
         self.assertNotEqual(0, self.runtime_probe(2027, "Auto", '{"runtimeOptions":{"tfm":"net8.0"}}').returncode)
-        legacy = self.runtime_probe(2022, "Auto", None)
-        self.assertEqual(0, legacy.returncode, legacy.stderr)
-        self.assertEqual("net48", legacy.stdout.strip())
-        self.assertNotEqual(0, self.runtime_probe(2024, "net10", None).returncode)
+        # Không còn hỗ trợ net48 (AutoCAD 2022–2024): thiếu runtimeconfig là lỗi.
+        self.assertNotEqual(0, self.runtime_probe(2024, "Auto", None).returncode)
 
     def test_native_failure_with_valid_output_preserves_existing_addin(self):
         for name, variable, component in LOOKUPS:

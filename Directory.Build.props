@@ -1,33 +1,17 @@
 <Project>
-  <!-- Each host year uses its own SDK. Older AutoCAD hosts cannot load a newer SDK. -->
+  <!-- Chỉ hỗ trợ .NET 10: AutoCAD 2025/2026 (SDK profile net10), AutoCAD 2027 và Revit 2027. Từ 2026-11-14 đã bỏ
+       Revit 2022–2026 và AutoCAD 2022–2024 (net48) cùng profile net8. -->
   <PropertyGroup>
-    <RevitVersion Condition="'$(RevitVersion)'==''">2024</RevitVersion>
-    <AcadVersion Condition="'$(AcadVersion)'==''">2024</AcadVersion>
+    <RevitVersion Condition="'$(RevitVersion)'==''">2027</RevitVersion>
+    <AcadVersion Condition="'$(AcadVersion)'==''">2026</AcadVersion>
     <DhcbIsAcadProject Condition="$(MSBuildProjectName.Contains('AutoCAD'))">true</DhcbIsAcadProject>
     <DhcbIsRevitProject Condition="'$(MSBuildProjectName)'=='DhcbTools.Core' Or '$(MSBuildProjectName)'=='DhcbTools.Revit'">true</DhcbIsRevitProject>
-    <AcadRuntime Condition="'$(AcadRuntime)'=='' And ('$(AcadVersion)'=='2022' Or '$(AcadVersion)'=='2023' Or '$(AcadVersion)'=='2024')">net48</AcadRuntime>
-    <AcadRuntime Condition="'$(AcadRuntime)'=='' And '$(AcadVersion)'=='2025'">net8</AcadRuntime>
-    <!-- Preserve the existing 2026 package default; RTM hosts select AcadRuntime=net8. -->
-    <AcadRuntime Condition="'$(AcadRuntime)'=='' And ('$(AcadVersion)'=='2026' Or '$(AcadVersion)'=='2027')">net10</AcadRuntime>
-    <RevitRuntime Condition="'$(RevitVersion)'=='2022' Or '$(RevitVersion)'=='2023' Or '$(RevitVersion)'=='2024'">net48</RevitRuntime>
-    <!-- The .NET 8 API baseline also serves updated 2025.5/2026.5 hosts; host smoke tests are required. -->
-    <RevitRuntime Condition="'$(RevitVersion)'=='2025' Or '$(RevitVersion)'=='2026'">net8</RevitRuntime>
+    <AcadRuntime Condition="'$(AcadRuntime)'==''">net10</AcadRuntime>
     <RevitRuntime Condition="'$(RevitVersion)'=='2027'">net10</RevitRuntime>
-    <RevitApiVersion Condition="'$(RevitApiVersion)'=='' And '$(RevitVersion)'=='2022'">2022.1.80</RevitApiVersion>
-    <RevitApiVersion Condition="'$(RevitApiVersion)'=='' And '$(RevitVersion)'=='2023'">2023.1.90</RevitApiVersion>
-    <RevitApiVersion Condition="'$(RevitApiVersion)'=='' And '$(RevitVersion)'=='2024'">2024.3.60</RevitApiVersion>
-    <RevitApiVersion Condition="'$(RevitApiVersion)'=='' And '$(RevitVersion)'=='2025'">2025.4.60</RevitApiVersion>
-    <RevitApiVersion Condition="'$(RevitApiVersion)'=='' And '$(RevitVersion)'=='2026'">2026.4.10</RevitApiVersion>
     <RevitApiVersion Condition="'$(RevitApiVersion)'=='' And '$(RevitVersion)'=='2027'">2027.2.0</RevitApiVersion>
-    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And '$(AcadVersion)'=='2022'">24.1.51000</AcadNetVersion>
-    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And '$(AcadVersion)'=='2023'">24.2.0</AcadNetVersion>
-    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And '$(AcadVersion)'=='2024'">24.3.0</AcadNetVersion>
-    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And '$(AcadVersion)'=='2025' And '$(AcadRuntime)'=='net8'">25.0.1</AcadNetVersion>
-    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And '$(AcadVersion)'=='2025' And '$(AcadRuntime)'=='net10'">25.0.2</AcadNetVersion>
-    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And '$(AcadVersion)'=='2026' And '$(AcadRuntime)'=='net8'">25.1.0</AcadNetVersion>
-    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And '$(AcadVersion)'=='2026' And '$(AcadRuntime)'=='net10'">25.1.1</AcadNetVersion>
+    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And '$(AcadVersion)'=='2025'">25.0.2</AcadNetVersion>
+    <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And '$(AcadVersion)'=='2026'">25.1.1</AcadNetVersion>
     <AcadNetVersion Condition="'$(AcadNetVersion)'=='' And '$(AcadVersion)'=='2027'">26.0.0</AcadNetVersion>
-    <AcadCoreNetVersion Condition="'$(AcadCoreNetVersion)'=='' And '$(AcadNetVersion)'=='25.0.1'">25.0.0</AcadCoreNetVersion>
     <AcadCoreNetVersion Condition="'$(AcadCoreNetVersion)'==''">$(AcadNetVersion)</AcadCoreNetVersion>
     <AcadRoot Condition="'$(AcadRoot)'==''">$(ProgramFiles)\Autodesk\AutoCAD $(AcadVersion)</AcadRoot>
     <LangVersion>latest</LangVersion>
@@ -44,14 +28,10 @@
     <Copyright>Copyright (c) DHCB</Copyright>
   </PropertyGroup>
   <PropertyGroup Condition="'$(DhcbIsAcadProject)'=='true'">
-    <TargetFramework Condition="'$(AcadRuntime)'=='net48'">net48</TargetFramework>
-    <TargetFramework Condition="'$(AcadRuntime)'=='net8'">net8.0-windows</TargetFramework>
     <TargetFramework Condition="'$(AcadRuntime)'=='net10'">net10.0-windows</TargetFramework>
     <DhcbHostBuildPath>$(AcadVersion)/$(AcadRuntime)</DhcbHostBuildPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(DhcbIsRevitProject)'=='true'">
-    <TargetFramework Condition="'$(RevitRuntime)'=='net48'">net48</TargetFramework>
-    <TargetFramework Condition="'$(RevitRuntime)'=='net8'">net8.0-windows</TargetFramework>
     <TargetFramework Condition="'$(RevitRuntime)'=='net10'">net10.0-windows</TargetFramework>
     <DhcbHostBuildPath>$(RevitVersion)/$(RevitRuntime)</DhcbHostBuildPath>
   </PropertyGroup>
@@ -61,13 +41,7 @@
     <BaseIntermediateOutputPath>obj/$(DhcbHostBuildPath)/</BaseIntermediateOutputPath>
     <DefaultItemExcludes>$(DefaultItemExcludes);bin/**;obj/**</DefaultItemExcludes>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(DhcbIsRevitProject)'=='true' And ('$(RevitVersion)'=='2023' Or '$(RevitVersion)'=='2024' Or '$(RevitVersion)'=='2025' Or '$(RevitVersion)'=='2026' Or '$(RevitVersion)'=='2027')">
-    <DefineConstants>$(DefineConstants);REVIT2023_OR_GREATER</DefineConstants>
+  <PropertyGroup Condition="'$(DhcbIsRevitProject)'=='true' And '$(RevitVersion)'=='2027'">
+    <DefineConstants>$(DefineConstants);REVIT2023_OR_GREATER;REVIT2024_OR_GREATER</DefineConstants>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(DhcbIsRevitProject)'=='true' And ('$(RevitVersion)'=='2024' Or '$(RevitVersion)'=='2025' Or '$(RevitVersion)'=='2026' Or '$(RevitVersion)'=='2027')">
-    <DefineConstants>$(DefineConstants);REVIT2024_OR_GREATER</DefineConstants>
-  </PropertyGroup>
-  <ItemGroup Condition="'$(TargetFramework)'=='net48'">
-    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
-  </ItemGroup>
 </Project>
