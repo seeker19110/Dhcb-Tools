@@ -26,11 +26,11 @@ GitHub Actions và pip mỗi tháng. Mô hình an toàn tổng thể: [`SECURITY
 | Job | Máy/ma trận | Làm gì |
 |---|---|---|
 | `logic-tests` | windows-latest | Restore/build/test C# Release, cổng phủ 100% dòng, CLI BatchRunner, đối chiếu BCF/IDS độc lập và artifact TRX |
-| `check-build` | windows-latest; 8 profile năm/runtime 2022–2027 | Build đầy đủ Core/WPF/Core Console bằng SDK NuGet. Hàng 2025/net8 kiểm Python phủ 100%, pyflakes, panel JavaScript, PowerShell 5.1 và installer thật trong sandbox; hàng 2026/net10 chạy nghiệm thu giao diện WPF |
+| `check-build` | windows-latest; 3 hàng AutoCAD 2025/2026/2027 net10 (Revit 2027) | Build đầy đủ Core/WPF/Core Console bằng SDK NuGet. Hàng 2027 kiểm Python phủ 100%, pyflakes, panel JavaScript, PowerShell 5.1 và installer thật trong sandbox; hàng 2026 chạy nghiệm thu giao diện WPF |
 | `quality-gate` | windows-latest | Luôn chạy sau hai nhóm; chỉ xanh khi mọi hàng đều đạt. Lỗi, hủy hoặc bỏ qua đều chặn cổng |
 
-Revit/AutoCAD 2022–2024 dùng net48; Revit 2025/2026 giữ API baseline net8; Revit 2027 dùng net10.
-AutoCAD 2025/2026 có hai profile net8/net10 tùy mức cập nhật host; AutoCAD 2027 dùng net10.
+CI chỉ kiểm .NET 10: AutoCAD 2025/2026/2027 (profile net10) và Revit 2027. Revit 2022–2026 và AutoCAD 2022–2024
+(net48/net8) không còn trong CI; mã đa profile vẫn nằm trong csproj nhưng không được kiểm.
 Xem [ma trận và giới hạn nghiệm thu](docs/tuong-thich-2022-2027.md). CI kiểm biên dịch; kiểm host thật
 vẫn cần DWG/RVT mẫu và bằng chứng đầu ra.
 

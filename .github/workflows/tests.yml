@@ -74,13 +74,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Chỉ hỗ trợ .NET 10 (AutoCAD 2025+ có profile net10; Revit chỉ 2027). Bỏ net48 (2022–2024) và net8.
         include:
-          - { version: '2022', acad-runtime: net48 }
-          - { version: '2023', acad-runtime: net48 }
-          - { version: '2024', acad-runtime: net48 }
-          - { version: '2025', acad-runtime: net8 }
           - { version: '2025', acad-runtime: net10 }
-          - { version: '2026', acad-runtime: net8 }
           - { version: '2026', acad-runtime: net10 }
           - { version: '2027', acad-runtime: net10 }
     steps:
@@ -93,12 +89,12 @@ jobs:
             8.0.x
             10.0.x
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        if: matrix.version == '2025' && matrix.acad-runtime == 'net8'
+        if: matrix.version == '2027'
         with:
           python-version: '3.12'
       - name: Build toàn bộ Core, WPF và Core Console
         shell: powershell
-        run: ./scripts/check-build.ps1 -RevitVersion ${{ matrix.version }} -AcadVersion ${{ matrix.version }} -AcadRuntime ${{ matrix.acad-runtime }} -SkipTests
+        run: ./scripts/check-build.ps1 -RevitVersion 2027 -AcadVersion ${{ matrix.version }} -AcadRuntime ${{ matrix.acad-runtime }} -SkipTests
       - name: Build fixture nghiệm thu AutoCAD
         if: matrix.version == '2026' && matrix.acad-runtime == 'net10'
         run: dotnet build tools/acceptance/DhcbTools.AutoCAD.Acceptance.csproj -c Release -p:AcadVersion=2026
@@ -113,13 +109,13 @@ jobs:
           name: windows-ui-acceptance
           path: out/ui-acceptance
       - name: Cài Inno Setup cho kiểm thử installer
-        if: matrix.version == '2025' && matrix.acad-runtime == 'net8'
+        if: matrix.version == '2027'
         run: |
           choco install innosetup --version=6.7.1 --yes --no-progress
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $env:DHCB_ISCC = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
       - name: Kiểm tra Python (ngưỡng phủ 100% câu lệnh)
-        if: matrix.version == '2025' && matrix.acad-runtime == 'net8'
+        if: matrix.version == '2027'
         run: |
           python -m pip install --quiet -r requirements-dev.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -137,12 +133,12 @@ jobs:
           python -m coverage report
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Kiểm tra JavaScript panel AutoCAD
-        if: matrix.version == '2025' && matrix.acad-runtime == 'net8'
+        if: matrix.version == '2027'
         run: |
           node -e "const fs=require('fs');const s=fs.readFileSync('tools/autocad-mcp-server/panel.html','utf8');const m=s.match(/<script>([\s\S]*?)<\/script>/);if(!m)throw Error('script missing');new Function(m[1]);if(!s.includes('runCleanup(false)'))throw Error('real cleanup path missing');"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Kiểm cú pháp Windows PowerShell 5.1
-        if: matrix.version == '2025' && matrix.acad-runtime == 'net8'
+        if: matrix.version == '2027'
         shell: powershell
         run: |
           $bad = 0
