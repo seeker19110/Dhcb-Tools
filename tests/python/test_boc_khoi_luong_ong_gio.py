@@ -567,6 +567,17 @@ class TagSpecAndToleTests(unittest.TestCase):
         joints, rest = bog.flange_joints(segs)
         self.assertEqual((joints, sorted(s["handle"] for s in rest)), ([], ["h", "v"]))
 
+    def test_ong_mem_net_gap_nep_khong_tinh_dot(self) -> None:
+        # flex D100: 4 cặp nét 80 mm nối tiếp lệch nhau (gấp nếp) + một ống thật 1110 riêng
+        segs = [line("a1", 0, 0, 1110, 0), line("a2", 0, 300, 1110, 300)]
+        for k in range(4):
+            x = 3000 + k * 90
+            segs += [line(f"m{k}a", x, k * 40, x + 80, k * 40), line(f"m{k}b", x, 100 + k * 40, x + 80, 100 + k * 40)]
+        tags = bog.parse_tags([text("FAD - 300x200", 500, 600), text("FAD - 100x100", 3100, 400)])
+        runs = bog.build_runs(bog.assign_sizes(bog.pair_segments(bog.duct_segments(segs)), tags), [])
+        self.assertEqual(bog.mark_flex(runs), 4)
+        self.assertEqual([p["len"] for p in bog.split_runs(runs, [])], [1110])
+
     def test_thu_tu_cum_trai_phai(self) -> None:
         runs, pieces, elbows = pipeline()
         secs = bog.build_sections(runs, pieces, elbows, bog.fitting_boxes(GEOMETRY, BBOX), LABELS, order="trai-phai")

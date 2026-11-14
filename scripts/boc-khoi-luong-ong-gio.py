@@ -402,6 +402,20 @@ def build_runs(pieces: list, joints: list, gap: float = 80, joint_gap: float = 3
     return runs
 
 
+def mark_flex(runs: list, short: float = 200, radius: float = 400, crowd: int = 2) -> int:
+    """Ống mềm (flex) vẽ bằng chuỗi nét gấp nếp ngắn: mỗi cặp nét thành một 'tuyến' dài vài chục mm. Tuyến ngắn
+    hơn `short` mà quanh nó (≤ `radius`) còn ít nhất `crowd` tuyến ngắn khác → ống mềm, không tính đốt."""
+    tiny = [r for r in runs if r["t1"] - r["t0"] < short]
+    mids = {id(r): point(r["u"], (r["t0"] + r["t1"]) / 2, r["off"]) for r in tiny}
+    n = 0
+    for r in tiny:
+        x, y = mids[id(r)]
+        if sum(1 for o in tiny if o is not r and math.hypot(mids[id(o)][0] - x, mids[id(o)][1] - y) <= radius) >= crowd:
+            r["flex"] = True
+            n += 1
+    return n
+
+
 def joint_by_size(w: int, h: int) -> str:
     kind = JOINT_TABLE[0][1]
     for edge, k in JOINT_TABLE:
@@ -467,7 +481,7 @@ def split_runs(runs: list, joints: list, boxes: list = ()) -> list:
     - chiều dài làm tròn 'le7'; từ L max − 10 tới L max + LEN_TOL tính bằng L max (đốt chuẩn)."""
     out = []
     for r in runs:
-        if not r["size"] or r.get("elbow_part"):  # đoạn chéo giữa hai nửa co là cổ co, không phải ống
+        if not r["size"] or r.get("elbow_part") or r.get("flex"):  # cổ co / ống mềm không phải đốt ống
             continue
         if joints:
             cuts = [t for t, _ in _joints_between(joints, r["u"], r["off"], r["w"], r["t0"], r["t1"])
@@ -1144,6 +1158,7 @@ def build_sheets(pieces: list, elbows: list, unsized: list, fittings: collection
              [f"6. Khoảng cuối ở đầu kín (nắp bịt hoặc không nối gì) dài hơn L max, tới {TAP_MAX} (+{LEN_TOL}) mm = box bít đầu (sản xuất riêng, cộng tấm bít R×C), không chia."],
              ["7. Co: block Elbow; hai nửa co 45° nối nhau bằng đoạn chéo ngắn gộp thành một co (đoạn chéo là cổ co, không tính ống); góc theo hướng hai tuyến nối vào, chỉ một tuyến thì theo tên family; R×C và nẹp theo tuyến nối vào; DT = 2(R+C) × R·tan(góc/2)."],
              ["8. Diện tích tôn = 2 × (R + C) / 1000 × chiều dài (m²); hao hụt theo ô S3 trang Tổng hợp."],
+             ["9. Ống mềm vẽ bằng chuỗi nét gấp nếp (nhiều cặp nét < 200 mm sát nhau) không tính thành đốt."],
              [], ["GIỚI HẠN — kỹ sư kiểm trước khi dùng"],
              ["• Không tính ống vẽ bằng polyline/spline/trong block, chi tiết xref ghép, khung ngoài vùng --bbox."],
              ["• Côn, tê, chân rẽ, van chỉ đếm số lượng (trang Phụ kiện); chưa tính m²."],
@@ -1156,7 +1171,7 @@ def build_sheets(pieces: list, elbows: list, unsized: list, fittings: collection
             ("Co", co, [6, 9, 9, 7, 12, 8, 8, 8, 6, 12, 10, 12, 12, 12, 30, 12, 9, 10], {1: BOLD, 3: HEAD, len(co): TOTAL}),
             ("Phụ kiện", fit, [6, 28, 30, 10, 7], {1: BOLD, 3: HEAD, len(fit): TOTAL}),
             ("Chưa xác định", un, [6, 14, 10, 12, 12, 16, 13, 13], {1: BOLD, 3: HEAD, len(un): TOTAL}),
-            ("Ghi chú", notes, [140], {1: BOLD, 11: BOLD})]
+            ("Ghi chú", notes, [140], {1: BOLD, 12: BOLD})]
 
 
 # ── Bridge ───────────────────────────────────────────────────────────────────
@@ -1248,9 +1263,10 @@ def main(argv=None, agent=None) -> int:
     if not joints:
         print("Cảnh báo: không có block mối nối hay nét bích (thiếu --geometry?) — cắt đốt theo khe giữa các mảnh cạnh.", file=sys.stderr)
     runs = build_runs(assign_sizes(pairs, parse_tags(texts, bbox)), joints)
+    flex = mark_flex(runs)
     elbows = find_elbows(boxes, runs)  # trước split_runs: đánh dấu đoạn chéo cổ co để không tính thành ống
     pieces = number_pieces(split_runs(runs, joints, boxes))
-    unsized = [r for r in runs if not r["size"]]
+    unsized = [r for r in runs if not r["size"] and not r.get("flex")]
     fittings = count_fittings(geometry, bbox, args.layer_prefix)
     if not pieces:
         print("Không tìm thấy đoạn ống nào có kích thước — kiểm --bbox và --layer-prefix.", file=sys.stderr)
@@ -1266,7 +1282,8 @@ def main(argv=None, agent=None) -> int:
     print(f"Đã ghi {args.output}: {kinds[STD_LABEL]} đốt chuẩn, {kinds[FILL_LABEL]} đoạn bù, {kinds[BOX_LABEL]} box bít đầu "
           f"trên {len({id(p['run']) for p in pieces})} tuyến ({length:.2f} m ống), {len(elbows)} co, {area:.2f} m² tôn "
           f"(+{args.waste:.0%}: {area * (1 + args.waste):.2f} m²), {sum(fittings.values())} phụ kiện, "
-          f"{len(unsized)} tuyến chưa xác định ({sum(r['t1'] - r['t0'] for r in unsized) / 1000:.2f} m).")
+          f"{len(unsized)} tuyến chưa xác định ({sum(r['t1'] - r['t0'] for r in unsized) / 1000:.2f} m), "
+          f"bỏ {flex} mảnh ống mềm.")
     if args.lsp:
         n_txt, n_dim = write_lsp(Path(args.lsp), sections, args.text_height)
         print(f"Đã ghi {args.lsp}: {n_txt} số TT, {n_dim} DIM — APPLOAD rồi gõ DHCB_KL_GHI (xoá: DHCB_KL_XOA).")
